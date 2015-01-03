@@ -52,6 +52,7 @@ NMP = r'\x01\*(\w*)\:\x02(.*)'
 # conversions
 def str2bool(s): return bool(int(s))
 def str2ints(s): return [int(x) for x in s.split(',')]
+def str2float(s): return None if s == 'nan' else float(s)
 
 def tokenize(f):
         """ parses string f into list of tokens """
@@ -161,23 +162,20 @@ FRAME_RID       = 1 # mac address of collecting radio
 FRAME_FRAME     = 2 # the frame 
 
 #### GPS ####
-GPS_FIELDS = ['ts','id','fix','coord','exp','epy','alt','epv','dir','epd',
-              'spd','xdop','ydop','pdop']
-GPS_WFIELDS = [('ts',str),('id',str),('fix',int),('coord',str),('epx',float),
-               ('epy',float),('alt',float),('epv',float),('dir',float),
-               ('epd',float),('spd',float),('xdop',float),('ydop',float),
-               ('pdop',float)]
+GPS_FIELDS = ['ts','id','fix','coord','alt','dir',
+              'spd','exp','epy','xdop','ydop','pdop']
+GPS_WFIELDS = [('ts',str),('id',str),('fix',int),('coord',str),('alt',str2float),
+               ('dir',str2float),('spd',str2float),('epx',float),('epy',float),
+               ('xdop',float),('ydop',float),('pdop',float)]
 GPS_TIMESTAMP =  0 # timestamp of geolocation
 GPS_ID        =  1 # id of device collecting this
-GPS_FIX       =  1 # 'quality' of the fix, -1 = fixed
-GPS_COORD     =  2 # MGRS grid coordinate
-GPS_EPX       =  3 # error in latitude
-GPS_EPY       =  4 # error in longitude
-GPS_ALT       =  5 # altitude
-GPS_EPV       =  6 # error in altitude
-GPS_DIR       =  7 # heading/direction
-GPS_EPD       =  8 # error in heading
-GPS_SPD       =  9 # speed
-GPS_XDOP      = 10 # cross-track dilution of precision
-GPS_YDOP      = 11 # cross-track dilution of precision
-GPS_PDOP      = 12 # positon dilution of precision
+GPS_FIX       =  2 # 'quality' of the fix, -1 = fixed
+GPS_COORD     =  3 # MGRS grid coordinate
+GPS_ALT       =  4 # altitude
+GPS_DIR       =  5 # heading/direction
+GPS_SPD       =  6 # speed
+GPS_EPX       =  7 # error in latitude
+GPS_EPY       =  8 # error in longitude
+GPS_XDOP      =  9 # cross-track dilution of precision
+GPS_YDOP      = 10 # cross-track dilution of precision
+GPS_PDOP      = 11 # positon dilution of precision

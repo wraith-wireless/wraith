@@ -106,18 +106,9 @@ class GPSPoller(threading.Thread):
                     geo['fix'] = rpt['mode']
                     geo['lat'] = (rpt['lat'],rpt['epy'])
                     geo['lon'] = (rpt['lon'],rpt['epx'])
-                    if rpt.has_key('alt'):
-                        geo['alt'] = (rpt['alt'],rpt['epv'])
-                    else:
-                        geo['alt'] = (None,None)
-                    if rpt.has_key('track'):
-                        geo['dir'] = (rpt['track'],rpt['epd'])
-                    else:
-                        geo['dir'] = (None,None)
-                    if rpt.has_key('speed'):
-                        geo['spd'] = rpt['speed']
-                    else:
-                        geo['spd'] = None
+                    geo['alt'] = rpt['alt'] if 'alt' in rpt else float("nan")
+                    geo['dir'] = rpt['track'] if 'track' in rpt else float("nan")
+                    geo['spd'] = rpt['spd'] if 'spd' in rpt else float("nan")
                     geo['dop'] = {'xdop':self._gpsd.xdop,
                                   'ydop':self._gpsd.ydop,
                                   'pdop':self._gpsd.pdop}
@@ -126,9 +117,9 @@ class GPSPoller(threading.Thread):
                     if rpt['epy'] <= self._qcy and rpt['epx'] <= self._qcx:
                         self._eQ.put(('!GEO!',time.time(),geo))
                     break
-                except KeyError: # not all values present
+                except KeyError as e: # not all values present
                     pass
-                except AttributeError: # not all dop values present
+                except AttributeError as e: # not all dop values present
                     pass
             time.sleep(self._poll)
 
@@ -306,9 +297,9 @@ class RTO(mp.Process):
             send = "\x01*%s:\x02" % t
             if t == 'DEVICE': send += self._craftdevice(ts,d)
             elif t == 'RADIO': send += self._craftradio(ts,d)
-            elif t == 'GPSD': send += self._craftgpsd(ts,d)
+            elif t == 'GPSD': send += self._craftfltd(ts,d)
             elif t == 'FRAME': send += self._craftframe(ts,d)
-            elif t == 'GPS': send += self._craftgps(ts,d,self._mgrs)
+            elif t == 'GPS': send += self._craftflt(ts,d,self._mgrs)
             elif t == 'RADIO_EVENT': send += self._craftradioevent(ts,d)
             send += "\x03\x12\x15\04"
             if not self._nidus.send(send): return "Nidus socket closed unexpectantly"
@@ -337,8 +328,8 @@ class RTO(mp.Process):
                                                     'id':gpsid,
                                                     'lat':(self._conf['lat'],0.0),
                                                     'lon':(self._conf['lon'],0.0),
-                                                    'alt':(self._conf['alt'],0.0),
-                                                    'dir':(self._conf['dir'],0.0),
+                                                    'alt':self._conf['alt'],
+                                                    'dir':self._conf['dir'],
                                                     'spd':0.0,
                                                     'dop':{'xdop':1,
                                                            'ydop':1,
@@ -383,15 +374,15 @@ class RTO(mp.Process):
         return "%s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E" % (ts,d[0],d[1])
 
     @staticmethod
-    def _craftgpsd(ts,d):
+    def _craftfltd(ts,d):
         """ create body of gps device message """
         return "%s %s %s %d \x1EFB\x1F%s\x1FFE\x1E %d \x1EFB\x1F%s\x1FFE\x1E" %\
                (ts,d['id'],d['version'],d['flags'],d['driver'],d['bps'],d['path'])
 
     @staticmethod
-    def _craftgps(ts,d,m):
+    def _craftflt(ts,d,m):
         """ create body of the gps location message """
-        return "%s %s %d %s %.3f %.3f %.3f %.3f %.3f %.3f %.2f %.2f %.2f %.2f" %\
-               (ts,d['id'],d['fix'],m.toMGRS(d['lat'][0],d['lon'][0]),d['lat'][1],
-                d['lon'][1],d['alt'][0],d['alt'][1],d['dir'][0],d['dir'][1],
-                d['spd'],d['dop']['xdop'],d['dop']['ydop'],d['dop']['pdop'])
+        return "%s %s %d %s %.2f %.2f %.2f %.3f %.3f %.3f %.3f %.3f" %\
+               (ts,d['id'],d['fix'],m.toMGRS(d['lat'][0],d['lon'][0]),d['alt'],
+                d['dir'],d['spd'],d['lat'][1],d['lon'][1],d['dop']['xdop'],
+                d['dop']['ydop'],d['dop']['pdop'])

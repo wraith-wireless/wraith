@@ -94,8 +94,6 @@ CREATE TABLE geo(
    pdop REAL DEFAULT 0,         -- position (3D) dilution of precision
    epx REAL DEFAULT 0,          -- longitude uncertainty
    epy REAL DEFAULT 0,          -- latitude uncertainty
-   epv REAL,                    -- vertical uncertainty
-   epd REAL,                    -- direction uncertainty
    CONSTRAINT ch_spd CHECK (spd >= 0),
    CONSTRAINT ch_dir CHECK(dir >=0 and dir <= 360),
    CONSTRAINT ch_fix CHECK (fix >= -1 and fix <= 3),
@@ -104,8 +102,6 @@ CREATE TABLE geo(
    CONSTRAINT ch_pdop CHECK (pdop > 0),
    CONSTRAINT ch_epx CHECK (epx >= 0),
    CONSTRAINT ch_epy CHECK (epy >= 0),
-   CONSTRAINT ch_epv CHECK (epv >= 0),
-   CONSTRAINT ch_epd CHECK (epd >= 0),
    FOREIGN KEY (gid) REFERENCES gpsd(id),
    PRIMARY KEY(gid,ts)
 );

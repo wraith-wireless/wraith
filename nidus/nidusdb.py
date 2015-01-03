@@ -327,16 +327,16 @@ class NidusDB(object):
             ds = nmp.data2dict(nmp.tokenize(f),"GPS")
 
             # submit to db
-            sql = "insert into geo values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);"
+            sql = "insert into geo values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);"
             self._curs.execute(sql,(ds['id'],ds['ts'],ds['coord'],ds['alt'],
                                     ds['spd'],ds['dir'],ds['fix'],ds['xdop'],
-                                    ds['ydop'],ds['pdop'],ds['epx'],ds['epy'],
-                                    ds['epv'],ds['epd']))
+                                    ds['ydop'],ds['pdop'],ds['epx'],ds['epy']))
+        except nmp.NMPException as e:
+            print f
+            raise NidusDBSubmitParseException(e)
         except psql.Error as e:
             self._conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
-        except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
         else:
             self._conn.commit()
 
