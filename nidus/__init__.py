@@ -4,13 +4,6 @@
 
 Uses Python SocketServer with Threaded mixin to get & store Wasp collected data
 
-Requires:
-  linux
-  python 2.7
-  postgresql 9.x (tested on 9.3.5)
-  pyscopg 2.5.3
-  mgrs 1.1
-
 nidus 0.0.3
  desc: implements datastorage writes to db. ATT it is assumed that nidus will be/has
   the potential to be a bottleneck requiring massive amounts of data to be received
@@ -26,17 +19,14 @@ nidus 0.0.3
     o frames are parsed and portions are stored in the data store
 
 TODO:
-  1) return messages? i.e instead of closing pipe for no running server etc, send
-     to wasp first
-  2) need constraints either through postgresql (preferred) or nidusdb - one
-     example for each geo inserted verify first that the ts is within the period
-     defined for the corresponding sensor
-  3) Optimize datastore storage and retrieval
-  4) identify postgresql server not running prior to request handler
-  7) encrypted socket connection from wasp to nidus?
-  8) secured (hashed) username/password from to datastore
-  9) multithread/process the submitframe portion of nidusdb
- 10) how/when to partition table to offload older records
+1) Should we return messages? i.e instead of just closing pipe for no running server etc
+2) need constraints either through postgresql (preferred) or nidusdb - one example for each geo inserted verify first that the ts is within the period defined for the corresponding sensor
+3) Optimize datastore storage and retrieval
+4) identify postgresql server not running prior to request handler
+7) encrypted socket connection from wasp to nidus?
+8) secured (hashed) username/password from to datastore
+9) multithread/process the submitframe portion of nidusdb
+10) how/when to partition table to offload older records
 """
 __name__ = 'datastore'
 __license__ = 'GPL'

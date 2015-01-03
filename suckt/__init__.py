@@ -2,12 +2,13 @@
 
 """ suckt: Small Unit Capture/Kill Team (Wraith Sensor)
 
-A suckt consists of an optional collection radio (i.e. spotter), a mandatory
-reconnaissance radio (i.e. shooter)  and an RTO which relays collected data to
-the data storage system (i.e. HQ). The suckt collects data in the form of raw
-802.11 packets with both the reconnaissance and collection radios and forwards
-that date along with any geolocational data (if a gps device is present) to higher.
-The reconnaissance radio will also partake in assaults in directed to.
+Suckt is a 802.11 sensor consisting of an optional collection radio (i.e.
+spotter), a mandatory reconnaissance radio (i.e. shooter) and an RTO which relays
+collected data to Nidus, the data storage system (i.e. HQ). Suckt collects data
+in the form of raw 802.11 packets with the reconnaissance (and collection if
+present) radios, forwarding that date along with any geolocational data (if a
+gps device is present) to higher. The reconnaissance radio will also partake in
+assaults in directed to.
 
 REVISIONS:
 suckt 0.1.4

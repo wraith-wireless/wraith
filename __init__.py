@@ -3,8 +3,11 @@
 Wireless assault, reconnaissance, collection and exploitation toolkit.
 
 Requires:
+ linux (preferred 3.x kernel)
  Python 2.7
  iw 3.17
+ postgresql 9.x (tested on 9.3.5)
+ pyscopg 2.5.3
  mgrs 1.1
 
 wraith package hierarchy
@@ -12,7 +15,8 @@ wraith/                Top-level package
     __init__.py          this file - initialize the top-level (includes misc functions)
     wraith-rt.py         the gui
     LICENSE              software license
-    README.txt           configuration/setup details
+    README.txt           details
+    CONFIGURE.txt        setup details
     widgets              gui subpackage
         icons            icons folder
         __init__.py      initialize widgets subpackage
@@ -22,18 +26,20 @@ wraith/                Top-level package
         bits.py          bitmask related funcs, bit extraction functions
         iwtools.py       iwconfig, ifconfig interface and nic utilities
         iw.py            iw 3.17 interface
-        radiotap.py      radiotap frames parsing
-        mpdu.py          IEEE 802.11 MAC (MPDU) frames parsing
+        radiotap.py      radiotap parsing
+        mpdu.py          IEEE 802.11 MAC (MPDU) parsing
         infoelement.py   contstants for mgmt frames
         channels.py      802.11 channel, freq utilities
         mcs.py           mcs index functions
+        oui.py           oui/manuf related functions
     suckt                subpackage for wraith sensor
         __init__.py      initialize suckt package
         suckt.conf       configuration file for wasp
         suckt.log.conf   configuration file for wasp logging
         suckt.py         primary module
+        internal.py      defines the Report class
         rdoctl.py        radio controler with tuner, sniffer
-        collate.py       data collation and forwarding
+        rto.py           data collation and forwarding
         sucktd           sucktd daemon
     nidus                subpackage for datamanager
         __init__.py      initialize nidus package
@@ -44,10 +50,7 @@ wraith/                Top-level package
         nmp.py           nidus protocol definition
         nidusdb.py       interface to storage system
         simplepcap.py    pcap writer
-        nidus.sql        sql table definition
-
-TODO:
-      2) look into dis package
+        nidus.sql        sql tables definition
 """
 __name__ = 'wraith'
 __license__ = 'GPL'

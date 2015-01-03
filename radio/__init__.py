@@ -24,13 +24,13 @@ radio 0.0.4
   - supports toplevel parsing of all frames (excluding control wrapper)
 
 TODO:
- 1) support AVS, Prism headers ?
- 2) radiotap: handle data pad
+ 1) Should we add support for AVS, Prism headers ?
+ 2) radiotap: ensure data pad is handled
  3) mpdu: fully parse
     o control wrapper
     o fully parse qos
- 4) figure out what to do about +htc
- 5) look into parsing
+    o +htc
+ 4) look into parsing
    0 RSN Std 8.4.2.27
    o 802.11u
 """
