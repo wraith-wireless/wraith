@@ -179,57 +179,58 @@ class RTO(mp.Process):
         # radio map: maps callsigns to mac addr
         rmap = {}
 
-        # send sensor up notification and gps if fixed
+        # send sensor up notification and gps
         ret = self._send('DEVICE',time.time(),['sensor',socket.gethostname(),1])
         if ret: self._conn.send(('err','RTO','Nidus',ret))
-
         gpsid = self._setgpsd()
 
         # execution loop
-        while True:
+        tkn = None
+        while tkn != '!STOP!':
+            # 1. anything on suckt connection?
+            if self._conn.poll():
+                tkn = self._conn.recv()
+                if tkn != '!STOP!':
+                    self._conn.send(('warn','RTO','Token',"unknown %s" % tkn))
+                else:
+                    continue
+
+            # 2. gps device/frontline trace?
+            if self._flt:
+                try:
+                    (t,ts,msg) = self._q.get_nowait()
+                except Empty: # no new messages
+                    pass
+                else:
+                    if t == '!DEV!': # device up message
+                        gpsid = msg['id']
+                        self._conn.send(('info','RTO','GPSD',"%s initiated" % gpsid))
+                        ret = self._send('GPSD',ts,msg)
+                        if ret: self._conn.send(('err','RTO','Nidus',ret))
+                    elif t == '!GEO!': # frontline trace
+                        if not gpsid:
+                            self._conn.send(('warn','RTO','GPSD','out of order'))
+                        ret = self._send('GPS',ts,msg)
+                        if ret: self._conn.send(('err','RTO','Nidus',ret))
+
+            # 3. queued data from radios (possibly suckt)
             try:
-                # anything on suckt connection?
-                if self._conn.poll():
-                    tkn = self._conn.recv()
-                    if tkn == '!STOP!':
-                        break
-
-                # gps device or frontline trace?
-                if self._flt:
-                    try:
-                        (t,ts,msg) = self._q.get_nowait()
-                        if t == '!DEV!':
-                            # device message (should only get once)
-                            ret = self._send('GPSD',ts,msg)
-                            gpsid = msg['id']
-                            if ret: self._conn.send(('err','RTO','Nidus',ret))
-                        elif t == '!GEO!':
-                            # frontline trace
-                            ret = self._send('GPS',ts,msg)
-                            if ret: self._conn.send(('err','RTO','Nidus',ret))
-                    except Empty:
-                        # no new messages
-                        pass
-
-                # queued data from radios (possibly suckt)
-                rpt = self._comms.get()
+                rpt = self._comms.get() # blocking call
                 (cs,ts,ev,msg,_) = rpt.report
 
-                if cs == 'suckt':
-                    # for now we do nothing - this will allows us to break
-                    # a deadlock waiting on the internal comms for data
-                    continue
-                elif ev == '!UP!': # should be the 1st message we get from radio(s)
+                # suckt pushes a token onto the internal comms allows us to
+                # break the blocking call and check the token
+                if cs == 'suckt': continue
+
+                if ev == '!UP!': # should be the 1st message we get from radio(s)
                     # NOTE: sending the radio, nidus will take care of setting
                     # the radio device to up
                     rmap[cs] = msg['mac']
+                    self._conn.send(('info','RTO','Radio',"%s initiated" % cs))
                     ret = self._send('RADIO',ts,msg)
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
-                elif ev == '!FRAME!': # pass the frame on
-                    ret = self._send('FRAME',ts,[rmap[cs],msg])
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
-                elif ev == '!DOWN!':
-                    pass
+                #elif ev == '!DOWN!':
+                #    pass
                 elif ev == '!FAIL!':
                     # send fail to nidus, notify suckt & delete cs from rmap
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'fail',msg])
@@ -240,17 +241,21 @@ class RTO(mp.Process):
                     sl = ",".join(["%d:%s" % (c,w) for (c,w) in msg])
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'scan',sl])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
-                elif ev == '!LISTEN!':
-                    pass
+                #elif ev == '!LISTEN!':
+                #    pass
                 elif ev == '!HOLD!':
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'hold',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
-                elif ev == '!PAUSE!':
-                    pass
+                #elif ev == '!PAUSE!':
+                #    pass
+                elif ev == '!FRAME!': # pass the frame on
+                    ret = self._send('FRAME',ts,[rmap[cs],msg])
+                    if ret: self._conn.send(('err','RTO','Nidus',ret))
                 else: # unidentified event type, notify leader
-                    self._conn.send(('warn','RTO','Radio',"unidentified event %s" % ev))
-            except KeyError as e: # a radio sent a message out of order
-                self._conn.send(('err','RTO','Radio','s' % e))
+                    self._conn.send(('warn','RTO','Radio',
+                                     "unidentified event %s" % ev))
+            except KeyError as e: # a radio sent a message without initiating
+                self._conn.send(('err','RTO','Radio %s' % e,"sent data w/o initiating"))
             except Exception as e: # handle catchall error
                 self._conn.send(('err','RTO','Unknown',e))
 
