@@ -128,12 +128,12 @@ class NidusDB(object):
                 self._setradio(ds['ts'],ds['id'],ds['state'])
             elif ds['type'] == 'gpsd':
                 self._setgpsd(ds['ts'],ds['id'],ds['state'])
+        except nmp.NMPException as e:
+            raise NidusDBSubmitParseException(e)
         except psql.Error as e:
             # rollback so postgresql is not left in error state
             self._conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
-        except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
         else:
             self._conn.commit()
 
@@ -211,12 +211,12 @@ class NidusDB(object):
                   values (%s,%s,tstzrange(%s,NULL,'[]'));
                 """
             self._curs.execute(sql,(self._sid,ds['id'],ds['ts']))
+        except nmp.NMPException as e:
+            raise NidusDBSubmitParseException(e)
         except psql.Error as e:
             # rollback so postgresql is not left in error state
             self._conn.rollback() 
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
-        except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
         else:
             self._conn.commit()
         
@@ -279,11 +279,11 @@ class NidusDB(object):
             
             sql = "insert into radio_event values (%s,%s,%s,%s);"
             self._curs.execute(sql,(ds['mac'],ds['event'],ds['params'],ds['ts']))
+        except nmp.NMPException as e:
+            raise NidusDBSubmitParseException(e)
         except psql.Error as e:
             self._conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
-        except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
         else:
             self._conn.commit()
 
@@ -306,7 +306,6 @@ class NidusDB(object):
             dR = rtap.parse(frame)
             dM = mpdu.parse(frame[dR['sz']:], rtap.flags_get(dR['flags'],'fcs'))
         except (rtap.RadiotapException,mpdu.MPDUException):
-            # TODO: log reason for failure
             dR = {}
             dM = {}
 
@@ -357,6 +356,8 @@ class NidusDB(object):
                    where session_id = %s;
                   """
             self._curs.execute(sql,(ts,self._sid))
+
+    #### NOTE: for all _set* functions commit or rollback is exec'd from caller
 
     def _setradio(self,ts,did,state):
         """ set the state of a radio """
@@ -436,7 +437,6 @@ class NidusDB(object):
 
             # insert signal record
             # determine the standard, rate and mcs fields
-            # TODO: is b,g differentiation enough, notify if vht found
             try:
                 std = 'n'
                 mcsflags = rtap.mcsflags_params(dR['mcs'][0],dR['mcs'][1])
