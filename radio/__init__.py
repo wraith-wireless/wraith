@@ -16,8 +16,8 @@ Not Supported
 REVISIONS:
 radio 0.0.4
  desc: provides tools to manipulate wireless nics and parse raw wireless traffic
- includes: bits 0.0.1 channels 0.0.1, mcs 0.0.1, iw 0.1.0 iwtools 0.0.11, radiotap 0.0.3,
-  mpdu 0.0.12, infoelement 0.0.1
+ includes: bits 0.0.4 channels 0.0.1, mcs 0.0.1, iw 0.1.0 iwtools 0.0.11,
+ radiotap 0.0.4, mpdu 0.0.13, infoelement 0.0.1, oui 0.0.1
  changes:
   - adding support for iw 3.15+
     o no longer supporting versions less than 15

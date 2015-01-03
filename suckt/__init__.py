@@ -24,7 +24,7 @@ suckt 0.1.4
 suckt 0.1.5
  desc: utilizes a new internal communication SOP to streamline and simplify
   interprocess communications
- includes: suckt 0.0.10 internal 0.0.1 rto 0.0.9 (previously collator) rdoctl 0.0.4
+ includes: suckt 0.0.10 internal 0.0.1 rto 0.0.10 (previously collator) rdoctl 0.0.4
   suckt.conf suckt.log.conf sucktd
  changes:
   - streamlined inter-process communication methods/objects
