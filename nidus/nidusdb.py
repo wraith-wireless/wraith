@@ -429,8 +429,8 @@ class NidusDB(object):
                 self._curs.execute(sql,(fid,dR['a-mpdu'][0],dR['a-mpdu'][1]))
 
             # insert the source record
-            ant = dR['antenna'] if dR.has_key('antenna') else 0
-            pwr = dR['antsignal'] if dR.has_key('antsignal') else 0
+            ant = dR['antenna'] if 'antenna' in dR else 0
+            pwr = dR['antsignal'] if 'antsignal' in dR else 0
             sql = "insert into source (fid,src,antenna,rfpwr) values (%s,%s,%s,%s);"
             self._curs.execute(sql,(fid,rdo,ant,pwr))
 
@@ -445,13 +445,13 @@ class NidusDB(object):
                 elif mcsflags['bw'] == rtap.MCS_BW_20L: bw = '20L'
                 else: bw = '20U'
                 width = 40 if bw == '40' else 20
-                gi = 1 if mcsflags.has_key('gi') and mcsflags['gi'] > 0 else 0
-                ht = 1 if mcsflags.has_key('ht') and mcsflags['ht'] > 0 else 0
+                gi = 1 if 'gi' in mcsflags and mcsflags['gi'] > 0 else 0
+                ht = 1 if 'ht' in mcsflags and mcsflags['ht'] > 0 else 0
                 index = dR['mcs'][2]
                 rate = mcs.mcs_rate(dR['mcs'][2],width,gi)
                 hasMCS = 1
             except:
-                if channels.ISM_24_F2C.has_key(dR['channel'][0]):
+                if dR['channel'][0] in channels.ISM_24_F2C:
                     if rtap.chflags_get(dR['channel'][1],'cck'):
                         std = 'b'
                     else:
@@ -490,11 +490,11 @@ class NidusDB(object):
                                         dM['framectrl']['flags'],
                                         dM['duration'],
                                         dM['addr1'],
-                                        dM['addr2'] if dM.has_key('addr2') else None,
-                                        dM['addr3'] if dM.has_key('addr3') else None,
-                                        dM['seqctrl']['fragno'] if dM.has_key('seqctrl') else None,
-                                        dM['seqctrl']['seqno'] if dM.has_key('seqctrl') else None,
-                                        dM['addr4'] if dM.has_key('addr4') else None))
+                                        dM['addr2'] if 'addr2' in dM else None,
+                                        dM['addr3'] if 'addr3' in dM else None,
+                                        dM['seqctrl']['fragno'] if 'seqctrl' in dM else None,
+                                        dM['seqctrl']['seqno'] if 'seqctrl' in dM else None,
+                                        dM['addr4'] if 'addr4' in dM else None))
         except psql.Error as e:
             self._conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
@@ -516,23 +516,23 @@ class NidusDB(object):
 
         # for addr2 thru addr4, if its present and not already being checked,
         # add to sql query
-        if m.has_key('addr2'):
+        if 'addr2' in m:
             a = m['addr2'].lower()
-            if addrs.has_key(a):
+            if a in addrs:
                 addrs[a]['loc'].append(2)
             else:
                 addrs[a] = {'loc':[2],'id':None}
                 sql += " or mac=%s"
-            if m.has_key('addr3'):
+            if 'addr3' in m:
                 a = m['addr3'].lower()
-                if addrs.has_key(a):
+                if a in addrs:
                     addrs[a]['loc'].append(3)
                 else:
                     addrs[a] = {'loc':[3],'id':None}
                     sql += " or mac=%s"
-                if m.has_key('addr4'):
+                if 'addr4' in m:
                     a = m['addr4'].lower()
-                    if addrs.has_key(a):
+                    if a in addrs:
                         addrs[a]['loc'].append(4)
                     else:
                         addrs[a] = {'loc':[4],'id':None}
@@ -565,7 +565,7 @@ class NidusDB(object):
                 mode = 'rx'
                 if 2 in addrs[addr]['loc']: mode = 'tx'
 
-                if self._stas.has_key(addr):
+                if addr in self._stas:
                     # update timestamps
                     if mode == 'tx':
                         self._stas[addr]['fh'] = ts

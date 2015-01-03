@@ -196,13 +196,13 @@ def framectrl(f):
     # return if packet is smaller the minimum frame size or the frame type
     # does not exist
     if len(f) < _MIN_FRAME_SZ_: raise MPDUException("invalid frame size")
-    if ST_MGMT.has_key(f[0]):
+    if f[0] in ST_MGMT:
         ft = FT_MGMT
         st = ST_MGMT[f[0]]
-    elif ST_CTRL.has_key(f[0]):
+    elif f[0] in ST_CTRL:
         ft = FT_CTRL
         st = ST_CTRL[f[0]]
-    elif ST_DATA.has_key(f[0]):
+    elif f[0] in ST_DATA:
         ft = FT_DATA
         st = ST_DATA[f[0]]
     else:

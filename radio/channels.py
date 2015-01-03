@@ -43,12 +43,12 @@ def freqs():
 
 def c2f(c): 
     """ return frequency in MHZ given channel number """
-    if ISM_24_C2F.has_key(c): return ISM_24_C2F[c]
-    if UNII_5_C2F.has_key(c): return UNII_5_C2F[c]
+    if c in ISM_24_C2F: return ISM_24_C2F[c]
+    if c in UNII_5_C2F: return UNII_5_C2F[c]
     return None
 
 def f2c(f): 
     """ return channel number given frequency in MHZ """
-    if ISM_24_F2C.has_key(f): return ISM_24_F2C[f]
-    if UNII_5_F2C.has_key(f): return UNII_5_F2C[f]
+    if f in ISM_24_F2C: return ISM_24_F2C[f]
+    if f in UNII_5_F2C: return UNII_5_F2C[f]
     return None

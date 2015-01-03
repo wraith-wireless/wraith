@@ -1045,7 +1045,7 @@ class CountByPanel(SharedPollingPanel):
         d = self.data 
         for key in keys:
             value = self._chief.bin[self._dtype][key][option]
-            if d.has_key(value):
+            if value in d:
                 d[value]['cnt'] += 1
                 d[value]['ids'].append(key)
             else:
@@ -1053,7 +1053,7 @@ class CountByPanel(SharedPollingPanel):
         
         # update the data dictionary and the list
         for key in d:
-            if self.data.has_key(key):
+            if key in self.data:
                 self.data[key] = d[key]
                 self.writeupdate(key)
             else:
@@ -1071,7 +1071,7 @@ class CountByPanel(SharedPollingPanel):
         for key in self._chief.bin[self._dtype]:
             if not key in self._chief.hidden[self._dtype]:
                 value = self._chief.bin[self._dtype][key][option]
-                if d.has_key(value):
+                if value in d:
                     d[value]['cnt'] += 1
                     d[value]['ids'].append(key)
                 else:
@@ -1079,7 +1079,7 @@ class CountByPanel(SharedPollingPanel):
             
         # write tallied data
         for key in d:
-            if self.data.has_key(key):
+            if key in self.data:
                 self.data[key] = d[key]
                 self.writeupdate(key)
             else:
@@ -1091,7 +1091,7 @@ class CountByPanel(SharedPollingPanel):
         option = self.option2field(self.ovar.get())
         if not key in self._chief.hidden[self._dtype]:
             value = self._chief.bin[self._dtype][key][option]
-            if self.data.has_key(value):
+            if value in self.data:
                 self.data[value]['cnt'] += 1
                 self.data[value]['ids'].append(key)
                 self.writeupdate(value)
@@ -1186,7 +1186,7 @@ class CountByPanelComplex(CountByPanel):
         for key in self.keys():
             if not key in self.hiddenkeys():
                 value = self.value(key,option)
-                if d.has_key(value):
+                if value in d:
                     d[value]['cnt'] += 1
                     d[value]['ids'].append(key)
                 else:
@@ -1194,7 +1194,7 @@ class CountByPanelComplex(CountByPanel):
         
         # write the tallied data
         for key in d:
-            if self.data.has_key(key):
+            if key in self.data:
                 self.data[key] = d[key]
                 self.writeupdate(key)
             else:
@@ -1220,7 +1220,7 @@ class CountByPanelComplex(CountByPanel):
         option = self.option2field(self.ovar.get())
         if not key in self.hiddenkeys():
             value = self.value(key,option)
-            if self.data.has_key(value):
+            if value in self.data:
                 self.data[value]['cnt'] += 1
                 self.data[value]['ids'].append(key)
                 self.writeupdate(value)
@@ -1240,7 +1240,7 @@ class CountByPanelComplex(CountByPanel):
         for key in keys:
             #value = self._chief.bin[self._dtype][key][option]
             value = self.value(key,option)
-            if d.has_key(value):
+            if value in d:
                 d[value]['cnt'] += 1
                 d[value]['ids'].append(key)
             else:
@@ -1248,7 +1248,7 @@ class CountByPanelComplex(CountByPanel):
         
         # update the data dictionary and the list
         for key in d:
-            if self.data.has_key(key):
+            if key in self.data:
                 self.data[key] = d[key]
                 self.writeupdate(key)
             else:
@@ -1449,7 +1449,7 @@ class MasterPanel(Panel):
                 c = self._panels[panel]
                 c.pnl.update_idletasks()
                 if c.desc != 'log':
-                    if ts.has_key(c.desc):
+                    if c.desc in ts:
                         ts[c.desc].append(c.tk.winfo_geometry())
                     else:
                         ts[c.desc] = [c.tk.winfo_geometry()]
@@ -1509,7 +1509,7 @@ class MasterPanel(Panel):
          override panelclose, we need to remove all notification requests from 
          the panel before deleting it
         """
-        if self._panels.has_key(panel):
+        if panel in self._panels:
             self.audit_deregister(panel)
             self.deletepanel(panel)
         else:
