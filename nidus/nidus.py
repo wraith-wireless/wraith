@@ -178,7 +178,7 @@ class Nidus(object):
         signal.signal(signal.SIGINT,self.stop)    # CTRL-C stop
         signal.signal(signal.SIGTERM,self.stop)   # stop
         
-        self.server = NidusServer(('127.0.0.1',2526),NidusRequestHandler)
+        self.server = NidusServer(('127.0.0.1',2527),NidusRequestHandler)
         self.server.start()
 
     # noinspection PyUnusedLocal
@@ -188,7 +188,6 @@ class Nidus(object):
         self.server.quit = True
 
 if __name__ == 'nidus':
-    bs = None
     try:
         # command line parsing
         opts = ap.ArgumentParser(description="Nidus %s (C) %s %s" % (nidus.__version__,

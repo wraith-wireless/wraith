@@ -41,7 +41,7 @@ suckt 0.1.5
 
 TODO:
      ** After testing remove set raw capability from python **
-      3) implement adapt scan pattern
+      3) implement adaptive scan pattern
      26) pf identify/handle gps device failing or being removed
      31) add interface (tcpserver? or socket?) to allow finer control of pausing,
          holding, listening

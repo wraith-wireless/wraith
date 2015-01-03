@@ -294,7 +294,8 @@ class Suckt(object):
 
         return r
 
-    def _parsechlist(self,pattern,ptype):
+    @staticmethod
+    def _parsechlist(pattern,ptype):
         """
          parse channel list pattern of type ptype = oneof {'scan','pass' and return
          a list of tuples (ch,chwidth)
@@ -342,7 +343,7 @@ class Suckt(object):
         else:
             return [(ch,chw) for chw in ws for ch in chs]
 
-        return ([],[])
+        return [],[]
 
 if __name__ == 'suckt':
     try:
