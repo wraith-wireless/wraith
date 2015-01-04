@@ -144,6 +144,7 @@ class SSEThread(threading.Thread):
         raise NotImplementedError
 
 class SaveThread(SSEThread):
+    """ handles saving the frame in tasks queue to file """
     def __init__(self,tasks,path,sz):
         """
          path - directory to store pcaps in
@@ -167,12 +168,117 @@ class SaveThread(SSEThread):
         pktwrite(self._fout,item.ts,item.frame)
 
 class StoreThread(SSEThread):
+    """ stores the frames to in the task queue to the db """
     def __init__(self,tasks):
         SSEThread.__init__(self,tasks,True)
-    def _consume(self,item,conn): pass
+    def _consume(self,item,conn):
+        # get our cursor & extract vars from item
+        curs = conn.cursor()
+        ts = item.ts
+        rdo = item.mac
+        lF = item.length
+        dR = item.l1
+        dM = item.l2
+
+        try:
+            # insert the frame - if invalid stop after insertion and commit it
+            sql = """
+                   insert into frame (ts,bytes,bytesHdr,ampdu,fcs)
+                   values (%s,%s,%s,%s,%s) RETURNING id;
+                  """
+            if not dR['sz']:
+                curs.execute(ts,(lF,0,0,0))
+                conn.commit()
+                return
+
+            # valid header, continue
+            ampdu = int('a-mpdu' in dR['present'])
+            curs.execute(sql,(ts,lF,dR['sz'],ampdu,rtap.flags_get(dR['flags'],'fcs')))
+            fid = curs.fetchone()[0]
+
+            # insert ampdu?
+            if ampdu:
+                sql = "insert into ampdu (fid,refnum,flags) values (%s,%s,%s);"
+                curs.execute(sql,(fid,dR['a-mpdu'][0],dR['a-mpdu'][1]))
+
+            # insert the source record
+            ant = dR['antenna'] if 'antenna' in dR else 0
+            pwr = dR['antsignal'] if 'antsignal' in dR else 0
+            sql = "insert into source (fid,src,antenna,rfpwr) values (%s,%s,%s,%s);"
+            curs.execute(sql,(fid,rdo,ant,pwr))
+
+            # insert signal record
+            # determine the standard, rate and mcs fields # NOTE: we assume that
+            # channels will always be present in radiotap
+            try:
+                std = 'n'
+                mcsflags = rtap.mcsflags_params(dR['mcs'][0],dR['mcs'][1])
+                if mcsflags['bw'] == rtap.MCS_BW_20: bw = '20'
+                elif mcsflags['bw'] == rtap.MCS_BW_40: bw = '40'
+                elif mcsflags['bw'] == rtap.MCS_BW_20L: bw = '20L'
+                else: bw = '20U'
+                width = 40 if bw == '40' else 20
+                gi = 1 if 'gi' in mcsflags and mcsflags['gi'] > 0 else 0
+                ht = 1 if 'ht' in mcsflags and mcsflags['ht'] > 0 else 0
+                index = dR['mcs'][2]
+                rate = mcs.mcs_rate(dR['mcs'][2],width,gi)
+                hasMCS = 1
+            except:
+                if dR['channel'][0] in channels.ISM_24_F2C:
+                    if rtap.chflags_get(dR['channel'][1],'cck'):
+                        std = 'b'
+                    else:
+                        std = 'g'
+                else:
+                    std = 'a'
+                rate = dR['rate'] * 0.5
+                bw = None
+                gi = None
+                ht = None
+                index = None
+                hasMCS = 0
+
+            sql = """
+                   insert into signal (fid,std,rate,channel,chflags,rf,ht,
+                                       mcs_bw,mcs_gi,mcs_ht,mcs_index)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                  """
+            curs.execute(sql,(fid,std,rate,channels.f2c(dR['channel'][0]),
+                            dR['channel'][1],dR['channel'][0],hasMCS,bw,gi,
+                            ht,index))
+
+            # insert traffic
+            if dM:
+                sql = """
+                       insert into traffic (fid,fc_type,fc_subtype,fc_flags,
+                                            duration,addr1,addr2,addr3,
+                                            sc_fragnum,sc_seqnum,addr4)
+                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                      """
+                curs.execute(sql,(fid,
+                                  mpdu.FT_TYPES[dM['framectrl']['type']],
+                                  mpdu.subtypes(dM['framectrl']['type'],
+                                                dM['framectrl']['subtype']),
+                                  dM['framectrl']['flags'],
+                                  dM['duration'],
+                                  dM['addr1'],
+                                  dM['addr2'] if 'addr2' in dM else None,
+                                  dM['addr3'] if 'addr3' in dM else None,
+                                  dM['seqctrl']['fragno'] if 'seqctrl' in dM else None,
+                                  dM['seqctrl']['seqno'] if 'seqctrl' in dM else None,
+                                  dM['addr4'] if 'addr4' in dM else None))
+        except psql.Error as e:
+            conn.rollback()
+            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+        else:
+            conn.commit()
+
+        # close the cursor
+        curs.close()
 
 class ExtractThread(SSEThread):
-    def __init__(self,db,tasks):
+    """  extracts & stores details of nets/stas etc from mpdus in tasks queue """
+    def __init__(self,tasks):
         SSEThread.__init__(self,tasks,True)
     def _consume(self,item,conn): pass
 
@@ -191,9 +297,9 @@ class NidusDB(object):
         self._qSave = {}               # one (or two) queues for each radio(s) saving
         self._tSave = {}               # one (or two) threads for each radio(s) saving
         self._qStore = None            # queue for storage
-        self._tStores = []             # thread(s) for storing
+        self._tStore = []              # thread(s) for storing
         self._qExtract = None          # queue for extraction
-        self._tExtracts = []           # thread(s) for extracting
+        self._tExtract = []            # thread(s) for extracting
 
         # parse the config file (if none set to defaults)
         if cpath:
@@ -252,10 +358,17 @@ class NidusDB(object):
             self._conn.close()
 
         # stop & wait on the sse threads
+        # save
         for thread in self._tSave: # save threads
             self._qSave[thread].put('!STOP!')
             while self._tSave[thread].is_alive():
                 self._tSave[thread].join(0.5)
+
+        # store
+        #for i in xrange(len(self._tStore)):
+        #    self._qStore[self._tStore[i]].put('!STOP!')
+        #    while self._tSave[thread].is_alive():
+        #        self._tSave[thread].join(0.5)
 
     def submitdevice(self,f,ip=None):
         """ submitdevice - submit the string fields to the database """
@@ -467,7 +580,7 @@ class NidusDB(object):
         if self._raw['store']:
             self._qSave[ds['mac']].put(SaveTask(self._sid,ds['ts'],
                                                 ds['mac'],ds['frame']))
-        #self._qStore.put((ds['ts'],ds['mac'],len(ds['frame']),dR,dM))
+        self._qStore.put((ds['ts'],ds['mac'],len(ds['frame']),dR,dM))
         #if dM: self._qExtract((ds['ts'],dM))
         
     def submitgeo(self,f):

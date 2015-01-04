@@ -93,7 +93,7 @@ class Suckt(object):
             self._rr = RadioController(self._ic,conn2,self._conf['recon'])
 
             # collection if present
-            if 'collection' in self._conf:
+            if self._conf['collection']:
                 try:
                     logging.info("Starting Collection Radio")
                     (conn1,conn2) = mp.Pipe()
