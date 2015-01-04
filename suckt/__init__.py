@@ -42,15 +42,16 @@ suckt 0.1.5
 TODO:
      ** After testing remove set raw capability from python **
       3) implement adaptive scan pattern
-     26) pf identify/handle gps device failing or being removed
+     26) gps device
+       o identify/handle device failing or being removed
+       o uniquely identify with a permanent id w/out hardcoding in conf file
      31) add interface (tcpserver? or socket?) to allow finer control of pausing,
          holding, listening
           o better define hold, listen, pause
            - hold stop scanning on current channel
            - listen stop scanning on specified channel
            - pause stop scanning and recording
-     34) uniquely identify a gps device with a permanent id w/out hardcoding
-         in conf file
+     34)
      37) add ability to 'filter' on one network, i.e. bssid or ssid?
      40) look into socket options (and pcapy code) to ensure best performance
 """

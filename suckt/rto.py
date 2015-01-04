@@ -117,9 +117,9 @@ class GPSPoller(threading.Thread):
                     if rpt['epy'] <= self._qcy and rpt['epx'] <= self._qcx:
                         self._eQ.put(('!GEO!',time.time(),geo))
                     break
-                except KeyError as e: # not all values present
+                except KeyError: # not all values present
                     pass
-                except AttributeError as e: # not all dop values present
+                except AttributeError: # not all dop values present
                     pass
             time.sleep(self._poll)
 

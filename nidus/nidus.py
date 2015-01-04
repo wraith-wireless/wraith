@@ -88,8 +88,8 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 connected = False
         
         # clean up
-        self.request.close()
         db.disconnect()
+        self.request.close()
 
     def _recv(self):
         """ recv - read 1024 byte chunks from sensor until EOT """

@@ -28,10 +28,6 @@ def pktwrite(fout,ts,pkt):
     """ writes packet pkt with timestamp ts to pcap file object fout """
     pkt = pcappkt(ts,pkt)
     fout.write(pkt)
-    
-#def writepkt(sec,usecs,plen,olen,pkt)
-#    struct.pack(pkt_hdr_fmt,*(sec,usec,plen,olen))+pkt
-#    fout.write(pcap_hdr + struct.pack(pkt_hdr_fmt,*(secs,usecs,len(ba),len(ba))) + ba)
 
 # pcaps are constructed as PCAP HEADER|RECORD HEADER<1>|DATA<1>|...|RECORD HEADER<n>|DATA<n>
 # where the PCAP HEADER as defined in pcap.h is:

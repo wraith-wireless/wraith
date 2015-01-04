@@ -11,8 +11,8 @@ underlying storage system, serving a two-fold service:
 """
 __name__ = 'nidusdb'
 __license__ = 'GPL'
-__version__ = '0.1.0'
-__date__ = 'October 2014'
+__version__ = '0.1.1'
+__date__ = 'January 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
@@ -22,6 +22,8 @@ import os                                              # file paths
 import time                                            # timestamps
 import psycopg2 as psql                                # postgresql api
 import ConfigParser                                    # config file
+import threading                                       # sse threads
+import Queue                                           # thread-safe queue
 import wraith.radio.radiotap as rtap                   # 802.11 layer 1 parsing
 from wraith.radio import mpdu                          # 802.11 layer 2 parsing
 from wraith.radio import mcs                           # 802.11 mcs fcts
@@ -39,9 +41,140 @@ class NidusDBSubmitParseException(NidusDBSubmitException): pass  # submit failed
 class NidusDBSubmitParamException(NidusDBSubmitException): pass  # one or more params are invalid
 class NidusDBInvalidFrameException(NidusDBSubmitException): pass # frame does not follow standard
 
-#### THREADS
+#### SSE functionality
+
+# for now define the number of threads here (there will only be 1 saving thread
+# for radio
+NUM_STORE_THREADS   = 1
+NUM_EXTRACT_THREADS = 1
+
+# Task Definitions
+
+class SaveTask(tuple):
+    # noinspection PyInitNewSignature
+    def __new__(cls,sid,ts,mac,frame):
+        return super(SaveTask,cls).__new__(cls,tuple([sid,ts,mac,frame]))
+    @property
+    def sid(self): return self[0]
+    @property
+    def ts(self): return self[1]
+    @property
+    def mac(self): return self[2]
+    @property
+    def frame(self): return self[3]
 
 
+class StoreTask(tuple):
+    # noinspection PyInitNewSignature
+    def __new__(cls,ts,mac,lFrame,l1,l2):
+        return super(StoreTask,cls).__new__(cls,tuple([ts,mac,lFrame,l1,l2]))
+    @property
+    def ts(self): return self[0]
+    @property
+    def mac(self): return self[1]
+    @property
+    def length(self): return self[2]
+    @property
+    def l1(self): return self[3]
+    @property
+    def l2(self): return self[4]
+
+class ExtractTask(tuple):
+    # noinspection PyInitNewSignature
+    def __new__(cls,sid,ts,l2):
+        return super(ExtractTask,cls).__new__(cls,tuple([sid,ts,l2]))
+    @property
+    def sid(self): return self[0]
+    @property
+    def ts(self): return self[1]
+    @property
+    def l2(self): return self[2]
+
+# Worker definitions
+
+class SSEThread(threading.Thread):
+    """ Super Class for a SaveStoreExtract worker thread """
+    def __init__(self,tasks,db):
+        """
+         sid - current session id
+         halt - stop event
+         task - queue of tasks to pull from
+         db - {True|False} db access is needed
+        """
+        threading.Thread.__init__(self)
+        self._qT = tasks
+        self._wDB = db
+
+    def run(self):
+        # connect to db
+        conn = None
+        if self._wDB:
+            try:
+                conn = self._dbconnect()
+            except psql.OperationalError as e:
+                if e.__str__().find('connect') > 0:
+                    raise NidusDBServerException("Postgresql not running")
+                elif e.__str__().find('authentication') > 0:
+                    raise NidusDBAuthException("Invalid connection string")
+                else:
+                    raise NidusDBException("Database failure: %s" % e)
+
+        # processing loop
+        while True:
+            item = self._qT.get()
+            if item == '!STOP!': break
+            self._consume(item,conn)
+
+        # close db
+        if conn and not conn.closed: conn.close()
+
+    def _dbconnect(self):
+        """ cnnnects to db returning a connection object"""
+        # connect to db
+        conn = psql.connect(host="localhost",dbname="nidus",
+                                  user="nidus",password="nidus")
+        curs = conn.cursor()
+        curs.execute("set time zone 'UTC';")
+        curs.close()
+        conn.commit()
+        return conn
+
+    def _consume(self,item,conn):
+        """ process the next item, using db connection conn if necessary """
+        raise NotImplementedError
+
+class SaveThread(SSEThread):
+    def __init__(self,tasks,path,sz):
+        """
+         path - directory to store pcaps in
+         sz - max size of pcap file
+        """
+        SSEThread.__init__(self,tasks,False)
+        self._path = path
+        self._sz = sz
+        self._fout = None
+    def _consume(self,item,conn=None):
+        """ write the packet in item to file """
+        fname = None
+        if not self._fout or os.path.getsize(self._fout.name) > self._sz:
+            if self._fout:
+                self._fout.close()
+                self._fout = None
+            fname = os.path.join(self._path,"%d_%s_%s.pcap" % (item.sid,
+                                                               item.ts,
+                                                               item.mac))
+        if not self._fout: self._fout = pcapopen(fname)
+        pktwrite(self._fout,item.ts,item.frame)
+
+class StoreThread(SSEThread):
+    def __init__(self,tasks):
+        SSEThread.__init__(self,tasks,True)
+    def _consume(self,item,conn): pass
+
+class ExtractThread(SSEThread):
+    def __init__(self,db,tasks):
+        SSEThread.__init__(self,tasks,True)
+    def _consume(self,item,conn): pass
 
 class NidusDB(object):
     """ NidusDB - interface to nidus database """
@@ -53,7 +186,14 @@ class NidusDB(object):
         self._raw = {'store':False} # raw frame storage config
         self._oui = {}              # oui dict (oui->manufacturer)
         self._stas = {}             # stas seen this session
-        self._fout = None           # current file
+
+        # SSE variables
+        self._qSave = {}               # one (or two) queues for each radio(s) saving
+        self._tSave = {}               # one (or two) threads for each radio(s) saving
+        self._qStore = None            # queue for storage
+        self._tStores = []             # thread(s) for storing
+        self._qExtract = None          # queue for extraction
+        self._tExtracts = []           # thread(s) for extracting
 
         # parse the config file (if none set to defaults)
         if cpath:
@@ -81,7 +221,7 @@ class NidusDB(object):
 
     def shutdown(self):
         """ closes open connections, cleans up """
-        if self._conn and not self._conn.closed: self.disconnect()
+        self.disconnect()
 
     def connect(self):
         """ client connects to NidusDB """
@@ -93,6 +233,7 @@ class NidusDB(object):
                                       password="nidus")
             self._curs = self._conn.cursor()
             self._curs.execute("set time zone 'UTC';")
+            self._conn.commit()
         except psql.OperationalError as e:
             if e.__str__().find('connect') > 0:
                 raise NidusDBServerException("Postgresql not running")
@@ -110,8 +251,11 @@ class NidusDB(object):
             self._curs.close()
             self._conn.close()
 
-        # close out current file (open)
-        if self._fout: self._fout.close()
+        # stop & wait on the sse threads
+        for thread in self._tSave: # save threads
+            self._qSave[thread].put('!STOP!')
+            while self._tSave[thread].is_alive():
+                self._tSave[thread].join(0.5)
 
     def submitdevice(self,f,ip=None):
         """ submitdevice - submit the string fields to the database """
@@ -222,6 +366,7 @@ class NidusDB(object):
         
     def submitradio(self,f):
         """ submitradio - submit the string fields to the database """
+        # TODO: ensure we only get a radio submit once per radio
         try:
             # tokenize the string f and convert to dict
             ds = nmp.data2dict(nmp.tokenize(f),"RADIO")
@@ -262,6 +407,15 @@ class NidusDB(object):
                   """
             self._curs.execute(sql,(self._sid,ds['mac'],ds['phy'],ds['nic'],
                                     ds['vnic'],ds['ts']))
+
+            # start save thread if save is enabled
+            if self._raw['store']:
+                self._qSave[ds['mac']] = Queue.Queue()
+                self._tSave[ds['mac']] = SaveThread(self._qSave[ds['mac']],
+                                                    self._raw['path'],
+                                                    self._raw['sz'])
+                self._tSave[ds['mac']].start()
+
         except nmp.NMPException as e:
             raise NidusDBSubmitParseException(e)
         except psql.Error as e:
@@ -300,7 +454,7 @@ class NidusDB(object):
         except nmp.NMPException as e:
             raise NidusDBSubmitParseException(e)
 
-        # parse radiotap and mpdu (init everything to empty)
+        # parse radiotap and mpdu
         try:
             frame = ds['frame']
             dR = rtap.parse(frame)
@@ -309,15 +463,12 @@ class NidusDB(object):
             dR = {}
             dM = {}
 
-        # execute SSE
+        # send to queues
         if self._raw['store']:
-            # save frame if specfied
-            try:
-                self._save(ds['ts'],ds['mac'],ds['frame'])
-            except IOError:
-                pass
-        self._store(ds['ts'],ds['mac'],len(ds['frame']),dR,dM)
-        if dM: self._extract(ds['ts'],dM)
+            self._qSave[ds['mac']].put(SaveTask(self._sid,ds['ts'],
+                                                ds['mac'],ds['frame']))
+        #self._qStore.put((ds['ts'],ds['mac'],len(ds['frame']),dR,dM))
+        #if dM: self._qExtract((ds['ts'],dM))
         
     def submitgeo(self,f):
         """ submitgeo - submit the string fields to the database """
@@ -339,11 +490,14 @@ class NidusDB(object):
         else:
             self._conn.commit()
 
+    #### NOTE: for all _set* functions commit or rollback is exec'd from caller
+
     def _setsensor(self,ts,did,state,ip):
         """ set the state of the sensor """
         # up or down
         if state:
             # open the sensor record
+            # TODO: don't make a new session if one already exists
             sql="""
                  insert into sensor (hostname,ip,period)
                  values (%s,%s,tstzrange(%s,NULL,'[]')) RETURNING session_id;
@@ -356,8 +510,6 @@ class NidusDB(object):
                    where session_id = %s;
                   """
             self._curs.execute(sql,(ts,self._sid))
-
-    #### NOTE: for all _set* functions commit or rollback is exec'd from caller
 
     def _setradio(self,ts,did,state):
         """ set the state of a radio """
@@ -391,242 +543,6 @@ class NidusDB(object):
                    where sid = %s and gid = %s;
                   """
             self._curs.execute(sql,(ts,self._sid,did))
-
-    def _save(self,ts,rdo,frame):
-        """ saves frame fr to file """
-        fname = None
-        if os.path.getsize(self._fout.name) > self._raw['sz'] or not self._fout:
-            self._fout.close()
-            fname = os.path.join(self._raw['path'],
-                                 "%d_%s_%s.pcap" % (self._sid,ts,rdo))
-        if not self._fout or self._fout.closed: self._fout = pcapopen(fname)
-        pktwrite(self._fout,ts,frame)
-
-    def _store(self,ts,rdo,lF,dR,dM):
-        """
-         stores the frame to db where lF is the total length of the frame and
-         dR and dM are the parsed radiotap and mpdu respectively
-        """
-        try:
-            # insert the frame - if invalid stop after insertion and commit it
-            sql = """
-                   insert into frame (ts,bytes,bytesHdr,ampdu,fcs)
-                   values (%s,%s,%s,%s,%s) RETURNING id;
-                  """
-            if not dR['sz']:
-                self._curs.execute(ts,(lF,0,0,0))
-                self._conn.commit()
-                return
-
-            # valid header, continue
-            ampdu = int('a-mpdu' in dR['present'])
-            self._curs.execute(sql,(ts,lF,dR['sz'],ampdu,rtap.flags_get(dR['flags'],
-                                                                        'fcs')))
-            fid = self._curs.fetchone()[0]
-
-            # insert ampdu?
-            if ampdu:
-                sql = "insert into ampdu (fid,refnum,flags) values (%s,%s,%s);"
-                self._curs.execute(sql,(fid,dR['a-mpdu'][0],dR['a-mpdu'][1]))
-
-            # insert the source record
-            ant = dR['antenna'] if 'antenna' in dR else 0
-            pwr = dR['antsignal'] if 'antsignal' in dR else 0
-            sql = "insert into source (fid,src,antenna,rfpwr) values (%s,%s,%s,%s);"
-            self._curs.execute(sql,(fid,rdo,ant,pwr))
-
-            # insert signal record
-            # determine the standard, rate and mcs fields
-            try:
-                std = 'n'
-                mcsflags = rtap.mcsflags_params(dR['mcs'][0],dR['mcs'][1])
-                if mcsflags['bw'] == rtap.MCS_BW_20: bw = '20'
-                elif mcsflags['bw'] == rtap.MCS_BW_40: bw = '40'
-                elif mcsflags['bw'] == rtap.MCS_BW_20L: bw = '20L'
-                else: bw = '20U'
-                width = 40 if bw == '40' else 20
-                gi = 1 if 'gi' in mcsflags and mcsflags['gi'] > 0 else 0
-                ht = 1 if 'ht' in mcsflags and mcsflags['ht'] > 0 else 0
-                index = dR['mcs'][2]
-                rate = mcs.mcs_rate(dR['mcs'][2],width,gi)
-                hasMCS = 1
-            except:
-                if dR['channel'][0] in channels.ISM_24_F2C:
-                    if rtap.chflags_get(dR['channel'][1],'cck'):
-                        std = 'b'
-                    else:
-                        std = 'g'
-                else:
-                    std = 'a'
-                rate = dR['rate'] * 0.5
-                bw = None
-                gi = None
-                ht = None
-                index = None
-                hasMCS = 0
-
-            # NOTE: we assume that channels will always be present in radiotap
-            sql = """
-                   insert into signal (fid,std,rate,channel,chflags,rf,ht,
-                                       mcs_bw,mcs_gi,mcs_ht,mcs_index)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
-                  """
-            self._curs.execute(sql,(fid,std,rate,channels.f2c(dR['channel'][0]),
-                                    dR['channel'][1],dR['channel'][0],hasMCS,
-                                    bw,gi,ht,index))
-
-            # insert traffic
-            if dM:
-                sql = """
-                       insert into traffic (fid,fc_type,fc_subtype,fc_flags,
-                                            duration,addr1,addr2,addr3,
-                                            sc_fragnum,sc_seqnum,addr4)
-                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
-                      """
-                self._curs.execute(sql,(fid,
-                                        mpdu.FT_TYPES[dM['framectrl']['type']],
-                                        mpdu.subtypes(dM['framectrl']['type'],
-                                                      dM['framectrl']['subtype']),
-                                        dM['framectrl']['flags'],
-                                        dM['duration'],
-                                        dM['addr1'],
-                                        dM['addr2'] if 'addr2' in dM else None,
-                                        dM['addr3'] if 'addr3' in dM else None,
-                                        dM['seqctrl']['fragno'] if 'seqctrl' in dM else None,
-                                        dM['seqctrl']['seqno'] if 'seqctrl' in dM else None,
-                                        dM['addr4'] if 'addr4' in dM else None))
-        except psql.Error as e:
-            self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
-        else:
-            self._conn.commit()
-
-    def _extract(self,ts,m):
-        """  extract extract and store details of networks/stas etc from mpdu dict m """
-        # get all mac addresses
-        # Function To DS From DS Address 1 Address 2 Address 3 Address 4
-        # IBSS/Intra   0    0        RA=DA     TA=SA     BSSID       N/A
-        # From AP      0    1        RA=DA  TA=BSSID        SA       N/A
-        # To AP        1    0     RA=BSSID     TA=SA        DA       N/A
-        # Wireless DS  1    1     RA=BSSID  TA=BSSID     DA=WDS    SA=WDS
-
-        # determine if each station exists already addr1 will always be present
-        sql = "select sid,id,mac from sta where mac=%s"
-        addrs = {m['addr1'].lower():{'loc':[1],'id':None}}
-
-        # for addr2 thru addr4, if its present and not already being checked,
-        # add to sql query
-        if 'addr2' in m:
-            a = m['addr2'].lower()
-            if a in addrs:
-                addrs[a]['loc'].append(2)
-            else:
-                addrs[a] = {'loc':[2],'id':None}
-                sql += " or mac=%s"
-            if 'addr3' in m:
-                a = m['addr3'].lower()
-                if a in addrs:
-                    addrs[a]['loc'].append(3)
-                else:
-                    addrs[a] = {'loc':[3],'id':None}
-                    sql += " or mac=%s"
-                if 'addr4' in m:
-                    a = m['addr4'].lower()
-                    if a in addrs:
-                        addrs[a]['loc'].append(4)
-                    else:
-                        addrs[a] = {'loc':[4],'id':None}
-                        sql += " or mac=%s"
-
-        # add non-broadcast addr(s) if not already present
-        try:
-            # get rows for any sta with given mac addr
-            self._curs.execute(sql,tuple(addrs.keys()))
-            rows = self._curs.fetchall()
-            for addr in addrs:
-                # if not broadcast, add sta id if found
-                if addr == mpdu.BROADCAST: continue
-                for row in rows:
-                    if addr == row[2]:
-                        addrs[addr]['id'] = row[1]
-                        break
-
-                # check current addr for an id, if not present add it
-                if not addrs[addr]['id']:
-                    sql = """
-                           insert into sta (sid,spotted,mac,manuf,note)
-                           values (%s,%s,%s,%s,%s)
-                           RETURNING id;
-                          """
-                    self._curs.execute(sql,(self._sid,ts,addr,self._manuf(addr),""))
-                    addrs[addr]['id'] = self._curs.fetchone()[0]
-
-                # add/update sta activity for this session
-                mode = 'rx'
-                if 2 in addrs[addr]['loc']: mode = 'tx'
-
-                if addr in self._stas:
-                    # update timestamps
-                    if mode == 'tx':
-                        self._stas[addr]['fh'] = ts
-                        self._stas[addr]['lh'] = ts
-                    else:
-                        self._stas[addr]['fs'] = ts
-                        self._stas[addr]['ls'] = ts
-
-                    # insert the record
-                    sql = """
-                           update sta_activity
-                           set firstSeen=%s,lastSeen=%s,firstHeard=%s,lastHeard=%s
-                           where sid = %s and staid = %s;
-                          """
-                    self._curs.execute(sql,(self._stas[addr]['fs'],
-                                            self._stas[addr]['ls'],
-                                            self._stas[addr]['fh'],
-                                            self._stas[addr]['lh'],
-                                            self._sid,self._stas[addr]['id']))
-                else:
-                    # create a new entry for this sta
-                    self._stas[addr] = {'id':addrs[addr]['id'],
-                                        'fs':None,'ls':None,
-                                        'fh':None,'lh':None}
-                    if mode == 'tx':
-                        self._stas[addr]['fh'] = ts
-                        self._stas[addr]['lh'] = ts
-                    else:
-                        self._stas[addr]['fs'] = ts
-                        self._stas[addr]['ls'] = ts
-
-                    # and insert it
-                    sql = """
-                           insert into sta_activity (sid,staid,firstSeen,lastSeen,
-                                                     firstHeard,lastHeard)
-                           values (%s,%s,%s,%s,%s,%s);
-                          """
-                    self._curs.execute(sql,(self._sid,self._stas[addr]['id'],
-                                            self._stas[addr]['fs'],
-                                            self._stas[addr]['ls'],
-                                            self._stas[addr]['fh'],
-                                            self._stas[addr]['lh']))
-        except psql.Error as e:
-            self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
-        else:
-            self._conn.commit()
-
-        #flags = mpdu.fcfields_all(m['framectrl']['flags'])
-        #if flags['td'] and flags['fd']:
-        #    # bridge: betw/ DS
-        #    pass
-        #elif flags['td'] and not flags['fd']:
-        #    # STA -> AP
-        #    pass
-        #elif not flags['td'] and not flags['fd']:
-        #    # AP -> STA
-        #    pass
-        #else:
-        #    # IBSS/intra
-        #    pass
 
     def _manuf(self,mac):
         """ returns the manufacturer of the mac address if exists, otherwise 'unknown' """

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" suckt.py: Wraith Sensor main process captures and collates raw 802.11-2012 traffic
+""" suckt.py: main process captures and collates raw 802.11-2012 traffic
 
 802.11-2012 sensor that collects araw 802.11 frames and gps data for processing
 by an external process.
@@ -93,7 +93,7 @@ class Suckt(object):
             self._rr = RadioController(self._ic,conn2,self._conf['recon'])
 
             # collection if present
-            if self._cr:
+            if 'collection' in self._conf:
                 try:
                     logging.info("Starting Collection Radio")
                     (conn1,conn2) = mp.Pipe()
@@ -194,6 +194,7 @@ class Suckt(object):
                     logging.error("Suckt failed. (Unknown) %s",e)
             time.sleep(1)
 
+    # noinspection PyUnusedLocal
     def stop(self,signum=None,stack=None):
         """ stop suckt execution """
         if SUCKT_RUNNING <= self.state < SUCKT_EXITING:

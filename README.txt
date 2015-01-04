@@ -1,6 +1,6 @@
-WRAITH v 0.0.1
+WRAITH: Wireless assault, reconnaissance, collection and exploitation toolkit.
 
-DESCRIPTION: Wireless assault, reconnaissance, collection and exploitation toolkit.
+    You knew that I reap where I have not sown and gather where I scattered no seed?
 
 MODULES: Currently consists of four components/modules
 

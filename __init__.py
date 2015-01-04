@@ -5,10 +5,11 @@ Wireless assault, reconnaissance, collection and exploitation toolkit.
 Requires:
  linux (preferred 3.x kernel)
  Python 2.7
- iw 3.17
+ iw 3.17 (can be made to work w/ 3.2
  postgresql 9.x (tested on 9.3.5)
  pyscopg 2.5.3
- mgrs 1.1
+ mgrs 1.3.1 (works w/ 1.1)
+ dateutil 2.3
 
 wraith package hierarchy
 wraith/                Top-level package
