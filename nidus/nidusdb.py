@@ -81,14 +81,12 @@ class StoreTask(tuple):
 
 class ExtractTask(tuple):
     # noinspection PyInitNewSignature
-    def __new__(cls,sid,ts,l2):
-        return super(ExtractTask,cls).__new__(cls,tuple([sid,ts,l2]))
+    def __new__(cls,ts,l2):
+        return super(ExtractTask,cls).__new__(cls,tuple([ts,l2]))
     @property
-    def sid(self): return self[0]
+    def ts(self): return self[0]
     @property
-    def ts(self): return self[1]
-    @property
-    def l2(self): return self[2]
+    def l2(self): return self[1]
 
 # Worker definitions
 
@@ -132,7 +130,7 @@ class SSEThread(threading.Thread):
         """ cnnnects to db returning a connection object"""
         # connect to db
         conn = psql.connect(host="localhost",dbname="nidus",
-                                  user="nidus",password="nidus")
+                            user="nidus",password="nidus")
         curs = conn.cursor()
         curs.execute("set time zone 'UTC';")
         curs.close()
@@ -278,9 +276,143 @@ class StoreThread(SSEThread):
 
 class ExtractThread(SSEThread):
     """  extracts & stores details of nets/stas etc from mpdus in tasks queue """
-    def __init__(self,tasks):
+    def __init__(self,tasks,sid,oui):
+        """
+         sid -> session id
+         oui -> oui dict
+        """
         SSEThread.__init__(self,tasks,True)
-    def _consume(self,item,conn): pass
+        self._sid = sid
+        self._oui = oui
+    def _consume(self,item,conn):
+        # make a cursor and extract variables
+        # TODO: need to make self._stas a shared variable amongst extract threads
+        curs = conn.cursor()
+        ts = item.ts
+        dM = item.l2
+
+        # sta addresses
+        # Function To DS From DS Address 1 Address 2 Address 3 Address 4
+        # IBSS/Intra   0    0        RA=DA     TA=SA     BSSID       N/A
+        # From AP      0    1        RA=DA  TA=BSSID        SA       N/A
+        # To AP        1    0     RA=BSSID     TA=SA        DA       N/A
+        # Wireless DS  1    1     RA=BSSID  TA=BSSID     DA=WDS    SA=WDS
+
+        # determine if each station exists already addr1 will always be present
+        sql = "select sid,id,mac from sta where mac=%s"
+        addrs = {dM['addr1'].lower():{'loc':[1],'id':None}}
+
+        # for addr2 thru addr4, if its present and not already being checked,
+        # add to sql query
+        if 'addr2' in dM:
+            a = dM['addr2'].lower()
+            if a in addrs:
+                addrs[a]['loc'].append(2)
+            else:
+                addrs[a] = {'loc':[2],'id':None}
+                sql += " or mac=%s"
+            if 'addr3' in dM:
+                a = dM['addr3'].lower()
+                if a in addrs:
+                    addrs[a]['loc'].append(3)
+                else:
+                    addrs[a] = {'loc':[3],'id':None}
+                    sql += " or mac=%s"
+                if 'addr4' in dM:
+                    a = dM['addr4'].lower()
+                    if a in addrs:
+                        addrs[a]['loc'].append(4)
+                    else:
+                        addrs[a] = {'loc':[4],'id':None}
+                        sql += " or mac=%s"
+
+        # add any non-broadcast addr(s) if not already present
+        # close the cursor
+        try:
+            # get rows for any sta with given mac addr
+            curs.execute(sql,tuple(addrs.keys()))
+            rows = curs.fetchall()
+            conn.commit()
+            for addr in addrs:
+                # if not broadcast, add sta id if found
+                if addr == mpdu.BROADCAST: continue
+                for row in rows:
+                    if addr == row[2]:
+                        addrs[addr]['id'] = row[1]
+                        break
+
+                # check current addr for an id, if not present add it
+                if not addrs[addr]['id']:
+                    sql = """
+                           insert into sta (sid,spotted,mac,manuf,note)
+                           values (%s,%s,%s,%s,%s)
+                           RETURNING id;
+                          """
+                    curs.execute(sql,(self._sid,ts,addr,self._manuf(addr),""))
+                    addrs[addr]['id'] = curs.fetchone()[0]
+
+                # add/update sta activity for this session
+                mode = 'rx'
+                if 2 in addrs[addr]['loc']: mode = 'tx'
+
+                # update sta activity timestamps
+                if addr in self._stas:
+                    if mode == 'tx':
+                        self._stas[addr]['fh'] = ts
+                        self._stas[addr]['lh'] = ts
+                    else:
+                        self._stas[addr]['fs'] = ts
+                        self._stas[addr]['ls'] = ts
+
+                    # insert the record
+                    sql = """
+                           update sta_activity
+                           set firstSeen=%s,lastSeen=%s,firstHeard=%s,lastHeard=%s
+                           where sid = %s and staid = %s;
+                          """
+                    curs.execute(sql,(self._stas[addr]['fs'],
+                                      self._stas[addr]['ls'],
+                                      self._stas[addr]['fh'],
+                                      self._stas[addr]['lh'],
+                                      self._sid,self._stas[addr]['id']))
+                else:
+                    # create a new entry for this sta
+                    self._stas[addr] = {'id':addrs[addr]['id'],
+                                        'fs':None,'ls':None,
+                                        'fh':None,'lh':None}
+                    if mode == 'tx':
+                        self._stas[addr]['fh'] = ts
+                        self._stas[addr]['lh'] = ts
+                    else:
+                        self._stas[addr]['fs'] = ts
+                        self._stas[addr]['ls'] = ts
+
+                    # and insert it
+                    sql = """
+                           insert into sta_activity (sid,staid,firstSeen,lastSeen,
+                                                     firstHeard,lastHeard)
+                           values (%s,%s,%s,%s,%s,%s);
+                          """
+                    curs.execute(sql,(self._sid,self._stas[addr]['id'],
+                                                self._stas[addr]['fs'],
+                                                self._stas[addr]['ls'],
+                                                self._stas[addr]['fh'],
+                                                self._stas[addr]['lh']))
+        except psql.Error as e:
+            conn.rollback()
+            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+        else:
+            conn.commit()
+
+        # close the cursor
+        curs.close()
+
+    def _manuf(self,mac):
+        """ returns the manufacturer of the mac address if exists, otherwise 'unknown' """
+        try:
+            return self._oui[mac[:8]]
+        except KeyError:
+            return "unknown"
 
 class NidusDB(object):
     """ NidusDB - interface to nidus database """
@@ -340,6 +472,7 @@ class NidusDB(object):
             self._curs = self._conn.cursor()
             self._curs.execute("set time zone 'UTC';")
             self._conn.commit()
+
         except psql.OperationalError as e:
             if e.__str__().find('connect') > 0:
                 raise NidusDBServerException("Postgresql not running")
@@ -365,10 +498,16 @@ class NidusDB(object):
                 self._tSave[thread].join(0.5)
 
         # store
-        #for i in xrange(len(self._tStore)):
-        #    self._qStore[self._tStore[i]].put('!STOP!')
-        #    while self._tSave[thread].is_alive():
-        #        self._tSave[thread].join(0.5)
+        for thread in self._tStore: self._qStore.put('!STOP!')
+        for thread in self._tStore:
+            while thread.is_alive():
+                thread.join(0.5)
+
+        # extract
+        for thread in self._tExtract: self._qExtract.put('!STOP!')
+        for thread in self._tExtract:
+            while thread.is_alive():
+                thread.join(0.5)
 
     def submitdevice(self,f,ip=None):
         """ submitdevice - submit the string fields to the database """
@@ -567,6 +706,11 @@ class NidusDB(object):
         except nmp.NMPException as e:
             raise NidusDBSubmitParseException(e)
 
+        # load frame onto store q
+        if self._raw['store']:
+            self._qSave[ds['mac']].put(SaveTask(self._sid,ds['ts'],
+                                                ds['mac'],ds['frame']))
+
         # parse radiotap and mpdu
         try:
             frame = ds['frame']
@@ -577,11 +721,8 @@ class NidusDB(object):
             dM = {}
 
         # send to queues
-        if self._raw['store']:
-            self._qSave[ds['mac']].put(SaveTask(self._sid,ds['ts'],
-                                                ds['mac'],ds['frame']))
-        self._qStore.put((ds['ts'],ds['mac'],len(ds['frame']),dR,dM))
-        #if dM: self._qExtract((ds['ts'],dM))
+        self._qStore.put(StoreTask(ds['ts'],ds['mac'],len(ds['frame']),dR,dM))
+        if dM: self._qExtract(ExtractTask(ds['ts'],dM))
         
     def submitgeo(self,f):
         """ submitgeo - submit the string fields to the database """
@@ -617,6 +758,22 @@ class NidusDB(object):
                 """
             self._curs.execute(sql,(did,ip,ts))
             self._sid = self._curs.fetchone()[0]
+
+            # start extract and store threads here - save threads will be
+            # started in the submitradio function
+            # store threads
+            self._qStore = Queue.Queue()
+            for i in xrange(NUM_STORE_THREADS):
+                thread = StoreThread(self._qStore)
+                thread.start()
+                self._tStore.append(thread)
+
+            # extract threads
+            self._qExtract = Queue.Queue()
+            for i in xrange(NUM_EXTRACT_THREADS):
+                thread = ExtractThread(self._qExtract,self._sid,self._oui)
+                thread.start()
+                self._tExtract.append(thread)
         else:
             sql = """
                    update sensor set period = tstzrange(lower(period),%s) 
@@ -656,10 +813,3 @@ class NidusDB(object):
                    where sid = %s and gid = %s;
                   """
             self._curs.execute(sql,(ts,self._sid,did))
-
-    def _manuf(self,mac):
-        """ returns the manufacturer of the mac address if exists, otherwise 'unknown' """
-        try:
-            return self._oui[mac[:8]]
-        except KeyError:
-            return "unknown"
