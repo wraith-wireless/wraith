@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-""" nidusdb.py: interface to underlying nidus storage system 
+""" nidusdb.py: interface to underlying nidus storage system
 
-Provides a common interface and access methods from Nidus request handlers to the 
+Provides a common interface and access methods from Nidus request handlers to the
 underlying storage system, serving a two-fold service:
  1) remove necessity for request handler to 'understand' underlying storage system
     protocols
@@ -523,10 +523,10 @@ class NidusDB(object):
         try:
             # tokenize the string f, convert to dict
             ds = nmp.data2dict(nmp.tokenize(f),"DEVICE")
-            
+
             # what type of device
             if not ds['type'] in ['sensor','radio','gpsd']:
-                raise NidusDBSubmitParamException("Invalid Device type %s" % ds['type'])                
+                raise NidusDBSubmitParamException("Invalid Device type %s" % ds['type'])
             if ds['type'] == "sensor":
                 self._setsensor(ds['ts'],ds['id'],ds['state'],ip)
             elif ds['type'] == "radio":
@@ -548,42 +548,42 @@ class NidusDB(object):
         try:
             # get current time
             ts = ts2iso(time.time())
-            
+
             # close out the sensor
             sql = """
-                   update sensor set period = tstzrange(lower(period),%s) 
+                   update sensor set period = tstzrange(lower(period),%s)
                    where session_id = %s;
                   """
             self._curs.execute(sql,(ts,self._sid))
-            
+
             # close out radios
             # get radios currently used by sensor
             sql = " select mac from using_radio where sid=%s;"
             self._curs.execute(sql,(self._sid,))
             for row in self._curs.fetchall():
                 mac = row[0]
-                
+
                 # close out radio_epoch
                 sql = """
                        update radio_epoch set period = tstzrange(lower(period),%s)
                        where mac = %s and upper(period) is NULL;
                       """
                 self._curs.execute(sql,(ts,mac))
-                
+
                 # close out radio_period
                 sql = """
                        update radio_period set period = tstzrange(lower(period),%s)
                        where mac = %s and upper(period) is NULL;
                       """
                 self._curs.execute(sql,(ts,mac))
-                
+
                 # close out using_radio
                 sql = """
                        update using_radio set period = tstzrange(lower(period),%s)
                        where sid=%s and mac=%s;
                       """
                 self._curs.execute(sql,(ts,self._sid,mac))
-           
+
             # close out gpsd
             sql = """
                    update using_gpsd set period = tstzrange(lower(period),%s)
@@ -594,14 +594,14 @@ class NidusDB(object):
             # don't raise an exception here, nidus is already exiting
             self._conn.rollback()
         else:
-            self._conn.commit()    
- 
+            self._conn.commit()
+
     def submitgpsd(self,f):
         """ submitgpsd - submit the string fields to the database """
         try:
             # tokenize the string f and convert to dict
             ds = nmp.data2dict(nmp.tokenize(f),"GPSD")
-            
+
             # submit to db
             # insert into the gpsd table (if it does not already exist)
             self._curs.execute("select * from gpsd where id=%s;",(ds['id'],))
@@ -609,7 +609,7 @@ class NidusDB(object):
                 sql = "insert into gpsd values (%s,%s,%s,%s,%s,%s);"
                 self._curs.execute(sql,(ds['id'],ds['vers'],ds['flags'],
                                         ds['driver'],ds['bps'],ds['path']))
-            
+
             # insert into the using table
             sql = """
                   insert into using_gpsd (sid,gid,period)
@@ -620,18 +620,18 @@ class NidusDB(object):
             raise NidusDBSubmitParseException(e)
         except psql.Error as e:
             # rollback so postgresql is not left in error state
-            self._conn.rollback() 
+            self._conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
         else:
             self._conn.commit()
-        
+
     def submitradio(self,f):
         """ submitradio - submit the string fields to the database """
         # TODO: ensure we only get a radio submit once per radio
         try:
             # tokenize the string f and convert to dict
             ds = nmp.data2dict(nmp.tokenize(f),"RADIO")
-            
+
             # submit to db
             # insert radio into radio table if it does not exist
             self._curs.execute("select * from radio where mac=%s;",(ds['mac'],))
@@ -644,7 +644,7 @@ class NidusDB(object):
                 self._curs.execute(sql,(ds['mac'],ds['driver'][0:20],
                                         ds['chipset'][0:20],ds['channels'],
                                         ds['standards'][0:20]))
-            
+
             # insert epochal
             sql = """
                    insert into radio_epoch
@@ -653,14 +653,14 @@ class NidusDB(object):
                   """
             self._curs.execute(sql,(ds['mac'],ds['role'],ds['ant_offset'],ds['ant_gain'],
                                     ds['ant_loss'],ds['ant_type'],ds['desc'],ds['ts']))
-            
+
             # insert periodic
             sql = """
                    insert into radio_period (mac,spoofed,txpwr,period)
                    values (%s,%s,%s,tstzrange(%s,NULL,'[]'));
                   """
             self._curs.execute(sql,(ds['mac'],ds['spoofed'],ds['txpwr'],ds['ts']))
-            
+
             # insert using_radio
             sql = """
                    insert into using_radio (sid,mac,phy,nic,vnic,period)
@@ -681,7 +681,7 @@ class NidusDB(object):
             raise NidusDBSubmitParseException(e)
         except psql.Error as e:
             # rollback so postgresql is not left in error state
-            self._conn.rollback() 
+            self._conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
         else:
             self._conn.commit()
@@ -691,7 +691,7 @@ class NidusDB(object):
         try:
             # tokenize the string f and convert to dict
             ds = nmp.data2dict(nmp.tokenize(f),"RADIO_EVENT")
-            
+
             sql = "insert into radio_event values (%s,%s,%s,%s);"
             self._curs.execute(sql,(ds['mac'],ds['event'],ds['params'],ds['ts']))
         except nmp.NMPException as e:
@@ -731,7 +731,7 @@ class NidusDB(object):
         # send to queues
         self._qStore.put(StoreTask(ds['ts'],ds['mac'],len(ds['frame']),dR,dM))
         if dM: self._qExtract.put(ExtractTask(ds['ts'],dM))
-        
+
     def submitgeo(self,f):
         """ submitgeo - submit the string fields to the database """
         try:
@@ -787,7 +787,7 @@ class NidusDB(object):
         else:
             # close out the sensor record
             sql = """
-                   update sensor set period = tstzrange(lower(period),%s) 
+                   update sensor set period = tstzrange(lower(period),%s)
                    where session_id = %s;
                   """
             self._curs.execute(sql,(ts,self._sid))
@@ -801,14 +801,14 @@ class NidusDB(object):
                    where mac = %s and upper(period) is NULL;
                   """
             self._curs.execute(sql,(ts,did))
-            
+
             # radio_periodic
             sql = """
                    update radio_period set period = tstzrange(lower(period),%s)
                    where mac = %s and upper(period) is NULL;
                   """
             self._curs.execute(sql,(ts,did))
-            
+
             # and using_radio record
             sql = """
                    update using_radio set period = tstzrange(lower(period),%s)
