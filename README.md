@@ -8,13 +8,12 @@ Current tools i.e. Kismet, Aircrack-ng and Wireshark are excellent tools but non
 suitable for collecting and analyzing the 802.11 environment over a period of time (without implementing a 
 custom interface). 
 
-Wraith is an attempt to develop a toolsuite that ease the collection, collation and analysis of temporal 
+Wraith is an attempt to develop a toolsuite that eases the collection, collation and analysis of temporal 
 802.11 data in order to provide administrators with the ability to view their networks from a bird's eye 
-view and drill down as necessary to single device.
+view and drill down as necessary to a single device.
 
 Once the reconnaissance and collection development is stable, assault plug-ins will be developed to aid
 WLAN administrators in the security testing of their networks. 
-
 
 ## 2. REQUIREMENTS: 
  * linux (preferred 3.x kernel, tested on 3.13.0-43)
