@@ -19,8 +19,8 @@ nidus 0.0.4
     o frames are parsed and portions are stored in the data store
   - SSE (Save Store Extract) is multithreaded which has helped alleviate delay
     from sensor exiting to nidus closing session records
-     o 1 thread per radio for saving and currently 1 thread each for store, extract
-
+     o 1 thread per radio for saving and number of threads for storing, extracting
+       are specified in the configuration file
 
 TODO:
 1) Should we return messages? i.e instead of just closing pipe for no running server etc
@@ -30,7 +30,6 @@ TODO:
 7) encrypted socket connection from wasp to nidus?
 8) secured (hashed) username/password from to datastore
 10) how/when to partition table to offload older records
-11) need more testing for threaded SSE, add config options for # of threads
 """
 __name__ = 'datastore'
 __license__ = 'GPL'

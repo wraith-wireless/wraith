@@ -43,11 +43,6 @@ class NidusDBInvalidFrameException(NidusDBSubmitException): pass # frame does no
 
 #### SSE functionality
 
-# for now define the number of threads here (there will only be 1 saving thread
-# for radio
-NUM_STORE_THREADS   = 1
-NUM_EXTRACT_THREADS = 1
-
 # Task Definitions
 
 class SaveTask(tuple):
@@ -126,7 +121,12 @@ class SSEThread(threading.Thread):
         while True:
             item = self._qT.get()
             if item == '!STOP!': break
-            self._consume(item,conn)
+            try:
+                self._consume(item,conn)
+            except:
+                # for now, quit thread on any exception
+                # TODO: how to handle this in caller
+                break
 
         # close db
         if conn and not conn.closed: conn.close()
@@ -324,10 +324,10 @@ class ExtractThread(SSEThread):
                         addrs[a] = {'loc':[4],'id':None}
                         sql += " or mac=%s"
 
-        # add any non-broadcast addr(s) if not already present
+        # main try-except block
         try:
-            # get rows for any sta with given mac addr
-            curs.execute(sql,tuple(addrs.keys()))
+            # add any non-broadcast addr(s) if not already present
+            curs.execute(sql,tuple(addrs.keys())) # get rows sta w/ given mac addr
             rows = curs.fetchall()
 
             for addr in addrs:
@@ -345,21 +345,15 @@ class ExtractThread(SSEThread):
                            values (%s,%s,%s,%s,%s)
                            RETURNING id;
                           """
-                    try:
-                        curs.execute(sql,(self._sid,ts,addr,self._manuf(addr),''))
-                        addrs[addr]['id'] = curs.fetchone()[0]
-                    except psql.Error as e:
-                        conn.rollback()
-                        raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
-                    else:
-                        conn.commit()
+                    curs.execute(sql,(self._sid,ts,addr,self._manuf(addr),''))
+                    addrs[addr]['id'] = curs.fetchone()[0]
 
                 # addr2 is transmitting (i.e. heard) others are seen
                 mode = 'tx' if 2 in addrs[addr]['loc'] else 'rx'
 
                 # add/update shared sta activity timestamps
+                #### ENTER CS
                 try:
-                    #### ENTER CS
                     self._l.acquire()
 
                     if addr in self._stas:
@@ -396,16 +390,11 @@ class ExtractThread(SSEThread):
                               self._stas[addr]['lh'])
                 finally:
                     #### EXIT CS
+                    # NOTE: any exceptions will be rethrown after releasing the lock
                     self._l.release()
 
                 # update the database
-                try:
-                    curs.execute(sql,vs)
-                except psql.Error as e:
-                    conn.rollback()
-                    raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
-                else:
-                    conn.commit()
+                curs.execute(sql,vs)
         except psql.Error as e:
             conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
@@ -438,8 +427,10 @@ class NidusDB(object):
         self._qSave = {}            # one (or two) queues for each radio(s) saving
         self._tSave = {}            # one (or two) threads for each radio(s) saving
         self._qStore = None         # queue for storage
+        self._nStore = 1            # num threads for storing default is 1
         self._tStore = []           # thread(s) for storing
         self._qExtract = None       # queue for extraction
+        self._nExtract = 1          # num threads for extracting default is 1
         self._tExtract = []         # thread(s) for extracting
 
         # parse the config file (if none set to defaults)
@@ -447,20 +438,27 @@ class NidusDB(object):
             conf = ConfigParser.RawConfigParser()
             if not conf.read(cpath): raise NidusDBException('%s is invalid' % cpath)
 
+            # save section of SSE
             try:
-                # raw frame storage
-                if conf.has_section('STORE'):
-                    self._raw['store'] = conf.getboolean('STORE','store')
-                    if self._raw['store']:
-                        self._raw['path'] = conf.get('STORE','path')
-                        self._raw['sz'] = conf.getint('STORE','maxsize') * 1048576
-                        self._raw['nfiles'] = conf.getint('STORE','maxfiles')
+                # save section
+                self._raw['save'] = conf.getboolean('SSE','save')
+                if self._raw['save']:
+                    self._raw['path'] = conf.get('SSE','path')
+                    self._raw['sz'] = conf.getint('SSE','maxsize') * 1048576
+                    self._raw['nfiles'] = conf.getint('SSE','maxfiles')
 
-                # oui file
-                if conf.has_option('OUI','path'):
-                    self._oui = parseoui(conf.get('OUI','path'))
-            except ConfigParser.NoOptionError as e:
+                # number of storing and extracting threads
+                self._nStore = conf.getint('SSE','store_threads')
+                self._nExtract = conf.getint('SSE','extract_threads')
+            except ValueError as e:
                 raise NidusDBException("%s" % e)
+            except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
+                raise NidusDBException("%s" % e)
+
+            # oui file
+            if conf.has_option('OUI','path'):
+                self._oui = parseoui(conf.get('OUI','path'))
+
 
     def __del__(self):
         """ called during garbage collection forces shuts down connection """
@@ -503,20 +501,17 @@ class NidusDB(object):
         # save
         for thread in self._tSave: # save threads
             self._qSave[thread].put('!STOP!')
-            while self._tSave[thread].is_alive():
-                self._tSave[thread].join(0.5)
+            if thread.is_alive(): thread.join()
 
         # store
-        for thread in self._tStore: self._qStore.put('!STOP!')
+        for _ in self._tStore: self._qStore.put('!STOP!')
         for thread in self._tStore:
-            while thread.is_alive():
-                thread.join(0.5)
+            if thread.is_alive(): thread.join()
 
         # extract
-        for thread in self._tExtract: self._qExtract.put('!STOP!')
+        for _ in self._tExtract: self._qExtract.put('!STOP!')
         for thread in self._tExtract:
-            while thread.is_alive():
-                thread.join(0.5)
+            if thread.is_alive(): thread.join()
 
     def submitdevice(self,f,ip=None):
         """ submitdevice - submit the string fields to the database """
@@ -771,7 +766,7 @@ class NidusDB(object):
             # started in the submitradio function
             # store threads
             self._qStore = Queue.Queue()
-            for i in xrange(NUM_STORE_THREADS):
+            for i in xrange(self._nStore):
                 thread = StoreThread(self._qStore)
                 thread.start()
                 self._tStore.append(thread)
@@ -779,9 +774,12 @@ class NidusDB(object):
             # extract threads
             self._lSta = threading.Lock()
             self._qExtract = Queue.Queue()
-            for i in xrange(NUM_EXTRACT_THREADS):
-                thread = ExtractThread(self._qExtract,self._stas,self._lSta,
-                                       self._sid,self._oui)
+            for i in xrange(self._nExtract):
+                thread = ExtractThread(self._qExtract,
+                                       self._stas,
+                                       self._lSta,
+                                       self._sid,
+                                       self._oui)
                 thread.start()
                 self._tExtract.append(thread)
         else:
