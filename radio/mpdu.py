@@ -2,7 +2,7 @@
 
 """ mpdu.py: 802.11 mac frame parsing
 
-Parse the 802.11 MAC Protocol Data Unit (MPDU) IAW IEED 802.11-2012
+Parse the 802.11 MAC Protocol Data Unit (MPDU) IAW IEEE 802.11-2012
 we use Std when referring to IEEE Std 802.11-2012
 NOTE:
  It is recommended not to import * as it may cause conflicts with other modules
@@ -23,23 +23,73 @@ from wraith.radio import infoelement as ie
 
 class MPDUException(Exception): pass # generic mpdu exception
 
-# broadcast address
-BROADCAST = "ff:ff:ff:ff:ff:ff"
+#### SOME CONSTANTS
+BROADCAST = "ff:ff:ff:ff:ff:ff" # broadcast address
+MAX_MPDU = 7991 # maximum mpdu size in bytes
 
-# maximum mpdu size in bytes
-MAX_MPDU = 7991
+def parse(frame,hasFCS=False):
+    """
+     parses the mpdu in frame (where frame is stripped of any layer 1 header)
+     and returns a dict d where d will always have key->value pairs for:
+      vers: mpdu version (always 0)
+      sz: bytes read from mpdu. Note: this is a tuple (offset,total) where
+       offset is the last byte read from frame and total is the total number
+       of bytes read. offset will equal total except in the case of FCS being
+       present
+      present: a list of fields preent in the frame
+      and key->value pairs for each field in present
+    """
+    # unpack framectrl into type, subtype and fields
+    ft,st,fs = _framectrl_(frame)
 
-### 802.11 MAC Frame Control
-#  Protocol Vers 2 bits: always '00'
-#  Type 2 bits: '00' Management, '01' Control,'10' Data,'11' Reserved
-#  This comes down the wire as:
-#   ST|FT|PV|Flags
-#    4| 2| 2|    8
-#  We parse these fields, ST|FT|PV together
-# at a minimum, frames will have a framectrl,duration,addr and fcs see Std 8.3.1.3
-_MIN_FRAME_ = '=HH6B'
-_MIN_FRAME_SZ_ = struct.calcsize(_MIN_FRAME_)
-_FC_FLAGS_ = "=B"
+    # construct the minimum present fields, mac, and fmt string
+    pfs = ['framectrl','duration','addr1']
+    mac = {'framectrl':{'type':ft,'subtype':st,'flags':fs}}
+    offset = _MIN_FRAME_SZ_
+
+    # remove fcs if present
+    if hasFCS:
+        # unpack & store fcs into our dict and remove the fcs from the frame
+        mac['fcs'] = struct.unpack("=L", frame[-4:])[0]
+        frame = frame[:-4]
+
+    # unpack the duration and address and fill in mac dict
+    try:
+        ret = struct.unpack(_MIN_FRAME_,frame[:offset])[1:] # skip the frame ctrl
+        mac['duration'] = ret[0]                            # duration is first value
+        mac['addr1'] = _macaddr_(ret[1:])                     # address is next 6
+    except struct.error as e:
+        raise MPDUException(e)
+
+    # handle frame types separately
+    if ft == FT_CTRL:
+        offset = _parsectrl_(st,frame,pfs,mac,offset)
+    elif ft == FT_MGMT:
+        offset = _parsemgmt_(st,frame,pfs,mac,offset)
+    elif ft == FT_DATA:
+        offset = _parsedata_(st,frame,pfs,mac,offset)
+    else:
+        raise MPDUException("unresolved")
+
+    ttlRead = offset
+    if hasFCS:
+        pfs.append('fcs')
+        ttlRead+=4
+
+    # add vers, sz and present to dict and return
+    mac['vers'] = 0
+    mac['sz'] = (offset,ttlRead)
+    mac['present'] = pfs
+    return mac
+
+def subtypes(ft,st):
+    """ returns the subtype description given the values ft and st """
+    if ft == FT_MGMT: return ST_MGMT_TYPES[st]
+    elif ft == FT_CTRL: return ST_CTRL_TYPES[st]
+    elif ft == FT_DATA: return ST_DATA_TYPES[st]
+    else: return 'rsrv'
+
+#### FRAME CONTROL CONSTANTS/FUNCTIONS
 
 # index of frame types and string titles
 FT_TYPES = ['mgmt','ctrl','data','rsrv']
@@ -160,34 +210,22 @@ ST_DATA = {"\x08":ST_DATA_DATA,
            "\xE8":ST_DATA_QOS_CFPOLL,
            "\xF8":ST_DATA_QOS_CFACK_CFPOLL}
 
-def subtypes(ft,st):
-    """ returns the subtype description given the values ft and st """
-    if ft == FT_MGMT: return ST_MGMT_TYPES[st]
-    elif ft == FT_CTRL: return ST_CTRL_TYPES[st]
-    elif ft == FT_DATA: return ST_DATA_TYPES[st]
-    else: return 'rsrv'
+# token invalid frame_subtype
+ST_RSRV_RSRV = 0
 
-# unpack formats
-_S2F_ = {'framectrl':'H',
-         'addr':'6B',
-         'seqctrl':'H',
-         'bactrl':'H',
-         'barctrl':'H',
-         'qos':"BB",
-         'htc':'L',
-         'capability':'H',
-         'listen-int':'H',
-         'status-code':'H',
-         'aid':'H',
-         'timestamp':'Q',
-         'beacon-int':'H',
-         'reason-code':'H',
-         'algorithm-no':'H',
-         'auth-seq':'H',
-         'category':'B',
-         'action':'B'}
+### 802.11 MAC Frame Control
+#  Protocol Vers 2 bits: always '00'
+#  Type 2 bits: '00' Management, '01' Control,'10' Data,'11' Reserved
+#  This comes down the wire as:
+#   ST|FT|PV|Flags
+#    4| 2| 2|    8
+#  We parse these fields, ST|FT|PV together
+# at a minimum, frames will have a framectrl,duration,addr and fcs see Std 8.3.1.3
+_MIN_FRAME_ = '=HH6B'
+_MIN_FRAME_SZ_ = struct.calcsize(_MIN_FRAME_)
+_FC_FLAGS_ = "=B"
 
-def framectrl(f):
+def _framectrl_(f):
     """
      given the 802.11-2012 frame f stripped of any radiotap,
      returns a tuple t = (ft=Frame type,st=Subtype,fs=Flags)
@@ -230,62 +268,28 @@ def fcfields_get(mn,f):
     except KeyError:
         raise MPDUException("invalid frame control flag '%s'" % f)
 
-def parse(frame,hasFCS=False):
-    """
-     parses the mpdu in frame (where frame is stripped of any layer 1 header)
-     and returns a dict d where d will always have key->value pairs for:
-      vers: mpdu version (always 0)
-      sz: bytes read from mpdu. Note: this is a tuple (offset,total) where
-       offset is the last byte read from frame and total is the total number
-       of bytes read. offset will equal total except in the case of FCS being
-       present
-      present: a list of fields preent in the frame
-      and key->value pairs for each field in present
-    """
-    # unpack framectrl into type, subtype and fields
-    ft,st,fs = framectrl(frame)
+# unpack formats
+_S2F_ = {'framectrl':'H',
+         'duration':'H',
+         'addr':'6B',
+         'seqctrl':'H',
+         'bactrl':'H',
+         'barctrl':'H',
+         'qos':"BB",
+         'htc':'L',
+         'capability':'H',
+         'listen-int':'H',
+         'status-code':'H',
+         'aid':'H',
+         'timestamp':'Q',
+         'beacon-int':'H',
+         'reason-code':'H',
+         'algorithm-no':'H',
+         'auth-seq':'H',
+         'category':'B',
+         'action':'B'}
 
-    # construct the minimum present fields, mac, and fmt string
-    pfs = ['framectrl','duration','addr1']
-    mac = {'framectrl':{'type':ft,'subtype':st,'flags':fs}}
-    offset = _MIN_FRAME_SZ_
-
-    # remove fcs if present
-    if hasFCS:
-        # unpack & store fcs into our dict and remove the fcs from the frame
-        mac['fcs'] = struct.unpack("=L", frame[-4:])[0]
-        frame = frame[:-4]
-
-    # unpack the duration and address and fill in mac dict
-    try:
-        ret = struct.unpack(_MIN_FRAME_,frame[:offset])[1:] # skip the frame ctrl
-        mac['duration'] = ret[0]                            # duration is first value
-        mac['addr1'] = macaddr(ret[1:])                     # address is next 6
-    except struct.error as e:
-        raise MPDUException(e)
-
-    # handle frame types separately
-    if ft == FT_CTRL:
-        offset = parsectrl(st,frame,pfs,mac,offset)
-    elif ft == FT_MGMT:
-        offset = parsemgmt(st,frame,pfs,mac,offset)
-    elif ft == FT_DATA:
-        offset = parsedata(st,frame,pfs,mac,offset)
-    else:
-        raise MPDUException("unresolved")
-
-    ttlRead = offset
-    if hasFCS:
-        pfs.append('fcs')
-        ttlRead+=4
-
-    # add vers, sz and present to dict and return
-    mac['vers'] = 0
-    mac['sz'] = (offset,ttlRead)
-    mac['present'] = pfs
-    return mac
-
-def parsectrl(st,f,pfs,d,o):
+def _parsectrl_(st,f,pfs,d,o):
     """
      parse the control frame f of subtype st starting at offset o into the dict d
      adding elements to pfs, and returning the new offset
@@ -295,12 +299,12 @@ def parsectrl(st,f,pfs,d,o):
         # append addr2 and process macaddress
         pfs.append('addr2')
         v,o = _unpack_from_(_S2F_['addr'],f,o)
-        d['addr2'] = macaddr(v)
+        d['addr2'] = _macaddr_(v)
     elif st == ST_CTRL_BLOCK_ACK_REQ:
         # append addr2, barctrl then process macaddr
         pfs.extend(['addr2','barctrl'])
         v,o = _unpack_from_(_S2F_['addr'],f,o)
-        d['addr2'] = macaddr(v)
+        d['addr2'] = _macaddr_(v)
 
         # & bar control
         v,o = _unpack_from_(_S2F_['barctrl'],f,o)
@@ -332,7 +336,7 @@ def parsectrl(st,f,pfs,d,o):
         # add addr2 and ba control, process addr2
         pfs.extend(['addr2','bactrl'])
         v,o = _unpack_from_(_S2F_['addr'],f,o)
-        d['addr2'] = macaddr(v)
+        d['addr2'] = _macaddr_(v)
 
         # & ba control
         v,o = _unpack_from_(_S2F_['bactrl'],f,o)
@@ -380,7 +384,7 @@ def parsectrl(st,f,pfs,d,o):
         raise MPDUException("Unknown subtype in CTRL frame %d" % st)
     return o
 
-def parsedata(st,f,pfs,d,o):
+def _parsedata_(st,f,pfs,d,o):
     """
      parse the data frame f of subtype st with fields fs starting at offset o into the
      dict d adding elements to pfs, and returning the new offset
@@ -390,8 +394,8 @@ def parsedata(st,f,pfs,d,o):
     pfs.extend(['addr2','addr3','seqctrl'])
     fmt = _S2F_['addr'] + _S2F_['addr'] + _S2F_['seqctrl']
     v,o = _unpack_from_(fmt,f,o)
-    d['addr2'] = macaddr(v[0:6])
-    d['addr3'] = macaddr(v[6:12])
+    d['addr2'] = _macaddr_(v[0:6])
+    d['addr3'] = _macaddr_(v[6:12])
     d['seqctrl'] = seqctrl(v[-1])
 
     # get frame ctrl fields
@@ -401,7 +405,7 @@ def parsedata(st,f,pfs,d,o):
     if flags['td'] and flags['fd']:
         pfs.append('addr4')
         v,o = _unpack_from_(_S2F_['addr'],f,o)
-        d['addr4'] = macaddr(v)
+        d['addr4'] = _macaddr_(v)
 
     # QoS field?
     if ST_DATA_QOS_DATA <= st <= ST_DATA_QOS_CFACK_CFPOLL:
@@ -417,7 +421,7 @@ def parsedata(st,f,pfs,d,o):
 
     return o
 
-def parsemgmt(st,f,pfs,d,o):
+def _parsemgmt_(st,f,pfs,d,o):
     """
      parse the mgmt frame f of subtype st with fields fs starting at offset o into the
      dict d adding elements to pfs, and returning the new offset
@@ -425,8 +429,8 @@ def parsemgmt(st,f,pfs,d,o):
     pfs.extend(['addr2','addr3','seqctrl'])
     fmt = _S2F_['addr'] + _S2F_['addr'] + _S2F_['seqctrl']
     v,o = _unpack_from_(fmt,f,o)
-    d['addr2'] = macaddr(v[0:6])
-    d['addr3'] = macaddr(v[6:12])
+    d['addr2'] = _macaddr_(v[0:6])
+    d['addr3'] = _macaddr_(v[6:12])
     d['seqctrl'] = seqctrl(v[-1])
 
     # HTC fields?
@@ -459,7 +463,7 @@ def parsemgmt(st,f,pfs,d,o):
         v,o = _unpack_from_(fmt,f,o)
         d['fixed-params'] = {'capability':v[0],
                              'listen-int':v[1],
-                             'current-ap':macaddr(v[2:])}
+                             'current-ap':_macaddr_(v[2:])}
     elif st == ST_MGMT_PROBE_REQ:
         pass # all fields are information elements
     elif st == ST_MGMT_TIMING_ADV:
@@ -537,12 +541,6 @@ def datasubtype_get(mn,f):
         return bitmask_get(_DATA_SUBTYPE_FIELDS_,mn,f)
     except KeyError:
         raise MPDUException("invalid data subtype flag '%s'" % f)
-
-#--> macaddr
-def macaddr(l):
-    """ converts a list/tuple of unpacked integers to a string mac address """
-    if len(l) != 6: raise RuntimeError('mac address has length 6')
-    return ":".join(['{0:02X}'.format(a) for a in l])
 
 #--> sequence Control Std 8.2.4.4
 _SEQCTRL_DIVIDER_ = 4
@@ -720,3 +718,9 @@ def _unpack_from_(fmt,b,o):
         return vs,o+struct.calcsize(fmt)
     except struct.error as e:
         raise MPDUException('Error unpacking: %s' % e)
+
+#--> macaddr
+def _macaddr_(l):
+    """ converts a list/tuple of unpacked integers to a string mac address """
+    if len(l) != 6: raise RuntimeError('mac address has length 6')
+    return ":".join(['{0:02X}'.format(a) for a in l])

@@ -58,7 +58,6 @@ class SaveTask(tuple):
     @property
     def frame(self): return self[3]
 
-
 class StoreTask(tuple):
     # noinspection PyInitNewSignature
     def __new__(cls,ts,mac,lFrame,l1,l2):
