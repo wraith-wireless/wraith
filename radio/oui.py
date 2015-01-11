@@ -39,3 +39,10 @@ def parseoui(path):
     except IOError:
         if fin and not fin.closed: fin.close()
     return oui
+
+def manufacturer(oui,mac):
+    """ returns the manufacturer of the mac address if exists, otherwise 'unknown' """
+    try:
+        return oui[mac[:8]]
+    except KeyError:
+        return "unknown"

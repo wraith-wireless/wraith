@@ -28,7 +28,7 @@ import wraith.radio.radiotap as rtap                   # 802.11 layer 1 parsing
 from wraith.radio import mpdu                          # 802.11 layer 2 parsing
 from wraith.radio import mcs                           # 802.11 mcs fcts
 from wraith.radio import channels                      # 802.11 channels
-from wraith.radio.oui import parseoui                  # out dict
+from wraith.radio.oui import parseoui,manufacturer     # oui functions
 from wraith.nidus import nmp                           # message protocol
 from wraith.nidus.simplepcap import pcapopen, pktwrite # pcap writing
 from wraith import ts2iso                              # timestamp convesion
@@ -344,7 +344,7 @@ class ExtractThread(SSEThread):
                            values (%s,%s,%s,%s,%s)
                            RETURNING id;
                           """
-                    curs.execute(sql,(self._sid,ts,addr,self._manuf(addr),''))
+                    curs.execute(sql,(self._sid,ts,addr,manufacturer(self._oui,addr),''))
                     addrs[addr]['id'] = curs.fetchone()[0]
 
                 # addr2 is transmitting (i.e. heard) others are seen
@@ -401,13 +401,6 @@ class ExtractThread(SSEThread):
             conn.commit()
         finally:
             curs.close()
-
-    def _manuf(self,mac):
-        """ returns the manufacturer of the mac address if exists, otherwise 'unknown' """
-        try:
-            return self._oui[mac[:8]]
-        except KeyError:
-            return "unknown"
 
 class NidusDB(object):
     """ NidusDB - interface to nidus database """
