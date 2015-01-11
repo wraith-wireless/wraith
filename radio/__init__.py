@@ -14,14 +14,12 @@ Not Supported
 802.11s\y\ac\ad\af
 
 REVISIONS:
-radio 0.0.4
+radio 0.0.5
  desc: provides tools to manipulate wireless nics and parse raw wireless traffic
  includes: bits 0.0.4 channels 0.0.1, mcs 0.0.1, iw 0.1.0 iwtools 0.0.11,
  radiotap 0.0.4, mpdu 0.0.13, infoelement 0.0.1, oui 0.0.1
  changes:
-  - adding support for iw 3.15+
-    o no longer supporting versions less than 15
-  - supports toplevel parsing of all frames (excluding control wrapper)
+  - cleaned up some of the code in mpdu
 
 TODO:
  1) Should we add support for AVS, Prism headers ?
@@ -37,7 +35,7 @@ TODO:
 __name__ = 'radio'
 __license__ = 'GPL'
 __version__ = '0.0.4'
-__date__ = 'November 2014'
+__date__ = 'Janurary 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'

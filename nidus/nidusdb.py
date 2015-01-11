@@ -419,7 +419,6 @@ class NidusDB(object):
         self._raw = {'store':False} # raw frame storage config
         self._oui = {}              # oui dict (oui->manufacturer)
 
-
         # SSE variables
         self._stas = {}             # stas seen this session
         self._lSta = None           # lock on the stas dict
@@ -717,9 +716,11 @@ class NidusDB(object):
         try:
             frame = ds['frame']
             dR = rtap.parse(frame)
-            dM = mpdu.parse(frame[dR['sz']:], rtap.flags_get(dR['flags'],'fcs'))
-        except (rtap.RadiotapException,mpdu.MPDUException):
+            dM = mpdu.parse(frame[dR['sz']:],rtap.flags_get(dR['flags'],'fcs'))
+        except rtap.RadiotapException:
             dR = {}
+            dM = {}
+        except mpdu.MPDUException:
             dM = {}
 
         # send to queues
@@ -738,7 +739,6 @@ class NidusDB(object):
                                     ds['spd'],ds['dir'],ds['fix'],ds['xdop'],
                                     ds['ydop'],ds['pdop'],ds['epx'],ds['epy']))
         except nmp.NMPException as e:
-            print f
             raise NidusDBSubmitParseException(e)
         except psql.Error as e:
             self._conn.rollback()
