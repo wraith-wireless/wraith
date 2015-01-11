@@ -50,8 +50,18 @@ def leastx(x,v):
 def midx(s,x,v):
     """ returns the (unsigned int) value of x bits starting at s from v """
     # TODO: is this correct
-    return mostx(x,(v >> s))
+    #return mostx(x,(v >> s))
+    return leastx(x,(v >> s))
 
 def mostx(s,v):
     """ returns the (unsigned int) value of the most significant bits in v starting at s """
     return v >> s
+
+"""
+def mask(a,b):
+    r = 0
+    for i in range(a,b+1): r |= 1 << i
+    return r
+mask(2,2) & n
+have to shift over after this
+"""

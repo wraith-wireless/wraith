@@ -397,7 +397,6 @@ VENUE_TYPE_ASSIGN = {VENUE_UNSPECIFIED:{0,"UNSPECIFIED"},
                                     5:"BUS STOP",
                                     6:"KIOSK"}}
 
-
 # action frames Std 8.5.1
 SPEC_MGMT_MEAS_REQ  = 0
 SPEC_MGMT_MEAS_REP  = 1
@@ -413,13 +412,4 @@ SPEC_MGMT_CH_SWITCH = 4
 # the number in bits 0-6 to 0.5 * times that number which is the same thing
 # that happens if MSB is set to 1 ????
 _RATE_DIVIDER_ = 7
-#_DATA_RATE_ = {2:1,3:1.5,4:2,5:2.5,6:3,9:4.5,11:5.5,12:6,18:9,22:11,24:12,
-#               27:13.5,36:18,44:22,48:24,54:27,66:33,72:36,96:48,108:54}
 def getrate(val): return leastx(_RATE_DIVIDER_,val) * 0.5
-    #r = leastx(_RATE_DIVIDER_,val)
-    #if mostx(_RATE_DIVIDER_,val):
-    #    print 'True', r, r*0.5
-    #    return r * 0.5
-    #else:
-    #    print 'False', r, _DATA_RATE_[r]
-    #    return _DATA_RATE_[r]

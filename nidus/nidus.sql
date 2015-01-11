@@ -4,10 +4,10 @@
 -- version 0.0.8
 
 -- create nidus user and nidus database  
-#postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
-#  Enter password for new role: **** (nidus)
-#  Enter it again: **** (nidusr)
-#createdb --owner=nidus nidus
+--postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
+--  Enter password for new role: **** (nidus)
+--  Enter it again: **** (nidusr)
+--createdb --owner=nidus nidus
 
 -- DEFUNCT will not be using this for now
 -- add postgis extension to nidus db
