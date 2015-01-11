@@ -17,7 +17,7 @@ REVISIONS:
 radio 0.0.5
  desc: provides tools to manipulate wireless nics and parse raw wireless traffic
  includes: bits 0.0.4 channels 0.0.1, mcs 0.0.1, iw 0.1.0 iwtools 0.0.11,
- radiotap 0.0.4, mpdu 0.0.13, infoelement 0.0.1, oui 0.0.1
+ radiotap 0.0.4, mpdu 0.0.14, infoelement 0.0.1, oui 0.0.1
  changes:
   - cleaned up some of the code in mpdu
 
