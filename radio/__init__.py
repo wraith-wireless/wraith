@@ -20,12 +20,14 @@ radio 0.0.5
  radiotap 0.0.4, mpdu 0.1.0, infoelement 0.0.1, oui 0.0.1
  changes:
   - cleaned up some of the code in mpdu
-    o moved parse function to top, 'sectioned' code together
+    o moved parse function to top, 'sectioned' code together based on field,
+      type of frame
     o defined a 'wrapper' class around the mpdu dict
+    o added wep, tkip and ccmp parsing
 
 TODO:
  1) Should we add support for AVS, Prism headers ?
- 2) radiotap: ensure data pad is handled
+ 2) radiotap: ensure data pad is handled for atheros cards (any others?)
  3) mpdu: fully parse
     o control wrapper
     o fully parse qos

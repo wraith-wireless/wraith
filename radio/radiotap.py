@@ -20,6 +20,46 @@ from wraith.radio.bits import bitmask, bitmask_list, bitmask_get
 
 class RadiotapException(Exception): pass
 
+FMT_BO = "=" # struct format byte order specifier
+
+def parse(f):
+    """
+     parses the radiotap in f returning a dict d where d will always have
+      key->value pairs for:
+       vers: the radiotap version
+       sz: bytes of radiotap header
+       present: an ordered list of fields present in this frame
+     and key->value pairs for each field in present
+     NOTE: tried unpacking individually (concise code) but it failed to align
+     the individual fields
+    """
+    # parse header and present flags
+    (v,l,p) = header(f)
+    if v != 0 or len(f) < l: raise RadiotapException("Invalid frame")
+    flags = present_list(p)
+
+    # for the flags that are true, add a format specifier and unpack
+    ufmt = FMT_BO # format specified
+    fs = []       # list of flags
+    ps = []       # ordered list of present fields
+    for (flag,fmt) in _P2F_:
+        if not flags[flag]: continue
+        ufmt += fmt
+        fs.append((flag,len(fmt)))
+        ps.append(flag)
+    vs = list(struct.unpack_from(ufmt,f,_HDR_SZ_))
+
+    # compile fields and values into dict
+    fields = {'vers':v,'sz':l,'present':ps}
+    for (f,lF) in fs:
+        if lF == 1: fields[f] = vs.pop(0)
+        else:
+            fields[f] = []
+            while lF:
+                fields[f].append(vs.pop(0))
+                lF -= 1
+    return fields
+
 #--> RADIO TAP HEADER <-- http://www.radiotap.org/Radiotap
 # Note: Radiotap fields are in little-endian byte-order.
 # (u8)  it_version: always 0, for the foreseeable future
@@ -27,7 +67,7 @@ class RadiotapException(Exception): pass
 # (u16) it_len:     length of radio tap including this header
 # (u32) it_present: bitmask of which fields are present. Additional extensions can 
 #                   be made by setting bit 31
-_HDR_ = "@BxHI"
+_HDR_ = FMT_BO + "BxHI"
 _HDR_SZ_ = struct.calcsize(_HDR_)
 def header(f):
     """  parse/return tuple = (version,length,present) from frame f """
@@ -36,7 +76,7 @@ def header(f):
     except struct.error:
         raise RadiotapException("invalid frame")
 
-_VER_ = "@B"
+_VER_ =  FMT_BO + "B"
 _VER_SZ_ = struct.calcsize(_VER_)
 def version(f):
     """
@@ -48,7 +88,7 @@ def version(f):
     except struct.error:
         raise RadiotapException("invalid frame")
 
-_LEN_ = "@BxH"
+_LEN_ =  FMT_BO + "BxH"
 _LEN_SZ_ = struct.calcsize(_LEN_)
 def length(f):
     """
@@ -168,48 +208,12 @@ _PRESENT_ = {'tsft':(1 << 0),
              'vendor_namespace':(1 << 30),
              'ext':(1 << 31)}
 def present(mn): return bitmask(_PRESENT_,mn)
-def present_all(mn): return bitmask_list(_PRESENT_,mn)
+def present_list(mn): return bitmask_list(_PRESENT_,mn)
 def present_get(mn,f):
     try:
         return bitmask_get(_PRESENT_,mn,f)
     except KeyError:
         raise RadiotapException("Invalid present flag '%s'" % f)
-
-def parse(f):
-    """
-     parses the radiotap in f returning a dict d where d will always have
-      key->value pairs for:
-       vers: the radiotap version
-       sz: bytes of radiotap header
-       present: a list of fields present in this frame
-     and key->value pairs for each field in present
-     NOTE: tried unpacking individually (concise code) but it failed to align
-     the individual fields
-    """
-    # parse header and present flags
-    (v,l,p) = header(f)
-    if v != 0 or len(f) < l: raise RadiotapException("Invalid frame")
-    flags = present_all(p)
-    
-    # for the flags that are true, add a format specifier and unpack
-    ufmt = "@"
-    fs = []
-    for (flag,fmt) in _P2F_:
-        if not flags[flag]: continue
-        ufmt += fmt
-        fs.append((flag,len(fmt)))
-    vs = list(struct.unpack_from(ufmt,f,_HDR_SZ_))
-
-    # compile fields and values into dict
-    fields = {'vers':v,'sz':l,'present':present(p)}
-    for (f,lF) in fs:
-        if lF == 1: fields[f] = vs.pop(0)
-        else:
-            fields[f] = []
-            while lF:
-                fields[f].append(vs.pop(0))
-                lF -= 1
-    return fields
 
 # --> Flags <-- http://www.radiotap.org/defined-fields/Flags
 # cfp Sent/Received during CFP
@@ -217,14 +221,13 @@ def parse(f):
 # wep Sent/Received with WEP encryption
 # frag Sent/Received with fragmentation
 # fcs Includes FCS
-# pad Frame has padding betw/ 802.11 header and payload (TODO: do we need to 
-#    handle this?)
+# pad Frame has padding betw/ 802.11 header and payload
 # fail Frame failed fcs check
 # short Frame used short guard interval (currently unspecfied but used)
 _FLAGS_ = {'cfp':0x01,'short':0x02,'wep':0x04,'frag':0x08,'fcs':0x10,
            'pad':0x20,'fail':0x40,'shortgi':0x80}
 def flags(mn): return bitmask(_FLAGS_,mn)
-def flags_all(mn): return bitmask_list(_FLAGS_,mn)
+def flags_list(mn): return bitmask_list(_FLAGS_,mn)
 def flags_get(mn,f):
     try:
         return bitmask_get(_FLAGS_,mn,f)
@@ -244,7 +247,7 @@ def flags_get(mn,f):
 _CHANNEL_FLAGS_ = {'turbo':0x0010,'cck':0x0020,'ofdm':0x0040,'ism':0x0080,
                    'unii':0x0100,'passive':0x0200,'dcck':0x0400,'gfsk':0x0800,}
 def chflags(mn): return bitmask(_CHANNEL_FLAGS_,mn)
-def chflags_all(mn): return bitmask_list(_CHANNEL_FLAGS_,mn)
+def chflags_list(mn): return bitmask_list(_CHANNEL_FLAGS_,mn)
 def chflags_get(mn,f):
     try:
         return bitmask_get(_CHANNEL_FLAGS_,mn,f)
@@ -255,7 +258,7 @@ def chflags_get(mn,f):
 # crc PLCP CRC check failed
 _RX_FLAGS_= {'crc':0x0002}
 def rxflags(mn): return bitmask(_RX_FLAGS_,mn)
-def rxflags_all(mn): return bitmask_list(_RX_FLAGS_,mn)
+def rxflags_list(mn): return bitmask_list(_RX_FLAGS_,mn)
 def rxflags_get(mn,f):
     try:
         return bitmask_get(_RX_FLAGS_,mn,f)
@@ -274,7 +277,7 @@ def rxflags_get(mn,f):
 _MCS_KNOWN_ = {'bw':0x01,'mcs':0x02,'gi':0x04,'ht':0x08,'fec':0x10,'stbc':0x20,
                'nessk':0x40,'nessd':0x80}
 def mcsknown(mn): return bitmask(_MCS_KNOWN_,mn)
-def mcsknown_all(mn): return bitmask_list(_MCS_KNOWN_,mn)
+def mcsknown_list(mn): return bitmask_list(_MCS_KNOWN_,mn)
 def mcsknown_get(mn,f):
     try:
         return bitmask_get(_MCS_KNOWN_,mn,f)
@@ -317,7 +320,7 @@ def mcsflags_params(kn,fn):
 _AMPDU_FLAGS_ = {'nolen':0x0001,'nolensub':0x0002,'known':0x0004,
                  'last':0x0008,'err':0x0010,'crc':0x0020}
 def ampduflags(mn): return bitmask(_AMPDU_FLAGS_,mn)
-def ampduflags_all(mn): return bitmask_list(_AMPDU_FLAGS_,mn)
+def ampduflags_list(mn): return bitmask_list(_AMPDU_FLAGS_,mn)
 def ampduflags_get(mn,f):
     try:
         return bitmask_get(_AMPDU_FLAGS_,mn,f)
@@ -337,7 +340,7 @@ def ampduflags_get(mn,f):
 _VHT_KNOWN_ = {'stbc':0x0001,'txop':0x0002,'gi':0x0004,'short':0x0008,'ldpc':0x0010,
                'beam':0x0020,'bw':0x0040,'gid':0x0080,'paid':0x0100}
 def vhtknown(mn): return bitmask(_VHT_KNOWN_,mn)
-def vhtknown_all(mn): return bitmask_list(_VHT_KNOWN_,mn)
+def vhtknown_list(mn): return bitmask_list(_VHT_KNOWN_,mn)
 def vhtknown_get(mn,f):
     try:
         return bitmask_get(_VHT_KNOWN_,mn,f)
@@ -371,7 +374,7 @@ def vhtflags_params(kn,fn):
 # c3 coding for user 3 Set to 0 for BCC. Set to 1 for LDPC
 _VHT_CODING_ = {'c0':0x01,'c1':0x02,'c2':0x04,'c3':0x08}
 def vhtcoding(mn): return bitmask(_VHT_CODING_,mn)
-def vhtcoding_all(mn): return bitmask_list(_VHT_CODING_,mn)
+def vhtcoding_list(mn): return bitmask_list(_VHT_CODING_,mn)
 def vhtcoding_get(mn,f):
     try:
         return bitmask_get(_VHT_CODING_,mn,f)
