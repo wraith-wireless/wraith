@@ -12,7 +12,7 @@ __version__ = '0.0.4'
 __date__ = 'August 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'dale.v.patterson@gmail.mil'
+__email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
 
 import struct

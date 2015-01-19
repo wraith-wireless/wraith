@@ -25,11 +25,11 @@ Tested on Ubuntu 12.04 with net-tools 1.60, ifconfig 1.42, Wireless-Tools versio
 """
 __name__ = 'iwtools'
 __license__ = 'GPL'
-__version__ = '0.0.11'
+__version__ = '0.0.12'
 __date__ = 'April 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'dale.v.patterson@gmail.mil'
+__email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
 
 import os                # getuid & file hierarchy
@@ -122,6 +122,17 @@ def ifconfig(nic,setto=None):
         p = sp.Popen(cmd,stderr=sp.PIPE,stdout=sp.PIPE)
         out,err = p.communicate()
         if err: raise IWToolsException(err)
+
+def sethwaddr(nic,newmac):
+    """
+     ifconfig set hw address interface: Note: it is the callers responsibility to
+     ensure interface is down prior to calling and up after call
+    """
+    cmd = ['ifconfig',nic,'hw','ether',newmac]
+    if os.getuid() != 0: cmd.insert(0,'sudo')
+    p = sp.Popen(cmd,stderr=sp.PIPE,stdout=sp.PIPE)
+    out,err = p.communicate()
+    if err: raise IWToolsException(err)
 
 #### IWCONFIG
 
