@@ -133,7 +133,7 @@ class RadioController(mp.Process):
         self._nic = conf['nic']
         self._role = conf['role']
         # TODO: need to spoof the mac addr at the dev level (cannot use the vnic)
-        #  or use macchanger (need more testing)
+        #  or use macchanger (need more testing
 
         # get the phy and associated interfaces
         try:
