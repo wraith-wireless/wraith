@@ -132,6 +132,8 @@ class RadioController(mp.Process):
             raise RuntimeError("%s:iwtools.wifaces:not found" % conf['role'])
         self._nic = conf['nic']
         self._role = conf['role']
+        # TODO: need to spoof the mac addr at the dev level (cannot use the vnic)
+        #  or use macchanger (need more testing)
 
         # get the phy and associated interfaces
         try:
@@ -167,13 +169,6 @@ class RadioController(mp.Process):
         try:
             # create a monitor and turn it on
             iw.phyadd(self._phy,self._vnic,'monitor')
-            #if conf['spoofed']:
-            #    try:
-            #        newmac = iwt.sethwaddr(self._vnic,conf['spoofed'])
-            #    except iwt.IWToolsException as e:
-            #        pass
-            #    else:
-            #        if newmac != self._mac: self._spoofed = newmac
             iwt.ifconfig(self._vnic,'up')
         except iw.IWException as e:
             raise RuntimeError("%s:iw.phyadd:%s" % (self._role,e))
