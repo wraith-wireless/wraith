@@ -27,7 +27,7 @@ WLAN administrators in the security testing of their networks.
 
 ## 3. MODULES: Currently consists of four components/modules
 
-###  a. Radio: 802.11 network interface objects and functions
+###  a. Radio (v 0.0.4): 802.11 network interface objects and functions
 
 Objects/functions to manipulate wireless nics and parse 802.11 captures.
 Partial support of 802.11-2012
@@ -37,7 +37,7 @@ Partial support of 802.11-2012
 * Partially Supported: 802.11n
 * Not Supported: 802.11s\y\u\ac\ad\af
 
-### b. Suckt: Small Unit Capture/Kill Team (Wraith Sensor)
+### b. Suckt (v 0.1.5) : Small Unit Capture/Kill Team (Wraith Sensor)
 
 Suckt is a 802.11 sensor consisting of an optional collection radio (i.e.
 spotter), a mandatory reconnaissance radio (i.e. shooter) and an RTO which relays
@@ -47,7 +47,7 @@ radios, forwarding that date along with any geolocational data (if a gps device
 is present) to higher. The reconnaissance radio will also partake in assaults in
 directed to.
 
-### c. Nidus: Data Storage Manager
+### c. Nidus (v 0.0.4): Data Storage Manager
 
 Nidus is the Data Storage manager processing data received from Suckt. Nidus is the 
 interface to the backend Postgresql database, processing data in terms of raw 802.11
@@ -74,7 +74,7 @@ frames, gps location, and 'device' details/status.
  - iw.py            iw 3.17 interface
  - radiotap.py      radiotap parsing
  - mpdu.py          IEEE 802.11 MAC (MPDU) parsing
- - infoelement.py   contstants for mgmt frames
+ - dott1u.py        contstants for 802.11u (not currently used)
  - channels.py      802.11 channel, freq utilities
  - mcs.py           mcs index functions
  - oui.py           oui/manuf related functions
