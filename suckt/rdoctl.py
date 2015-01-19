@@ -85,7 +85,7 @@ class RadioController(mp.Process):
          comms - internal communications
          conn - connection to/from suckt
          conf - radio configuration dict. Must have key->value pairs for keys role,
-          nic, dwell, scan and pass and optionally for keys ant_gain, ant_type,
+          nic, dwell, scan and pass and optionally for keys spoof, ant_gain, ant_type,
           ant_loss, desc
          NOTE: the list of dwell times is an artifact of previous revisions. it
           is maintained here for future revisions that may implement adaptive
@@ -167,6 +167,13 @@ class RadioController(mp.Process):
         try:
             # create a monitor and turn it on
             iw.phyadd(self._phy,self._vnic,'monitor')
+            #if conf['spoofed']:
+            #    try:
+            #        newmac = iwt.sethwaddr(self._vnic,conf['spoofed'])
+            #    except iwt.IWToolsException as e:
+            #        pass
+            #    else:
+            #        if newmac != self._mac: self._spoofed = newmac
             iwt.ifconfig(self._vnic,'up')
         except iw.IWException as e:
             raise RuntimeError("%s:iw.phyadd:%s" % (self._role,e))

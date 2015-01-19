@@ -198,6 +198,7 @@ def chset(vnic,ch,chwidth=None):
 
 def txpwrset(nic,pwr,option="fixed"):
     """ sets txpower of nic to pwr (dBm) with option = oneof {fixed|limit|auto} """
+    # NOTE: does not work (at least on my cards)
     # confirm option is valid
     if not option in ['fixed','auto','limit']:
         raise IWException("option %s must be one of {fixed|limit|auto}" % option)

@@ -256,6 +256,7 @@ class Suckt(object):
         """ read in the rtype radio configuration from conf and return parsed dict """
         # get nic and set role setting default antenna config
         r = {'nic':conf.get(rtype,'nic'),
+             'spoofed':None,
              'ant_gain':0.0,
              'ant_loss':0.0,
              'ant_offset':0.0,
@@ -264,7 +265,9 @@ class Suckt(object):
              'scan_start':None,
              'role':rtype.lower()}
 
-        # get antenna properties
+        # get optional properties
+        if conf.has_option(rtype,'spoof'):
+            r['spoofed'] = conf.get(rtype,'spoof')
         if conf.has_option(rtype,'antenna_gain'):
             r['ant_gain'] = conf.getfloat(rtype,'antenna_gain')
         if conf.has_option(rtype,'antenna_type'):
@@ -273,8 +276,8 @@ class Suckt(object):
             r['ant_loss'] = conf.getfloat(rtype,'antenna_loss')
         if conf.has_option(rtype,'antenna_offset'):
             r['ant_offset'] = conf.getfloat(rtype,'antenna_offset')
-        if conf.has_option(rtype,'antenna_desc'):
-            r['desc'] = conf.get(rtype,'antenna_desc')
+        if conf.has_option(rtype,'desc'):
+            r['desc'] = conf.get(rtype,'desc')
 
         # get scan pattern
         r['dwell'] = conf.getfloat(rtype,'dwell')
