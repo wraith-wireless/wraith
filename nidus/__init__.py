@@ -21,7 +21,7 @@ nidus 0.0.4
     from sensor exiting to nidus closing session records
      o 1 thread per radio for saving and number of threads for storing, extracting
        are specified in the configuration file
-  - implements 'privacy' feature where saving frames can be configure to only
+  - implements 'privacy' feature whereby saving frames can be configured to only
     save layer 1 and layer 2 (including encryption from layer 3)
 
 TODO:
@@ -34,8 +34,6 @@ TODO:
 7) encrypted socket connection from wasp to nidus?
 8) secured (hashed) username/password from to datastore
 10) how/when to partition table to offload older records
-11) implement 'privatization' by giving option to only store layer1 and layer2
-    data
 12) nidusdb.py
   - in SSE Threads handle errors in some way to at least let nidusdb know thread
     is quitting
