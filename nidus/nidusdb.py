@@ -24,7 +24,6 @@ import psycopg2 as psql                                # postgresql api
 import ConfigParser                                    # config file
 import threading                                       # sse threads
 import Queue                                           # thread-safe queue
-import uuid                                            # for frame id
 import wraith.radio.radiotap as rtap                   # 802.11 layer 1 parsing
 from wraith.radio import mpdu                          # 802.11 layer 2 parsing
 from wraith.radio import mcs                           # 802.11 mcs fcts
@@ -49,6 +48,14 @@ class NidusDBInvalidFrameException(NidusDBSubmitException): pass # frame does no
 class SaveTask(tuple):
     # noinspection PyInitNewSignature
     def __new__(cls,ts,fid,sid,mac,frame,lr):
+        """
+         ts - timestamp
+         fid - frame id
+         sid - session id
+         mac - capture source mac
+         frame - actual frame
+         lr - left/right offsets into layer 1 and layer 2
+        """
         return super(SaveTask,cls).__new__(cls,tuple([ts,fid,sid,mac,frame,lr]))
     @property
     def ts(self): return self[0]
@@ -65,24 +72,31 @@ class SaveTask(tuple):
 
 class StoreTask(tuple):
     # noinspection PyInitNewSignature
-    def __new__(cls,ts,fid,mac,lFrame,l1,l2):
-        return super(StoreTask,cls).__new__(cls,tuple([ts,fid,mac,lFrame,l1,l2]))
+    def __new__(cls,fid,mac,l1,l2):
+        """
+         fid - frame id
+         mac - capture source mac
+         l1 - radiotap dict
+         l2 - mpdu dict
+        """
+        return super(StoreTask,cls).__new__(cls,tuple([fid,mac,l1,l2]))
     @property
-    def ts(self): return self[0]
+    def fid(self): return self[0]
     @property
-    def fid(self): return self[1]
+    def mac(self): return self[1]
     @property
-    def mac(self): return self[2]
+    def l1(self): return self[2]
     @property
-    def length(self): return self[3]
-    @property
-    def l1(self): return self[4]
-    @property
-    def l2(self): return self[5]
+    def l2(self): return self[3]
 
 class ExtractTask(tuple):
     # noinspection PyInitNewSignature
     def __new__(cls,ts,fid,l2):
+        """
+         ts - timestamp
+         fid - frame id
+         l2 - MPDU dict
+        """
         return super(ExtractTask,cls).__new__(cls,tuple([ts,fid,l2]))
     @property
     def ts(self): return self[0]
@@ -103,17 +117,14 @@ class SSEThread(threading.Thread):
         """
         threading.Thread.__init__(self)
         self._qT = tasks
-
-    def run(self):
-        # connect to db
-        conn = None
+        self._conn = None # connection to database
         try:
-            conn = psql.connect(host="localhost",dbname="nidus",
-                                user="nidus",password="nidus")
-            curs = conn.cursor()
+            self._conn = psql.connect(host="localhost",dbname="nidus",
+                                      user="nidus",password="nidus")
+            curs = self._conn.cursor()
             curs.execute("set time zone 'UTC';")
             curs.close()
-            conn.commit()
+            self._conn.commit()
         except psql.OperationalError as e:
             if e.__str__().find('connect') > 0:
                 raise NidusDBServerException("Postgresql not running")
@@ -122,22 +133,26 @@ class SSEThread(threading.Thread):
             else:
                 raise NidusDBException("Database failure: %s" % e)
 
-        # processing loop
+    def run(self):
+        """ processing loop - calls consume until told to stop """
         while True:
             item = self._qT.get()
             if item == '!STOP!': break
             try:
-                self._consume(item,conn)
+                self._consume(item)
             except NidusDBSubmitException as e:
                 print "Error: ", e
             except Exception as e:
                 print "Error: ", e
+        self._clean() # cleanup
 
-        # cleanup
+    def _clean(self):
+        """ closes database and call _cleanup for any subthread closing taks """
+        if self._conn and not self._conn.closed: self._conn.close()
         self._cleanup()
-        if conn and not conn.closed: conn.close()
 
-    def _consume(self,item,conn): raise NotImplementedError
+    # the following must be implemented by subclasses
+    def _consume(self,item): raise NotImplementedError
     def _cleanup(self): raise NotImplementedError
 
 class SaveThread(SSEThread):
@@ -157,20 +172,25 @@ class SaveThread(SSEThread):
         """ close file if it is open """
         if self._fout: self._fout.close()
 
-    def _consume(self,item,conn):
+    def _consume(self,item):
         """ write the packet in item to file """
+        ts = item.ts
         fid = item.fid
+        sid = item.sid
+        mac = item.mac
         frame = item.frame
         (left,right) = item.offsets
         fname = None
+
+        # close any open file exceeding specified size & create name for new file
         if not self._fout or os.path.getsize(self._fout.name) > self._sz:
             if self._fout:
                 self._fout.close()
                 self._fout = None
-            fname = os.path.join(self._path,"%d_%s_%s.pcap" % (item.sid,
-                                                               item.ts,
-                                                               item.mac))
-        curs = conn.cursor()
+            fname = os.path.join(self._path,"%d_%s_%s.pcap" % (sid,ts,mac))
+
+        # get a cursor
+        curs = self._conn.cursor()
         try:
             # need to open a new file?
             if not self._fout: self._fout = pcap.pcapopen(fname)
@@ -178,26 +198,25 @@ class SaveThread(SSEThread):
             # if private, only write the layer 1, layer 2
             if self._private:
                 if left < right: frame = frame[:left] + frame[right:]
-            pcap.pktwrite(self._fout,item.ts,frame)
+            pcap.pktwrite(self._fout,ts,frame)
 
             # store in datastore
-            sql = "insert into frame_path (id,filepath) values (%s,%s);"
-            curs.execute(sql,(fid,os.path.join(self._path,
-                                               os.path.split(self._fout.name)[1])))
+            sql = "insert into frame_path (fid,filepath) values (%s,%s);"
+            curs.execute(sql,(fid,os.path.join(self._path,os.path.split(self._fout.name)[1])))
         except pcap.PCAPException:
             # try closing the file
             self._fout.close()
             raise
         except psql.Error as e:
-            conn.rollback()
+            self._conn.rollback()
             raise NidusDBSubmitException(e.pgcode,e.pgerror)
         else:
-            conn.commit()
+            self._conn.commit()
         finally:
             curs.close()
 
 class StoreThread(SSEThread):
-    """ stores the frames in the task queue to the db """
+    """ stores the frame details in the task queue to the db """
     def __init__(self,tasks,sid):
         """
          tasks - the tasks queue
@@ -208,34 +227,15 @@ class StoreThread(SSEThread):
 
     def _cleanup(self): pass
 
-    def _consume(self,item,conn):
+    def _consume(self,item):
         # get our cursor & extract vars from item
-        curs = conn.cursor()
-        ts = item.ts
+        curs = self._conn.cursor()
         fid = item.fid
         rdo = item.mac
-        lF = item.length
         dR = item.l1
         dM = item.l2
 
         try:
-            # insert the frame - if invalid stop after insertion and commit it
-            sql = """
-                   insert into frame (id,sid,ts,bytes,bRTAP,bMPDU,data,ampdu,crypt,fcs)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
-                  """
-            if not dR:
-                curs.execute(sql,(fid,self._sid,ts,lF,0,0,[0,lF],0,'none',0))
-                conn.commit()
-                return
-
-            # valid header, continue
-            curs.execute(sql,(fid,self._sid,ts,lF,dR['sz'],dM.offset,
-                              [(dR['sz']+dM.offset),(lF-dM.stripped)],
-                              int('a-mpdu' in dR['present']),
-                              dM.crypt['type'] if dM.crypt else 'none',
-                              rtap.flags_get(dR['flags'],'fcs')))
-
             # insert ampdu?
             if 'a-mpdu' in dR['present']:
                 sql = "insert into ampdu (fid,refnum,flags) values (%s,%s,%s);"
@@ -287,7 +287,7 @@ class StoreThread(SSEThread):
                               ht,index))
 
             # insert traffic
-            if dM:
+            if dM.offset > 0:
                 sql = """
                        insert into traffic (fid,type,subtype,td,fd,mf,rt,pm,md,pf,so,
                                             dur_type,dur_val,addr1,addr2,addr3,
@@ -323,7 +323,7 @@ class StoreThread(SSEThread):
                                           dM.qosctrl['txop']))
 
                 # insert encyption if present
-                if dM.crypt and False:
+                if dM.crypt:
                     # setup sql statement and insert values
                     if dM.crypt['type'] == 'wep':
                         sql = """
@@ -333,7 +333,7 @@ class StoreThread(SSEThread):
                         vs = (fid,dM.crypt['iv'],dM.crypt['key-id'],dM.crypt['icv'])
                     elif dM.crypt['type'] == 'tkip':
                         sql = """
-                               insert into tkipcrypt (fid,ts1,wepseed,ts0,key_id,
+                               insert into tkipcrypt (fid,tsc1,wepseed,tsc0,key_id,
                                                       tsc2,tsc3,tsc4,tsc5,mic,icv)
                                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
                               """
@@ -355,12 +355,13 @@ class StoreThread(SSEThread):
                     # insert crypt if present
                     if sql and vs: curs.execute(sql,vs)
         except psql.Error as e:
-            conn.rollback()
+            self._conn.rollback()
             curs.close()
             raise NidusDBSubmitException(e.pgcode,e.pgerror)
-
-        conn.commit()
-        curs.close()
+        else:
+            self._conn.commit()
+        finally:
+            curs.close()
 
 class ExtractThread(SSEThread):
     """  extracts & stores details of nets/stas etc from mpdus in tasks queue """
@@ -379,13 +380,12 @@ class ExtractThread(SSEThread):
 
     def _cleanup(self): pass
 
-    def _consume(self,item,conn):
+    def _consume(self,item):
         # make a cursor and extract variables
-        curs = conn.cursor()
+        curs = self._conn.cursor()
         ts = item.ts
         fid = item.fid
         dM = item.l2
-        return
 
         # sta addresses
         # Function To DS From DS Address 1 Address 2 Address 3 Address 4
@@ -394,8 +394,9 @@ class ExtractThread(SSEThread):
         # To AP        1    0     RA=BSSID     TA=SA        DA       N/A
         # Wireless DS  1    1     RA=BSSID  TA=BSSID     DA=WDS    SA=WDS
 
-        # determine if each station exists already addr1 will always be present
-        sql = "select sid,id,mac from sta where mac=%s"
+        # does each station already exists for this session?
+        # addr1 will always be present
+        sql = "select sid, id, mac from sta where mac=%s"
         addrs = {dM['addr1'].lower():{'loc':[1],'id':None}}
         if 'addr2' in dM:
             a = dM['addr2'].lower()
@@ -433,14 +434,19 @@ class ExtractThread(SSEThread):
                         addrs[addr]['id'] = row[1]
                         break
 
-                # check current addr for an id, if not present add it
+                # NOTE: it is possible that another thread inserts this sta
+                # after we have checked for an id and before we insert the
+                # new sta - this will result in a duplicate key on the unique
+                # column mac in sta. Should we push everything down into the
+                # critical section below? or make a new critical section here
+
+                # check current addr for an id, if not present add this sta
                 if not addrs[addr]['id']:
                     sql = """
-                           insert into sta (sid,spotted,mac,manuf,note)
-                           values (%s,%s,%s,%s,%s)
-                           RETURNING id;
+                           insert into sta (sid,fid,spotted,mac,manuf)
+                           values (%s,%s,%s,%s,%s) RETURNING id;
                           """
-                    curs.execute(sql,(self._sid,ts,addr,manufacturer(self._oui,addr),''))
+                    curs.execute(sql,(self._sid,fid,ts,addr,manufacturer(self._oui,addr)))
                     addrs[addr]['id'] = curs.fetchone()[0]
 
                 # addr2 is transmitting (i.e. heard) others are seen
@@ -483,18 +489,18 @@ class ExtractThread(SSEThread):
                         vs = (self._sid,self._stas[addr]['id'],self._stas[addr]['fs'],
                               self._stas[addr]['ls'],self._stas[addr]['fh'],
                               self._stas[addr]['lh'])
+
+                    # update the database
+                    curs.execute(sql,vs)
                 finally:
                     #### EXIT CS
                     # NOTE: any exceptions will be rethrown after releasing the lock
                     self._l.release()
-
-                # update the database
-                curs.execute(sql,vs)
         except psql.Error as e:
-            conn.rollback()
+            self._conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
         else:
-            conn.commit()
+            self._conn.commit()
         finally:
             curs.close()
 
@@ -612,7 +618,12 @@ class NidusDB(object):
             if not ds['type'] in ['sensor','radio','gpsd']:
                 raise NidusDBSubmitParamException("Invalid Device type %s" % ds['type'])
             if ds['type'] == "sensor":
-                self._setsensor(ds['ts'],ds['id'],ds['state'],ip)
+                try:
+                    self._setsensor(ds['ts'],ds['id'],ds['state'],ip)
+                except NidusDBException:
+                    # one of our threads failed to connect to database - reraise
+                    self._conn.rollback()
+                    raise
             elif ds['type'] == "radio":
                 self._setradio(ds['ts'],ds['id'],ds['state'])
             elif ds['type'] == 'gpsd':
@@ -774,6 +785,10 @@ class NidusDB(object):
             # rollback so postgresql is not left in error state
             self._conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+        except NidusDBException:
+            # our thread failed to connect to database - reraise
+            self._conn.rollback()
+            raise
         else:
             self._conn.commit()
 
@@ -806,28 +821,64 @@ class NidusDB(object):
         except nmp.NMPException as e:
             raise NidusDBSubmitParseException(e)
 
+        # because each thread relies on a frame id and for that frame to exist
+        # frames are inserted here. The worker threads will insert as necessary
+        # remaining details
+
         # parse the radiotap and mpdu
-        frame = ds['frame']
+        f = ds['frame']  # pull out the frame
+        lF = len(f)      # & get the total length
+        dR = {}          # make an empty rtap dict
+        dM = mpdu.MPDU() # & an empty mpdu dict
+        validRTAP = True # rtap was parsed correctly
+        validMPDU = True # mpdu was parsed correctly
         try:
-            dR = rtap.parse(frame)
-            dM = mpdu.parse(frame[dR['sz']:],rtap.flags_get(dR['flags'],'fcs'))
+            dR = rtap.parse(f)
+            dM = mpdu.parse(f[dR['sz']:],rtap.flags_get(dR['flags'],'fcs'))
         except rtap.RadiotapException:
-            dR = {'sz':0}
-            dM = mpdu.MPDU()
+            # the parsing failed at radiotap, set insert values to empty
+            validRTAP = validMPDU = False
+            vs = (self._sid,ds['ts'],lF,0,0,[0,lF],0,'none',0)
         except mpdu.MPDUException:
-            dM = mpdu.MPDU()
+            # the radiotap was valid but mpdu failed - initialize empty mpdu
+            validMPDU = False
+            vs = (self._sid,ds['ts'],lF,dR['sz'],0,[dR['sz'],lF],
+                  int('a-mpdu' in dR['present']),0,0)
+        else:
+            vs = (self._sid,ds['ts'],lF,dR['sz'],
+                  dM.offset,[(dR['sz']+dM.offset),(lF-dM.stripped)],
+                  int('a-mpdu' in dR['present']),
+                  dM.crypt['type'] if dM.crypt else 'none',
+                  rtap.flags_get(dR['flags'],'fcs'))
 
-        # send to SSE workers
-        # store thread
-        fid = uuid.uuid4().hex
+        # insert the frame
+        sql = """
+               insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,ampdu,crypt,fcs)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning id;
+              """
+        try:
+            self._curs.execute(sql,vs)
+            fid = self._curs.fetchone()[0]
+        except psql.Error as e:
+            self._conn.rollback()
+            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+        else:
+            self._conn.commit()
+
+        # put task(s) on SSE queues
+        # S: frame will always be saved (if specified in config file
+        # S: frame will be 'stored' if radiotap is valid
+        # E: frame will be 'extracted' if mpdu is valid
         if self._raw['save']:
-            self._qSave[ds['mac']].put(SaveTask(ds['ts'],fid,self._sid,ds['mac'],
-                                                frame,(dR['sz']+dM.offset,
-                                                       len(frame)-dM.stripped)))
-
-        # send to queues
-        self._qStore.put(StoreTask(ds['ts'],fid,ds['mac'],len(frame),dR,dM))
-        if dM: self._qExtract.put(ExtractTask(ds['ts'],fid,dM))
+            # setup our left/right boundaries for privacy feature
+            l = r = 0
+            if validRTAP: l += dR['sz']
+            if validMPDU:
+                l += dM.offset
+                r = lF-dM.stripped
+            self._qSave[ds['mac']].put(SaveTask(ds['ts'],fid,self._sid,ds['mac'],f,(l,r)))
+        if validRTAP: self._qStore.put(StoreTask(fid,ds['mac'],dR,dM))
+        if validMPDU: self._qExtract.put(ExtractTask(ds['ts'],fid,dM))
 
     def submitgeo(self,f):
         """ submitgeo - submit the string fields to the database """

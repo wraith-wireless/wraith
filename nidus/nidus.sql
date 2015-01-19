@@ -206,7 +206,7 @@ CREATE TYPE CRYPT_TYPE AS ENUM ('none','wep','tkip','ccmp','other');
 -- TODO: add location here or force separate select on geo table
 DROP TABLE IF EXISTS frame;
 CREATE TABLE frame(
-   id uuid NOT NULL,                 -- frame primary key
+   id bigserial NOT NULL,            -- frame primary key
    sid integer NOT NULL,             -- foreign key to session
    ts TIMESTAMPTZ NOT NULL,          -- time of collection
    bytes smallint NOT NULL,          -- ttl bytes
@@ -231,17 +231,20 @@ CREATE TABLE frame(
 -- case the different threads processing thsee are out of sync
 DROP TABLE IF EXISTS frame_path;
 CREATE TABLE frame_path(
-   id uuid UNIQUE NOT NULL,
-   filepath TEXT NOT NULL
+   fid bigint NOT NULL,      -- foreign key to frame id
+   filepath TEXT NOT NULL,   -- file path of this frame
+   CONSTRAINT ch_fid CHECK (fid > 0),
+   FOREIGN KEY (fid) REFERENCES frame(id)
 );
 
 -- ampdu table
 -- defines ampdu frames
 DROP TABLE IF EXISTS ampdu;
 CREATE TABLE ampdu(
-   fid uuid NOT NULL, -- foreign key to frame
+   fid bigint NOT NULL,      -- foreign key to frame
    refnum bigint NOT NULL,   -- reference number
    flags integer NOT NULL,   -- flags
+   CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_refnum CHECK (refnum > 0),
    CONSTRAINT ch_flags CHECK (flags > 0),
    FOREIGN KEY (fid) REFERENCES frame(id)
@@ -251,10 +254,11 @@ CREATE TABLE ampdu(
 -- defines the collecting source of a frame
 DROP TABLE IF EXISTS source;
 CREATE TABLE source(
-   fid uuid NOT NULL,     -- foreign key to frame
+   fid bigint NOT NULL,          -- foreign key to frame
    src macaddr NOT NULL,         -- foreign key to collecting source
    antenna smallint default '0', -- antenna of source collecting signal
    rfpwr smallint,               -- rf power in dB
+   CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_ant CHECK (antenna >= 0 and antenna < 256),   
    CONSTRAINT ch_rfpwr CHECK (rfpwr > -150 and rfpwr < 150),
    FOREIGN KEY (src) REFERENCES radio(mac),
@@ -273,7 +277,7 @@ CREATE TYPE MCS_BW AS ENUM ('20','40','20L','20U');
 -- defines data as captured in the frame header
 DROP TABLE IF EXISTS signal;
 CREATE TABLE signal(
-   fid uuid NOT NULL,   -- foreign key to frame
+   fid bigint NOT NULL,        -- foreign key to frame
    std STANDARD NOT NULL,      -- what standard
    rate decimal(5,1) NOT NULL, -- rate in Mbps of signal
    channel smallint NOT NULL,  -- channel
@@ -284,6 +288,7 @@ CREATE TABLE signal(
    mcs_gi smallint,            -- mcs guard interval 0=long, 1=short
    mcs_ht smallint,            -- mcs ht format 0=mixed, 1=greenfield
    mcs_index smallint,         -- mcs index if known
+   CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_rate CHECK (rate >= 0),
    CONSTRAINT ch_channel CHECK (channel > 0 and channel < 200),
    CONSTRAINT ch_chflags CHECK (chflags >= 0),
@@ -322,13 +327,13 @@ CREATE TYPE DUR_TYPE AS ENUM ('vcs','cfp','aid','rsrv');
 -- NOTE: for duration value is only included if the type is of vsc or aid
 DROP TABLE IF EXISTS traffic;
 CREATE TABLE traffic(
-   fid uuid NOT NULL,    -- foreign key to frame
+   fid bigint NOT NULL,         -- foreign key to frame
    type FT_TYPE NOT NULL,       -- type of frame
    subtype FT_SUBTYPE NOT NULL, -- subtype of frame
    td smallint default '0',     -- to ds bit 
    fd smallint default '0',     -- from ds bit
    mf smallint default '0',     -- more fragments bit
-   rt smallint default '0',      -- retry bit
+   rt smallint default '0',     -- retry bit
    pm smallint default '0',     -- power mgmt bit
    md smallint default '0',     -- more data bit
    pf smallint default '0',     -- protected frame bit
@@ -341,6 +346,7 @@ CREATE TABLE traffic(
    fragnum smallint,            -- seq control fragment number
    seqnum smallint,             -- seq control sequence number
    addr4 macaddr,               -- fourth address
+   CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_td CHECK (td >= 0 and td <= 1),
    CONSTRAINT ch_fd CHECK (fd >= 0 and fd <= 1),
    CONSTRAINT ch_mf CHECK (mf >= 0 and mf <= 1),
@@ -358,12 +364,13 @@ CREATE TABLE traffic(
 -- defines qos control table
 DROP TABLE IF EXISTS qosctrl;
 CREATE TABLE qosctrl(
-   fid uuid NOT NULL, -- foreign key to frame
+   fid bigint NOT NULL,      -- foreign key to frame
    tid smallint NOT NULL,    -- tid/access class bits 0-3
    eosp smallint not NULL,   -- eosp bit 4
    ackpol smallint not NULL, -- ack policy bits 5-6
    amsdu smallint not NULL,  -- a-msdu bit 7
    txop smallint not NULL,   -- 8 bit txop limit, txip dur. req. AP PS, etc
+   CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_tid CHECK (tid >=0 and tid < 16),
    CONSTRAINT ch_eosp CHECK (eosp >=0 and eosp <=1),
    CONSTRAINT ch_ackpol CHECK (ackpol >= 0 and ackpol <=4),
@@ -376,10 +383,11 @@ CREATE TABLE qosctrl(
 -- defines wep encryption scheme at layer 3
 DROP TABLE IF EXISTS wepcrypt;
 CREATE TABLE wepcrypt(
-   fid uuid NOT NULL, -- foreign key to frame
+   fid bigint NOT NULL,      -- foreign key to frame
    iv bytea NOT NULL,        -- hex repr of 3 byte wep iv
    key_id smallint NOT NULL, -- index of wep key (out of 4) used
    icv bytea NOT NULL,       -- hex repr of f byte wep icv
+   CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_key_id CHECK (key_id >= 0 and key_id < 4),
    FOREIGN KEY(fid) REFERENCES frame(id)
 );
@@ -388,7 +396,7 @@ CREATE TABLE wepcrypt(
 -- defines tkip encryption scheme at layer 3
 DROP TABLE IF EXISTS tkipcrypt;
 CREATE TABLE tkipcrypt(
-   fid uuid NOT NULL, -- foreign key to frame
+   fid bigint NOT NULL,      -- foreign key to frame
    tsc1 bytea NOT NULL,      -- hex repr of 1 byte iv-tsc1
    wepseed bytea NOT NULL,   -- hex repr of 1 byte iv-wep-seed
    tsc0 bytea NOT NULL,      -- hex repr of 1 byte iv-tsc0
@@ -399,6 +407,7 @@ CREATE TABLE tkipcrypt(
    tsc5 bytea NOT NULL,      -- hex repr of 1 byte extiv-tsc5
    mic bytea NOT NULL,       -- hex repr of 8 byte mic
    icv bytea NOT NULL,       -- hex repr of 4 byte ICV
+   CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_key_id CHECK (key_id >= 0 and key_id < 4),
    FOREIGN KEY(fid) REFERENCES frame(id)
 );
@@ -407,7 +416,7 @@ CREATE TABLE tkipcrypt(
 -- defines ccmp encryption scheme at layer 3
 DROP TABLE IF EXISTS ccmpcrypt;
 CREATE TABLE ccmpcrypt(
-   fid uuid NOT NULL, -- foreign key to frame
+   fid bigint NOT NULL,      -- foreign key to frame
    pn0 bytea NOT NULL,       -- hex repr of 1 byte pn0
    pn1 bytea NOT NULL,       -- hex repr of 1 byte pn1
    key_id smallint NOT NULL, -- index of ccmp key value
@@ -416,6 +425,7 @@ CREATE TABLE ccmpcrypt(
    pn4 bytea NOT NULL,       -- hex repr of 1 byte pn4
    pn5 bytea NOT NULL,       -- hex repr of 1 byte pn5
    mic bytea NOT NULL,       -- hex repr of 8 byte mic
+   CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_key_id CHECK (key_id >= 0 and key_id < 4),
    FOREIGN KEY(fid) REFERENCES frame(id)
 );
@@ -423,28 +433,65 @@ CREATE TABLE ccmpcrypt(
 -- network entities
 
 -- sta table
--- primary entity of a network. A sta is a client or an ap in a BSS/IBSS (or 
--- outside probing etc)
+-- primary entity of a network. A sta is a client or an ap of a BSS/IBSS or
+-- a station attempting to enter/create a BSS/IBSS or the ap a sta is 
+-- probing for 
+-- the sta table exists across sessions
 DROP TABLE IF EXISTS sta;
 CREATE TABLE sta(
    id serial NOT NULL,                   -- primary key
-   sid integer NOT NULL,                 -- fk first session sta was identified
+   sid integer NOT NULL,                 -- fk to session sta was seen
+   fid bigint NOT NULL,                  -- fk to frame sta was first seen
    spotted TIMESTAMPTZ NOT NULL,         -- ts sta was first seen/heard
-   mac macaddr UNIQUE NOT NULL,          -- mac address of radio
+   mac macaddr UNIQUE NOT NULL,          -- mac address of sta's radio
    manuf VARCHAR(100) default 'unknown', -- manufacturer according to oui
    note TEXT,                            -- any notes on sta
+   CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_sid CHECK (sid > 0),
-   PRIMARY KEY (id),
-   FOREIGN KEY(sid) REFERENCES sensor(session_id)
+   FOREIGN KEY (sid) REFERENCES sensor(session_id),
+   FOREIGN KEY (fid) REFERENCES frame(id),
+   PRIMARY KEY (id)
 );
 
--- host table
--- each host may have one or more stas
---DROP TABLE IF EXISTS host;
---CREATE TABLE host(
---   id integer NOT NULL,    -- id of this host
---   staid integer NOT NULL, -- id of a sta on this host
---);
+-- sta_activity table
+-- defines activity (seen,heard) of 802.11 station during a session
+--  Seen and Heard
+-- define the stations activity timestamps during the giving session:
+--  firstSeen - timestamp this station was first referenced in traffic i.e.
+--              through a probe, traffic sent to etc
+--  lastSeen - timestamp this station was last referenced in traffic
+--  firstHeard - timestamp this station first transmitted
+--  lastHeard - timestamp this station last transmitted
+-- The sta_activity table defines a sta's activity on a per session basis 
+DROP TABLE IF EXISTS sta_activity;
+CREATE TABLE sta_activity(
+   sid integer NOT NULL,   -- foreign key to session id
+   staid integer NOT NULL, -- foreign key to sta id
+   firstSeen TIMESTAMPTZ,  -- ts this station was first seen
+   lastSeen TIMESTAMPTZ,   -- ts this station was las seen 
+   firstHeard TIMESTAMPTZ, -- ts this station was first heard
+   lastHeard TIMESTAMPTZ,  -- ts this station was last heard 
+   CONSTRAINT ch_sid CHECK (sid > 0),
+   CONSTRAINT ch_staid CHECK (staid > 0),
+   FOREIGN KEY(sid) REFERENCES sensor(session_id),
+   FOREIGN KEY(staid) REFERENCES sta(id),
+   PRIMARY KEY(sid,staid)
+);
+
+DROP TABLE IF EXISTS net;
+CREATE TABLE net(
+   id serial NOT NULL,   -- primary key
+   sid integer NOT NULL, -- foreign key to session id
+   essid VARCHAR(32),    -- the ssid of this network
+   CONSTRAINT ch_sid CHECK (sid > 0),
+   PRIMARY KEY(id)
+);
+
+DROP TABLE IF EXISTS net_activity;
+CREATE TABLE net_activity(
+   essid VARCHAR(32), -- the ssid of this network
+   
+);
 
 -- sta state enumerations
 DROP TYPE IF EXISTS STA_STATE;
@@ -456,7 +503,7 @@ CREATE TYPE STA_TYPE AS ENUM ('unknown','ap','sta','wired');
 
 DROP TABLE IF EXISTS sta_info;
 CREATE TABLE sta_info(
-   sid integer NOT NULL,              -- fk to session, these details are known
+   sid integer NOT NULL,              -- fk to session that these details are known
    staid integer NOT NULL,            -- fk to sta
    ts TIMESTAMPTZ NOT NULL,           -- timestamp this info is knwon
    state STA_STATE default 'unknown', -- state of sta
@@ -467,20 +514,17 @@ CREATE TABLE sta_info(
    os_vers VARCHAR(50),               -- os vers i.e XP
    os_sp VARCHAR(50),                 -- os service pack or revision
    os_lang VARCHAR(50),               -- human language of os
-   os_not TEXT,                       -- any notes on os
    hw_name VARCHAR(50),               -- hw name i.e. Buffalo
    hw_flavor VARCHAR(50),             -- hw flavor i.e. N750
    hw_vers VARCHAR(50),               -- hw version
    hw_sp VARCHAR(50),                 -- hw service pack or revision
    hw_lang VARCHAR(50),               -- language
-   hw_note TEXT,                      -- any note on hw
    fw_name VARCHAR(50),               -- fw/card name i.e. intel
    fw_flavor VARCHAR(50),             -- fw/card flavor i.e. centrino 1000
    fw_vers VARCHAR(50),               -- fw/card version
    fw_rev VARCHAR(50),                -- fw/card revision
    fw_driver VARCHAR(50),             -- driver of the card 
    fw_chipset VARCHAR(50),            -- chipset of the card
-   fw_note TEXT,                      -- any note on fw
    CONSTRAINT ch_sid CHECK (sid > 0),
    CONSTRAINT ch_staid CHECK (staid > 0),
    FOREIGN KEY(sid) REFERENCES sensor(session_id),
@@ -507,31 +551,6 @@ CREATE TABLE sta_event(
    FOREIGN KEY(staid) REFERENCES sta(id),
 );
 
--- sta_activity table
--- defines activity (seen,heard) of 802.11 station during a session
--- each 'unique' station is defined on a per session basis. Seen and Heard
--- define the stations activity timestamps during the giving session:
---  firstSeen - timestamp this station was first referenced in traffic i.e.
---              through a probe, traffic sent to etc
---  lastSeen - timestamp this station was last referenced in traffic
---  firstHeard - timestamp this station first transmitted
---  lastHeard - timestamp this station last transmitted
--- TODO: make sid,staid a primary key ?
-DROP TABLE IF EXISTS sta_activity;
-CREATE TABLE sta_activity(
-   sid integer NOT NULL,   -- foreign key to session id
-   staid integer NOT NULL, -- foreign key to sta id
-   firstSeen TIMESTAMPTZ,  -- ts this station was first seen
-   lastSeen TIMESTAMPTZ,   -- ts this station was las seen 
-   firstHeard TIMESTAMPTZ, -- ts this station was first heard
-   lastHeard TIMESTAMPTZ,  -- ts this station was last heard 
-   CONSTRAINT ch_sid CHECK (sid > 0),
-   CONSTRAINT ch_staid CHECK (staid > 0),
-   FOREIGN KEY(sid) REFERENCES sensor(session_id),
-   FOREIGN KEY(staid) REFERENCES sta(id),
-   PRIMARY KEY(sid,staid)
-);
-
 -- delete data from all tables
 -- TODO: look into truncate
 DELETE FROM ampdu;
@@ -543,7 +562,11 @@ DELETE FROM wepcrypt;
 DELETE FROM signal;
 DELETE FROM source;
 DELETE FROM frame_path;
+DELETE FROM sta_activity;
+DELETE FROM sta;
+ALTER SEQUENCE sta_id_seq restart;
 DELETE FROM frame;
+ALTER SEQUENCE frame_id_seq RESTART;
 DELETE FROM using_gpsd;
 DELETE FROM geo;
 DELETE FROM gpsd;
@@ -555,29 +578,6 @@ DELETE FROM radio_period;
 DELETE FROM radio;
 DELETE FROM sensor;
 ALTER SEQUENCE sensor_session_id_seq RESTART;
-
-
-delete from sta_info;
---delete from sta_event;
-delete from sta_activity;
-delete from sta;
-alter sequence sta_id_seq restart;
-delete from traffic;
-delete from source;
-delete from signal;
-delete from ampdu;
-delete from frame_path;
-delete from frame;
-delete from using_radio;
-delete from using_gpsd;
-delete from geo;
-delete from sensor;
-alter sequence sensor_session_id_seq restart;
-delete from gpsd;
-delete from radio_epoch;
-delete from radio_period;
-delete from radio_event;
-delete from radio;
 
 DROP TABLE ampdu;
 DROP TABLE ccmpcrypt;

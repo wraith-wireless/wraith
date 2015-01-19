@@ -35,6 +35,7 @@ TODO:
  4) look into parsing
    0 RSN Std 8.4.2.27
    o 802.11u
+ 5) how to support a-msdu etc
 """
 __name__ = 'radio'
 __license__ = 'GPL'

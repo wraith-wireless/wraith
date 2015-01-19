@@ -15,14 +15,25 @@ nidus 0.0.4
  changes:
   - extends failure method to handle situations where nidus is shutdown unexpectantly
   - no longer attempts to store all packets in the data store
-    o frames are saved to file
-    o frames are parsed and portions are stored in the data store
+     o frames are saved to file
+     o frames are parsed and portions are stored in the data store
   - SSE (Save Store Extract) is multithreaded which has helped alleviate delay
     from sensor exiting to nidus closing session records
-     o 1 thread per radio for saving and number of threads for storing, extracting
-       are specified in the configuration file
+      o 1 thread per radio for saving and number of threads for storing, extracting
+        are specified in the configuration file
+      o the database connection is attempted in the __init__ function
+      o threads will create a cursor each time an item is processed (see
+        psycopg2 for details on lightweight cursors)
   - implements 'privacy' feature whereby saving frames can be configured to only
     save layer 1 and layer 2 (including encryption from layer 3)
+  - modified frame submission (running into issues where a frame id had to be
+    created IOT individual threads [i.e. Save,Extract] did not insert a record
+    referenceing a frame that did not exist):
+     o the frame record is inserted in the submitframe function so that each thread
+       will have the primary key of that frame.
+     o tasks are only put respective queues if there is something for the SSE
+       thread to process. i.e. if the MPDU failed to parse, extract threads will
+       not be tasked with processing an empty MPDU
 
 TODO:
 1) Should we return messages? i.e instead of just closing pipe for no running server etc
@@ -40,6 +51,8 @@ TODO:
   - ensure only one radio submit per radio is allowed
   - during setsensor ensure a new session for a sensor is not created if one already
     exists
+  - extend critical session to ensure stas are not inserted in between queries for
+    their presence in the db and inserting them by another thread
 """
 __name__ = 'datastore'
 __license__ = 'GPL'

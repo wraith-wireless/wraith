@@ -51,7 +51,6 @@ TODO:
            - hold stop scanning on current channel
            - listen stop scanning on specified channel
            - pause stop scanning and recording
-     34)
      37) add ability to 'filter' on one network, i.e. bssid or ssid?
      40) look into socket options (and pcapy code) to ensure best performance
 """

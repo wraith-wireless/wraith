@@ -243,7 +243,6 @@ def flags_get(mn,f):
 # passive Only Passive scan allowed
 # dcck Dyanamic CCK-OFDM channel
 # gfsk GFSK Channel (FHS PHY)
-# TODO: look into flags found in wireshark, not listed by radiotap
 _CHANNEL_FLAGS_ = {'turbo':0x0010,'cck':0x0020,'ofdm':0x0040,'ism':0x0080,
                    'unii':0x0100,'passive':0x0200,'dcck':0x0400,'gfsk':0x0800,}
 def chflags(mn): return bitmask(_CHANNEL_FLAGS_,mn)
