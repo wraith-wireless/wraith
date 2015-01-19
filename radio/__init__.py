@@ -24,13 +24,13 @@ radio 0.0.5
       type of frame
     o defined a 'wrapper' class around the mpdu dict
     o added wep, tkip and ccmp parsing
+    o decided to pass on parsing msb of qosctrl to 'clients'
 
 TODO:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)
  3) mpdu: fully parse
     o control wrapper
-    o fully parse qos
     o +htc
  4) look into parsing
    0 RSN Std 8.4.2.27

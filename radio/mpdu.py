@@ -61,8 +61,9 @@ class MPDU(dict):
         return super(MPDU,cls).__new__(cls,dict({} if not d else d))
 
     #### PROPERTIES
-    # The following are the minimum required fields of a mpdu frame
-    # and will raise an unistantiated error if not present
+
+    # the following are 'added fields' of an mpdu they will return a default
+    # 'empty' value if the mpdu is not instantiated
 
     @property
     def offset(self):
@@ -70,14 +71,15 @@ class MPDU(dict):
         try:
             return self['offset']
         except:
-            raise MPDUUninstantiatedException
+            return 0
 
+    @property
     def stripped(self):
         # number of bytes read from the last byte of the frame
         try:
             return self['stripped']
         except:
-            raise MPDUUninstantiatedException
+            return 0
 
     @property
     def size(self):
@@ -86,14 +88,17 @@ class MPDU(dict):
         try:
             return self['offset'] + self['stripped']
         except:
-            raise MPDUUninstantiatedException
+            return 0
 
     @property
     def present(self):
         try:
             return self['present']
         except:
-            raise MPDUUninstantiatedException
+            return []
+
+    # The following are the minimum required fields of a mpdu frame
+    # and will raise an unistantiated error if not present
 
     @property
     def framectrl(self):
@@ -166,13 +171,13 @@ class MPDU(dict):
     @property
     def addr4(self): return self['addr4'] if 'addr4' in self else None
     @property
-    def qosctrl(self): return self['qosctrl'] if 'qosctrl' in self else None
+    def qosctrl(self): return self['qos'] if 'qos' in self else None
     @property
     def htc(self): return self['htc'] if 'htc' in self else None
     @property
     def fcs(self): return self['fcs'] if 'fcs' in self else None
     @property
-    def encryption(self): return self['l3-crypt'] if 'l3-crypt' in self else None
+    def crypt(self): return self['l3-crypt'] if 'l3-crypt' in self else None
 
 def parse(frame,hasFCS=False):
     """
@@ -229,7 +234,6 @@ def parse(frame,hasFCS=False):
                 _tkip_(frame,mac)
             else:
                 _ccmp_(frame,mac)
-
         else: # 5th (ExtIV) bit is not set on the 4th octet we have WEP
             _wep_(frame,mac)
 
@@ -363,6 +367,13 @@ def datasubtype_get(mn,f):
     except KeyError:
         raise MPDUException("invalid data subtype flag '%s'" % f)
 
+def subtypes(ft,st):
+    """ returns the subtype description given the values ft and st """
+    if ft == FT_MGMT: return ST_MGMT_TYPES[st]
+    elif ft == FT_CTRL: return ST_CTRL_TYPES[st]
+    elif ft == FT_DATA: return ST_DATA_TYPES[st]
+    else: return 'rsrv'
+
 #### DURATION/ID Std 8.2.4.2 (also see Table 3.3 in CWAP)
 # Duration/ID field is 2 bytes and has three functions
 #  1. Virtual carrier-sense: value is the NAV timer (i.e. duration)
@@ -380,14 +391,14 @@ _DUR_CFP_ = 32768
 def _duration_(v):
     """ parse duration field v """
     bits = bitmask_list(_DUR_SIG_BITS_,v)
-    if not bits['15']: return {'type':'duration','dur':leastx(15,v)}
+    if not bits['15']: return {'type':'vcs','dur':leastx(15,v)}
     else:
         if not bits['14']:
             if v == _DUR_CFP_: return {'type':'cfp'}
         else:
             x = leastx(13,v)
             if x <= 2007: return {'type':'aid','aid':x}
-    return {'type':'duration','dur':'rsrv'}
+    return {'type':None,'dur':'rsrv'}
 
 #### ADDRESS Fields Std 8.2.4.3
 def _address_(l):
@@ -408,11 +419,33 @@ def _seqctrl_(v): return {'fragno':leastx(_SEQCTRL_DIVIDER_,v),
 # the sender and frame subtype
 # See Table 8-4 for descriptions
 
+# ACCESS CATEGORY CONSTANTS
+QOS_AC_BE_BE = 0
+QOS_AC_BK_BK = 1
+QOS_AC_BK_NN = 2
+QOS_AC_BE_EE = 3
+QOS_AC_VI_CL = 4
+QOS_AC_VI_VI = 5
+QOS_AC_VO_VO = 6
+QOS_AC_VO_NC = 7
+
 # least signficant 8 bits
 _QOS_FIELDS_ = {'eosp':(1 << 4),'a-msdu':(1 << 7)}
 _QOS_TID_END_          = 4 # BITS 0 - 3
 _QOS_ACK_POLICY_START_ = 5 # BITS 5-6
 _QOS_ACK_POLICY_LEN_   = 2
+
+def _qosctrl_(v):
+    """ parse the qos field from the unpacked values v """
+    lsb = v[0] # bits 0-7
+    msb = v[1] # bits 8-15
+
+    # bits 0-7 are TID (3 bits), EOSP (1 bit), ACK Policy (2 bits and A-MSDU-present(1 bit)
+    qos = bitmask_list(_QOS_FIELDS_,lsb)
+    qos['tid'] = leastx(_QOS_TID_END_,lsb)
+    qos['ack-policy'] = midx(_QOS_ACK_POLICY_START_,_QOS_ACK_POLICY_LEN_,lsb)
+    qos['txop'] = msb # bits 8-15 can vary Std Table 8-4
+    return qos
 
 # most signficant 8 bits
 #                                 |Sent by HC          |Non-AP STA EOSP=0  |Non-AP STA EOSP=1
@@ -432,30 +465,12 @@ _QOS_ACK_POLICY_LEN_   = 2
 # AP PS Buffer State:
 # Queue Size: sent by non-AP STA with EOSP bit set
 
+
 # AP PS Buffer State
 _QOS_AP_PS_BUFFER_FIELDS = {'rsrv':(1 << 0),'buffer-state-indicated':(1 << 1)}
 _QOS_AP_PS_BUFFER_HIGH_PRI_START_ = 2 # BITS 2-3 (corresponds to 10 thru 11)
 _QOS_AP_PS_BUFFER_HIGH_PRI_LEN_   = 2
 _QOS_AP_PS_BUFFER_AP_BUFF_START_  = 4 # BITS 4-7 (corresponds to 12 thru 15
-
-# Mesh Fields
-_QOS_MESH_FIELDS_ = {'mesh-control':(1 << 0),'pwr-save-lvl':(1 << 1),'rspi':(1 << 2)}
-_QOS_MESH_RSRV_START_  = 3
-
-def _qosctrl_(v):
-    """ parse the qos field from the unpacked values v """
-    lsb = v[0] # bits 0-7
-    msb = v[1] # bits 8-15
-
-    # bits 0-7 are TID (3 bits), EOSP (1 bit), ACK Policy (2 bits and A-MSDU-present(1 bit)
-    qos = bitmask_list(_QOS_FIELDS_,lsb)
-    qos['tid'] = leastx(_QOS_TID_END_,lsb)
-    qos['ack-policy'] = midx(_QOS_ACK_POLICY_START_,_QOS_ACK_POLICY_LEN_,lsb)
-
-    # bits 8-15 can vary Std Table 8-4
-    qos['txop'] = msb
-    return qos
-
 def _qosapbufferstate_(v):
     """ parse the qos ap ps buffer state """
     apps = bitmask_list(_QOS_FIELDS_,v)
@@ -464,6 +479,9 @@ def _qosapbufferstate_(v):
     apps['ap-buffered'] = mostx(_QOS_AP_PS_BUFFER_AP_BUFF_START_,v)
     return apps
 
+# Mesh Fields
+_QOS_MESH_FIELDS_ = {'mesh-control':(1 << 0),'pwr-save-lvl':(1 << 1),'rspi':(1 << 2)}
+_QOS_MESH_RSRV_START_  = 3
 def _qosmesh_(v):
     """ parse the qos mesh fields """
     mf = bitmask_list(_QOS_MESH_FIELDS_,v)
@@ -652,7 +670,15 @@ def capinfo_get(mn,f):
     except KeyError:
         raise MPDUException("invalid data subtype flag '%s'" % f)
 
-# CONSTANTS for element ids
+
+# CONSTANTS for action frames Std 8.5.1
+SPEC_MGMT_MEAS_REQ  = 0
+SPEC_MGMT_MEAS_REP  = 1
+SPEC_MGMT_TPC_REQ   = 2
+SPEC_MGMT_TPC_REP   = 3
+SPEC_MGMT_CH_SWITCH = 4
+
+# CONSTANTS for element ids Std 8.4.2.1
 # reserved 17 to 31, 47, 49, 128, 129, 133-136, 143-173, 175-220, 222-255
 # undefined 77,103
 EID_SSID                    =   0

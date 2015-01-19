@@ -1,19 +1,7 @@
 #!/usr/bin/env python
 
-""" infoelement 802.11 information element ids
-
-Fixed Parameter and Information Element constants for 802.11 MGMT Frames, listed here
-to avoid cluttering up mpdu.py
-
-See Std Table 8-54
-
-TODO:
- 1) parse out "interesting" info element fields, status, reason codes (look at http://w1.fi/wpa_supplicant/devel
-   /ieee802__11__defs_8h_source.html for)
-  o RSN 48
-  o Neighbor Report 52
-"""
-__name__ = 'infoelement'
+""" dot11u 802.11u constants """
+__name__ = 'dot11u'
 __license__ = 'GPL'
 __version__ = '0.0.1'
 __date__ = 'December 2014'
@@ -102,11 +90,4 @@ VENUE_TYPE_ASSIGN = {VENUE_UNSPECIFIED:{0,"UNSPECIFIED"},
                                     4:"TRAFFIC CONTROL",
                                     5:"BUS STOP",
                                     6:"KIOSK"}}
-
-# action frames Std 8.5.1
-SPEC_MGMT_MEAS_REQ  = 0
-SPEC_MGMT_MEAS_REP  = 1
-SPEC_MGMT_TPC_REQ   = 2
-SPEC_MGMT_TPC_REP   = 3
-SPEC_MGMT_CH_SWITCH = 4
 

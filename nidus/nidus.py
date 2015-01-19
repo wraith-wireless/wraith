@@ -59,7 +59,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
             db.connect() 
         except nidusdb.NidusDBException as e:
             logging.error("DB Interface failed: %s",e)
-            connected = False
+            return
             
         # serving loop
         while connected:

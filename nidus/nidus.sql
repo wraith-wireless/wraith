@@ -1,7 +1,7 @@
 -- timestamp for eternity = infinity
 -- using postgresql 9.3.4
 -- ensure postgresql service is running - sudo service postgresql start
--- version 0.0.8
+-- version 0.0.9
 
 -- create nidus user and nidus database  
 --postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
@@ -45,7 +45,8 @@ CREATE TABLE sensor(
 -- details of a gps device
 DROP TABLE IF EXISTS gpsd;
 CREATE TABLE gpsd(
-    id VARCHAR(9),                  -- id of device (assumes usb)
+    id serial,                      -- primary key
+    devid VARCHAR(9),               -- device id (XXXX:XXXX assumes usb)
     version VARCHAR(5) NOT NULL,    -- gpsd version
     flags SMALLINT DEFAULT 1,       -- device flags
     driver VARCHAR(50) NOT NULL,    -- driver for device
@@ -55,14 +56,13 @@ CREATE TABLE gpsd(
 );
 
 -- using_gpsd table
--- this assumes that the gpsd device will be usb and the device id is of the form
--- XXXX:XXXX
 DROP TABLE IF EXISTS using_gpsd;
 CREATE TABLE using_gpsd(
    sid integer NOT NULL,          -- foreign key to session
-   gid VARCHAR(9) NOT NULL,       -- foreign key to gps device
+   gid integer NOT NULL,          -- foreign key to gps device
    period TSTZRANGE NOT NULL,     -- timerange sensor is using gid
    CONSTRAINT ch_sid CHECK (sid > 0),
+   CONSTRAINT ch_gid CHECK (gid > 0),
    FOREIGN KEY (sid) REFERENCES sensor(session_id),
    FOREIGN KEY (gid) REFERENCES gpsd(id),
    EXCLUDE USING gist (sid WITH =,gid WITH =,period WITH &&)
@@ -82,7 +82,7 @@ CREATE TABLE using_gpsd(
 -- >20	 Poor	    measurements are inaccurate and should be discard
 DROP TABLE IF EXISTS geo;
 CREATE TABLE geo(
-   gid VARCHAR(9) NOT NULL,     -- FOREIGN KEY to gpsd id
+   gid integer NOT NULL,        -- FOREIGN KEY to gpsd id
    ts TIMESTAMPTZ NOT NULL,     -- timestamp of geolocation
    coord VARCHAR(15) NOT NULL,  -- geolocation in mgrs
    alt REAL,                    -- altitude
@@ -94,6 +94,7 @@ CREATE TABLE geo(
    pdop REAL DEFAULT 0,         -- position (3D) dilution of precision
    epx REAL DEFAULT 0,          -- longitude uncertainty
    epy REAL DEFAULT 0,          -- latitude uncertainty
+   CONSTRAINT ch_gid CHECK (gid >= 0),
    CONSTRAINT ch_spd CHECK (spd >= 0),
    CONSTRAINT ch_dir CHECK(dir >=0 and dir <= 360),
    CONSTRAINT ch_fix CHECK (fix >= -1 and fix <= 3),
@@ -111,11 +112,12 @@ CREATE TABLE geo(
 -- any changes to the below would imply a new wireless nic
 DROP TABLE IF EXISTS radio;
 CREATE TABLE radio(
-   mac macaddr PRIMARY KEY,                  -- mac address of nic
-   driver VARCHAR(20) DEFAULT 'UNKNOWN',     -- nic driver
-   chipset VARCHAR(20) DEFAULT 'UNKNOWN',    -- nic chipset
-   channels SMALLINT[] NOT NULL,             -- list of channels supported by nic 
-   standards VARCHAR(20) DEFAULT '802.11b/g' -- list of standards supported by nic
+   mac macaddr NOT NULL,                      -- mac address of nic
+   driver VARCHAR(20) DEFAULT 'UNKNOWN',      -- nic driver
+   chipset VARCHAR(20) DEFAULT 'UNKNOWN',     -- nic chipset
+   channels SMALLINT[] NOT NULL,              -- list of channels supported by nic 
+   standards VARCHAR(20) DEFAULT '802.11b/g', -- list of standards supported by nic
+   PRIMARY KEY(mac)
 );
 
 -- antenna type enumeration
@@ -189,8 +191,13 @@ CREATE TABLE using_radio(
 );
 
 -- NOTE:
--- capture header and mpdu layers are defined in a set of tables. The phy
--- layer is defined in frame, source, ampdu and signal
+-- capture header and mpdu layers are defined in a set of tables. The phy layer 
+-- is defined (partially) in frame, source, ampdu and signal. The mac layer 
+-- is defined in traffic and wepcrypt, tkipcrypt and ccmpcrypt
+
+-- encryption type
+DROP TYPE IF EXISTS CRYPT_TYPE;
+CREATE TYPE CRYPT_TYPE AS ENUM ('none','wep','tkip','ccmp','other');
 
 -- frame table
 -- each traffic is defined by its id, timestampe and src and describes basic
@@ -199,27 +206,42 @@ CREATE TABLE using_radio(
 -- TODO: add location here or force separate select on geo table
 DROP TABLE IF EXISTS frame;
 CREATE TABLE frame(
-   id bigserial,                          -- frame primary key
-   ts TIMESTAMPTZ NOT NULL,               -- time of collection
-   bytes smallint NOT NULL,               -- ttl bytes
-   bytesHdr smallint,                     -- bytes in the header
-   ampdu smallint not NULL,               -- ampdu is present 
-   fcs smallint not NULL,                 -- fcs is present (1) or not (0)
+   id uuid NOT NULL,                 -- frame primary key
+   sid integer NOT NULL,             -- foreign key to session
+   ts TIMESTAMPTZ NOT NULL,          -- time of collection
+   bytes smallint NOT NULL,          -- ttl bytes
+   bRTAP smallint,                   -- bytes in radiotap
+   bMPDU smallint,                   -- bytes in mmpdu
+   data smallint[2] NOT NULL,        -- left,right indexes into data portion 
+   ampdu smallint not NULL,          -- ampdu is present 
+   crypt CRYPT_TYPE default 'none',  -- encryption type 
+   fcs smallint not NULL,            -- fcs is present (1) or not (0)
    CONSTRAINT ch_bytes CHECK (bytes > 0),
-   CONSTRAINT ch_bytesHdr CHECK (bytesHdr >= 0),
+   CONSTRAINT ch_bytesRTAP CHECK (bRTAP >= 0),
+   CONSTRAINT ch_bytesMPDU CHECK (bMPDU >= 0),
    CONSTRAINT ch_ampdu CHECK (ampdu >= 0 AND ampdu <= 1),
    CONSTRAINT ch_fcs CHECK (fcs >= 0 AND fcs <= 1),
+   FOREIGN KEY(sid) REFERENCES sensor(session_id),
    PRIMARY KEY(id)
+);
+
+-- frame_path table
+-- stores the file that this frame is save in
+-- NOTE: this is the same id as frame.id but we do not make a reference in 
+-- case the different threads processing thsee are out of sync
+DROP TABLE IF EXISTS frame_path;
+CREATE TABLE frame_path(
+   id uuid UNIQUE NOT NULL,
+   filepath TEXT NOT NULL
 );
 
 -- ampdu table
 -- defines ampdu frames
 DROP TABLE IF EXISTS ampdu;
 CREATE TABLE ampdu(
-   fid bigint NOT NULL,    -- foreign key to frame
-   refnum bigint NOT NULL, -- reference number
-   flags integer NOT NULL, -- flags
-   CONSTRAINT ch_fid CHECK (fid > 0),
+   fid uuid NOT NULL, -- foreign key to frame
+   refnum bigint NOT NULL,   -- reference number
+   flags integer NOT NULL,   -- flags
    CONSTRAINT ch_refnum CHECK (refnum > 0),
    CONSTRAINT ch_flags CHECK (flags > 0),
    FOREIGN KEY (fid) REFERENCES frame(id)
@@ -229,12 +251,11 @@ CREATE TABLE ampdu(
 -- defines the collecting source of a frame
 DROP TABLE IF EXISTS source;
 CREATE TABLE source(
-   fid bigint NOT NULL,          -- foreign key to frame
+   fid uuid NOT NULL,     -- foreign key to frame
    src macaddr NOT NULL,         -- foreign key to collecting source
    antenna smallint default '0', -- antenna of source collecting signal
    rfpwr smallint,               -- rf power in dB
-   CONSTRAINT ch_fid CHECK (fid > 0),
-   CONSTRAINT ch_ant CHECK (antenna >= 0 and antenna < 10),   
+   CONSTRAINT ch_ant CHECK (antenna >= 0 and antenna < 256),   
    CONSTRAINT ch_rfpwr CHECK (rfpwr > -150 and rfpwr < 150),
    FOREIGN KEY (src) REFERENCES radio(mac),
    FOREIGN KEY (fid) REFERENCES frame(id)
@@ -252,7 +273,7 @@ CREATE TYPE MCS_BW AS ENUM ('20','40','20L','20U');
 -- defines data as captured in the frame header
 DROP TABLE IF EXISTS signal;
 CREATE TABLE signal(
-   fid bigint NOT NULL,        -- foreign key to frame
+   fid uuid NOT NULL,   -- foreign key to frame
    std STANDARD NOT NULL,      -- what standard
    rate decimal(5,1) NOT NULL, -- rate in Mbps of signal
    channel smallint NOT NULL,  -- channel
@@ -263,8 +284,7 @@ CREATE TABLE signal(
    mcs_gi smallint,            -- mcs guard interval 0=long, 1=short
    mcs_ht smallint,            -- mcs ht format 0=mixed, 1=greenfield
    mcs_index smallint,         -- mcs index if known
-   CONSTRAINT ch_fid CHECK (fid > 0),
-   CONSTRAINT ch_rate CHECK (rate > 0),
+   CONSTRAINT ch_rate CHECK (rate >= 0),
    CONSTRAINT ch_channel CHECK (channel > 0 and channel < 200),
    CONSTRAINT ch_chflags CHECK (chflags >= 0),
    CONSTRAINT ch_rf CHECK (rf > 0),
@@ -293,26 +313,110 @@ CREATE TYPE FT_SUBTYPE AS ENUM ('assoc-req','assoc-resp','reassoc-req','reassoc-
                                 'qos-data-cfack-cfpoll','qos-null','qos-cfpoll',
                                 'qos-cfack-cfpoll','rsrv');
 
+DROP TYPE IF EXISTS DUR_TYPE;
+CREATE TYPE DUR_TYPE AS ENUM ('vcs','cfp','aid','rsrv');
+
 -- traffic table
 -- defines portions of the mpdu layer.
 -- The minimum mpdu is frame control, duration and address 1
+-- NOTE: for duration value is only included if the type is of vsc or aid
 DROP TABLE IF EXISTS traffic;
 CREATE TABLE traffic(
-   fid bigint NOT NULL,            -- foreign key to frame
-   fc_type FT_TYPE NOT NULL,       -- type of frame
-   fc_subtype FT_SUBTYPE NOT NULL, -- subtype of frame
-   fc_flags smallint default '0',  -- frame control fields
-   duration integer NOT NULL,      -- duration
-   addr1 macaddr NOT NULL,         -- first address
-   addr2 macaddr,                  -- second address
-   addr3 macaddr,                  -- third address
-   sc_fragnum smallint,            -- seq control fragment number
-   sc_seqnum smallint,             -- seq control sequence number
-   addr4 macaddr,                  -- fourth address
-   CONSTRAINT ch_fid CHECK (fid > 0),
-   CONSTRAINT ch_fc_fields CHECK (fc_fields >= 0),
-   CONSTRAINT ch_dur CHECK (duration >= 0),
-   CONSTRAINT ch_seqctrl CHECK (sc_fragnum >= 0 and sc_seqnum >= 0),
+   fid uuid NOT NULL,    -- foreign key to frame
+   type FT_TYPE NOT NULL,       -- type of frame
+   subtype FT_SUBTYPE NOT NULL, -- subtype of frame
+   td smallint default '0',     -- to ds bit 
+   fd smallint default '0',     -- from ds bit
+   mf smallint default '0',     -- more fragments bit
+   rt smallint default '0',      -- retry bit
+   pm smallint default '0',     -- power mgmt bit
+   md smallint default '0',     -- more data bit
+   pf smallint default '0',     -- protected frame bit
+   so smallint default '0',     -- order bit
+   dur_type DUR_TYPE NOT NULL,  -- duration type
+   dur_val integer,             -- duration value
+   addr1 macaddr NOT NULL,      -- first address
+   addr2 macaddr,               -- second address
+   addr3 macaddr,               -- third address
+   fragnum smallint,            -- seq control fragment number
+   seqnum smallint,             -- seq control sequence number
+   addr4 macaddr,               -- fourth address
+   CONSTRAINT ch_td CHECK (td >= 0 and td <= 1),
+   CONSTRAINT ch_fd CHECK (fd >= 0 and fd <= 1),
+   CONSTRAINT ch_mf CHECK (mf >= 0 and mf <= 1),
+   CONSTRAINT ch_rt CHECK (rt >= 0 and rt <= 1),
+   CONSTRAINT ch_pm CHECK (pm >= 0 and pm <= 1),
+   CONSTRAINT ch_md CHECK (md >= 0 and md <= 1),
+   CONSTRAINT ch_pf CHECK (pf >= 0 and pf <= 1),
+   CONSTRAINT ch_so CHECK (so >= 0 and so <= 1),
+   CONSTRAINT ch_dur_val CHECK (dur_val >= 0),
+   CONSTRAINT ch_seqctrl CHECK (fragnum >= 0 and seqnum >= 0),
+   FOREIGN KEY(fid) REFERENCES frame(id)
+);
+
+-- qos table
+-- defines qos control table
+DROP TABLE IF EXISTS qosctrl;
+CREATE TABLE qosctrl(
+   fid uuid NOT NULL, -- foreign key to frame
+   tid smallint NOT NULL,    -- tid/access class bits 0-3
+   eosp smallint not NULL,   -- eosp bit 4
+   ackpol smallint not NULL, -- ack policy bits 5-6
+   amsdu smallint not NULL,  -- a-msdu bit 7
+   txop smallint not NULL,   -- 8 bit txop limit, txip dur. req. AP PS, etc
+   CONSTRAINT ch_tid CHECK (tid >=0 and tid < 16),
+   CONSTRAINT ch_eosp CHECK (eosp >=0 and eosp <=1),
+   CONSTRAINT ch_ackpol CHECK (ackpol >= 0 and ackpol <=4),
+   CONSTRAINT ch_amsdu CHECK (amsdu >=0 and amsdu <= 1),
+   CONSTRAINT ch_txop CHECK (txop >= 0 and txop < 256),
+   FOREIGN KEY(fid) REFERENCES frame(id)
+);
+
+-- wepcrypt table
+-- defines wep encryption scheme at layer 3
+DROP TABLE IF EXISTS wepcrypt;
+CREATE TABLE wepcrypt(
+   fid uuid NOT NULL, -- foreign key to frame
+   iv bytea NOT NULL,        -- hex repr of 3 byte wep iv
+   key_id smallint NOT NULL, -- index of wep key (out of 4) used
+   icv bytea NOT NULL,       -- hex repr of f byte wep icv
+   CONSTRAINT ch_key_id CHECK (key_id >= 0 and key_id < 4),
+   FOREIGN KEY(fid) REFERENCES frame(id)
+);
+
+-- tkipcrypt table
+-- defines tkip encryption scheme at layer 3
+DROP TABLE IF EXISTS tkipcrypt;
+CREATE TABLE tkipcrypt(
+   fid uuid NOT NULL, -- foreign key to frame
+   tsc1 bytea NOT NULL,      -- hex repr of 1 byte iv-tsc1
+   wepseed bytea NOT NULL,   -- hex repr of 1 byte iv-wep-seed
+   tsc0 bytea NOT NULL,      -- hex repr of 1 byte iv-tsc0
+   key_id smallint NOT NULL, -- index of tkip key value
+   tsc2 bytea NOT NULL,      -- hex repr of 1 byte extiv-tsc2
+   tsc3 bytea NOT NULL,      -- hex repr of 1 byte extiv-tsc3
+   tsc4 bytea NOT NULL,      -- hex repr of 1 byte extiv-tsc4
+   tsc5 bytea NOT NULL,      -- hex repr of 1 byte extiv-tsc5
+   mic bytea NOT NULL,       -- hex repr of 8 byte mic
+   icv bytea NOT NULL,       -- hex repr of 4 byte ICV
+   CONSTRAINT ch_key_id CHECK (key_id >= 0 and key_id < 4),
+   FOREIGN KEY(fid) REFERENCES frame(id)
+);
+
+-- ccmpcrypt table
+-- defines ccmp encryption scheme at layer 3
+DROP TABLE IF EXISTS ccmpcrypt;
+CREATE TABLE ccmpcrypt(
+   fid uuid NOT NULL, -- foreign key to frame
+   pn0 bytea NOT NULL,       -- hex repr of 1 byte pn0
+   pn1 bytea NOT NULL,       -- hex repr of 1 byte pn1
+   key_id smallint NOT NULL, -- index of ccmp key value
+   pn2 bytea NOT NULL,       -- hex repr of 1 byte pn2
+   pn3 bytea NOT NULL,       -- hex repr of 1 byte pn3
+   pn4 bytea NOT NULL,       -- hex repr of 1 byte pn4
+   pn5 bytea NOT NULL,       -- hex repr of 1 byte pn5
+   mic bytea NOT NULL,       -- hex repr of 8 byte mic
+   CONSTRAINT ch_key_id CHECK (key_id >= 0 and key_id < 4),
    FOREIGN KEY(fid) REFERENCES frame(id)
 );
 
@@ -324,7 +428,7 @@ CREATE TABLE traffic(
 DROP TABLE IF EXISTS sta;
 CREATE TABLE sta(
    id serial NOT NULL,                   -- primary key
-   sid integer NOT NULL,                 -- fk first seession sta was identified
+   sid integer NOT NULL,                 -- fk first session sta was identified
    spotted TIMESTAMPTZ NOT NULL,         -- ts sta was first seen/heard
    mac macaddr UNIQUE NOT NULL,          -- mac address of radio
    manuf VARCHAR(100) default 'unknown', -- manufacturer according to oui
@@ -430,6 +534,29 @@ CREATE TABLE sta_activity(
 
 -- delete data from all tables
 -- TODO: look into truncate
+DELETE FROM ampdu;
+DELETE FROM ccmpcrypt;
+DELETE FROM qosctrl;
+DELETE FROM tkipcrypt;
+DELETE FROM traffic;
+DELETE FROM wepcrypt;
+DELETE FROM signal;
+DELETE FROM source;
+DELETE FROM frame_path;
+DELETE FROM frame;
+DELETE FROM using_gpsd;
+DELETE FROM geo;
+DELETE FROM gpsd;
+ALTER SEQUENCE gpsd_id_seq RESTART;
+DELETE FROM using_radio;
+DELETE FROM radio_epoch;
+DELETE FROM radio_event;
+DELETE FROM radio_period;
+DELETE FROM radio;
+DELETE FROM sensor;
+ALTER SEQUENCE sensor_session_id_seq RESTART;
+
+
 delete from sta_info;
 --delete from sta_event;
 delete from sta_activity;
@@ -439,8 +566,8 @@ delete from traffic;
 delete from source;
 delete from signal;
 delete from ampdu;
+delete from frame_path;
 delete from frame;
-alter sequence frame_id_seq restart;
 delete from using_radio;
 delete from using_gpsd;
 delete from geo;
@@ -451,6 +578,17 @@ delete from radio_epoch;
 delete from radio_period;
 delete from radio_event;
 delete from radio;
+
+DROP TABLE ampdu;
+DROP TABLE ccmpcrypt;
+DROP TABLE qosctrl;
+DROP TABLE tkipcrypt;
+DROP TABLE traffic;
+DROP TABLE wepcrypt;
+DROP TABLE signal;
+DROP TABLE source;
+DROP TABLE frame_path;
+DROP TABLE frame;
 
 -- data sizes 
 -- size of relations

@@ -17,17 +17,32 @@ __status__ = 'Development'
 import struct
 from wraith import iso2ts
 
+class PCAPException(Exception): pass         # generic pcap exception
+class PCAPIOException(PCAPException): pass   # pcap IO error
+class PCAPPackException(PCAPException): pass # pcap struct errors
+
 def pcapopen(fname):
     """ opens fname and writes pcap header, returning open file object """
-    fout = open(fname,'wb')
-    hdr = pcaphdr()
-    fout.write(hdr)
-    return fout
+    try:
+        fout = open(fname,'wb')
+        fout.write(pcaphdr())
+    except IOError as e:
+        raise PCAPIOException(e)
+    except struct.error as e:
+        raise PCAPPackException(e)
+    else:
+        return fout
+
     
 def pktwrite(fout,ts,pkt):
     """ writes packet pkt with timestamp ts to pcap file object fout """
-    pkt = pcappkt(ts,pkt)
-    fout.write(pkt)
+    try:
+        pkt = pcappkt(ts,pkt)
+        fout.write(pkt)
+    except IOError as e:
+        raise PCAPIOException(e)
+    except struct.error as e:
+        raise PCAPPackException(e)
 
 # pcaps are constructed as PCAP HEADER|RECORD HEADER<1>|DATA<1>|...|RECORD HEADER<n>|DATA<n>
 # where the PCAP HEADER as defined in pcap.h is:

@@ -18,9 +18,9 @@ import signal                   # signal processing
 import time                     # sleep and timestamps
 import socket                   # connection to nidus and gps device
 import threading                # threads
-from Queue import Queue, Empty  # thread-safe queue
 import mgrs                     # lat/lon to mgrs conversion
 import gps                      # gps device access
+from Queue import Queue, Empty  # thread-safe queue
 import multiprocessing as mp    # multiprocessing
 from internal import Report     # report class
 from wraith import ts2iso       # timestamp conversion
@@ -209,10 +209,9 @@ class RTO(mp.Process):
                 rpt = self._comms.get() # blocking call
                 (cs,ts,ev,msg,_) = rpt.report
 
-                # suckt pushes a token onto the internal comms allows us to
+                # suckt pushes a token onto the internal comms allowing us to
                 # break the blocking call and check the token
                 if cs == 'suckt': continue
-
                 if ev == '!UP!': # should be the 1st message we get from radio(s)
                     # NOTE: sending the radio, nidus will take care of setting
                     # the radio device to up
@@ -247,7 +246,8 @@ class RTO(mp.Process):
                                      "unidentified event %s" % ev))
             except KeyError as e: # a radio sent a message without initiating
                 # NOTE: getting odd not initiated errors periodically
-                self._conn.send(('warn','RTO','Radio %s' % e,"sent data %s of type %s w/o 'initiating'" % (ev,msg)))
+                self._conn.send(('warn','RTO','Radio %s' % e,
+                                 "sent data %s of type %s w/o 'initiating'" % (ev,msg)))
             except Exception as e: # handle catchall error
                 self._conn.send(('err','RTO','Unknown',e))
 
@@ -298,7 +298,7 @@ class RTO(mp.Process):
             send = "\x01*%s:\x02" % t
             if t == 'DEVICE': send += self._craftdevice(ts,d)
             elif t == 'RADIO': send += self._craftradio(ts,d)
-            elif t == 'GPSD': send += self._craftfltd(ts,d)
+            elif t == 'GPSD': send += self._craftgpsd(ts,d)
             elif t == 'FRAME': send += self._craftframe(ts,d)
             elif t == 'GPS': send += self._craftflt(ts,d,self._mgrs)
             elif t == 'RADIO_EVENT': send += self._craftradioevent(ts,d)
@@ -375,7 +375,7 @@ class RTO(mp.Process):
         return "%s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E" % (ts,d[0],d[1])
 
     @staticmethod
-    def _craftfltd(ts,d):
+    def _craftgpsd(ts,d):
         """ create body of gps device message """
         return "%s %s %s %d \x1EFB\x1F%s\x1FFE\x1E %d \x1EFB\x1F%s\x1FFE\x1E" %\
                (ts,d['id'],d['version'],d['flags'],d['driver'],d['bps'],d['path'])

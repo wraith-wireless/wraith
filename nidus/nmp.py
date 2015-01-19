@@ -159,7 +159,7 @@ FRAME_FIELDS = ['ts','mac','frame']
 FRAME_WFIELDS = [('ts',str),('mac',str),('frame',str)]
 FRAME_TIMESTAMP = 0 # timestamp of frame
 FRAME_RID       = 1 # mac address of collecting radio
-FRAME_FRAME     = 2 # the frame 
+FRAME_FRAME     = 2 # the frame
 
 #### GPS ####
 GPS_FIELDS = ['ts','id','fix','coord','alt','dir',

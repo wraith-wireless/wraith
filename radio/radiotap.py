@@ -20,7 +20,7 @@ from wraith.radio.bits import bitmask, bitmask_list, bitmask_get
 
 class RadiotapException(Exception): pass
 
-FMT_BO = "=" # struct format byte order specifier
+FMT_BO = "@" # struct format byte order specifier
 
 def parse(f):
     """
