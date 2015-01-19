@@ -21,6 +21,8 @@ nidus 0.0.4
     from sensor exiting to nidus closing session records
      o 1 thread per radio for saving and number of threads for storing, extracting
        are specified in the configuration file
+  - implements 'privacy' feature where saving frames can be configure to only
+    save layer 1 and layer 2 (including encryption from layer 3)
 
 TODO:
 1) Should we return messages? i.e instead of just closing pipe for no running server etc
