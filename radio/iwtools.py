@@ -125,14 +125,19 @@ def ifconfig(nic,setto=None):
 
 def sethwaddr(nic,newmac):
     """
+     nic: nic identifier
+     newmac: new mac addr to assume (note if incomplete macaddr, the hwaddr will
+      change anyway)
      ifconfig set hw address interface: Note: it is the callers responsibility to
-     ensure interface is down prior to calling and up after call
+     ensure interface is down prior to calling and up after call. If successful
+     will return the new hwaddr
     """
     cmd = ['ifconfig',nic,'hw','ether',newmac]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stderr=sp.PIPE,stdout=sp.PIPE)
     out,err = p.communicate()
     if err: raise IWToolsException(err)
+    return ifconfig('nic')['HWaddr']
 
 #### IWCONFIG
 
