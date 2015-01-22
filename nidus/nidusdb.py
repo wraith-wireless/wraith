@@ -420,12 +420,15 @@ class ExtractThread(SSEThread):
                         addrs[a] = {'loc':[4],'id':None}
                         sql += " or mac=%s"
 
-        # main try-except block
         try:
-            # add any non-broadcast addr(s) if not already present
+            #### ENTER sta CS
+            self._l.acquire()
+
+            # get all rows with current sta(s)
             curs.execute(sql,tuple(addrs.keys())) # get rows sta w/ given mac addr
             rows = curs.fetchall()
 
+            # for each address (not broadcast) get the id (if any)
             for addr in addrs:
                 # if not broadcast, add sta id if found
                 if addr == mpdu.BROADCAST: continue
@@ -434,13 +437,7 @@ class ExtractThread(SSEThread):
                         addrs[addr]['id'] = row[1]
                         break
 
-                # NOTE: it is possible that another thread inserts this sta
-                # after we have checked for an id and before we insert the
-                # new sta - this will result in a duplicate key on the unique
-                # column mac in sta. Should we push everything down into the
-                # critical section below? or make a new critical section here
-
-                # check current addr for an id, if not present add this sta
+                # if this address does not have an id present add the sta
                 if not addrs[addr]['id']:
                     sql = """
                            insert into sta (sid,fid,spotted,mac,manuf)
@@ -452,56 +449,51 @@ class ExtractThread(SSEThread):
                 # addr2 is transmitting (i.e. heard) others are seen
                 mode = 'tx' if 2 in addrs[addr]['loc'] else 'rx'
 
-                # add/update shared sta activity timestamps
-                #### ENTER CS
-                try:
-                    self._l.acquire()
+                # update shared sta's timestamps
+                if addr in self._stas:
+                    if mode == 'tx':
+                        self._stas[addr]['fh'] = self._stas[addr]['lh'] = ts
+                    else:
+                        self._stas[addr]['fs'] = self._stas[addr]['ls'] = ts
 
-                    if addr in self._stas:
-                        if mode == 'tx':
-                            self._stas[addr]['fh'] = self._stas[addr]['lh'] = ts
-                        else:
-                            self._stas[addr]['fs'] = self._stas[addr]['ls'] = ts
-
-                        # update the record
-                        sql = """
-                               update sta_activity
-                               set firstSeen=%s,lastSeen=%s,firstHeard=%s,lastHeard=%s
-                               where sid = %s and staid = %s;
-                              """
-                        vs = (self._stas[addr]['fs'],self._stas[addr]['ls'],
+                    # update the record
+                    sql = """
+                           update sta_activity
+                           set firstSeen=%s,lastSeen=%s,firstHeard=%s,lastHeard=%s
+                           where sid = %s and staid = %s;
+                          """
+                    vs = (self._stas[addr]['fs'],self._stas[addr]['ls'],
                               self._stas[addr]['fh'],self._stas[addr]['lh'],
                               self._sid,self._stas[addr]['id'])
+                else:
+                    # create a new entry for this sta
+                    self._stas[addr] = {'id':addrs[addr]['id'],'fs':None,
+                                        'ls':None,'fh':None,'lh':None}
+                    if mode == 'tx':
+                        self._stas[addr]['fh'] = self._stas[addr]['lh'] = ts
                     else:
-                        # create a new entry for this sta
-                        self._stas[addr] = {'id':addrs[addr]['id'],'fs':None,
-                                            'ls':None,'fh':None,'lh':None}
-                        if mode == 'tx':
-                            self._stas[addr]['fh'] = self._stas[addr]['lh'] = ts
-                        else:
-                            self._stas[addr]['fs'] = self._stas[addr]['ls'] = ts
+                        self._stas[addr]['fs'] = self._stas[addr]['ls'] = ts
 
-                        sql = """
-                               insert into sta_activity (sid,staid,firstSeen,lastSeen,
-                                                         firstHeard,lastHeard)
-                               values (%s,%s,%s,%s,%s,%s);
-                              """
-                        vs = (self._sid,self._stas[addr]['id'],self._stas[addr]['fs'],
-                              self._stas[addr]['ls'],self._stas[addr]['fh'],
-                              self._stas[addr]['lh'])
+                    sql = """
+                           insert into sta_activity (sid,staid,firstSeen,lastSeen,
+                                                     firstHeard,lastHeard)
+                           values (%s,%s,%s,%s,%s,%s);
+                          """
+                    vs = (self._sid,self._stas[addr]['id'],self._stas[addr]['fs'],
+                          self._stas[addr]['ls'],self._stas[addr]['fh'],
+                          self._stas[addr]['lh'])
 
-                    # update the database
-                    curs.execute(sql,vs)
-                finally:
-                    #### EXIT CS
-                    # NOTE: any exceptions will be rethrown after releasing the lock
-                    self._l.release()
+                # update the database
+                curs.execute(sql,vs)
         except psql.Error as e:
             self._conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
         else:
             self._conn.commit()
         finally:
+            #### EXIT CS
+            self._l.release()
+
             curs.close()
 
 class NidusDB(object):

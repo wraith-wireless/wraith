@@ -51,8 +51,6 @@ TODO:
   - ensure only one radio submit per radio is allowed
   - during setsensor ensure a new session for a sensor is not created if one already
     exists
-  - extend critical session to ensure stas are not inserted in between queries for
-    their presence in the db and inserting them by another thread
 """
 __name__ = 'datastore'
 __license__ = 'GPL'
