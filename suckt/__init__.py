@@ -24,7 +24,7 @@ suckt 0.1.4
 suckt 0.1.5
  desc: utilizes a new internal communication SOP to streamline and simplify
   interprocess communications
- includes: suckt 0.0.10 internal 0.0.1 rto 0.0.10 (previously collator) rdoctl 0.0.4
+ includes: suckt 0.0.10 internal 0.0.1 rto 0.0.10 (previously collator) rdoctl 0.0.5
   suckt.conf suckt.log.conf sucktd
  changes:
   - streamlined inter-process communication methods/objects
@@ -38,6 +38,7 @@ suckt 0.1.5
    o removed pf.py and pushed gps polling as a thread into rto
  - removed signal handling as a means to pass commands
    o need to code command interface
+ - added mac spoofing cability on start of each radio
 
 TODO:
      ** After testing remove set raw capability from python **
@@ -53,6 +54,7 @@ TODO:
            - pause stop scanning and recording
      37) add ability to 'filter' on one network, i.e. bssid or ssid?
      40) look into socket options (and pcapy code) to ensure best performance
+     41) need to handle tuner thread failure ir rdoctl
 """
 __name__ = 'suckt'
 __license__ = 'GPL'

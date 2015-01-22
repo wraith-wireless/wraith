@@ -6,7 +6,7 @@ A "consolidated" radio with tuning , sniffing and reporting capabilities
 """
 __name__ = 'rdoctl'
 __license__ = 'GPL'
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 __date__ = 'December 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -132,8 +132,6 @@ class RadioController(mp.Process):
             raise RuntimeError("%s:iwtools.wifaces:not found" % conf['role'])
         self._nic = conf['nic']
         self._role = conf['role']
-        # TODO: need to spoof the mac addr at the dev level (cannot use the vnic)
-        #  or use macchanger (need more testing
 
         # get the phy and associated interfaces
         try:
@@ -151,6 +149,15 @@ class RadioController(mp.Process):
         self._driver = iwt.getdriver(self._nic)
         self._chipset = iwt.getchipset(self._driver)
 
+        # spoof the mac address ??
+        if conf['spoofed']:
+            mac = None if conf['spoofed'].lower() == 'random' else conf['spoofed']
+            try:
+                iwt.ifconfig(self._nic,'down')
+                self._spoofed = iwt.sethwaddr(self._nic,mac)
+            except iwt.IWToolsException as e:
+                raise RuntimeError("%s:iwtools.sethwaddr:%s" % (self._role,e))
+
         # delete all associated interfaces - we want full control
         for iface in ifaces: iw.devdel(iface['nic'])
 
@@ -167,16 +174,30 @@ class RadioController(mp.Process):
 
         # sniffing interface
         try:
-            # create a monitor and turn it on
-            iw.phyadd(self._phy,self._vnic,'monitor')
-            iwt.ifconfig(self._vnic,'up')
+            iw.phyadd(self._phy,self._vnic,'monitor') # create a monitor,
+            iwt.ifconfig(self._vnic,'up')             # and turn it on
         except iw.IWException as e:
-            raise RuntimeError("%s:iw.phyadd:%s" % (self._role,e))
+            # never added virtual nic, restore nic
+            errMsg = "%s:iw.phyadd:%s" % (self._role,e)
+            try:
+                iwt.ifconfig(self._nic,'up')
+            except iwt.IWToolsException:
+                errMsg += " Failed to restore %s" % self._nic
+            raise RuntimeError(errMsg)
         except iwt.IWToolsException as e:
-            raise RuntimeError("%s:iwtools.ifconfig:%s" % (self._role,e))
+            # failed to 'raise' virtual nic, remove vnic and add nic
+            errMsg = "%s:iwtools.ifconfig:%s" % (self._role,e)
+            try:
+                iw.phyadd(self._phy,self._nic,'managed')
+                iw.devdel(self._vnic)
+                iwt.ifconfig(self._nic,'up')
+            except (iw.IWException,iwt.IWToolsException):
+                errMsg += " Failed to restore %s" % self._nic
+            raise RuntimeError(errMsg)
 
         # wrap remaining in a try block, we must attempt to restore card and
         # release the socket after any failures ATT
+        self._s = None
         try:
             # bind the socket
             self._s = socket.socket(socket.AF_PACKET,
@@ -245,36 +266,37 @@ class RadioController(mp.Process):
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
-            except iw.IWException:
+                iwt.ifconfig(self._nic,'up')
+            except (iw.IWException,iwt.IWToolsException):
                 pass
             raise RuntimeError("%s:Socket:%s" % (self._role,e))
         except iw.IWException as e:
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
-            except iw.IWException:
+                iwt.ifconfig(self._nic,'up')
+            except (iw.IWException,iwt.IWToolsException):
                 pass
-            self._s.close()
-            self._s = None
+            if self._s: self._s.close()
             raise RuntimeError("%s:iw.chset:Failed to set channel: %s" % (self._role,e))
         except (ValueError,TypeError) as e:
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
-            except iw.IWException:
+                iwt.ifconfig(self._nic,'up')
+            except (iw.IWException,iwt.IWToolsException):
                 pass
-            self._s.close()
-            self._s = None
+            if self._s: self._s.close()
             raise RuntimeError("%s:config:%s" % (self._role,e))
         except Exception as e:
             # blanket exception
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
-            except iw.IWException:
+                iwt.ifconfig(self._nic,'up')
+            except (iw.IWException,iwt.IWToolsException):
                 pass
-            self._s.close()
-            self._s = None
+            if self._s: self._s.close()
             raise RuntimeError("%s:Unknown:%s" % (self._role,e))
 
     def terminate(self): pass
@@ -285,7 +307,7 @@ class RadioController(mp.Process):
         signal.signal(signal.SIGINT,signal.SIG_IGN)
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
-        # start tuner thread TODO: what to do on failure of tuner thread??
+        # start tuner thread
         self._tuner.start()
         self._comms.put(Report(self._vnic,time.time(),'!SCAN!',self._scan))
 
@@ -357,6 +379,10 @@ class RadioController(mp.Process):
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
+                if self._spoofed:
+                    iwt.ifconfig(self._nic,'down')
+                    iwt.resethwaddr(self._nic)
+                iwt.ifconfig(self._nic,'up')
             except iw.IWException:
                 clean = False
 

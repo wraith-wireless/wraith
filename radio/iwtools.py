@@ -123,21 +123,40 @@ def ifconfig(nic,setto=None):
         out,err = p.communicate()
         if err: raise IWToolsException(err)
 
-def sethwaddr(nic,newmac):
+#### MACCHANGER
+
+def sethwaddr(nic,setto=None):
     """
      nic: nic identifier
-     newmac: new mac addr to assume (note if incomplete macaddr, the hwaddr will
-      change anyway)
-     ifconfig set hw address interface: Note: it is the callers responsibility to
-     ensure interface is down prior to calling and up after call. If successful
-     will return the new hwaddr
+     setto: if None will set to a random mac address, otherwise will use setto
+      as new mac to assume
+     uses macchanger to set the hw addr. iwconfig was more 'finicky'
+     will return the new mac
     """
-    cmd = ['ifconfig',nic,'hw','ether',newmac]
+    if not setto:
+        cmd = ['macchanger','-a',nic]
+    else:
+        cmd = ['macchanger','-m',setto,nic]
+    if os.getuid() != 0: cmd.insert(0,'sudo')
+    p = sp.Popen(cmd,stderr=sp.PIPE,stdout=sp.PIPE)
+    out,err = p.communicate()
+
+    # parse out and err for success - macchanger error messages appear as
+    # "[ERROR] ...:...:...". split on colon and send middle portion
+    if err: raise IWToolsException(err.split(':')[1].strip())
+
+    # verify newmac
+    r = re.search(r'\nNew MAC: *([:|\w]*) ',out)
+    if not r: raise IWToolsException("MAC Address did not change")
+    return r.groups()[0]
+
+def resethwaddr(nic):
+    """ reset macaddr of nic to permanent addr """
+    cmd = ['macchanger','-p',nic]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stderr=sp.PIPE,stdout=sp.PIPE)
     out,err = p.communicate()
     if err: raise IWToolsException(err)
-    return ifconfig('nic')['HWaddr']
 
 #### IWCONFIG
 

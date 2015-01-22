@@ -24,6 +24,7 @@ WLAN administrators in the security testing of their networks.
  * postgresql 9.x (tested on 9.3.5)
  * pyscopg 2.5.3
  * mgrs 1.1
+ * macchanger 1.7.0
 
 ## 3. MODULES: Currently consists of four components/modules
 

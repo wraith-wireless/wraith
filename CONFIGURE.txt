@@ -27,6 +27,8 @@ postgres=# CREATE EXTENSION btree_gist;
  - mgrs 1.1 https://pypi.python.org/packages/source/m/mgrs/mgrs-1.1.0.tar.gz
    o may need python-setuptools
    
+ - macchanger 1.7.0 http://www.gnu.org/software/macchanger
+   
  - gui support
    o python-tk
    o tix
@@ -60,11 +62,13 @@ postgres=# CREATE EXTENSION btree_gist;
        Cmnd_Alias	IWCONFIG = /sbin/iwconfig
        Cmnd_Alias	IFCONFIG = /sbin/ifconfig
        Cmnd_Alias	IW = /usr/sbin/iw #--> iw 3.17
+       Cmnd_Alias   MACCHANGER = /usr/bin/macchanger
        
        # Allow user to execute iw* commands
        <user> ALL=NOPASSWD:IWCONFIG
        <user> ALL=NOPASSWD:IFCONFIG
        <user> ALL=NOPASSWD:IW
+       <user> ALL=NOPASSWD:MACCHANGER
   
        sudo service sudo restart # to have it start immediately
     o We need to give the python interpreter set raw capability
