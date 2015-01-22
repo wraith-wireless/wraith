@@ -205,6 +205,7 @@ class RTO(mp.Process):
                         if ret: self._conn.send(('err','RTO','Nidus',ret))
 
             # 3. queued data from radios (possibly suckt)
+            ev = msg = None
             try:
                 rpt = self._comms.get() # blocking call
                 (cs,ts,ev,msg,_) = rpt.report
@@ -245,7 +246,6 @@ class RTO(mp.Process):
                     self._conn.send(('warn','RTO','Radio',
                                      "unidentified event %s" % ev))
             except KeyError as e: # a radio sent a message without initiating
-                # NOTE: getting odd not initiated errors periodically
                 self._conn.send(('warn','RTO','Radio %s' % e,
                                  "sent data %s of type %s w/o 'initiating'" % (ev,msg)))
             except Exception as e: # handle catchall error
