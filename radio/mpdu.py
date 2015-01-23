@@ -204,7 +204,7 @@ def parse(frame,hasFCS=False):
         vs,mac['offset'] = _unpack_from_(_S2F_['duration'] + _S2F_['addr'],
                                          frame,mac['offset'])
         mac['duration'] = _duration_(vs[0])
-        mac['addr1'] = _address_(vs[1:])
+        mac['addr1'] = _hwaddr_(vs[1:])
         mac['present'].extend(['duration','addr1'])
 
         # remove fcs if present (as some functions will eat all remaining bytes
@@ -401,10 +401,10 @@ def _duration_(v):
     return {'type':None,'dur':'rsrv'}
 
 #### ADDRESS Fields Std 8.2.4.3
-def _address_(l):
-    """ converts a list/tuple of unpacked integers to a string mac address """
+def _hwaddr_(l):
+    """ converts list of unpacked ints to string hw address in lower case hex """
     if len(l) != 6: raise RuntimeError('mac address has length 6')
-    return ":".join(['{0:02X}'.format(a) for a in l])
+    return ":".join(['{0:02x}'.format(a) for a in l])
 
 #### SEQUENCE CONTROL Std 8.2.4.4
 # Seq. Ctrl is 2 bytes and consists of the follwoing
@@ -544,8 +544,8 @@ def _parsemgmt_(f,mac):
     """ parse the mgmt frame f into the mac dict """
     fmt = _S2F_['addr'] + _S2F_['addr'] + _S2F_['seqctrl']
     v,mac['offset'] = _unpack_from_(fmt,f,mac['offset'])
-    mac['addr2'] = _address_(v[0:6])
-    mac['addr3'] = _address_(v[6:12])
+    mac['addr2'] = _hwaddr_(v[0:6])
+    mac['addr3'] = _hwaddr_(v[6:12])
     mac['seqctrl'] = _seqctrl_(v[-1])
     mac['present'].extend(['addr2','addr3','seqctrl'])
 
@@ -575,7 +575,7 @@ def _parsemgmt_(f,mac):
         v,mac['offset'] = _unpack_from_(fmt,f,mac['offset'])
         mac['fixed-params'] = {'capability':capinfo_all(v[0]),
                                'listen-int':v[1],
-                               'current-ap':_address_(v[2:])}
+                               'current-ap':_hwaddr_(v[2:])}
         mac['present'].append('fixed-params')
     elif mac.subtype == ST_MGMT_PROBE_REQ: pass # all fields are info-elements
     elif mac.subtype == ST_MGMT_TIMING_ADV:
@@ -986,12 +986,12 @@ def _parsectrl_(f,mac):
     elif mac.subtype in [ST_CTRL_RTS,ST_CTRL_PSPOLL,ST_CTRL_CFEND,ST_CTRL_CFEND_CFACK]:
         # append addr2 and process macaddress
         v,mac['offset'] = _unpack_from_(_S2F_['addr'],f,mac['offset'])
-        mac['addr2'] = _address_(v)
+        mac['addr2'] = _hwaddr_(v)
         mac['present'].append('addr2')
     elif mac.subtype == ST_CTRL_BLOCK_ACK_REQ:
         # append addr2,
         v,mac['offset'] = _unpack_from_(_S2F_['addr'],f,mac['offset'])
-        mac['addr2'] = _address_(v)
+        mac['addr2'] = _hwaddr_(v)
         # & bar control
         v,mac['offset'] = _unpack_from_(_S2F_['barctrl'],f,mac['offset'])
         mac['barctrl'] = _bactrl_(v)
@@ -1022,7 +1022,7 @@ def _parsectrl_(f,mac):
     elif mac.subtype == ST_CTRL_BLOCK_ACK:
         # add addr2,
         v,mac['offset'] = _unpack_from_(_S2F_['addr'],f,mac['offset'])
-        mac['addr2'] = _address_(v)
+        mac['addr2'] = _hwaddr_(v)
         # & ba control
         v,mac['offset'] = _unpack_from_(_S2F_['bactrl'],f,mac['offset'])
         mac['bactrl'] = _bactrl_(v)
@@ -1102,15 +1102,15 @@ def _parsedata_(f,mac):
     # addr2, addr3 & seqctrl are always present in data Std Figure 8-30
     fmt = _S2F_['addr'] + _S2F_['addr'] + _S2F_['seqctrl']
     v,mac['offset'] = _unpack_from_(fmt,f,mac['offset'])
-    mac['addr2'] = _address_(v[0:6])
-    mac['addr3'] = _address_(v[6:12])
+    mac['addr2'] = _hwaddr_(v[0:6])
+    mac['addr3'] = _hwaddr_(v[6:12])
     mac['seqctrl'] = _seqctrl_(v[-1])
     mac['present'].extend(['addr2','addr3','seqctrl'])
 
     # fourth address?
     if mac.flags['td'] and mac.flags['fd']:
         v,mac['offset'] = _unpack_from_(_S2F_['addr'],f,mac['offset'])
-        mac['addr4'] = _address_(v)
+        mac['addr4'] = _hwaddr_(v)
         mac['present'].append('addr4')
 
     # QoS field?

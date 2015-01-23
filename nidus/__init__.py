@@ -51,6 +51,7 @@ TODO:
   - ensure only one radio submit per radio is allowed
   - during setsensor ensure a new session for a sensor is not created if one already
     exists
+  - do not save packet by packet but save blocks and store n packets at a time
 """
 __name__ = 'datastore'
 __license__ = 'GPL'

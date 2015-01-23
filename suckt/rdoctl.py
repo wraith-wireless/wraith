@@ -23,6 +23,7 @@ from internal import Report            # internal communications
 from wraith.radio import iw            # iw command line interface
 import wraith.radio.iwtools as iwt     # nic command line interaces
 from wraith.radio.mpdu import MAX_MPDU # maximum size of frame
+from wraith import ts2iso
 
 class Tuner(threading.Thread):
     """ 'tunes' the radio's current channel and width """
@@ -320,6 +321,8 @@ class RadioController(mp.Process):
                 # no notices from tuner thread, pull of the next frame
                 try:
                     # pull the frame off and pass it on
+                    #ts = time.time()
+                    #print ts2iso(ts)
                     frame = self._s.recv(MAX_MPDU)
                     self._comms.put(Report(self._vnic,time.time(),'!FRAME!',frame))
                 except socket.error as e:

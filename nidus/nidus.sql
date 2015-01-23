@@ -505,6 +505,7 @@ DROP TABLE IF EXISTS sta_info;
 CREATE TABLE sta_info(
    sid integer NOT NULL,              -- fk to session that these details are known
    staid integer NOT NULL,            -- fk to sta
+   fid bigint NOT NULL,               -- fk to frame these details were seen
    ts TIMESTAMPTZ NOT NULL,           -- timestamp this info is knwon
    state STA_STATE default 'unknown', -- state of sta
    type STA_TYPE default 'unknown',   -- type of sta 

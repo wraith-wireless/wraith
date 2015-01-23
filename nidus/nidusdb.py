@@ -11,7 +11,7 @@ underlying storage system, serving a two-fold service:
 """
 __name__ = 'nidusdb'
 __license__ = 'GPL'
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 __date__ = 'January 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -24,6 +24,7 @@ import psycopg2 as psql                                # postgresql api
 import ConfigParser                                    # config file
 import threading                                       # sse threads
 import Queue                                           # thread-safe queue
+from dateutil import parser as dtparser                # parsing dates
 import wraith.radio.radiotap as rtap                   # 802.11 layer 1 parsing
 from wraith.radio import mpdu                          # 802.11 layer 2 parsing
 from wraith.radio import mcs                           # 802.11 mcs fcts
@@ -310,7 +311,7 @@ class StoreThread(SSEThread):
                                   dM.seqctrl['seqno'] if dM.seqctrl else None,
                                   dM.addr4))
 
-                # insert qos if present
+                # insert qos if present (do we really need qos)
                 if dM.qosctrl:
                     sql = """
                            insert into qosctrl (fid,tid,eosp,ackpol,amsdu,txop)
@@ -365,15 +366,13 @@ class StoreThread(SSEThread):
 
 class ExtractThread(SSEThread):
     """  extracts & stores details of nets/stas etc from mpdus in tasks queue """
-    def __init__(self,tasks,stas,lSta,sid,oui):
+    def __init__(self,tasks,lSta,sid,oui):
         """
-         stas - the session sta dictionary -> this is created by the caller
          lSta - lock on the stay dictionary
          sid - session id
          oui - oui dict
         """
         SSEThread.__init__(self,tasks)
-        self._stas = stas
         self._l = lSta
         self._sid = sid
         self._oui = oui
@@ -385,7 +384,7 @@ class ExtractThread(SSEThread):
         curs = self._conn.cursor()
         ts = item.ts
         fid = item.fid
-        dM = item.l2
+        l2 = item.l2
 
         # sta addresses
         # Function To DS From DS Address 1 Address 2 Address 3 Address 4
@@ -394,50 +393,39 @@ class ExtractThread(SSEThread):
         # To AP        1    0     RA=BSSID     TA=SA        DA       N/A
         # Wireless DS  1    1     RA=BSSID  TA=BSSID     DA=WDS    SA=WDS
 
-        # does each station already exists for this session?
-        # addr1 will always be present
-        sql = "select sid, id, mac from sta where mac=%s"
-        addrs = {dM['addr1'].lower():{'loc':[1],'id':None}}
-        if 'addr2' in dM:
-            a = dM['addr2'].lower()
-            if a in addrs:
-                addrs[a]['loc'].append(2)
-            else:
-                addrs[a] = {'loc':[2],'id':None}
-                sql += " or mac=%s"
-            if 'addr3' in dM:
-                a = dM['addr3'].lower()
-                if a in addrs:
-                    addrs[a]['loc'].append(3)
+        # extract addresses of stas in mpdu
+        addrs = {}
+        locations = ['addr1','addr2','addr3','addr4']
+        for i in xrange(len(locations)):
+            a = locations[i]
+            if not a in l2: break        # no more stas to process
+            if l2[a] != mpdu.BROADCAST:  # don't store broadcasts
+                if l2[a] in addrs:
+                    addrs[l2[a]]['loc'].append(i+1)
                 else:
-                    addrs[a] = {'loc':[3],'id':None}
-                    sql += " or mac=%s"
-                if 'addr4' in dM:
-                    a = dM['addr4'].lower()
-                    if a in addrs:
-                        addrs[a]['loc'].append(4)
-                    else:
-                        addrs[a] = {'loc':[4],'id':None}
-                        sql += " or mac=%s"
+                    addrs[l2[a]] = {'loc':[i+1],'id':None}
+
+        # build the query to determine if we have seen the stas
+        if addrs:
+            sql = "select id, mac from sta where "
+            sql += " or ".join(["mac=%s" for _ in addrs])
+            sql += ';'
+        else:
+            # nothing to update ????
+            return
 
         try:
             #### ENTER sta CS
             self._l.acquire()
 
-            # get all rows with current sta(s)
-            curs.execute(sql,tuple(addrs.keys())) # get rows sta w/ given mac addr
-            rows = curs.fetchall()
+            # get all rows with current sta(s) & add sta id if it is not new
+            curs.execute(sql,tuple(addrs.keys()))
+            for row in curs.fetchall():
+                if row[1] in addrs: addrs[row[1]]['id'] = row[0]
 
-            # for each address (not broadcast) get the id (if any)
+            # for each address
             for addr in addrs:
-                # if not broadcast, add sta id if found
-                if addr == mpdu.BROADCAST: continue
-                for row in rows:
-                    if addr == row[2]:
-                        addrs[addr]['id'] = row[1]
-                        break
-
-                # if this address does not have an id present add the sta
+                # if this one does not have an id (i.e. not seen before) add it
                 if not addrs[addr]['id']:
                     sql = """
                            insert into sta (sid,fid,spotted,mac,manuf)
@@ -446,45 +434,71 @@ class ExtractThread(SSEThread):
                     curs.execute(sql,(self._sid,fid,ts,addr,manufacturer(self._oui,addr)))
                     addrs[addr]['id'] = curs.fetchone()[0]
 
-                # addr2 is transmitting (i.e. heard) others are seen
-                mode = 'tx' if 2 in addrs[addr]['loc'] else 'rx'
+                # check sta activity
+                mode = 'tx' if 2 in addrs[addr]['loc'] else 'rx' # addr2 is transmitting
+                fs = ls = fh = lh = None
+                vs = None
+                sql = """
+                       select firstSeen,lastSeen,firstHeard,lastHeard
+                       from sta_activity where sid=%s and staid=%s;
+                      """
+                curs.execute(sql,(self._sid,addrs[addr]['id']))
+                row = curs.fetchone()
 
-                # update shared sta's timestamps
-                if addr in self._stas:
+                if row:
+                    # sta has been seen this session
                     if mode == 'tx':
-                        self._stas[addr]['fh'] = self._stas[addr]['lh'] = ts
+                        # check 'heard' activities
+                        if not row[2]:
+                            # 1st tx heard by sta, update first/lastHeard to the ts
+                            fh = lh = ts
+                        elif dtparser.parse(ts+"+00:00") > row[3]:
+                            # tx is later than lastHeard, update it
+                            lh = ts
                     else:
-                        self._stas[addr]['fs'] = self._stas[addr]['ls'] = ts
+                        # check 'seen' activities
+                        if not row[0]:
+                            # 1st time sta seen, update first/lastSeen to the ts
+                            fs = ls = ts
+                        elif dtparser.parse(ts+"+00:00") > row[1]:
+                            # seen prior and ts is later than lastSeen, update it
+                            ls = ts
 
-                    # update the record
-                    sql = """
-                           update sta_activity
-                           set firstSeen=%s,lastSeen=%s,firstHeard=%s,lastHeard=%s
-                           where sid = %s and staid = %s;
-                          """
-                    vs = (self._stas[addr]['fs'],self._stas[addr]['ls'],
-                              self._stas[addr]['fh'],self._stas[addr]['lh'],
-                              self._sid,self._stas[addr]['id'])
+                    # build query if there is something to update
+                    if fs or ls or fh or lh:
+                        vs = []
+                        us = ""
+                        if fs:
+                            us = " firstSeen=%s"
+                            vs.append(fs)
+                        if ls:
+                            if not us: us = " lastSeen=%s"
+                            else: us += ", lastSeen=%s"
+                            vs.append(ls)
+                        if fh:
+                            if not us: us = " firstHeard=%s"
+                            else: us += ", firstHeard=%s"
+                            vs.append(fh)
+                        if lh:
+                            if not us: us = " lastHeard=%s"
+                            else: us += ", lastHeard=%s"
+                            vs.append(lh)
+                        sql = "update sta_activity set"  + us + ' where staid=%s;'
+                        vs = tuple(vs+[addrs[addr]['id']])
+
                 else:
-                    # create a new entry for this sta
-                    self._stas[addr] = {'id':addrs[addr]['id'],'fs':None,
-                                        'ls':None,'fh':None,'lh':None}
-                    if mode == 'tx':
-                        self._stas[addr]['fh'] = self._stas[addr]['lh'] = ts
-                    else:
-                        self._stas[addr]['fs'] = self._stas[addr]['ls'] = ts
-
+                    # sta has not been seen this session
+                    if mode == 'tx': fh = lh = ts
+                    else: fs = ls = ts
                     sql = """
-                           insert into sta_activity (sid,staid,firstSeen,lastSeen,
-                                                     firstHeard,lastHeard)
+                           insert into sta_activity
+                           (sid,staid,firstSeen,lastSeen,firstHeard,lastHeard)
                            values (%s,%s,%s,%s,%s,%s);
                           """
-                    vs = (self._sid,self._stas[addr]['id'],self._stas[addr]['fs'],
-                          self._stas[addr]['ls'],self._stas[addr]['fh'],
-                          self._stas[addr]['lh'])
+                    vs = (self._sid,addrs[addr]['id'],fs,ls,fh,lh)
 
                 # update the database
-                curs.execute(sql,vs)
+                if vs: curs.execute(sql,vs)
         except psql.Error as e:
             self._conn.rollback()
             raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
@@ -493,7 +507,6 @@ class ExtractThread(SSEThread):
         finally:
             #### EXIT CS
             self._l.release()
-
             curs.close()
 
 class NidusDB(object):
@@ -508,8 +521,7 @@ class NidusDB(object):
         self._oui = {}              # oui dict (oui->manufacturer)
 
         # SSE variables
-        self._stas = {}             # stas seen this session
-        self._lSta = None           # lock on the stas dict
+        self._lSta = None           # lock on the stas
         self._qSave = {}            # one (or two) queues for each radio(s) saving
         self._tSave = {}            # one (or two) threads for each radio(s) saving
         self._qStore = None         # queue for storage
@@ -923,7 +935,6 @@ class NidusDB(object):
             self._qExtract = Queue.Queue()
             for i in xrange(self._nExtract):
                 thread = ExtractThread(self._qExtract,
-                                       self._stas,
                                        self._lSta,
                                        self._sid,
                                        self._oui)
