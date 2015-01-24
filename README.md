@@ -4,14 +4,18 @@
 > "You knew that I reap where I have not sown and gather where I scattered no seed?"
 
 ## 1 DESCRIPTION:
-Attack vectors, rogue devices, interfering networks are best visualized and identified over time. 
-Current tools i.e. Kismet, Aircrack-ng and Wireshark are excellent tools but none are completely 
-suitable for collecting and analyzing the 802.11 environment over a period of time (without implementing a 
-custom interface). 
+Attack vectors, rogue devices, interfering networks are best visualized and identified
+over time. Current tools i.e. Kismet, Aircrack-ng and Wireshark are excellent tools
+but none are completely suitable for collecting and analyzing the 802.11 environment
+over a period of time without that is, implementing a custom interface.
 
-Wraith is an attempt to develop a toolsuite that eases the collection, collation and analysis of temporal 
-802.11 data in order to provide administrators with the ability to view their networks from a bird's eye 
-view and drill down as necessary to a single device.
+While originally intending to develop such a custom interface to one or more Kismet
+based sensors, Wraith evolved. Kismet did not offer enough information, Wireshark
+offered too much. Wraith is an attempt to develop a toolsuite that eases the
+collection, collation and analysis of temporal 802.11 data in order to provide
+administrators with the ability to view their network(s) from a bird's eye view and
+drill down as necessary to a single device. Wraith allows the user to decide what
+data to view, how to view it and 'when' to view it.
 
 Once the reconnaissance and collection development is stable, assault plug-ins will be developed to aid
 WLAN administrators in the security testing of their networks. 
@@ -39,19 +43,18 @@ Partial support of 802.11-2012
 * Partially Supported: 802.11n
 * Not Supported: 802.11s\y\u\ac\ad\af
 
-### b. Suckt (v 0.1.5) : Small Unit Capture/Kill Team (Wraith Sensor)
+### b. DySKT (v 0.1.5) : Dynamic Small Kill Team (Wraith Sensor)
 
-Suckt is a 802.11 sensor consisting of an optional collection radio (i.e.
-spotter), a mandatory reconnaissance radio (i.e. shooter) and an RTO which relays
-collected data to Nidus, the data storage system (i.e. HQ). Suckt collects data
-in the form of raw 802.11 packets with the reconnaissance (and collection if present)
-radios, forwarding that date along with any geolocational data (if a gps device
-is present) to higher. The reconnaissance radio will also partake in assaults in
-directed to.
+An 802.11 sensor consisting of an optional collection radio (i.e. spotter), a
+mandatory reconnaissance radio (i.e. shooter) and an RTO which relays collected
+data to Nidus, the data storage system (i.e. HQ). DySKT collects data in the form
+of raw 802.11 packets with the reconnaissance (and collection if present) radios,
+forwarding that date along with any geolocational data (if a gps device is present)
+to higher.
 
 ### c. Nidus (v 0.0.4): Data Storage Manager
 
-Nidus is the Data Storage manager processing data received from Suckt. Nidus is the 
+Nidus is the Data Storage manager processing data received from DySKT. Nidus is the
 interface to the backend Postgresql database, processing data in terms of raw 802.11
 frames, gps location, and 'device' details/status. 
 
@@ -80,17 +83,17 @@ frames, gps location, and 'device' details/status.
  - channels.py      802.11 channel, freq utilities
  - mcs.py           mcs index functions
  - oui.py           oui/manuf related functions
-*  suckt                subpackage for wraith sensor
- - \_\_init\_\_.py      initialize suckt package
- - suckt.conf       configuration file for wasp
- - suckt.log.conf   configuration file for wasp logging
- - suckt.py         primary module
+*  dyskt            subpackage for wraith sensor
+ - \_\_init\_\_.py  initialize dyskt package
+ - dyskt.conf       configuration file for dyskt
+ - dyskt.log.conf   configuration file for dyskt logging
+ - dyskt.py         primary module
  - internal.py      defines the Report class
  - rdoctl.py        radio controler with tuner, sniffer
  - rto.py           data collation and forwarding
- - sucktd           sucktd daemon
-*  nidus                subpackage for datamanager
- - \_\_init\_\_.py      initialize nidus package
+ - dysktd           dysktd daemon
+*  nidus            subpackage for datamanager
+ - \_\_init\_\_.py  initialize nidus package
  - nidus.conf       nidus configuration
  - nidus.log.conf   nidus logging configuration
  - nidus.py         nidus server

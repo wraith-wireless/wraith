@@ -30,7 +30,7 @@ class Tuner(threading.Thread):
     def __init__(self,ev,tC,iface,scan,dwell,i):
         """
          ev - event queue between radio and this Thread
-         tC - suckt token connnection
+         tC - dyskt token connnection
          iface - interface name of card
          scan - scan list of channel tuples (ch,chw)
          dwell - dwell list each stay on scan[i] for dwell[i]
@@ -39,7 +39,7 @@ class Tuner(threading.Thread):
         threading.Thread.__init__(self)
         self._done = threading.Event()
         self._eQ = ev      # event queue from radio controller
-        self._tC = tC      # connection from suckt to tuner
+        self._tC = tC      # connection from DySKT to tuner
         self._vnic = iface # this radio's vnic
         self._chs = scan   # scan list
         self._ds = dwell   # corresponding dwell times
@@ -52,7 +52,7 @@ class Tuner(threading.Thread):
         while not self._done.is_set():
             # wait on connection for channel's dwell time. If no token, switch
             # to next channel. If token & it is a hold, block on the connection
-            # until we get another token (assumes suckt will not send consecutive
+            # until we get another token (assumes dyskt will not send consecutive
             # holds) which should be a resme or stop
             if self._tC.poll(self._ds[self._i]):
                 token = self._tC.recv()
@@ -84,7 +84,7 @@ class RadioController(mp.Process):
     def __init__(self,comms,conn,conf):
         """ initialize radio
          comms - internal communications
-         conn - connection to/from suckt
+         conn - connection to/from DysKT
          conf - radio configuration dict. Must have key->value pairs for keys role,
           nic, dwell, scan and pass and optionally for keys spoof, ant_gain, ant_type,
           ant_loss, desc
@@ -94,7 +94,7 @@ class RadioController(mp.Process):
         """
         mp.Process.__init__(self)
         self._comms = comms   # internal deque
-        self._conn = conn     # message queue to suckt
+        self._conn = conn     # message queue to DySKT
         self._q = None        # queue between tuner and us
         
         # _setup() sets the following
@@ -165,13 +165,13 @@ class RadioController(mp.Process):
         # determine virtual interface name
         ns = []
         for wiface in iwt.wifaces():
-            cs = wiface.split('suckt')
+            cs = wiface.split('dyskt')
             try:
                 if len(cs) > 1: ns.append(int(cs[1]))
             except ValueError:
                 pass
         n = 0 if not 0 in ns else max(ns)+1
-        self._vnic = "suckt%d" % n
+        self._vnic = "dyskt%d" % n
 
         # sniffing interface
         try:
@@ -355,7 +355,7 @@ class RadioController(mp.Process):
             try:
                 self._conn.send(('warn',self._role,'Shutdown',"Incomplete reset"))
             except IOError:
-                # most likely suckt already closed their side
+                # most likely DySKT already closed their side
                 pass
 
     def shutdown(self):

@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
-""" suckt: Small Unit Capture/Kill Team (Wraith Sensor)
+""" dyktt: Dynamic Small Kill Team (Wraith Sensor)
 
-Suckt is a 802.11 sensor consisting of an optional collection radio (i.e.
+DySKT is a 802.11 sensor consisting of an optional collection radio (i.e.
 spotter), a mandatory reconnaissance radio (i.e. shooter) and an RTO which relays
-collected data to Nidus, the data storage system (i.e. HQ). Suckt collects data
+collected data to Nidus, the data storage system (i.e. HQ). DySKT collects data
 in the form of raw 802.11 packets with the reconnaissance (and collection if
 present) radios, forwarding that date along with any geolocational data (if a
 gps device is present) to higher. The reconnaissance radio will also partake in
 assaults in directed to.
 
 REVISIONS:
-suckt 0.1.4
- includes: suckt 0.0.8, radio 0.0.4, collate 0.0.8, pf 0.0.6, sucktd, sucktd.conf,
-  sucktd.log.conf suktd
+dyskt 0.1.4
+ includes: dyskt 0.0.8, radio 0.0.4, collate 0.0.8, pf 0.0.6, dysktd, dyskt.conf,
+  dyskt.log.conf dyskt
  changes:
   - consolidates radio related processes, sniffer and tuner, into a the RadioController
     class
@@ -21,15 +21,15 @@ suckt 0.1.4
      shared communication objects and the number of sub process
    o radio class now subclasses mp.Process
 
-suckt 0.1.5
+dyskt 0.1.5
  desc: utilizes a new internal communication SOP to streamline and simplify
   interprocess communications
- includes: suckt 0.0.10 internal 0.0.1 rto 0.0.10 (previously collator) rdoctl 0.0.5
-  suckt.conf suckt.log.conf sucktd
+ includes: dyskt 0.0.10 internal 0.0.1 rto 0.0.10 (previously collator) rdoctl 0.0.5
+  dyskt.conf dyskt.log.conf dysktd
  changes:
   - streamlined inter-process communication methods/objects
    o replaced interprocess Pipes with a single Queue
-   o removed the Queue used by children to communicate with suckt and made
+   o removed the Queue used by children to communicate with DySKT and made
     each connection dual-ended
   - scan pattern config modified
    o added band and width specification to scan and pass configuration
@@ -56,7 +56,7 @@ TODO:
      40) look into socket options (and pcapy code) to ensure best performance
      41) need to handle tuner thread failure in rdoctl
 """
-__name__ = 'suckt'
+__name__ = 'dyskt'
 __license__ = 'GPL'
 __version__ = '0.1.5'
 __date__ = 'December 2014'

@@ -30,7 +30,7 @@ class GPSPoller(threading.Thread):
     def __init__(self,ev,poll,did,epx,epy,host='127.0.0.1',port=2947):
         """
          ev - event queue between rto and this Thread
-         tC - suckt token connnection
+         tC - DySKT token connnection
          poll - time to poll gps device
          did - device id
          epx - quality control
@@ -132,12 +132,12 @@ class RTO(mp.Process):
         """
          initializes RTO
          comms - internal communication
-         conn - connection to/from suckt
+         conn - connection to/from DySKT
          conf - necessary config details
         """
         mp.Process.__init__(self)
         self._comms = comms       # communications deque
-        self._conn = conn         # message queue to/from suckt
+        self._conn = conn         # message queue to/from DySKT
         self._mgrs = None         # lat/lon to mgrs conversion
         self._conf = conf['gps']  # configuration for gps/datastore
         self._nidus = None        # nidus server
@@ -178,7 +178,7 @@ class RTO(mp.Process):
         # execution loop
         tkn = None
         while tkn != '!STOP!':
-            # 1. anything on suckt connection?
+            # 1. anything from DySKT
             if self._conn.poll():
                 tkn = self._conn.recv()
                 if tkn != '!STOP!':
@@ -204,15 +204,15 @@ class RTO(mp.Process):
                         ret = self._send('GPS',ts,msg)
                         if ret: self._conn.send(('err','RTO','Nidus',ret))
 
-            # 3. queued data from radios (possibly suckt)
+            # 3. queued data from radios (possibly DySKT)
             ev = msg = None
             try:
                 rpt = self._comms.get() # blocking call
                 (cs,ts,ev,msg,_) = rpt.report
 
-                # suckt pushes a token onto the internal comms allowing us to
+                # DySKT pushes a token onto the internal comms allowing us to
                 # break the blocking call and check the token
-                if cs == 'suckt': continue
+                if cs == 'dyskt': continue
                 if ev == '!UP!': # should be the 1st message we get from radio(s)
                     # NOTE: sending the radio, nidus will take care of setting
                     # the radio device to up
@@ -223,7 +223,7 @@ class RTO(mp.Process):
                 #elif ev == '!DOWN!':
                 #    pass
                 elif ev == '!FAIL!':
-                    # send fail to nidus, notify suckt & delete cs from rmap
+                    # send fail to nidus, notify DySKT & delete cs from rmap
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'fail',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                     del rmap[cs]
@@ -262,7 +262,7 @@ class RTO(mp.Process):
             try:
                 self._conn.send(('warn','RTO','Shutdown',"Incomplete shutdown"))
             except IOError:
-                # most likely suckt closed their side of the pipe
+                # most likely DySKT closed their side of the pipe
                 pass
 
     def shutdown(self):

@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-""" suckt.py: main process captures and collates raw 802.11-2012 traffic
+""" dyskt.py: main process captures and collates raw 802.11-2012 traffic
 
 802.11-2012 sensor that collects araw 802.11 frames and gps data for processing
 by an external process.
 """
 
-__name__ = 'suckt'
+__name__ = 'dyskt'
 __license__ = 'GPL'
 __version__ = '0.0.10'
 __date__ = 'November 2014'
@@ -24,7 +24,7 @@ import logging.handlers             # handlers for log
 import multiprocessing as mp        # multiprocessing process, events etc
 import argparse as ap               # reading command line arguments
 import ConfigParser                 # reading configuration files
-from wraith import suckt            # for rev number, author
+from wraith import dyskt            # for rev number, author
 from internal import Report         # message report template
 from rto import RTO                 # the rto
 from rdoctl import RadioController  # Radio object etc
@@ -34,36 +34,36 @@ from wraith.radio.iw import IW_CHWS # channel widths
 #### set up log
 # have to configure absolute path
 GPATH = os.path.dirname(os.path.abspath(__file__))
-logpath = os.path.join(GPATH,'suckt.log.conf')
+logpath = os.path.join(GPATH,'dyskt.log.conf')
 logging.config.fileConfig(logpath)
 
 #### OUR EXCEPTIONS
-class SucktException(Exception): pass
-class SucktConfException(SucktException): pass
-class SucktParamException(SucktException): pass
-class SucktRuntimeException(SucktException): pass
+class DySKTException(Exception): pass
+class DySKTConfException(DySKTException): pass
+class DySKTParamException(DySKTException): pass
+class DySKTRuntimeException(DySKTException): pass
 
 #### CONSTANTS
 # WASP STATES
-SUCKT_INVALID         = -1 # suckt is unuseable
-SUCKT_CREATED         =  0 # suckt is created but not yet started
-SUCKT_RUNNING         =  1 # suckt is currently executing
-SUCKT_PAUSED_RECON    =  2 # suckt recon radio is paused
-SUCKT_PAUSED_COLL     =  3 # suckt collection radio is paused
-SUCKT_PAUSED_BOTH     =  4 # both radios are paused
-SUCKT_EXITING         =  5 # suckt has finished execution loop
-SUCKT_DESTROYED       =  6 # suckt is destroyed
+DYSKT_INVALID         = -1 # dyskt is unuseable
+DYSKT_CREATED         =  0 # dyskt is created but not yet started
+DYSKT_RUNNING         =  1 # dyskt is currently executing
+DYSKT_PAUSED_RECON    =  2 # dyskt recon radio is paused
+DYSKT_PAUSED_COLL     =  3 # dyskt collection radio is paused
+DYSKT_PAUSED_BOTH     =  4 # both radios are paused
+DYSKT_EXITING         =  5 # dyskt has finished execution loop
+DYSKT_DESTROYED       =  6 # dyskt is destroyed
 
-class Suckt(object):
-    """ Suckt - primary process of the 802.11a\b\g\n sensor """
+class DySKT(object):
+    """ DySKT - primary process of the Wraith sensor """
     def __init__(self,conf=None):
         """ initialize variables """
         # get parameters
-        self._cpath = conf if conf else os.path.join(GPATH,'suckt.conf')
+        self._cpath = conf if conf else os.path.join(GPATH,'dyskt.conf')
         
         # internal variables
-        self._state = SUCKT_INVALID # current state
-        self._conf = {}             # suckt configuration dict
+        self._state = DYSKT_INVALID # current state
+        self._conf = {}             # dyskt configuration dict
         self._halt = None           # the stop event
         self._pConns = None         # token pipes for children
         self._ic = None             # internal comms queue
@@ -72,7 +72,7 @@ class Suckt(object):
         self._cr = None             # collection radio
     
     def _create(self):
-        """ create Suckt and member processes """
+        """ create DySKT and member processes """
         # read in and validate the conf file 
         self._readconf()
 
@@ -114,27 +114,27 @@ class Suckt(object):
             # e should have the form "Major:Minor:Description"
             ms = e.message.split(':')
             logging.error("%s (%s) %s",ms[0],ms[1],ms[2])
-            self._state = SUCKT_INVALID
+            self._state = DYSKT_INVALID
         except Exception as e:
             # catchall
             logging.error(e)
-            self._state = SUCKT_INVALID
+            self._state = DYSKT_INVALID
         else:
             # start children execution
-            self._state = SUCKT_CREATED
+            self._state = DYSKT_CREATED
             self._rr.start()
             if self._cr: self._cr.start()
             self._rto.start()
 
     def _destroy(self):
-        """ destroy Suckt cleanly """
+        """ destroy DySKT cleanly """
         # change our state
-        self._state = SUCKT_EXITING
+        self._state = DYSKT_EXITING
 
         # halt main execution loop & send out poison pills
         logging.info("Stopping Sub-processes")
         self._halt.set() # stops main loop in start
-        self._ic.put(Report('suckt',time.time(),'!CHECK!',[]))
+        self._ic.put(Report('dyskt',time.time(),'!CHECK!',[]))
         for key in self._pConns.keys():
             try:
                 self._pConns[key].send('!STOP!')
@@ -145,27 +145,27 @@ class Suckt(object):
         while mp.active_children(): time.sleep(0.5)
 
         # change our state
-        self._state = SUCKT_DESTROYED
+        self._state = DYSKT_DESTROYED
 
     @property
     def state(self): return self._state
 
     def start(self):
-        """ start suckt execution """
+        """ start execution """
         # setup signal handlers for pause(s),resume(s),stop
         signal.signal(signal.SIGINT,self.stop)   # CTRL-C and kill -INT stop
         signal.signal(signal.SIGTERM,self.stop)  # kill -TERM stop
 
         # initialize, quit on failure
-        logging.info("**** Starting Suckt %s ****" % suckt.__version__)
+        logging.info("**** Starting DySKT %s ****" % dyskt.__version__)
         self._create()
-        if self.state == SUCKT_INVALID:
+        if self.state == DYSKT_INVALID:
             # make sure we do not leave system in corrupt state (i.e. no wireless nics)
             self._destroy()
-            raise SucktRuntimeException("Suckt failed to initialize, shutting down")
+            raise DySKTRuntimeException("DySKT failed to initialize, shutting down")
 
         # set state to running
-        self._state = SUCKT_RUNNING
+        self._state = DYSKT_RUNNING
 
         # execution loop
         while not self._halt.is_set():
@@ -176,7 +176,7 @@ class Suckt(object):
                         (l,o,t,m) = self._pConns[key].recv()
                         if l == "err":
                             # only process errors involved during execution
-                            if SUCKT_CREATED < self.state < SUCKT_EXITING:
+                            if DYSKT_CREATED < self.state < DYSKT_EXITING:
                                 if o == 'collection':
                                     # allow collection radio to fail and still continue
                                     logging.warning("Collection radio dropped. Continuing...")
@@ -191,14 +191,14 @@ class Suckt(object):
                         elif l == "info": logging.info("%s: (%s) %s",o,t,m)
                 except Exception as e:
                     # blanke exception
-                    logging.error("Suckt failed. (Unknown) %s",e)
+                    logging.error("DySKT failed. (Unknown) %s",e)
             time.sleep(1)
 
     # noinspection PyUnusedLocal
     def stop(self,signum=None,stack=None):
-        """ stop suckt execution """
-        if SUCKT_RUNNING <= self.state < SUCKT_EXITING:
-            logging.info("**** Stopping Suckt ****")
+        """ stop execution """
+        if DYSKT_RUNNING <= self.state < DYSKT_EXITING:
+            logging.info("**** Stopping DySKT ****")
             self._destroy()
 
     def _readconf(self):
@@ -206,7 +206,7 @@ class Suckt(object):
         logging.info("Reading configuration file...")
         conf = ConfigParser.RawConfigParser()
         if not conf.read(self._cpath):
-            raise SucktConfException('%s is invalid' % self._cpath)
+            raise DySKTConfException('%s is invalid' % self._cpath)
 
         # intialize conf to empty dict
         self._conf = {}
@@ -248,11 +248,11 @@ class Suckt(object):
             # C2C section
             self._conf['c2c'] = {'port',conf.getint('C2C','port')}
         except ConfigParser.NoSectionError as e:
-            raise SucktConfException("%s" % e)
+            raise DySKTConfException("%s" % e)
         except ConfigParser.NoOptionError as e:
-            raise SucktConfException("%s" % e)
+            raise DySKTConfException("%s" % e)
         except ValueError as e:
-            raise SucktConfException("%s" % e)
+            raise DySKTConfException("%s" % e)
 
     def _readradio(self,conf,rtype='Recon'):
         """ read in the rtype radio configuration from conf and return parsed dict """
@@ -351,12 +351,12 @@ class Suckt(object):
 
         return [],[]
 
-if __name__ == 'suckt':
+if __name__ == 'dyskt':
     try:
         # setup the argument parser
-        desc = "Suckt %s - (C) %s %s" % (suckt.__version__,
-                                         suckt.__date__.split(" ")[1],
-                                         suckt.__author__)
+        desc = "DySKT %s - (C) %s %s" % (dyskt.__version__,
+                                         dyskt.__date__.split(" ")[1],
+                                         dyskt.__author__)
         opts = ap.ArgumentParser(description=desc)
         opts.add_argument("--config",help="load specified configuration file")
         args = opts.parse_args()
@@ -367,19 +367,19 @@ if __name__ == 'suckt':
         # verify validity
         if cpath:
             if not os.path.exists(cpath):
-                raise SucktConfException("Config file %s does not exist" % cpath)
+                raise DySKTConfException("Config file %s does not exist" % cpath)
         
-        # create Suckt and start execution
-        logging.info("Suckt %s",suckt.__version__)
-        skt = Suckt(cpath)
+        # create DySKT and start execution
+        logging.info("DySKT %s",dyskt.__version__)
+        skt = DySKT(cpath)
         skt.start()
-    except SucktConfException as err:
+    except DySKTConfException as err:
         logging.error("Configuration Error: %s",err)
-    except SucktParamException as err:
+    except DySKTParamException as err:
         logging.error("Parameter Error: %s",err)
-    except SucktRuntimeException as err:
+    except DySKTRuntimeException as err:
         logging.error("Runtime Error: %s",err)
-    except SucktException as err:
+    except DySKTException as err:
         logging.error("General Error: %s",err)
     except Exception as err:
         logging.exception("Unknown Error: %s",err)

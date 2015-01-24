@@ -1,18 +1,18 @@
 #!/bin/sh
  
 ### BEGIN INIT INFO
-# Provides:          suckt (Wraith Sensor Daemon)
+# Provides:          dyskt (Wraith Sensor Daemon)
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Initiates Suckt, an Wraith sensor
+# Short-Description: Initiates DySKT, an Wraith sensor
 ### END INIT INFO
 
 # Author: Dale Patterson <wraith.wireless@hushmail.com>
 
 # Change the next 3 lines to suit where you install your script and what you want to call it
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
-DAEMON=/home/<user/workspace/projects/Python/wraith/suckt/suckt.py
-DAEMON_NAME=sucktd
+DAEMON=/home/<user/workspace/projects/Python/wraith/dyskt/dyskt.py
+DAEMON_NAME=dysktd
 
 # This next line determines what user the script runs as.
 DAEMON_USER=<user>
@@ -54,7 +54,7 @@ case "$1" in
      status_of_proc "$DAEMON_NAME" && exit 0 || exit $?
      ;;
     *)
-      echo "Usage: /etc/init.d/sucktd {start|stop|restart|status}"
+      echo "Usage: /etc/init.d/dysktd {start|stop|restart|status}"
       exit 1
      ;;
 esac

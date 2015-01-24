@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" internal.py: defines a report for internal communication betw/ suckt children
+""" internal.py: defines a report for internal communication betw/ dyskt children
 """
 __name__ = 'internal'
 __license__ = 'GPL'
