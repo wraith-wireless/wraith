@@ -321,8 +321,6 @@ class RadioController(mp.Process):
                 # no notices from tuner thread, pull of the next frame
                 try:
                     # pull the frame off and pass it on
-                    #ts = time.time()
-                    #print ts2iso(ts)
                     frame = self._s.recv(MAX_MPDU)
                     self._comms.put(Report(self._vnic,time.time(),'!FRAME!',frame))
                 except socket.error as e:

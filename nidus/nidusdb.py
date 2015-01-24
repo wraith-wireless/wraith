@@ -167,54 +167,73 @@ class SaveThread(SSEThread):
         self._path = path
         self._private = private
         self._sz = sz
+        self._pkts = []
         self._fout = None
 
     def _cleanup(self):
         """ close file if it is open """
-        if self._fout: self._fout.close()
+        # write any stored packets and close opened file
+        try:
+            if self._pkts: self._writepkts()
+            if self._fout: self._fout.close()
+        except:
+            # blanket exception to catch everything on quit
+            pass
 
     def _consume(self,item):
         """ write the packet in item to file """
-        ts = item.ts
-        fid = item.fid
         sid = item.sid
         mac = item.mac
         frame = item.frame
         (left,right) = item.offsets
-        fname = None
 
-        # close any open file exceeding specified size & create name for new file
-        if not self._fout or os.path.getsize(self._fout.name) > self._sz:
-            if self._fout:
+        # save the packet as tuple (time,frameid,frame) for later writing
+        if self._private and left < right: frame = frame[:left] + frame[right:]
+        self._pkts.append((item.ts,item.fid,frame))
+
+        # if there are (hardcoded: 20) number of stored frames, write them out
+        if len(self._pkts) > 20:
+            # close any open file exceeding specified size
+            if self._fout and os.path.getsize(self._fout.name) > self._sz:
                 self._fout.close()
                 self._fout = None
-            fname = os.path.join(self._path,"%d_%s_%s.pcap" % (sid,ts,mac))
 
-        # get a cursor
-        curs = self._conn.cursor()
+            # if no file, open a new file (using ts from first pkt in name)
+            if not self._fout:
+                fname = os.path.join(self._path,
+                                     "%d_%s_%s.pcap" % (sid,self._pkts[0][0],mac))
+                try:
+                    self._fout = pcap.pcapopen(fname)
+                except pcap.PCAPException as e:
+                    raise NidusDBSubmitException(e)
+
+            self._writepkts()
+
+    def _writepkts(self):
+        """ write stored packets to file """
+        curs = None
         try:
-            # need to open a new file?
-            if not self._fout: self._fout = pcap.pcapopen(fname)
-
-            # if private, only write the layer 1, layer 2
-            if self._private:
-                if left < right: frame = frame[:left] + frame[right:]
-            pcap.pktwrite(self._fout,ts,frame)
-
-            # store in datastore
-            sql = "insert into frame_path (fid,filepath) values (%s,%s);"
-            curs.execute(sql,(fid,os.path.join(self._path,os.path.split(self._fout.name)[1])))
+            # we'll catch db errors in the internal loop and attempt to
+            # continue writing
+            curs = self._conn.cursor()
+            for pkt in self._pkts:
+                sql = "insert into frame_path (fid,filepath) values (%s,%s);"
+                try:
+                    curs.execute(sql,(pkt[1],os.path.split(self._fout.name)[1]))
+                except psql.Error as e:
+                    print 'error writing frame_path', e
+                    self._conn.rollback()
+                else:
+                    self._conn.commit()
+                pcap.pktwrite(self._fout,pkt[0],pkt[2])
         except pcap.PCAPException:
-            # try closing the file
             self._fout.close()
-            raise
-        except psql.Error as e:
-            self._conn.rollback()
-            raise NidusDBSubmitException(e.pgcode,e.pgerror)
-        else:
-            self._conn.commit()
+            self._fout = None
         finally:
+            # make sure to reset packet list and close the cursor
+            self._pkts = []
             curs.close()
+
 
 class StoreThread(SSEThread):
     """ stores the frame details in the task queue to the db """
@@ -446,6 +465,10 @@ class ExtractThread(SSEThread):
                 row = curs.fetchone()
 
                 if row:
+                    # NOTE: ts from frames need to be converted to a datetime
+                    # object (with timezone info) before being compared
+                    # to ts from db
+
                     # sta has been seen this session
                     if mode == 'tx':
                         # check 'heard' activities
@@ -483,8 +506,10 @@ class ExtractThread(SSEThread):
                             if not us: us = " lastHeard=%s"
                             else: us += ", lastHeard=%s"
                             vs.append(lh)
-                        sql = "update sta_activity set"  + us + ' where staid=%s;'
-                        vs = tuple(vs+[addrs[addr]['id']])
+                        sql = "update sta_activity set"
+                        sql += us
+                        sql += " where sid=%s and staid=%s;"
+                        vs = tuple(vs+[self._sid,addrs[addr]['id']])
 
                 else:
                     # sta has not been seen this session
@@ -591,26 +616,27 @@ class NidusDB(object):
 
     def disconnect(self):
         """ client disconnects from NidusDB """
-        # close out database
-        if self._conn and not self._conn.closed:
-            self._curs.close()
-            self._conn.close()
+        try:
+            # stop & wait on the sse threads
+            for _ in self._tStore: self._qStore.put('!STOP!')
+            for thread in self._tStore:
+                if thread.is_alive(): thread.join()
 
-        # stop & wait on the sse threads
-        # save
-        for thread in self._tSave: # save threads
-            self._qSave[thread].put('!STOP!')
-            if self._tSave[thread].is_alive(): self._tSave[thread].join()
+            for _ in self._tExtract: self._qExtract.put('!STOP!')
+            for thread in self._tExtract:
+                if thread.is_alive(): thread.join()
 
-        # store
-        for _ in self._tStore: self._qStore.put('!STOP!')
-        for thread in self._tStore:
-            if thread.is_alive(): thread.join()
-
-        # extract
-        for _ in self._tExtract: self._qExtract.put('!STOP!')
-        for thread in self._tExtract:
-            if thread.is_alive(): thread.join()
+            for thread in self._tSave:
+                self._qSave[thread].put('!STOP!')
+                if self._tSave[thread].is_alive(): self._tSave[thread].join()
+        except:
+            # blanket exception
+            pass
+        finally:
+            # close out database
+            if self._conn and not self._conn.closed:
+                self._curs.close()
+                self._conn.close()
 
     def submitdevice(self,f,ip=None):
         """ submitdevice - submit the string fields to the database """

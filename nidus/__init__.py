@@ -17,6 +17,7 @@ nidus 0.0.4
   - no longer attempts to store all packets in the data store
      o frames are saved to file
      o frames are parsed and portions are stored in the data store
+     o data is 'extracted' from frames and is also stored
   - SSE (Save Store Extract) is multithreaded which has helped alleviate delay
     from sensor exiting to nidus closing session records
       o 1 thread per radio for saving and number of threads for storing, extracting
@@ -28,12 +29,13 @@ nidus 0.0.4
     save layer 1 and layer 2 (including encryption from layer 3)
   - modified frame submission (running into issues where a frame id had to be
     created IOT individual threads [i.e. Save,Extract] did not insert a record
-    referenceing a frame that did not exist):
+    referenceing a frame that did not exist at that time):
      o the frame record is inserted in the submitframe function so that each thread
        will have the primary key of that frame.
-     o tasks are only put respective queues if there is something for the SSE
+     o tasks are only put on respective queues if there is something for the SSE
        thread to process. i.e. if the MPDU failed to parse, extract threads will
        not be tasked with processing an empty MPDU
+  - frames are written to disk in 'bulk' rather on packet-per-packet basis
 
 TODO:
 1) Should we return messages? i.e instead of just closing pipe for no running server etc
@@ -51,7 +53,7 @@ TODO:
   - ensure only one radio submit per radio is allowed
   - during setsensor ensure a new session for a sensor is not created if one already
     exists
-  - do not save packet by packet but save blocks and store n packets at a time
+  - Save thread does not save last n frames to file
 """
 __name__ = 'datastore'
 __license__ = 'GPL'
