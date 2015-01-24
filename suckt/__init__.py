@@ -54,7 +54,7 @@ TODO:
            - pause stop scanning and recording
      37) add ability to 'filter' on one network, i.e. bssid or ssid?
      40) look into socket options (and pcapy code) to ensure best performance
-     41) need to handle tuner thread failure ir rdoctl
+     41) need to handle tuner thread failure in rdoctl
 """
 __name__ = 'suckt'
 __license__ = 'GPL'

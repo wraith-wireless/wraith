@@ -242,9 +242,11 @@ class Suckt(object):
                     self._conf['gps']['epy'] = conf.getfloat('GPS','epy')
 
             # Storage section
-            self._conf['store'] = {}
-            self._conf['store']['host'] = conf.get('Storage','host')
-            self._conf['store']['port'] = conf.getint('Storage','port')
+            self._conf['store'] = {'host':conf.get('Storage','host'),
+                                   'port':conf.getint('Storage','port')}
+
+            # C2C section
+            self._conf['c2c'] = {'port',conf.getint('C2C','port')}
         except ConfigParser.NoSectionError as e:
             raise SucktConfException("%s" % e)
         except ConfigParser.NoOptionError as e:
@@ -301,7 +303,7 @@ class Suckt(object):
     @staticmethod
     def _parsechlist(pattern,ptype):
         """
-         parse channel list pattern of type ptype = oneof {'scan','pass' and return
+         parse channel list pattern of type ptype = oneof {'scan','pass'} and return
          a list of tuples (ch,chwidth)
         """
         if not pattern:
