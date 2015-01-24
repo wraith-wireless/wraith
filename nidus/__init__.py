@@ -4,7 +4,7 @@
 
 Uses Python SocketServer with Threaded mixin to get & store Wasp collected data
 
-nidus 0.0.4
+nidus 0.0.5
  desc: implements datastorage writes to db. ATT it is assumed that nidus will be/has
   the potential to be a bottleneck requiring massive amounts of data to be received
   and processed. It is hoped the builtin SocketServer.TCPServer with ThreadingMixIn
@@ -57,7 +57,7 @@ TODO:
 """
 __name__ = 'datastore'
 __license__ = 'GPL'
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 __date__ = 'September 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
