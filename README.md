@@ -1,4 +1,5 @@
-# ![](widgets/icons/wraith2.png?raw=true) WRAITH: Wireless assault, reconnaissance, collection and exploitation toolkit.
+# ![](widgets/icons/wraith-banner.png?raw=true)
+WRAITH: Wireless assault, reconnaissance, collection and exploitation toolkit.
 
 > "You knew that I reap where I have not sown and gather where I scattered no seed?"
 
