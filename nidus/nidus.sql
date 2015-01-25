@@ -195,10 +195,6 @@ CREATE TABLE using_radio(
 -- is defined (partially) in frame, source, ampdu and signal. The mac layer 
 -- is defined in traffic and wepcrypt, tkipcrypt and ccmpcrypt
 
--- encryption type
-DROP TYPE IF EXISTS CRYPT_TYPE;
-CREATE TYPE CRYPT_TYPE AS ENUM ('none','wep','tkip','ccmp','other');
-
 -- frame table
 -- each traffic is defined by its id, timestampe and src and describes basic
 -- details of the signal to include the type of frame header, and type/subtype
@@ -213,8 +209,7 @@ CREATE TABLE frame(
    bRTAP smallint,                   -- bytes in radiotap
    bMPDU smallint,                   -- bytes in mmpdu
    data smallint[2] NOT NULL,        -- left,right indexes into data portion 
-   ampdu smallint not NULL,          -- ampdu is present 
-   crypt CRYPT_TYPE default 'none',  -- encryption type 
+   ampdu smallint not NULL,          -- ampdu is present    
    fcs smallint not NULL,            -- fcs is present (1) or not (0)
    CONSTRAINT ch_bytes CHECK (bytes > 0),
    CONSTRAINT ch_bytesRTAP CHECK (bRTAP >= 0),
@@ -321,31 +316,36 @@ CREATE TYPE FT_SUBTYPE AS ENUM ('assoc-req','assoc-resp','reassoc-req','reassoc-
 DROP TYPE IF EXISTS DUR_TYPE;
 CREATE TYPE DUR_TYPE AS ENUM ('vcs','cfp','aid','rsrv');
 
+-- encryption type
+DROP TYPE IF EXISTS CRYPT_TYPE;
+CREATE TYPE CRYPT_TYPE AS ENUM ('none','wep','tkip','ccmp','other');
+
 -- traffic table
 -- defines portions of the mpdu layer.
 -- The minimum mpdu is frame control, duration and address 1
 -- NOTE: for duration value is only included if the type is of vsc or aid
 DROP TABLE IF EXISTS traffic;
 CREATE TABLE traffic(
-   fid bigint NOT NULL,         -- foreign key to frame
-   type FT_TYPE NOT NULL,       -- type of frame
-   subtype FT_SUBTYPE NOT NULL, -- subtype of frame
-   td smallint default '0',     -- to ds bit 
-   fd smallint default '0',     -- from ds bit
-   mf smallint default '0',     -- more fragments bit
-   rt smallint default '0',     -- retry bit
-   pm smallint default '0',     -- power mgmt bit
-   md smallint default '0',     -- more data bit
-   pf smallint default '0',     -- protected frame bit
-   so smallint default '0',     -- order bit
-   dur_type DUR_TYPE NOT NULL,  -- duration type
-   dur_val integer,             -- duration value
-   addr1 macaddr NOT NULL,      -- first address
-   addr2 macaddr,               -- second address
-   addr3 macaddr,               -- third address
-   fragnum smallint,            -- seq control fragment number
-   seqnum smallint,             -- seq control sequence number
-   addr4 macaddr,               -- fourth address
+   fid bigint NOT NULL,             -- foreign key to frame
+   type FT_TYPE NOT NULL,           -- type of frame
+   subtype FT_SUBTYPE NOT NULL,     -- subtype of frame
+   td smallint default '0',         -- to ds bit 
+   fd smallint default '0',         -- from ds bit
+   mf smallint default '0',         -- more fragments bit
+   rt smallint default '0',         -- retry bit
+   pm smallint default '0',         -- power mgmt bit
+   md smallint default '0',         -- more data bit
+   pf smallint default '0',         -- protected frame bit
+   so smallint default '0',         -- order bit
+   dur_type DUR_TYPE NOT NULL,      -- duration type
+   dur_val integer,                 -- duration value
+   addr1 macaddr NOT NULL,          -- first address
+   addr2 macaddr,                   -- second address
+   addr3 macaddr,                   -- third address
+   fragnum smallint,                -- seq control fragment number
+   seqnum smallint,                 -- seq control sequence number
+   addr4 macaddr,                   -- fourth address
+   crypt CRYPT_TYPE default 'none', -- encryption type 
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_td CHECK (td >= 0 and td <= 1),
    CONSTRAINT ch_fd CHECK (fd >= 0 and fd <= 1),
@@ -589,7 +589,11 @@ DROP TABLE wepcrypt;
 DROP TABLE signal;
 DROP TABLE source;
 DROP TABLE frame_path;
+DROP TABLE sta_activity;
+DROP TABLE sta;
 DROP TABLE frame;
+
+select frame.ts,frame.bytes,frame.bRTAP,frame.bMPDU,frame.data,traffic.type,traffic.subtype,traffic.td,traffic.fd,traffic.mf,traffic.rt,traffic.pm,traffic.md,traffic.pf,traffic.so,traffic.dur_type,traffic.dur_val,traffic.addr1,traffic.addr2,traffic.addr3,traffic.fragnum,traffic.seqnum,traffic.addr4,traffic.crypt from frame,traffic where frame.id = traffic.fid;
 
 -- data sizes 
 -- size of relations

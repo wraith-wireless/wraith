@@ -244,6 +244,7 @@ class StoreThread(SSEThread):
         """
         SSEThread.__init__(self,tasks)
         self._sid = sid
+        self._err = None
 
     def _cleanup(self): pass
 
@@ -256,28 +257,65 @@ class StoreThread(SSEThread):
         dM = item.l2
 
         try:
-            # insert ampdu?
-            if 'a-mpdu' in dR['present']:
-                sql = "insert into ampdu (fid,refnum,flags) values (%s,%s,%s);"
-                curs.execute(sql,(fid,dR['a-mpdu'][0],dR['a-mpdu'][1]))
+            # each _insert function will reraise psql related errors after
+            # setting the internal err tuple
 
-            # insert the source record
-            ant = dR['antenna'] if 'antenna' in dR else 0
-            pwr = dR['antsignal'] if 'antsignal' in dR else 0
+            # insert radiotap data
+            if 'a-mpdu' in dR['present']: self._insertampdu(fid,dR,curs)
+            self._insertsource(fid,rdo,dR,curs)
+            self._insertsignal(fid,dR,curs)
+
+            # insert mpdu data
+            if dM.offset > 0:
+                self._inserttraffic(fid,dM,curs)
+                if dM.qosctrl: self._insertqos(fid,dM,curs)
+                if dM.crypt: self._insertcrypt(fid,dM,curs)
+        except psql.Error as e:
+            self._conn.rollback()
+            curs.close()
+            raise NidusDBSubmitException(e.pgcode,e.pgerror,self._err[0],self._err[1])
+        else:
+            self._conn.commit()
+        finally:
+            curs.close()
+
+    def _insertampdu(self,fid,r,curs):
+        """
+         insert ampdu from frame fid (as defined in radiotap r) in db using
+         cursor curs
+        """
+        try:
+            sql = "insert into ampdu fid,refnum,flags) values (%s,%s,%s);"
+            curs.execute(sql,(fid,r['a-mpdu'][0],r['a-mpdu'][1]))
+        except psql.Error:
+            self._err = ('ampdu',fid)
+            raise
+
+    def _insertsource(self,fid,rdo,r,curs):
+        """
+         insert source from frame fid (as defined in radiotap r), collected by
+         rdo in db using cursor curs
+        """
+        try:
+            ant = r['antenna'] if 'antenna' in r else 0
+            pwr = r['antsignal'] if 'antsignal' in r else 0
             sql = "insert into source (fid,src,antenna,rfpwr) values (%s,%s,%s,%s);"
             curs.execute(sql,(fid,rdo,ant,pwr))
+        except psql.Error:
+            self._err = ('source',fid)
+            raise
 
-            # insert signal record
-            # determine the standard, rate and mcs fields # NOTE: we assume that
-            # channels will always be present in radiotap
-            sql = """
-                   insert into signal (fid,std,rate,channel,chflags,rf,ht,
-                                       mcs_bw,mcs_gi,mcs_ht,mcs_index)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
-                  """
+    def _insertsignal(self,fid,r,curs):
+        """
+         insert signal record from frame fid (as defined in radiotap r) in db
+         using cursors curs
+        """
+        try:
+            # determine what standard, the data rate and any mcs fields
+            # assuming channels will always be present in radiotap r
             try:
                 std = 'n'
-                mcsflags = rtap.mcsflags_params(dR['mcs'][0],dR['mcs'][1])
+                mcsflags = rtap.mcsflags_params(r['mcs'][0],r['mcs'][1])
                 if mcsflags['bw'] == rtap.MCS_BW_20: bw = '20'
                 elif mcsflags['bw'] == rtap.MCS_BW_40: bw = '40'
                 elif mcsflags['bw'] == rtap.MCS_BW_20L: bw = '20L'
@@ -285,103 +323,137 @@ class StoreThread(SSEThread):
                 width = 40 if bw == '40' else 20
                 gi = 1 if 'gi' in mcsflags and mcsflags['gi'] > 0 else 0
                 ht = 1 if 'ht' in mcsflags and mcsflags['ht'] > 0 else 0
-                index = dR['mcs'][2]
-                rate = mcs.mcs_rate(dR['mcs'][2],width,gi)
+                index = r['mcs'][2]
+                rate = mcs.mcs_rate(r['mcs'][2],width,gi)
                 hasMCS = 1
             except:
-                if dR['channel'][0] in channels.ISM_24_F2C:
-                    if rtap.chflags_get(dR['channel'][1],'cck'):
+                if r['channel'][0] in channels.ISM_24_F2C:
+                    if rtap.chflags_get(r['channel'][1],'cck'):
                         std = 'b'
                     else:
                         std = 'g'
                 else:
                     std = 'a'
-                rate = dR['rate'] * 0.5 if 'rate' in dR else 0
+                rate = r['rate'] * 0.5 if 'rate' in r else 0
                 bw = None
                 gi = None
                 ht = None
                 index = None
                 hasMCS = 0
-            curs.execute(sql,(fid,std,rate,channels.f2c(dR['channel'][0]),
-                              dR['channel'][1],dR['channel'][0],hasMCS,bw,gi,
+            sql = """
+                   insert into signal (fid,std,rate,channel,chflags,rf,ht,
+                                       mcs_bw,mcs_gi,mcs_ht,mcs_index)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                  """
+            curs.execute(sql,(fid,std,rate,channels.f2c(r['channel'][0]),
+                              r['channel'][1],r['channel'][0],hasMCS,bw,gi,
                               ht,index))
+        except psql.Error:
+            self._err = ('signal',fid)
+            raise
 
-            # insert traffic
-            if dM.offset > 0:
+    def _inserttraffic(self,fid,m,curs):
+        """
+         insert traffic from frame fid (defined in mpdu m) into db using
+         cursor curs
+        """
+        try:
+            # get out duration type and value
+            dVal = None
+            if m.duration['type'] == 'vcs': dVal = m.duration['dur']
+            elif m.duration['type'] == 'aid': dVal = m.duration['aid']
+
+            sql = """
+                   insert into traffic (fid,type,subtype,td,fd,mf,rt,pm,md,pf,so,
+                                        dur_type,dur_val,addr1,addr2,addr3,
+                                        fragnum,seqnum,addr4,crypt)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                           %s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                  """
+            curs.execute(sql,(fid,mpdu.FT_TYPES[m.type],
+                                  mpdu.subtypes(m.type,m.subtype),
+                                  m.flags['td'],m.flags['fd'],
+                                  m.flags['mf'],m.flags['r'],
+                                  m.flags['pm'],m.flags['md'],
+                                  m.flags['pf'],m.flags['o'],
+                                  m.duration['type'],dVal,
+                                  m.addr1,m.addr2,m.addr3,
+                                  m.seqctrl['fragno'] if m.seqctrl else None,
+                                  m.seqctrl['seqno'] if m.seqctrl else None,
+                                  m.addr4,
+                                  m.crypt['type'] if m.crypt else 'none',))
+        except psql.Error:
+            self._err = ('traffic',fid)
+            raise
+
+    def _insertqos(self,fid,m,curs):
+        """
+         inserts the qos ctrl from frame id (defined in mpdu m) into the db
+         using cursor curs
+        """
+        try:
+            sql = """
+                   insert into qosctrl (fid,tid,eosp,ackpol,amsdu,txop)
+                   values (%s,%s,%s,%s,%s,%s);
+                  """
+            curs.execute(sql,(fid,m.qosctrl['tid'],
+                                  m.qosctrl['eosp'],
+                                  m.qosctrl['ack-policy'],
+                                  m.qosctrl['a-msdu'],
+                                  m.qosctrl['txop']))
+        except psql.Error:
+            self._err = ('qosctrl',fid)
+            raise
+
+    def _insertcrypt(self,fid,m,curs):
+        """
+         insert the encryption scheme/data from frame fid (as defined in mpdu m)
+         into the db using the cursor curs
+        """
+        try:
+            if m.crypt['type'] == 'wep':
                 sql = """
-                       insert into traffic (fid,type,subtype,td,fd,mf,rt,pm,md,pf,so,
-                                            dur_type,dur_val,addr1,addr2,addr3,
-                                            fragnum,seqnum,addr4)
-                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                               %s,%s,%s,%s,%s,%s,%s,%s,%s);
+                       insert into wepcrypt (fid,iv,key_id,icv) values (%s,%s,%s,%s);
                       """
-                dVal = None
-                if dM.duration['type'] == 'vcs': dVal = dM.duration['dur']
-                elif dM.duration['type'] == 'aid': dVal = dM.duration['aid']
-                curs.execute(sql,(fid,mpdu.FT_TYPES[dM.type],
-                                  mpdu.subtypes(dM.type,dM.subtype),
-                                  dM.flags['td'],dM.flags['fd'],
-                                  dM.flags['mf'],dM.flags['r'],
-                                  dM.flags['pm'],dM.flags['md'],
-                                  dM.flags['pf'],dM.flags['o'],
-                                  dM.duration['type'],dVal,
-                                  dM.addr1,dM.addr2,dM.addr3,
-                                  dM.seqctrl['fragno'] if dM.seqctrl else None,
-                                  dM.seqctrl['seqno'] if dM.seqctrl else None,
-                                  dM.addr4))
-
-                # insert qos if present (do we really need qos)
-                if dM.qosctrl:
-                    sql = """
-                           insert into qosctrl (fid,tid,eosp,ackpol,amsdu,txop)
-                           values (%s,%s,%s,%s,%s,%s);
-                          """
-                    curs.execute(sql,(fid,dM.qosctrl['tid'],
-                                          dM.qosctrl['eosp'],
-                                          dM.qosctrl['ack-policy'],
-                                          dM.qosctrl['a-msdu'],
-                                          dM.qosctrl['txop']))
-
-                # insert encyption if present
-                if dM.crypt:
-                    # setup sql statement and insert values
-                    if dM.crypt['type'] == 'wep':
-                        sql = """
-                               insert into wepcrypt (fid,iv,key_id,icv)
-                               values (%s,%s,%s,%s);
-                              """
-                        vs = (fid,dM.crypt['iv'],dM.crypt['key-id'],dM.crypt['icv'])
-                    elif dM.crypt['type'] == 'tkip':
-                        sql = """
-                               insert into tkipcrypt (fid,tsc1,wepseed,tsc0,key_id,
-                                                      tsc2,tsc3,tsc4,tsc5,mic,icv)
-                               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
-                              """
-                        vs = (fid,dM.crypt['iv']['tsc1'],dM.crypt['iv']['wep-seed'],
-                              dM.crypt['iv']['tsc0'],dM.crypt['iv']['key-id']['key-id'],
-                              dM.crypt['ext-iv']['tsc2'],dM.crypt['ext-iv']['tsc3'],
-                              dM.crypt['ext-iv']['tsc4'],dM.crypt['ext-iv']['tsc5'],
-                              dM.crypt['mic'],dM.crypt['icv'])
-                    elif dM.crypt['type'] == 'ccmp':
-                        sql = """
-                               insert into ccmpcrypt (fid,pn0,pn1,key_id,pn2,
-                                                      pn3,pn4,pn5,mic)
-                               values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
-                              """
-                        vs = (fid,dM.crypt['pn0'],dM.crypt['pn1'],dM.crypt['key-id']['key-id'],
-                              dM.crypt['pn2'],dM.crypt['pn3'],dM.crypt['pn4'],
-                              dM.crypt['pn5'],dM.crypt['mic'])
-
-                    # insert crypt if present
-                    if sql and vs: curs.execute(sql,vs)
-        except psql.Error as e:
-            self._conn.rollback()
-            curs.close()
-            raise NidusDBSubmitException(e.pgcode,e.pgerror)
-        else:
-            self._conn.commit()
-        finally:
-            curs.close()
+                curs.execute(sql,(fid,m.crypt['iv'],
+                                      m.crypt['key-id'],
+                                      m.crypt['icv']))
+            elif m.crypt['type'] == 'tkip':
+                sql = """
+                       insert into tkipcrypt (fid,tsc1,wepseed,tsc0,key_id,
+                                              tsc2,tsc3,tsc4,tsc5,mic,icv)
+                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                      """
+                curs.execute(sql,(fid,m.crypt['iv']['tsc1'],
+                                      m.crypt['iv']['wep-seed'],
+                                      m.crypt['iv']['tsc0'],
+                                      m.crypt['iv']['key-id']['key-id'],
+                                      m.crypt['ext-iv']['tsc2'],
+                                      m.crypt['ext-iv']['tsc3'],
+                                      m.crypt['ext-iv']['tsc4'],
+                                      m.crypt['ext-iv']['tsc5'],
+                                      m.crypt['mic'],
+                                      m.crypt['icv']))
+            elif m.crypt['type'] == 'ccmp':
+                sql = """
+                       insert into ccmpcrypt (fid,pn0,pn1,key_id,pn2,
+                                              pn3,pn4,pn5,mic)
+                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                      """
+                curs.execute(sql,(fid,m.crypt['pn0'],
+                                      m.crypt['pn1'],
+                                      m.crypt['key-id']['key-id'],
+                                      m.crypt['pn2'],
+                                      m.crypt['pn3'],
+                                      m.crypt['pn4'],
+                                      m.crypt['pn5'],
+                                      m.crypt['mic']))
+            else:
+                # undefined crypt type
+                pass
+        except psql.Error:
+            self._err = ('crypt',fid)
+            raise
 
 class ExtractThread(SSEThread):
     """  extracts & stores details of nets/stas etc from mpdus in tasks queue """
@@ -878,13 +950,12 @@ class NidusDB(object):
             vs = (self._sid,ds['ts'],lF,dR['sz'],
                   dM.offset,[(dR['sz']+dM.offset),(lF-dM.stripped)],
                   int('a-mpdu' in dR['present']),
-                  dM.crypt['type'] if dM.crypt else 'none',
                   rtap.flags_get(dR['flags'],'fcs'))
 
         # insert the frame
         sql = """
-               insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,ampdu,crypt,fcs)
-               values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning id;
+               insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,ampdu,fcs)
+               values (%s,%s,%s,%s,%s,%s,%s,%s) returning id;
               """
         try:
             self._curs.execute(sql,vs)
