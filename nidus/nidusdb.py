@@ -119,6 +119,7 @@ class SSEThread(threading.Thread):
         threading.Thread.__init__(self)
         self._qT = tasks
         self._conn = None # connection to database
+        self._err = None  # internal err information
         try:
             self._conn = psql.connect(host="localhost",dbname="nidus",
                                       user="nidus",password="nidus")
@@ -234,7 +235,6 @@ class SaveThread(SSEThread):
             self._pkts = []
             curs.close()
 
-
 class StoreThread(SSEThread):
     """ stores the frame details in the task queue to the db """
     def __init__(self,tasks,sid):
@@ -244,7 +244,6 @@ class StoreThread(SSEThread):
         """
         SSEThread.__init__(self,tasks)
         self._sid = sid
-        self._err = None
 
     def _cleanup(self): pass
 
@@ -256,10 +255,9 @@ class StoreThread(SSEThread):
         dR = item.l1
         dM = item.l2
 
+        # each _insert function will reraise psql related errors after
+        # setting the internal err tuple
         try:
-            # each _insert function will reraise psql related errors after
-            # setting the internal err tuple
-
             # insert radiotap data
             if 'a-mpdu' in dR['present']: self._insertampdu(fid,dR,curs)
             self._insertsource(fid,rdo,dR,curs)
@@ -477,6 +475,21 @@ class ExtractThread(SSEThread):
         fid = item.fid
         l2 = item.l2
 
+        # each _insert function will reraise psql related errors after
+        # setting the internal err tuple
+        try:
+            self._processstas(fid,ts,l2,curs)
+        except psql.Error as e:
+            self._conn.rollback()
+            curs.close()
+            raise NidusDBSubmitException(e.pgcode,e.pgerror,self._err[0],self._err[1])
+        else:
+            self._conn.commit()
+        finally:
+            curs.close()
+
+    def _processtas(self,fid,ts,m,curs):
+        """ from the mpdu l2 insert unique sta's and sta activity """
         # sta addresses
         # Function To DS From DS Address 1 Address 2 Address 3 Address 4
         # IBSS/Intra   0    0        RA=DA     TA=SA     BSSID       N/A
@@ -489,12 +502,12 @@ class ExtractThread(SSEThread):
         locations = ['addr1','addr2','addr3','addr4']
         for i in xrange(len(locations)):
             a = locations[i]
-            if not a in l2: break        # no more stas to process
-            if l2[a] != mpdu.BROADCAST:  # don't store broadcasts
-                if l2[a] in addrs:
-                    addrs[l2[a]]['loc'].append(i+1)
+            if not a in m: break        # no more stas to process
+            if m[a] != mpdu.BROADCAST:  # don't store broadcasts
+                if m[a] in addrs:
+                    addrs[m[a]]['loc'].append(i+1)
                 else:
-                    addrs[l2[a]] = {'loc':[i+1],'id':None}
+                    addrs[m[a]] = {'loc':[i+1],'id':None}
 
         # build the query to determine if we have seen the stas
         if addrs:
@@ -505,8 +518,8 @@ class ExtractThread(SSEThread):
             # nothing to update ????
             return
 
+        #### ENTER sta CS
         try:
-            #### ENTER sta CS
             self._l.acquire()
 
             # get all rows with current sta(s) & add sta id if it is not new
@@ -522,7 +535,8 @@ class ExtractThread(SSEThread):
                            insert into sta (sid,fid,spotted,mac,manuf)
                            values (%s,%s,%s,%s,%s) RETURNING id;
                           """
-                    curs.execute(sql,(self._sid,fid,ts,addr,manufacturer(self._oui,addr)))
+                    curs.execute(sql,(self._sid,fid,ts,addr,
+                                      manufacturer(self._oui,addr)))
                     addrs[addr]['id'] = curs.fetchone()[0]
 
                 # check sta activity
@@ -588,8 +602,8 @@ class ExtractThread(SSEThread):
                     if mode == 'tx': fh = lh = ts
                     else: fs = ls = ts
                     sql = """
-                           insert into sta_activity
-                           (sid,staid,firstSeen,lastSeen,firstHeard,lastHeard)
+                           insert into sta_activity (sid,staid,firstSeen,
+                                                     lastSeen,firstHeard,lastHeard)
                            values (%s,%s,%s,%s,%s,%s);
                           """
                     vs = (self._sid,addrs[addr]['id'],fs,ls,fh,lh)
@@ -597,14 +611,11 @@ class ExtractThread(SSEThread):
                 # update the database
                 if vs: curs.execute(sql,vs)
         except psql.Error as e:
-            self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
-        else:
-            self._conn.commit()
+            self._err = ('sta',fid)
+            raise # reraise
         finally:
-            #### EXIT CS
             self._l.release()
-            curs.close()
+        #### EXIT CS
 
 class NidusDB(object):
     """ NidusDB - interface to nidus database """

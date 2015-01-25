@@ -33,9 +33,10 @@ TODO:
     o control wrapper
     o +htc
  4) look into parsing
-   0 RSN Std 8.4.2.27
+   0 RSN Std 8.4.2.27 (Info-Element # 48
    o 802.11u
  5) how to support a-msdu etc
+ 6) 802.1X parsing
 """
 __name__ = 'radio'
 __license__ = 'GPL'
