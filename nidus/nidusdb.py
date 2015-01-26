@@ -610,7 +610,7 @@ class ExtractThread(SSEThread):
 
                 # update the database
                 if vs: curs.execute(sql,vs)
-        except psql.Error as e:
+        except psql.Error:
             self._err = ('sta',fid)
             raise # reraise
         finally:
