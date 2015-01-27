@@ -144,8 +144,8 @@ class SSEThread(threading.Thread):
                 self._consume(item)
             except NidusDBSubmitException as e:
                 print "DB Error: ", e
-            #except Exception as e:
-            #    print "Error: ", e
+            except Exception as e:
+                print "Error: ", e
         self._clean() # cleanup
 
     def _clean(self):
@@ -493,10 +493,16 @@ class ExtractThread(SSEThread):
                 addrs[l2[a]]['loc'].append(i+1)
             else:
                 addrs[l2[a]] = {'loc':[i+1],'id':None}
+        saddrs = set(addrs.keys())
+        if len(saddrs) != len(addrs.keys()):
+            print 'consume', addrs
 
         # each _insert function will reraise psql related errors after
         # setting the internal err tuple
         try:
+            # NOTE: 1) insertstas modifies the addrs dict in place, assigning
+            # ids to each nonbroadcast address 2) insertstas also commits
+            # the connection after each insert
             self._insertstas(fid,ts,addrs,curs)
         except psql.Error as e:
             self._conn.rollback()
@@ -535,6 +541,8 @@ class ExtractThread(SSEThread):
                 for addr in nonbroadcast:
                     # if this one doesnt have an id (not seen before) add it
                     if not addrs[addr]['id']:
+                        # insert the new sta - commit the transaction because
+                        # we we're experiencing duplicate key issues w/o commit
                         sql = """
                                insert into sta (sid,fid,spotted,mac,manuf)
                                values (%s,%s,%s,%s,%s) RETURNING id;
@@ -547,7 +555,6 @@ class ExtractThread(SSEThread):
                     # check sta activity, addr2 is transmitting
                     mode = 'tx' if 2 in addrs[addr]['loc'] else 'rx'
                     fs = ls = fh = lh = None
-                    vs = None
                     sql = """
                            select firstSeen,lastSeen,firstHeard,lastHeard
                            from sta_activity where sid=%s and staid=%s;
@@ -556,9 +563,8 @@ class ExtractThread(SSEThread):
                     row = curs.fetchone()
 
                     if row:
-                        # NOTE: ts from frames need to be converted to a datetime
-                        # object (with timezone info) before being compared
-                        # to ts from db
+                        # NOTE: frame ts needs to be converted to a datetime
+                        # object w/ tz info before being compared to db's ts
 
                         # sta has been seen this session
                         if mode == 'tx':
@@ -579,6 +585,8 @@ class ExtractThread(SSEThread):
                                 ls = ts
 
                         # build query if there is something to update
+                        # commit the transaction because we were experiencing
+                        # duplicate key issues w/o commit
                         if fs or ls or fh or lh:
                             vs = []
                             us = ""
@@ -600,9 +608,12 @@ class ExtractThread(SSEThread):
                             sql = "update sta_activity set"
                             sql += us
                             sql += " where sid=%s and staid=%s;"
-                            vs = tuple(vs+[self._sid,addrs[addr]['id']])
+                            curs.execute(sql,tuple(vs+[self._sid,addrs[addr]['id']]))
+                            self._conn.commit()
                     else:
                         # sta has not been seen this session
+                        # commit the transaction because we were experiencing
+                        # duplicate key issues w/o commit
                         if mode == 'tx':
                             fh = lh = ts
                         else:
@@ -613,13 +624,10 @@ class ExtractThread(SSEThread):
                                                          firstHeard,lastHeard)
                                values (%s,%s,%s,%s,%s,%s);
                               """
-                        vs = (self._sid,addrs[addr]['id'],fs,ls,fh,lh)
-
-                    # update the database
-                    curs.execute(sql,vs)
+                        curs.execute(sql,(self._sid,addrs[addr]['id'],fs,ls,fh,lh))
+                        self._conn.commit()
         except psql.Error:
             # tag the error & reraise (letting the finally block release the lock)
-            print addrs, nonbroadcast
             self._err = ('sta',fid)
             raise # reraise
         finally:

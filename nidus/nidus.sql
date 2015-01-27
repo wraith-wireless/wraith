@@ -478,20 +478,20 @@ CREATE TABLE sta_activity(
    PRIMARY KEY(sid,staid)
 );
 
-DROP TABLE IF EXISTS net;
-CREATE TABLE net(
-   id serial NOT NULL,   -- primary key
-   sid integer NOT NULL, -- foreign key to session id
-   essid VARCHAR(32),    -- the ssid of this network
-   CONSTRAINT ch_sid CHECK (sid > 0),
-   PRIMARY KEY(id)
-);
+--DROP TABLE IF EXISTS net;
+--CREATE TABLE net(
+--   id serial NOT NULL,   -- primary key
+--   sid integer NOT NULL, -- foreign key to session id
+--   essid VARCHAR(32),    -- the ssid of this network
+--   CONSTRAINT ch_sid CHECK (sid > 0),
+--   PRIMARY KEY(id)
+--);
 
-DROP TABLE IF EXISTS net_activity;
-CREATE TABLE net_activity(
-   essid VARCHAR(32), -- the ssid of this network
-   
-);
+--DROP TABLE IF EXISTS net_activity;
+--CREATE TABLE net_activity(
+--   essid VARCHAR(32), -- the ssid of this network
+--   
+--);
 
 -- sta state enumerations
 DROP TYPE IF EXISTS STA_STATE;

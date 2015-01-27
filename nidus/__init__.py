@@ -50,6 +50,8 @@ TODO:
 12) nidusdb.py
   - in SSE Threads handle errors in some way to at least let nidusdb know thread
     is quitting
+     o have started using a err variable in SSEThread class, must extend that
+       to allow nidusdb to see the error
   - ensure only one radio submit per radio is allowed
   - during setsensor ensure a new session for a sensor is not created if one already
     exists
