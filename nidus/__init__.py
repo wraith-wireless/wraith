@@ -37,6 +37,11 @@ nidus 0.0.5
        not be tasked with processing an empty MPDU
   - frames are written to disk in 'bulk' rather on packet-per-packet basis
 
+nidus 0.0.6
+ includes: nidus 0.0.3, nmp 0.0.2, nidusdb 0.1.3 nidus.sql 0.0.10, simplepcap 0.0.1
+  nidus.conf nidus.log.conf
+ changes:
+
 TODO:
 1) Should we return messages? i.e instead of just closing pipe for no running server etc
 2) need constraints either through postgresql (preferred) or nidusdb - one example
@@ -59,8 +64,8 @@ TODO:
 """
 __name__ = 'datastore'
 __license__ = 'GPL'
-__version__ = '0.0.5'
-__date__ = 'September 2014'
+__version__ = '0.0.6'
+__date__ = 'January 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'

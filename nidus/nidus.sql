@@ -1,7 +1,7 @@
 -- timestamp for eternity = infinity
 -- using postgresql 9.3.4
 -- ensure postgresql service is running - sudo service postgresql start
--- version 0.0.9
+-- version 0.0.10
 
 -- create nidus user and nidus database  
 --postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
@@ -431,6 +431,8 @@ CREATE TABLE ccmpcrypt(
 );
 
 -- network entities
+-- these are tables of inferred data, that is, the data in the below tables
+-- already exists in some form in the above tables
 
 -- sta table
 -- primary entity of a network. A sta is a client or an ap of a BSS/IBSS or

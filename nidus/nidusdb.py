@@ -11,7 +11,7 @@ underlying storage system, serving a two-fold service:
 """
 __name__ = 'nidusdb'
 __license__ = 'GPL'
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 __date__ = 'January 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -454,7 +454,11 @@ class StoreThread(SSEThread):
             raise
 
 class ExtractThread(SSEThread):
-    """  extracts & stores details of nets/stas etc from mpdus in tasks queue """
+    """
+     the ExtractThread exposes data that can be inferred from other tables IOT
+     to facilitate analysis by decreasing the need for complex queries.
+     Extracts & stores the details of nets/stas etc from mpdus
+    """
     def __init__(self,tasks,lSta,sid,oui):
         """
          lSta - lock on the stay dictionary
@@ -500,10 +504,14 @@ class ExtractThread(SSEThread):
         # each _insert function will reraise psql related errors after
         # setting the internal err tuple
         try:
-            # NOTE: 1) insertstas modifies the addrs dict in place, assigning
-            # ids to each nonbroadcast address 2) insertstas also commits
-            # the connection after each insert
-            self._insertstas(fid,ts,addrs,curs)
+            # NOTE: 1) insertsta modifies the addrs dict in place, assigning
+            # ids to each nonbroadcast address
+            # 2) insertsta/insertsta_activity also commits the connection after
+            # each insert
+            # Each of the insertsta and insertsta_activity use the shared lock
+            # to ensure ts and id data is written correctly
+            self._insertsta(fid,ts,addrs,curs)
+            self._insertsta_activity(fid,ts,addrs,curs)
         except psql.Error as e:
             self._conn.rollback()
             curs.close()
@@ -513,7 +521,7 @@ class ExtractThread(SSEThread):
         finally:
             curs.close()
 
-    def _insertstas(self,fid,ts,addrs,curs):
+    def _insertsta(self,fid,ts,addrs,curs):
         """
          given the frame id fid with timestamp ts and address dict of stas in
          the frame, inserts unique sta's and sta activity in db using the
@@ -551,88 +559,107 @@ class ExtractThread(SSEThread):
                                           manufacturer(self._oui,addr)))
                         addrs[addr]['id'] = curs.fetchone()[0]
                         self._conn.commit()
-
-                    # check sta activity, addr2 is transmitting
-                    mode = 'tx' if 2 in addrs[addr]['loc'] else 'rx'
-                    fs = ls = fh = lh = None
-                    sql = """
-                           select firstSeen,lastSeen,firstHeard,lastHeard
-                           from sta_activity where sid=%s and staid=%s;
-                          """
-                    curs.execute(sql,(self._sid,addrs[addr]['id']))
-                    row = curs.fetchone()
-
-                    if row:
-                        # NOTE: frame ts needs to be converted to a datetime
-                        # object w/ tz info before being compared to db's ts
-
-                        # sta has been seen this session
-                        if mode == 'tx':
-                            # check 'heard' activities
-                            if not row[2]:
-                                # 1st tx heard by sta, update first/lastHeard
-                                fh = lh = ts
-                            elif dtparser.parse(ts+"+00:00") > row[3]:
-                                # tx is later than lastHeard, update it
-                                lh = ts
-                        else:
-                            # check 'seen' activities
-                            if not row[0]:
-                                # 1st time sta seen, update first/lastSeen
-                                fs = ls = ts
-                            elif dtparser.parse(ts+"+00:00") > row[1]:
-                                # ts is later than lastSeen, update it
-                                ls = ts
-
-                        # build query if there is something to update
-                        # commit the transaction because we were experiencing
-                        # duplicate key issues w/o commit
-                        if fs or ls or fh or lh:
-                            vs = []
-                            us = ""
-                            if fs:
-                                us = " firstSeen=%s"
-                                vs.append(fs)
-                            if ls:
-                                if not us: us = " lastSeen=%s"
-                                else: us += ", lastSeen=%s"
-                                vs.append(ls)
-                            if fh:
-                                if not us: us = " firstHeard=%s"
-                                else: us += ", firstHeard=%s"
-                                vs.append(fh)
-                            if lh:
-                                if not us: us = " lastHeard=%s"
-                                else: us += ", lastHeard=%s"
-                                vs.append(lh)
-                            sql = "update sta_activity set"
-                            sql += us
-                            sql += " where sid=%s and staid=%s;"
-                            curs.execute(sql,tuple(vs+[self._sid,addrs[addr]['id']]))
-                            self._conn.commit()
-                    else:
-                        # sta has not been seen this session
-                        # commit the transaction because we were experiencing
-                        # duplicate key issues w/o commit
-                        if mode == 'tx':
-                            fh = lh = ts
-                        else:
-                            fs = ls = ts
-                        sql = """
-                               insert into sta_activity (sid,staid,
-                                                         firstSeen,lastSeen,
-                                                         firstHeard,lastHeard)
-                               values (%s,%s,%s,%s,%s,%s);
-                              """
-                        curs.execute(sql,(self._sid,addrs[addr]['id'],fs,ls,fh,lh))
-                        self._conn.commit()
         except psql.Error:
             # tag the error & reraise (letting the finally block release the lock)
             self._err = ('sta',fid)
             raise # reraise
         finally:
             self._l.release()
-        #### EXIT CS
+            #### EXIT CS
+
+    def _insertsta_activity(self,fid,ts,addrs,curs):
+        """
+         inserts sta activity of sta in addrs at timestamp ts into db using
+         the cursor curs
+        """
+        try:
+            # don't process broadcast addresses
+            nonbroadcast = [addr for addr in addrs if addr != mpdu.BROADCAST]
+
+            #### ENTER CS
+            self._l.acquire()
+
+            for addr in nonbroadcast:
+                # check sta activity, addr2 is transmitting
+                mode = 'tx' if 2 in addrs[addr]['loc'] else 'rx'
+                fs = ls = fh = lh = None # each ts will be initially None
+
+                sql = """
+                       select firstSeen,lastSeen,firstHeard,lastHeard
+                       from sta_activity where sid=%s and staid=%s;
+                      """
+                curs.execute(sql,(self._sid,addrs[addr]['id']))
+                row = curs.fetchone()
+
+                if row:
+                    # sta has been seen this session
+                    # NOTE: frame ts needs to be converted to a datetime
+                    # object w/ tz info before being compared to db's ts
+                    tstz = dtparser.parse(ts+"+00:00")
+                    if mode == 'tx':
+                        # check 'heard' activities
+                        if not row[2]:
+                            # 1st tx heard by sta, update first/lastHeard
+                            fh = lh = ts
+                        elif tstz > row[3]:
+                            # tx is later than lastHeard, update it
+                            lh = ts
+                    else:
+                        # check 'seen' activities
+                        if not row[0]:
+                            # 1st time sta seen, update first/lastSeen
+                            fs = ls = ts
+                        elif tstz > row[1]:
+                            # ts is later than lastSeen, update it
+                            ls = ts
+
+                    # build query if there is something to update
+                    # commit the transaction because we were experiencing
+                    # duplicate key issues w/o commit
+                    us = ""
+                    vs = []
+                    if fs or ls or fh or lh:
+                        if fs:
+                            us = " firstSeen=%s"
+                            vs.append(fs)
+                        if ls:
+                            if not us: us = " lastSeen=%s"
+                            else: us += ", lastSeen=%s"
+                            vs.append(ls)
+                        if fh:
+                            if not us: us = " firstHeard=%s"
+                            else: us += ", firstHeard=%s"
+                            vs.append(fh)
+                        if lh:
+                            if not us: us = " lastHeard=%s"
+                            else: us += ", lastHeard=%s"
+                            vs.append(lh)
+                        sql = "update sta_activity set"
+                        sql += us
+                        sql += " where sid=%s and staid=%s;"
+                        curs.execute(sql,tuple(vs+[self._sid,addrs[addr]['id']]))
+                        self._conn.commit()
+                else:
+                    # sta has not been seen this session
+                    # commit the transaction because we were experiencing
+                    # duplicate key issues w/o commit
+                    if mode == 'tx':
+                        fh = lh = ts
+                    else:
+                        fs = ls = ts
+                    sql = """
+                           insert into sta_activity (sid,staid,firstSeen,lastSeen,
+                                                     firstHeard,lastHeard)
+                           values (%s,%s,%s,%s,%s,%s);
+                          """
+                    curs.execute(sql,(self._sid,addrs[addr]['id'],fs,ls,fh,lh))
+                    self._conn.commit()
+        except psql.Error:
+            # tag the error and reraise, finally block will release the CS lock
+            self._err = ('sta_activity',fid)
+        finally:
+            self._l.release()
+            #### EXIT CS
 
 class NidusDB(object):
     """ NidusDB - interface to nidus database """
