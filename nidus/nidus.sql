@@ -440,7 +440,7 @@ CREATE TABLE ccmpcrypt(
 DROP TABLE IF EXISTS sta;
 CREATE TABLE sta(
    id serial NOT NULL,                   -- primary key
-   sid integer NOT NULL,                 -- fk to session sta was seen
+   sid integer NOT NULL,                 -- fk to session sta was first seen
    fid bigint NOT NULL,                  -- fk to frame sta was first seen
    spotted TIMESTAMPTZ NOT NULL,         -- ts sta was first seen/heard
    mac macaddr UNIQUE NOT NULL,          -- mac address of sta's radio

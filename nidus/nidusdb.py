@@ -143,9 +143,9 @@ class SSEThread(threading.Thread):
             try:
                 self._consume(item)
             except NidusDBSubmitException as e:
-                print "Error: ", e
-            except Exception as e:
-                print "Error: ", e
+                print "DB Error: ", e
+            #except Exception as e:
+            #    print "Error: ", e
         self._clean() # cleanup
 
     def _clean(self):
@@ -475,10 +475,29 @@ class ExtractThread(SSEThread):
         fid = item.fid
         l2 = item.l2
 
+        # sta addresses
+        # Function To DS From DS Address 1 Address 2 Address 3 Address 4
+        # IBSS/Intra   0    0        RA=DA     TA=SA     BSSID       N/A
+        # From AP      0    1        RA=DA  TA=BSSID        SA       N/A
+        # To AP        1    0     RA=BSSID     TA=SA        DA       N/A
+        # Wireless DS  1    1     RA=BSSID  TA=BSSID     DA=WDS    SA=WDS
+
+        # extract unique addresses of stas in the mpdu into the addr dict having
+        # the form <hwaddr>->{'loc:[<i..n>],'id':<sta_id>} where i=1 through 4
+        addrs = {}
+        locations = ['addr1','addr2','addr3','addr4']
+        for i in xrange(len(locations)):
+            a = locations[i]
+            if not a in l2: break         # no more stas to process
+            if l2[a] in addrs:
+                addrs[l2[a]]['loc'].append(i+1)
+            else:
+                addrs[l2[a]] = {'loc':[i+1],'id':None}
+
         # each _insert function will reraise psql related errors after
         # setting the internal err tuple
         try:
-            self._processstas(fid,ts,l2,curs)
+            self._insertstas(fid,ts,addrs,curs)
         except psql.Error as e:
             self._conn.rollback()
             curs.close()
@@ -488,129 +507,119 @@ class ExtractThread(SSEThread):
         finally:
             curs.close()
 
-    def _processtas(self,fid,ts,m,curs):
-        """ from the mpdu l2 insert unique sta's and sta activity """
-        # sta addresses
-        # Function To DS From DS Address 1 Address 2 Address 3 Address 4
-        # IBSS/Intra   0    0        RA=DA     TA=SA     BSSID       N/A
-        # From AP      0    1        RA=DA  TA=BSSID        SA       N/A
-        # To AP        1    0     RA=BSSID     TA=SA        DA       N/A
-        # Wireless DS  1    1     RA=BSSID  TA=BSSID     DA=WDS    SA=WDS
-
-        # extract addresses of stas in mpdu
-        addrs = {}
-        locations = ['addr1','addr2','addr3','addr4']
-        for i in xrange(len(locations)):
-            a = locations[i]
-            if not a in m: break        # no more stas to process
-            if m[a] != mpdu.BROADCAST:  # don't store broadcasts
-                if m[a] in addrs:
-                    addrs[m[a]]['loc'].append(i+1)
-                else:
-                    addrs[m[a]] = {'loc':[i+1],'id':None}
-
-        # build the query to determine if we have seen the stas
-        if addrs:
-            sql = "select id, mac from sta where "
-            sql += " or ".join(["mac=%s" for _ in addrs])
-            sql += ';'
-        else:
-            # nothing to update ????
-            return
-
+    def _insertstas(self,fid,ts,addrs,curs):
+        """
+         given the frame id fid with timestamp ts and address dict of stas in
+         the frame, inserts unique sta's and sta activity in db using the
+         cursor curs
+         NOTE: as a side-effect will insert the sta id for each non-broadcast
+          address
+        """
         #### ENTER sta CS
         try:
-            self._l.acquire()
+            # do not process broadcast addresses
+            nonbroadcast = [addr for addr in addrs if addr != mpdu.BROADCAST]
+            if nonbroadcast:
+                sql = "select id, mac from sta where "
+                sql += " or ".join(["mac=%s" for _ in nonbroadcast])
+                sql += ';'
 
-            # get all rows with current sta(s) & add sta id if it is not new
-            curs.execute(sql,tuple(addrs.keys()))
-            for row in curs.fetchall():
-                if row[1] in addrs: addrs[row[1]]['id'] = row[0]
+                self._l.acquire()
 
-            # for each address
-            for addr in addrs:
-                # if this one does not have an id (i.e. not seen before) add it
-                if not addrs[addr]['id']:
+                # get all rows with current sta(s) & add sta id if it is not new
+                curs.execute(sql,tuple(nonbroadcast))
+                for row in curs.fetchall():
+                    if row[1] in addrs: addrs[row[1]]['id'] = row[0]
+
+                # for each address
+                for addr in nonbroadcast:
+                    # if this one doesnt have an id (not seen before) add it
+                    if not addrs[addr]['id']:
+                        sql = """
+                               insert into sta (sid,fid,spotted,mac,manuf)
+                               values (%s,%s,%s,%s,%s) RETURNING id;
+                              """
+                        curs.execute(sql,(self._sid,fid,ts,addr,
+                                          manufacturer(self._oui,addr)))
+                        addrs[addr]['id'] = curs.fetchone()[0]
+                        self._conn.commit()
+
+                    # check sta activity, addr2 is transmitting
+                    mode = 'tx' if 2 in addrs[addr]['loc'] else 'rx'
+                    fs = ls = fh = lh = None
+                    vs = None
                     sql = """
-                           insert into sta (sid,fid,spotted,mac,manuf)
-                           values (%s,%s,%s,%s,%s) RETURNING id;
+                           select firstSeen,lastSeen,firstHeard,lastHeard
+                           from sta_activity where sid=%s and staid=%s;
                           """
-                    curs.execute(sql,(self._sid,fid,ts,addr,
-                                      manufacturer(self._oui,addr)))
-                    addrs[addr]['id'] = curs.fetchone()[0]
+                    curs.execute(sql,(self._sid,addrs[addr]['id']))
+                    row = curs.fetchone()
 
-                # check sta activity
-                mode = 'tx' if 2 in addrs[addr]['loc'] else 'rx' # addr2 is transmitting
-                fs = ls = fh = lh = None
-                vs = None
-                sql = """
-                       select firstSeen,lastSeen,firstHeard,lastHeard
-                       from sta_activity where sid=%s and staid=%s;
-                      """
-                curs.execute(sql,(self._sid,addrs[addr]['id']))
-                row = curs.fetchone()
+                    if row:
+                        # NOTE: ts from frames need to be converted to a datetime
+                        # object (with timezone info) before being compared
+                        # to ts from db
 
-                if row:
-                    # NOTE: ts from frames need to be converted to a datetime
-                    # object (with timezone info) before being compared
-                    # to ts from db
+                        # sta has been seen this session
+                        if mode == 'tx':
+                            # check 'heard' activities
+                            if not row[2]:
+                                # 1st tx heard by sta, update first/lastHeard
+                                fh = lh = ts
+                            elif dtparser.parse(ts+"+00:00") > row[3]:
+                                # tx is later than lastHeard, update it
+                                lh = ts
+                        else:
+                            # check 'seen' activities
+                            if not row[0]:
+                                # 1st time sta seen, update first/lastSeen
+                                fs = ls = ts
+                            elif dtparser.parse(ts+"+00:00") > row[1]:
+                                # ts is later than lastSeen, update it
+                                ls = ts
 
-                    # sta has been seen this session
-                    if mode == 'tx':
-                        # check 'heard' activities
-                        if not row[2]:
-                            # 1st tx heard by sta, update first/lastHeard to the ts
-                            fh = lh = ts
-                        elif dtparser.parse(ts+"+00:00") > row[3]:
-                            # tx is later than lastHeard, update it
-                            lh = ts
+                        # build query if there is something to update
+                        if fs or ls or fh or lh:
+                            vs = []
+                            us = ""
+                            if fs:
+                                us = " firstSeen=%s"
+                                vs.append(fs)
+                            if ls:
+                                if not us: us = " lastSeen=%s"
+                                else: us += ", lastSeen=%s"
+                                vs.append(ls)
+                            if fh:
+                                if not us: us = " firstHeard=%s"
+                                else: us += ", firstHeard=%s"
+                                vs.append(fh)
+                            if lh:
+                                if not us: us = " lastHeard=%s"
+                                else: us += ", lastHeard=%s"
+                                vs.append(lh)
+                            sql = "update sta_activity set"
+                            sql += us
+                            sql += " where sid=%s and staid=%s;"
+                            vs = tuple(vs+[self._sid,addrs[addr]['id']])
                     else:
-                        # check 'seen' activities
-                        if not row[0]:
-                            # 1st time sta seen, update first/lastSeen to the ts
+                        # sta has not been seen this session
+                        if mode == 'tx':
+                            fh = lh = ts
+                        else:
                             fs = ls = ts
-                        elif dtparser.parse(ts+"+00:00") > row[1]:
-                            # seen prior and ts is later than lastSeen, update it
-                            ls = ts
+                        sql = """
+                               insert into sta_activity (sid,staid,
+                                                         firstSeen,lastSeen,
+                                                         firstHeard,lastHeard)
+                               values (%s,%s,%s,%s,%s,%s);
+                              """
+                        vs = (self._sid,addrs[addr]['id'],fs,ls,fh,lh)
 
-                    # build query if there is something to update
-                    if fs or ls or fh or lh:
-                        vs = []
-                        us = ""
-                        if fs:
-                            us = " firstSeen=%s"
-                            vs.append(fs)
-                        if ls:
-                            if not us: us = " lastSeen=%s"
-                            else: us += ", lastSeen=%s"
-                            vs.append(ls)
-                        if fh:
-                            if not us: us = " firstHeard=%s"
-                            else: us += ", firstHeard=%s"
-                            vs.append(fh)
-                        if lh:
-                            if not us: us = " lastHeard=%s"
-                            else: us += ", lastHeard=%s"
-                            vs.append(lh)
-                        sql = "update sta_activity set"
-                        sql += us
-                        sql += " where sid=%s and staid=%s;"
-                        vs = tuple(vs+[self._sid,addrs[addr]['id']])
-
-                else:
-                    # sta has not been seen this session
-                    if mode == 'tx': fh = lh = ts
-                    else: fs = ls = ts
-                    sql = """
-                           insert into sta_activity (sid,staid,firstSeen,
-                                                     lastSeen,firstHeard,lastHeard)
-                           values (%s,%s,%s,%s,%s,%s);
-                          """
-                    vs = (self._sid,addrs[addr]['id'],fs,ls,fh,lh)
-
-                # update the database
-                if vs: curs.execute(sql,vs)
+                    # update the database
+                    curs.execute(sql,vs)
         except psql.Error:
+            # tag the error & reraise (letting the finally block release the lock)
+            print addrs, nonbroadcast
             self._err = ('sta',fid)
             raise # reraise
         finally:
