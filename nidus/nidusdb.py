@@ -522,9 +522,11 @@ class ExtractThread(SSEThread):
                     self._insertassocresp('assoc',fid,ts,addrs[l2.addr2]['id'],
                                           addrs[l2.addr1]['id'],l2,curs)
                 if l2.subtype == mpdu.ST_MGMT_REASSOC_REQ:
+                    self._insertreassocreq(fid,ts,addrs[l2.addr2]['id'],
+                                           addrs[l2.addr1]['id'],l2,curs)
+                if l2.subtype == mpdu.ST_MGMT_REASSOC_RESP:
                     self._insertassocresp('reassoc',fid,ts,addrs[l2.addr2]['id'],
                                           addrs[l2.addr1]['id'],l2,curs)
-                #ST_MGMT_REASSOC_RESP =  3
                 #ST_MGMT_PROBE_REQ    =  4
                 #ST_MGMT_PROBE_RESP   =  5
                 #ST_MGMT_TIMING_ADV   =  6
@@ -693,11 +695,11 @@ class ExtractThread(SSEThread):
         """
         try:
             sql = """
-                   insert into assocreq (sid,fid,client,ap,ts,listen_int,ess,ibss,
-                                         cf_pollable,cf_poll_req,privacy,short_pre,
-                                         pbcc,ch_agility,spec_mgmt,qos,short_slot,
+                   insert into assocreq (sid,fid,client,ap,ts,ess,ibss,cf_pollable,
+                                         cf_poll_req,privacy,short_pre,pbcc,
+                                         ch_agility,spec_mgmt,qos,short_slot,
                                          apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
-                                         ssid,sup_rates,ext_rates,vendors))
+                                         listen_int,ssid,sup_rates,ext_rates,vendors))
                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
                   """
@@ -711,7 +713,6 @@ class ExtractThread(SSEThread):
                 if ie[0] == mpdu.EID_EXTENDED_RATES: ext_rs = ie[1]
                 if ie[0] == mpdu.EID_VEND_SPEC: vendors.append(ie[1][0])
             curs.execute(sql,(self._sid,fid,client,ap,ts,
-                              l2['fixed-params']['listen-int'],
                               l2['fixed-params']['capability']['ess'],
                               l2['fixed-params']['capability']['ibss'],
                               l2['fixed-params']['capability']['cfpollable'],
@@ -728,7 +729,87 @@ class ExtractThread(SSEThread):
                               l2['fixed-params']['capability']['dsss-ofdm'],
                               l2['fixed-params']['capability']['delayed-ba'],
                               l2['fixed-params']['capability']['immediate-ba'],
+                              l2['fixed-params']['listen-int'],
                               ssid,sup_rs,ext_rs,vendors))
+        except psql.Error:
+            self._err = ('assocreq',fid)
+            raise
+        except (ValueError,IndexError,AttributeError):
+            self._err = ('assocreq',fid)
+            raise
+
+    def _insertreassocreq(self,fid,ts,client,ap,l2,curs):
+        """
+         inserts the reassociation req from the sta with id client to the ap with
+         id ap, seen in frame fid at time ts w/ further details in l2 into the
+         db using the cursors curs
+        """
+        try:
+            # lock the internal to determine if a) we have a matching sta for
+            # cur ap or if we need to add one
+            try:
+                #### ENTER CS
+                self._l.acquire()
+                curid = None
+                curs.execute("select id from sta where mac=%s;",
+                             (l2['fixed-params']['current-ap'],))
+                row = curs.fetchone()
+                if row: curid = row[0]
+                else:
+                    # not present, need to add it
+                    sql = """
+                           insert into sta (sid,fid,spotted,mac,manuf)
+                           values (%s,%s,%s,%s,%s) RETURNING id;
+                          """
+                    curs.execute(sql,(self._sid,fid,ts,l2['fixed-params']['current-ap'],
+                                          manufacturer(self._oui,l2['fixed-params']['current-ap'])))
+                    curid = curs.fetchone()[0]
+                    self._conn.commit()
+            except psql.Error:
+                self._err = ('reassoc',fid)
+                raise
+            finally:
+                self._l.release()
+                #### EXIT CS
+
+            sql = """
+                   insert into reassocreq (sid,fid,client,ap,ts,ess,ibss,cf_pollable,
+                                          cf_poll_req,privacy,short_pre,pbcc,
+                                          ch_agility,spec_mgmt,qos,short_slot,
+                                          apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
+                                          listen_int,cur_ap,ssid,sup_rates,ext_rates,
+                                          vendors))
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                           %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                  """
+            ssid = None
+            sup_rs = []
+            ext_rs = []
+            vendors = []
+            for ie in l2['info-elements']:
+                if ie[0] == mpdu.EID_SSID: ssid = ie[1]
+                if ie[0] == mpdu.EID_SUPPORTED_RATES: sup_rs = ie[1]
+                if ie[0] == mpdu.EID_EXTENDED_RATES: ext_rs = ie[1]
+                if ie[0] == mpdu.EID_VEND_SPEC: vendors.append(ie[1][0])
+            curs.execute(sql,(self._sid,fid,client,ap,ts,
+                              l2['fixed-params']['capability']['ess'],
+                              l2['fixed-params']['capability']['ibss'],
+                              l2['fixed-params']['capability']['cfpollable'],
+                              l2['fixed-params']['capability']['cf-poll-req'],
+                              l2['fixed-params']['capability']['privacy'],
+                              l2['fixed-params']['capability']['short-pre'],
+                              l2['fixed-params']['capability']['pbcc'],
+                              l2['fixed-params']['capability']['ch-agility'],
+                              l2['fixed-params']['capability']['spec-mgmt'],
+                              l2['fixed-params']['capability']['qos'],
+                              l2['fixed-params']['capability']['time-slot'],
+                              l2['fixed-params']['capability']['apsd'],
+                              l2['fixed-params']['capability']['rdo-meas'],
+                              l2['fixed-params']['capability']['dsss-ofdm'],
+                              l2['fixed-params']['capability']['delayed-ba'],
+                              l2['fixed-params']['capability']['immediate-ba'],
+                              l2['fixed-params']['listen-int'],
+                              curid,ssid,sup_rs,ext_rs,vendors))
         except psql.Error:
             self._err = ('assocreq',fid)
             raise
