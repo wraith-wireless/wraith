@@ -29,7 +29,7 @@ nidus 0.0.5
     save layer 1 and layer 2 (including encryption from layer 3)
   - modified frame submission (running into issues where a frame id had to be
     created because individual Extract threads attempted to insert records
-    referenceing a frame that had not been inserted by a Save thread at that time:
+    referenceing a frame that had not been inserted by a Store thread at that time:
      o the frame record is inserted in the submitframe function so that each thread
        will have the primary key of that frame.
      o tasks are only put on respective queues if there is something for the SSE

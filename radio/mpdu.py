@@ -671,7 +671,6 @@ def capinfo_get(mn,f):
     except KeyError:
         raise MPDUException("invalid data subtype flag '%s'" % f)
 
-
 # CONSTANTS for action frames Std 8.5.1
 SPEC_MGMT_MEAS_REQ  = 0
 SPEC_MGMT_MEAS_REP  = 1
