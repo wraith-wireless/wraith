@@ -28,8 +28,8 @@ nidus 0.0.5
   - implements 'privacy' feature whereby saving frames can be configured to only
     save layer 1 and layer 2 (including encryption from layer 3)
   - modified frame submission (running into issues where a frame id had to be
-    created IOT individual threads [i.e. Save,Extract] did not insert a record
-    referenceing a frame that did not exist at that time):
+    created because individual Extract threads attempted to insert records
+    referenceing a frame that had not been inserted by a Save thread at that time:
      o the frame record is inserted in the submitframe function so that each thread
        will have the primary key of that frame.
      o tasks are only put on respective queues if there is something for the SSE
@@ -38,9 +38,11 @@ nidus 0.0.5
   - frames are written to disk in 'bulk' rather on packet-per-packet basis
 
 nidus 0.0.6
+ desc: continues from v 0.0.5
  includes: nidus 0.0.3, nmp 0.0.2, nidusdb 0.1.3 nidus.sql 0.0.10, simplepcap 0.0.1
   nidus.conf nidus.log.conf
  changes:
+  - added extraction of beacon frames, association request
 
 TODO:
 1) Should we return messages? i.e instead of just closing pipe for no running server etc

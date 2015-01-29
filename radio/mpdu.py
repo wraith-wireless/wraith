@@ -581,13 +581,14 @@ def _parsemgmt_(f,mac):
     elif mac.subtype == ST_MGMT_TIMING_ADV:
         fmt = _S2F_['timestamp'] + _S2F_['capability']
         v,mac['offset'] = _unpack_from_(fmt,f,mac['offset'])
-        mac['fixed-params'] = {'timestamp':v[0],'capability':capinfo_all(v[1])}
+        mac['fixed-params'] = {'timestamp':v[0],
+                               'capability':capinfo_all(v[1])}
         mac['present'].append('fixed-params')
     elif mac.subtype == ST_MGMT_PROBE_RESP or mac.subtype == ST_MGMT_BEACON:
         fmt = _S2F_['timestamp'] + _S2F_['beacon-int'] + _S2F_['capability']
         v,mac['offset'] = _unpack_from_(fmt,f,mac['offset'])
         mac['fixed-params'] = {'timestamp':v[0],
-                               'beacon-int':v[1]*1024, # return in microseconds
+                               'beacon-int':v[1]*1024,    # return in microseconds
                                'capability':capinfo_all(v[2])}
         mac['present'].append('fixed-params')
     elif mac.subtype == ST_MGMT_DISASSOC or mac.subtype == ST_MGMT_DEAUTH:
@@ -636,7 +637,7 @@ def _parsemgmt_(f,mac):
                 oui = "-".join(['{0:02X}'.format(a) for a in struct.unpack(FMT_BO+'3B',
                                                                            info[1][:3])])
                 mac['info-elements'].append((info[0],(oui,info[1][3:])))
-            elif info[0] == EID_SUPPORTED_RATES or info[0] == EID_EXT_RATES:
+            elif info[0] == EID_SUPPORTED_RATES or info[0] == EID_EXTENDED_RATES:
                 # split into tuple (tag,listofrates) each rate is Mbps
                 rates = []
                 for rate in info[1]:
@@ -649,7 +650,7 @@ def _parsemgmt_(f,mac):
 _CAP_INFO_ = {'ess':(1 << 0),
               'ibss':(1 << 1),
               'cfpollable':(1 << 2),
-              'cf-poll req':(1 << 3),
+              'cf-poll-req':(1 << 3),
               'privacy':(1 << 4),
               'short-pre':(1 << 5),
               'pbcc':(1 << 6),
@@ -659,7 +660,7 @@ _CAP_INFO_ = {'ess':(1 << 0),
               'time-slot':(1 << 10),
               'apsd':(1 << 11),
               'rdo-meas':(1 << 12),
-              'dfss-ofdm':(1 << 13),
+              'dsss-ofdm':(1 << 13),
               'delayed-ba':(1 << 14),
               'immediate-ba':(1 << 15)}
 def capinfo(mn): return bitmask(_CAP_INFO_,mn)
@@ -714,7 +715,7 @@ EID_TCLAS_PRO               =  44
 EID_HT_CAP                  =  45
 EID_QOS_CAP                 =  46
 EID_RSN                     =  48
-EID_EXT_RATES               =  50
+EID_EXTENDED_RATES          =  50
 EID_AP_CH_RPT               =  51
 EID_NEIGHBOR_RPT            =  52
 EID_RCPI                    =  53

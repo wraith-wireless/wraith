@@ -52,9 +52,10 @@ TODO:
            - hold stop scanning on current channel
            - listen stop scanning on specified channel
            - pause stop scanning and recording
-     37) add ability to 'filter' on one network, i.e. bssid or ssid?
      40) look into socket options (and pcapy code) to ensure best performance
      41) need to handle tuner thread failure in rdoctl
+     42) consider sending multiple frames as a single compressed/encrypted
+         packet for efficiency and security
 """
 __name__ = 'dyskt'
 __license__ = 'GPL'

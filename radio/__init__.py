@@ -30,13 +30,13 @@ TODO:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)
  3) mpdu: fully parse
-    o control wrapper
-    o +htc
- 4) look into parsing
-   0 RSN Std 8.4.2.27 (Info-Element # 48
-   o 802.11u
+    - control wrapper
+    - +htc
+    - info-elements
+     o RSN Std 8.4.2.27 (Info-Element # 48
+     o TIM Info-Element # 5
  5) how to support a-msdu etc
- 6) 802.1X parsing
+ 6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
 """
 __name__ = 'radio'
 __license__ = 'GPL'

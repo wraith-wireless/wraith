@@ -434,6 +434,24 @@ CREATE TABLE ccmpcrypt(
 -- these are tables of inferred data, that is, the data in the below tables
 -- already exists in some form in the above tables
 
+-- host table
+-- consolidates multiple stas under a single host 
+DROP TABLE IF EXISTS host;
+CREATE TABLE host(
+  id serial NOT NULL, -- primary key
+);
+
+DROP TABLE IF EXISTS has_sta;
+CREATE TABLE has_sta(
+  hostid integer NOT NULL, -- fk to host
+  staid integer NOT NULL,  -- fk to sta
+  ts TIMESTAMPTZ NOT NULL, -- timestamp 'assumption' is made
+  CONSTRAINT ch_hostid CHECK (hostid > 0),
+  CONSTRAINT ch_staid CHECK (staid > 0),
+  FOREIGN KEY (hostid) REFERENCES host(id),
+  FOREIGN KEY (staid) REFERENCES sta(id)
+);
+
 -- sta table
 -- primary entity of a network. A sta is a client or an ap of a BSS/IBSS or
 -- a station attempting to enter/create a BSS/IBSS or the ap a sta is 
@@ -478,6 +496,129 @@ CREATE TABLE sta_activity(
    FOREIGN KEY(sid) REFERENCES sensor(session_id),
    FOREIGN KEY(staid) REFERENCES sta(id),
    PRIMARY KEY(sid,staid)
+);
+
+-- Management Frames
+
+-- assocreq table
+-- similar to beacon table, the assocreq references the sid it was seen in, the
+-- frame it is part of and the id of the AP as well as the id of the requesting 
+-- sta.
+DROP TABLE IF EXISTS assocreq;
+CREATE TABLE assocreq(
+  sid integer NOT NULL,             -- fk to session
+  fid bigint NOT NULL,              -- fk to frame
+  client integer NOT NULL,          -- fk to STA - this is the client
+  ap integer NOT NULL,              -- fk to STA - this is the AP
+  ts TIMESTAMPTZ NOT NULL,          -- timestamp this beacon was collected
+  listen_int integer NOT NULL,      -- listen interval in microseconds
+  ess smallint default '0',         -- ess bit (comes from an AP) 
+  ibss smallint default '0',        -- ibss bit (comes from an ibss)
+  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35  
+  cf_poll_req smallint default '0', -- see above
+  privacy smallint default '0',     -- indicates data is encrypted
+  short_pre smallint default '0',   -- AP supports short preambles
+  pbcc smallint default '0',        -- PKT binary convolutional code allowed
+  ch_agility smallint default '0',  -- irrelevant field not used
+  spec_mgmt smallint default '0',   -- 802.11h, if 1 implements DFS and TPC
+  qos smallint default '0',         -- AP supports qos
+  short_slot smallint default '0',  -- AP currently supports short time slots (i.e. no 802.11b)
+  apsd smallint default '0',        -- AP supports 802.11e power management
+  rdo_meas smallint default '0',    -- dot11RadioMeasurementActivated is true
+  dsss_ofdm smallint default '0',   -- deprecated
+  del_ba smallint default '0',      -- delayed block ack supported
+  imm_ba smallint default '0',      -- immediate block ack supported
+  ssid VARCHAR(32),                 -- the ssid of this network (NULL for cloaked,
+  sup_rates decimal(5,1)[],         -- list of supported rates
+  ext_rates decimal(5,1)[],         -- list of extended rates
+  vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
+  CONSTRAINT ch_sid CHECK (sid > 0),
+  CONSTRAINT ch_fid CHECK (fid > 0), 
+  CONSTRAINT ch_client CHECK (client > 0),
+  CONSTRAINT ch_ap CHECK (ap > 0),
+  CONSTRAINT ch_listen_int CHECK (listen_int > 0),
+  CONSTRAINT ch_ess CHECK (ess >=0 and ess <=1),
+  CONSTRAINT ch_ibss CHECK (ibss >=0 and ibss <=1),
+  CONSTRAINT ch_cf_pollable CHECK (cf_pollable >=0 and cf_pollable <=1),
+  CONSTRAINT ch_cf_poll_req CHECK (cf_poll_req >=0 and cf_poll_req <=1),
+  CONSTRAINT ch_privacy CHECK (privacy >=0 and privacy <=1),
+  CONSTRAINT ch_short_pre CHECK (short_pre >=0 and short_pre <=1),
+  CONSTRAINT ch_pbcc CHECK (pbcc >=0 and pbcc <=1),
+  CONSTRAINT ch_ch_agility CHECK (ch_agility >=0 and ch_agility <=1),
+  CONSTRAINT ch_spec_mgmt CHECK (spec_mgmt >=0 and spec_mgmt <=1),
+  CONSTRAINT ch_qos CHECK (qos >=0 and qos <=1),
+  CONSTRAINT ch_short_slot CHECK (short_slot >=0 and short_slot <=1),
+  CONSTRAINT ch_apsd CHECK (apsd >=0 and apsd <=1),
+  CONSTRAINT ch_rdo_meas CHECK (rdo_meas >=0 and rdo_meas <=1),
+  CONSTRAINT ch_dsss_ofdm CHECK (dsss_ofdm >=0 and dsss_ofdm <=1),
+  CONSTRAINT ch_del_ba CHECK (del_ba >=0 and del_ba <=1),
+  CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
+  FOREIGN KEY (sid) REFERENCES sensor(session_id),
+  FOREIGN KEY (fid) REFERENCES frame(id),
+  FOREIGN KEY (client) REFERENCES sta(id),
+  FOREIGN KEY (ap) REFERENCES sta(id)
+);
+ 
+
+-- beacon table
+-- The beacon table references, the sid it was seen in, frame it is in and the 
+-- id of the STA or BSSID and the ts it was captured. It exposes the beacon ts 
+-- as hex, the beacon interval, and capabilities info as 16 {0|1} smallints. 
+-- It will also expose (if present) the ssid, supporated rates and extended rates.
+-- TODO: do we need to include all sid,fid,ts as fid references the session
+--  and includes the ts. We have these now due to future thoughts of having
+--  to drop frames but maintain session/sta crap
+DROP TABLE IF EXISTS beacon;
+CREATE TABLE beacon(
+  sid integer NOT NULL,             -- fk to session
+  fid bigint NOT NULL,              -- fk to frame
+  ap integer NOT NULL,              -- fk to STA - this is the bss
+  ts TIMESTAMPTZ NOT NULL,          -- timestamp this beacon was collected
+  beacon_ts bytea NOT NULL,         -- beacon ts (as hex due to lack of 8-byte unsigned in postgres
+  beacon_int integer NOT NULL,      -- beacon interval in microseconds
+  ess smallint default '0',         -- ess bit (comes from an AP) 
+  ibss smallint default '0',        -- ibss bit (comes from an ibss)
+  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35  
+  cf_poll_req smallint default '0', -- see above
+  privacy smallint default '0',     -- indicates data is encrypted
+  short_pre smallint default '0',   -- AP supports short preambles
+  pbcc smallint default '0',        -- PKT binary convolutional code allowed
+  ch_agility smallint default '0',  -- irrelevant field not used
+  spec_mgmt smallint default '0',   -- 802.11h, if 1 implements DFS and TPC
+  qos smallint default '0',         -- AP supports qos
+  short_slot smallint default '0',  -- AP currently supports short time slots (i.e. no 802.11b)
+  apsd smallint default '0',        -- AP supports 802.11e power management
+  rdo_meas smallint default '0',    -- dot11RadioMeasurementActivated is true
+  dsss_ofdm smallint default '0',   -- deprecated
+  del_ba smallint default '0',      -- delayed block ack supported
+  imm_ba smallint default '0',      -- immediate block ack supported
+  ssid VARCHAR(32),                 -- the ssid of this network (NULL for cloaked,
+  sup_rates decimal(5,1)[],         -- list of supported rates
+  ext_rates decimal(5,1)[],         -- list of extended rates
+  vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
+  CONSTRAINT ch_sid CHECK (sid > 0),
+  CONSTRAINT ch_fid CHECK (fid > 0), 
+  CONSTRAINT ch_ap CHECK (ap > 0),
+  CONSTRAINT ch_beacon_int CHECK (beacon_int > 0),
+  CONSTRAINT ch_ess CHECK (ess >=0 and ess <=1),
+  CONSTRAINT ch_ibss CHECK (ibss >=0 and ibss <=1),
+  CONSTRAINT ch_cf_pollable CHECK (cf_pollable >=0 and cf_pollable <=1),
+  CONSTRAINT ch_cf_poll_req CHECK (cf_poll_req >=0 and cf_poll_req <=1),
+  CONSTRAINT ch_privacy CHECK (privacy >=0 and privacy <=1),
+  CONSTRAINT ch_short_pre CHECK (short_pre >=0 and short_pre <=1),
+  CONSTRAINT ch_pbcc CHECK (pbcc >=0 and pbcc <=1),
+  CONSTRAINT ch_ch_agility CHECK (ch_agility >=0 and ch_agility <=1),
+  CONSTRAINT ch_spec_mgmt CHECK (spec_mgmt >=0 and spec_mgmt <=1),
+  CONSTRAINT ch_qos CHECK (qos >=0 and qos <=1),
+  CONSTRAINT ch_short_slot CHECK (short_slot >=0 and short_slot <=1),
+  CONSTRAINT ch_apsd CHECK (apsd >=0 and apsd <=1),
+  CONSTRAINT ch_rdo_meas CHECK (rdo_meas >=0 and rdo_meas <=1),
+  CONSTRAINT ch_dsss_ofdm CHECK (dsss_ofdm >=0 and dsss_ofdm <=1),
+  CONSTRAINT ch_del_ba CHECK (del_ba >=0 and del_ba <=1),
+  CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
+  FOREIGN KEY (sid) REFERENCES sensor(session_id),
+  FOREIGN KEY (fid) REFERENCES frame(id),
+  FOREIGN KEY (ap) REFERENCES sta(id)
 );
 
 --DROP TABLE IF EXISTS net;
@@ -565,6 +706,8 @@ DELETE FROM wepcrypt;
 DELETE FROM signal;
 DELETE FROM source;
 DELETE FROM frame_path;
+DELETE FROM assocreq;
+DELETE FROM beacon;
 DELETE FROM sta_activity;
 DELETE FROM sta;
 ALTER SEQUENCE sta_id_seq restart;
@@ -591,11 +734,23 @@ DROP TABLE wepcrypt;
 DROP TABLE signal;
 DROP TABLE source;
 DROP TABLE frame_path;
+DROP TABLE beacon;
 DROP TABLE sta_activity;
 DROP TABLE sta;
 DROP TABLE frame;
 
-select frame.ts,frame.bytes,frame.bRTAP,frame.bMPDU,frame.data,traffic.type,traffic.subtype,traffic.td,traffic.fd,traffic.mf,traffic.rt,traffic.pm,traffic.md,traffic.pf,traffic.so,traffic.dur_type,traffic.dur_val,traffic.addr1,traffic.addr2,traffic.addr3,traffic.fragnum,traffic.seqnum,traffic.addr4,traffic.crypt from frame,traffic where frame.id = traffic.fid;
+-- QUERIES
+
+-- frame joined with traffic
+select frame.ts,frame.bytes,frame.bRTAP,frame.bMPDU,frame.data,traffic.type,
+       traffic.subtype,traffic.td,traffic.fd,traffic.mf,traffic.rt,traffic.pm,
+       traffic.md,traffic.pf,traffic.so,traffic.dur_type,traffic.dur_val,
+       traffic.addr1,traffic.addr2,traffic.addr3,traffic.fragnum,traffic.seqnum,
+       traffic.addr4,traffic.crypt from frame,traffic where frame.id = traffic.fid;
+
+-- beacons with ap.bssid
+select beacon.ts,sta.mac,beacon.ssid,beacon.sup_rates,beacon.ext_rates,beacon.vendors 
+from beacon,sta where sta.id = beacon.ap;
 
 -- data sizes 
 -- size of relations
