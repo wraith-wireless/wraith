@@ -59,7 +59,6 @@ TODO:
   - during setsensor ensure a new session for a sensor is not created if one already
     exists
   - Save thread does not save last n frames to file
- 13) sse.py
   - in SSE Threads handle errors in some way to at least let nidusdb know thread
     is quitting
      o have started using a err variable in SSEThread class, must extend that
@@ -67,7 +66,7 @@ TODO:
   - TIM (#5) from beacons could be useful
   - parse timing advance
 """
-__name__ = 'datastore'
+__name__ = 'nidus'
 __license__ = 'GPL'
 __version__ = '0.0.6'
 __date__ = 'January 2015'

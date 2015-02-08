@@ -977,10 +977,28 @@ DROP TABLE wepcrypt;
 DROP TABLE signal;
 DROP TABLE source;
 DROP TABLE frame_path;
+DROP TABLE assocreq;
+DROP TABLE reassocreq;
+DROP TABLE assocresp;
+DROP TABLE probereq;
+DROP TABLE proberesp;
+DROP TABLE disassoc;
+DROP TABLE deauth;
 DROP TABLE beacon;
+DROP TABLE auth;
+DROP TABLE action;
 DROP TABLE sta_activity;
 DROP TABLE sta;
 DROP TABLE frame;
+DROP TABLE using_gpsd;
+DROP TABLE geo;
+DROP TABLE gpsd;
+DROP TABLE using_radio;
+DROP TABLE radio_epoch;
+DROP TABLE radio_event;
+DROP TABLE radio_period;
+DROP TABLE radio;
+DROP TABLE sensor;
 
 -- QUERIES
 

@@ -14,20 +14,20 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
 
-import os                                  # file functions
-import threading                           # threads
-import psycopg2 as psql                    # postgresql api
-from dateutil import parser as dtparser    # parse out timestamps
-from wraith.radio import mcs               # mcs functionality
-from wraith.radio import channels          # channesl
-from wraith.radio.oui import manufacturer  # extract manufacturer/oui from macaddr
-import wraith.radio.radiotap as rtap       # radiotap parsing
-from wraith.radio import mpdu              # mac layer parsing
-import wraith.nidus.simplepcap as pcap     # writing frames to file
-from nidusdb import NidusDBException       # nidusdb exceptions used
-from nidusdb import NidusDBServerException
-from nidusdb import NidusDBAuthException
-from nidusdb import NidusDBSubmitException
+import os                                        # file functions
+import threading                                 # threads
+import psycopg2 as psql                          # postgresql api
+from dateutil import parser as dtparser          # parse out timestamps
+from wraith.radio import mcs                     # mcs functionality
+from wraith.radio import channels                # channels
+from wraith.radio.oui import manufacturer        # extract manufacturer/oui from macaddr
+import wraith.radio.radiotap as rtap             # radiotap parsing
+from wraith.radio import mpdu                    # mac layer parsing
+import wraith.nidus.simplepcap as pcap           # writing frames to file
+from nidus.nidusdb import NidusDBException       # nidusdb exceptions used
+from nidus.nidusdb import NidusDBServerException
+from nidus.nidusdb import NidusDBAuthException
+from nidus.nidusdb import NidusDBSubmitException
 
 # Task Definitions
 
@@ -1105,7 +1105,7 @@ class ExtractThread(SSEThread):
                                        category,action,has_el)
                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
                   """
-            curs.execute(sql,(fid,rx,tx,ap,noack,
+            curs.execute(sql,(fid,rx,tx,ap,fromap,noack,
                               l2.fixed_params['category'],
                               l2.fixed_params['action'],
                               int('action-els' in l2.present)))

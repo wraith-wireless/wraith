@@ -23,7 +23,7 @@ import logging.config      # log configuration
 import logging.handlers    # handlers for log
 import argparse as ap      # cmd line argument parsing
 import SocketServer as ss  # socket server
-import nidusdb             # nidus datastorage interface
+import nidusdb  # nidus datastorage interface
 from wraith import nidus   # top level package
 from nmp import NMP        # nidus message protocol regular expression
 
