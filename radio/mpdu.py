@@ -178,6 +178,10 @@ class MPDU(dict):
     def fcs(self): return self['fcs'] if 'fcs' in self else None
     @property
     def crypt(self): return self['l3-crypt'] if 'l3-crypt' in self else None
+    @property
+    def fixed_params(self): return self['fixed-params'] if 'fixed-params' in self else None
+    @property
+    def info_els(self): return self['info-elements'] if 'info-elements' in self else None
 
 def parse(frame,hasFCS=False):
     """
@@ -296,7 +300,7 @@ ST_MGMT_REASSOC_REQ  =  2
 ST_MGMT_REASSOC_RESP =  3
 ST_MGMT_PROBE_REQ    =  4
 ST_MGMT_PROBE_RESP   =  5
-ST_MGMT_TIMING_ADV   =  6
+ST_MGMT_TIMING_ADV   =  6 # 802.11p
 ST_MGMT_RSRV_7       =  7
 ST_MGMT_BEACON       =  8
 ST_MGMT_ATIM         =  9
@@ -599,8 +603,8 @@ def _parsemgmt_(f,mac):
         fmt = _S2F_['algorithm-no'] + _S2F_['auth-seq'] + _S2F_['status-code']
         v,mac['offset'] = _unpack_from_(fmt,f,mac['offset'])
         mac['fixed-params'] = {'algorithm-no':v[0],
-                             'auth-seq':v[1],
-                             'status-code':v[2]}
+                               'auth-seq':v[1],
+                               'status-code':v[2]}
         mac['present'].append('fixed-params')
     elif mac.subtype == ST_MGMT_ACTION or mac.subtype == ST_MGMT_ACTION_NOACK:
         fmt = _S2F_['category'] + _S2F_['action']
@@ -914,7 +918,7 @@ CATEGORY_VHT                       =  21
 CATEGORY_VENDOR_SPECIFIC_PROTECTED = 126
 CATEGORY_VENDOR_SPECIFIC           = 127
 
-# reason code Std Table 8-36 (not an info element but kept here anyway)
+# reason code Std Table 8-36
 REASON_UNSPECIFIED                    =  1
 REASON_PREV_AUTH_NOT_VALID            =  2
 REASON_DEAUTH_LEAVING                 =  3

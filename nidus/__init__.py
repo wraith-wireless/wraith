@@ -63,6 +63,7 @@ TODO:
   - during setsensor ensure a new session for a sensor is not created if one already
     exists
   - Save thread does not save last n frames to file
+  - TIM (#5) from beacons could be useful
 """
 __name__ = 'datastore'
 __license__ = 'GPL'

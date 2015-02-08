@@ -506,11 +506,9 @@ CREATE TABLE sta_activity(
 -- sta.
 DROP TABLE IF EXISTS assocreq;
 CREATE TABLE assocreq(
-  sid integer NOT NULL,             -- fk to session
   fid bigint NOT NULL,              -- fk to frame
   client integer NOT NULL,          -- fk to STA - this is the client
   ap integer NOT NULL,              -- fk to STA - this is the AP
-  ts TIMESTAMPTZ NOT NULL,          -- timestamp this was collected
   ess smallint default '0',         -- ess bit (comes from an AP) 
   ibss smallint default '0',        -- ibss bit (comes from an ibss)
   cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35  
@@ -532,7 +530,6 @@ CREATE TABLE assocreq(
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
-  CONSTRAINT ch_sid CHECK (sid > 0),
   CONSTRAINT ch_fid CHECK (fid > 0), 
   CONSTRAINT ch_client CHECK (client > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
@@ -553,7 +550,6 @@ CREATE TABLE assocreq(
   CONSTRAINT ch_dsss_ofdm CHECK (dsss_ofdm >=0 and dsss_ofdm <=1),
   CONSTRAINT ch_del_ba CHECK (del_ba >=0 and del_ba <=1),
   CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
-  FOREIGN KEY (sid) REFERENCES sensor(session_id),
   FOREIGN KEY (fid) REFERENCES frame(id),
   FOREIGN KEY (client) REFERENCES sta(id),
   FOREIGN KEY (ap) REFERENCES sta(id)
@@ -565,14 +561,12 @@ CREATE TYPE ASSOC_TYPE AS ENUM ('assoc','reassoc');
 
 -- assocresp table 
 -- The assocresp table stores response for both association and reassociation
--- requests. See beacon for capability bits information 
+-- response. See beacon for capability bits information 
 DROP TABLE IF EXISTS assocresp;
 CREATE TABLE assocresp(
-  sid integer NOT NULL,             -- fk to session
   fid bigint NOT NULL,              -- fk to frame
   client integer NOT NULL,          -- fk to STA - this is the client
   ap integer NOT NULL,              -- fk to STA - this is the AP
-  ts TIMESTAMPTZ NOT NULL,          -- timestamp this beacon was collected
   type ASSOC_TYPE NOT NULL,         -- one of {association|reassociation}
   ess smallint default '0',         -- ess bit (comes from an AP) 
   ibss smallint default '0',        -- ibss bit (comes from an ibss)
@@ -596,7 +590,6 @@ CREATE TABLE assocresp(
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
-  CONSTRAINT ch_sid CHECK (sid > 0),
   CONSTRAINT ch_fid CHECK (fid > 0), 
   CONSTRAINT ch_client CHECK (client > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
@@ -618,7 +611,6 @@ CREATE TABLE assocresp(
   CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
   CONSTRAINT ch_status CHECK (status >= 0),
   CONSTRAINT ch_aid CHECK (aid >= 0),
-  FOREIGN KEY (sid) REFERENCES sensor(session_id),
   FOREIGN KEY (fid) REFERENCES frame(id),
   FOREIGN KEY (client) REFERENCES sta(id),
   FOREIGN KEY (ap) REFERENCES sta(id)
@@ -628,12 +620,10 @@ CREATE TABLE assocresp(
 -- near similar to assocreq table but includes the bssid/mac address of the
 -- ap the sta is currently associated(or authenticated) to
 DROP TABLE IF EXISTS reassocreq;
-CREATE TABLE assocreq(
-  sid integer NOT NULL,             -- fk to session
+CREATE TABLE reassocreq(
   fid bigint NOT NULL,              -- fk to frame
   client integer NOT NULL,          -- fk to STA - this is the client
   ap integer NOT NULL,              -- fk to STA - this is the AP
-  ts TIMESTAMPTZ NOT NULL,          -- timestamp this was collected
   ess smallint default '0',         -- ess bit (comes from an AP) 
   ibss smallint default '0',        -- ibss bit (comes from an ibss)
   cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35  
@@ -656,7 +646,6 @@ CREATE TABLE assocreq(
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
-  CONSTRAINT ch_sid CHECK (sid > 0),
   CONSTRAINT ch_fid CHECK (fid > 0), 
   CONSTRAINT ch_client CHECK (client > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
@@ -678,27 +667,43 @@ CREATE TABLE assocreq(
   CONSTRAINT ch_del_ba CHECK (del_ba >=0 and del_ba <=1),
   CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
   CONSTRAINT ch_cur_ap CHECK (cur_ap > 0),
-  FOREIGN KEY (sid) REFERENCES sensor(session_id),
   FOREIGN KEY (fid) REFERENCES frame(id),
   FOREIGN KEY (client) REFERENCES sta(id),
   FOREIGN KEY (ap) REFERENCES sta(id),
   FOREIGN KEY (cur_ap) REFERENCES sta(id)
 ); 
- 
--- beacon table
--- The beacon table references, the sid it was seen in, frame it is in and the 
--- id of the STA or BSSID and the ts it was captured. It exposes the beacon ts 
--- as hex, the beacon interval, and capabilities info as 16 {0|1} smallints. 
--- It will also expose (if present) the ssid, supporated rates and extended rates.
--- TODO: do we need to include all sid,fid,ts as fid references the session
---  and includes the ts. We have these now due to future thoughts of having
---  to drop frames but maintain session/sta crap
-DROP TABLE IF EXISTS beacon;
-CREATE TABLE beacon(
-  sid integer NOT NULL,             -- fk to session
+
+-- probereq table
+-- A probe request coming from a client, we track only ssid, supported rates
+-- extended rates and lists of vendors sought. Probe requests include the
+-- ids to the frame and session it was collected in, the client mac addr id
+-- and the the ap id (which is normally broadcast)
+DROP TABLE IF EXISTS probereq;
+CREATE TABLE probereq(
+  fid bigint NOT NULL,      -- fk to frame
+  client integer NOT NULL,  -- fk to STA - this is the client
+  ap integer,               -- fk to STA - this is the AP
+  ssid VARCHAR(32),         -- the ssid of this network (NULL for cloaked,
+  sup_rates decimal(5,1)[], -- list of supported rates
+  ext_rates decimal(5,1)[], -- list of extended rates
+  vendors char(8)[],        -- list of (unique) vendor ouis found in info-elements
+  FOREIGN KEY (fid) REFERENCES frame(id),
+  FOREIGN KEY (client) REFERENCES sta(id),
+  FOREIGN KEY (ap) REFERENCES sta(id)
+); 
+
+-- proberesp table
+-- Very similar to the beacon table. References, the sid it was seen in, frame 
+-- it is in and the  id of the STA or BSSID and the ts it was captured. It exposes 
+-- the beacon ts as hex, the beacon interval, and capabilities info as 16 {0|1} 
+-- smallints. It will also expose (if present) the ssid, supporated rates and 
+-- extended rates. In addition, it will expose the sta id of the client, the
+-- ap is responding to
+DROP TABLE IF EXISTS proberesp;
+CREATE TABLE proberesp(
   fid bigint NOT NULL,              -- fk to frame
+  client integer NOT NULL,          -- fk to STA - this is the requesting STA
   ap integer NOT NULL,              -- fk to STA - this is the bss
-  ts TIMESTAMPTZ NOT NULL,          -- timestamp this beacon was collected
   beacon_ts bytea NOT NULL,         -- beacon ts (as hex due to lack of 8-byte unsigned in postgres
   beacon_int integer NOT NULL,      -- beacon interval in microseconds
   ess smallint default '0',         -- ess bit (comes from an AP) 
@@ -721,7 +726,64 @@ CREATE TABLE beacon(
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
-  CONSTRAINT ch_sid CHECK (sid > 0),
+  CONSTRAINT ch_fid CHECK (fid > 0), 
+  CONSTRAINT ch_client CHECK (client > 0),
+  CONSTRAINT ch_ap CHECK (ap > 0),
+  CONSTRAINT ch_beacon_int CHECK (beacon_int > 0),
+  CONSTRAINT ch_ess CHECK (ess >=0 and ess <=1),
+  CONSTRAINT ch_ibss CHECK (ibss >=0 and ibss <=1),
+  CONSTRAINT ch_cf_pollable CHECK (cf_pollable >=0 and cf_pollable <=1),
+  CONSTRAINT ch_cf_poll_req CHECK (cf_poll_req >=0 and cf_poll_req <=1),
+  CONSTRAINT ch_privacy CHECK (privacy >=0 and privacy <=1),
+  CONSTRAINT ch_short_pre CHECK (short_pre >=0 and short_pre <=1),
+  CONSTRAINT ch_pbcc CHECK (pbcc >=0 and pbcc <=1),
+  CONSTRAINT ch_ch_agility CHECK (ch_agility >=0 and ch_agility <=1),
+  CONSTRAINT ch_spec_mgmt CHECK (spec_mgmt >=0 and spec_mgmt <=1),
+  CONSTRAINT ch_qos CHECK (qos >=0 and qos <=1),
+  CONSTRAINT ch_short_slot CHECK (short_slot >=0 and short_slot <=1),
+  CONSTRAINT ch_apsd CHECK (apsd >=0 and apsd <=1),
+  CONSTRAINT ch_rdo_meas CHECK (rdo_meas >=0 and rdo_meas <=1),
+  CONSTRAINT ch_dsss_ofdm CHECK (dsss_ofdm >=0 and dsss_ofdm <=1),
+  CONSTRAINT ch_del_ba CHECK (del_ba >=0 and del_ba <=1),
+  CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
+  FOREIGN KEY (fid) REFERENCES frame(id),
+  FOREIGN KEY (client) REFERENCES sta(id),
+  FOREIGN KEY (ap) REFERENCES sta(id)
+);
+
+-- beacon table
+-- The beacon table references, the sid it was seen in, frame it is in and the 
+-- id of the STA or BSSID and the ts it was captured. It exposes the beacon ts 
+-- as hex, the beacon interval, and capabilities info as 16 {0|1} smallints. 
+-- It will also expose (if present) the ssid, supporated rates and extended rates.
+-- 
+-- TODO: include TIM field
+DROP TABLE IF EXISTS beacon;
+CREATE TABLE beacon(
+  fid bigint NOT NULL,              -- fk to frame
+  ap integer NOT NULL,              -- fk to STA - this is the bss
+  beacon_ts bytea NOT NULL,         -- beacon ts (as hex due to lack of 8-byte unsigned in postgres
+  beacon_int integer NOT NULL,      -- beacon interval in microseconds
+  ess smallint default '0',         -- ess bit (comes from an AP) 
+  ibss smallint default '0',        -- ibss bit (comes from an ibss)
+  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35  
+  cf_poll_req smallint default '0', -- see above
+  privacy smallint default '0',     -- indicates data is encrypted
+  short_pre smallint default '0',   -- AP supports short preambles
+  pbcc smallint default '0',        -- PKT binary convolutional code allowed
+  ch_agility smallint default '0',  -- irrelevant field not used
+  spec_mgmt smallint default '0',   -- 802.11h, if 1 implements DFS and TPC
+  qos smallint default '0',         -- AP supports qos
+  short_slot smallint default '0',  -- AP currently supports short time slots (i.e. no 802.11b)
+  apsd smallint default '0',        -- AP supports 802.11e power management
+  rdo_meas smallint default '0',    -- dot11RadioMeasurementActivated is true
+  dsss_ofdm smallint default '0',   -- deprecated
+  del_ba smallint default '0',      -- delayed block ack supported
+  imm_ba smallint default '0',      -- immediate block ack supported
+  ssid VARCHAR(32),                 -- the ssid of this network (NULL for cloaked)
+  sup_rates decimal(5,1)[],         -- list of supported rates
+  ext_rates decimal(5,1)[],         -- list of extended rates
+  vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
   CONSTRAINT ch_fid CHECK (fid > 0), 
   CONSTRAINT ch_ap CHECK (ap > 0),
   CONSTRAINT ch_beacon_int CHECK (beacon_int > 0),
@@ -741,41 +803,83 @@ CREATE TABLE beacon(
   CONSTRAINT ch_dsss_ofdm CHECK (dsss_ofdm >=0 and dsss_ofdm <=1),
   CONSTRAINT ch_del_ba CHECK (del_ba >=0 and del_ba <=1),
   CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
-  FOREIGN KEY (sid) REFERENCES sensor(session_id),
   FOREIGN KEY (fid) REFERENCES frame(id),
   FOREIGN KEY (ap) REFERENCES sta(id)
 );
 
---DROP TABLE IF EXISTS net;
---CREATE TABLE net(
---   id serial NOT NULL,   -- primary key
---   sid integer NOT NULL, -- foreign key to session id
---   essid VARCHAR(32),    -- the ssid of this network
---   CONSTRAINT ch_sid CHECK (sid > 0),
---   PRIMARY KEY(id)
---);
+-- dissaoc table
+-- disassociation table: a client notifies ap of disassociation or an ap notifies
+-- a client(s) to dissocate. fromap = 0 if the client has sent the dissociation
+-- or 1 if the ap has sent the dissociation
+DROP TABLE IF EXISTS disassoc;
+CREATE TABLE disassoc(
+  fid bigint NOT NULL,      -- fk to frame
+  client integer,           -- fk to STA - this is the requesting STA
+  ap integer NOT NULL,      -- fk to STA - this is the bss
+  fromap smallint NOT NULL, -- {0:client initiated|1:ap initiated}
+  reason integer NOT NULL,  -- reason code for disassociation
+  CONSTRAINT ch_fid CHECK (fid > 0),
+  CONSTRAINT ch_client CHECK (client >= 0),
+  CONSTRAINT ch_ap CHECK (ap >= 0),
+  CONSTRAINT ch_fromap CHECK (fromap >= 0 and fromap <=1),
+  CONSTRAINT ch_reason CHECK (reason >= 0),
+  FOREIGN KEY (fid) REFERENCES frame(id),
+  FOREIGN KEY (client) REFERENCES sta(id),
+  FOREIGN KEY (ap) REFERENCES sta(id)
+);
 
---DROP TABLE IF EXISTS net_activity;
---CREATE TABLE net_activity(
---   essid VARCHAR(32), -- the ssid of this network
---   
---);
+-- auth table
+-- authentication - client request authentication to an ap
+DROP TABLE IF EXISTS auth;
+CREATE TABLE auth(
+  fid bigint NOT NULL,         -- fk to frame
+  client integer NOT NULL,     -- fk to STA, the client
+  ap integer NOT NULL,         -- fk to STA, the ap
+  fromap smallint NOT NULL,    -- {0:client initiated|1:ap initiated}
+  auth_alg integer NOT NULL,   -- authentication algorithm number
+  auth_trans integer NOT NULL, -- authentication transaction seq. number
+  status integer NOT NULL,     -- status code
+  CONSTRAINT ch_fid CHECK (fid > 0),
+  CONSTRAINT ch_client CHECK (client >= 0),
+  CONSTRAINT ch_ap CHECK (ap >= 0),
+  CONSTRAINT ch_fromap CHECK (fromap >= 0 and fromap <=1),
+  CONSTRAINT ch_auth_alg CHECK (auth_alg >= 0),
+  CONSTRAINT ch_auth_trans CHECK (auth_trans >= 0),
+  CONSTRAINT ch_status CHECK (status >= 0),
+  FOREIGN KEY (fid) REFERENCES frame(id),
+  FOREIGN KEY (client) REFERENCES sta(id),
+  FOREIGN KEY (ap) REFERENCES sta(id)
+);
 
--- sta state enumerations
-DROP TYPE IF EXISTS STA_STATE;
-CREATE TYPE STA_STATE AS ENUM ('unknown','authenticated','associated',
-                               'deassociated','deauthenticated','none');
+-- deauth table
+-- deauthentication table: a client notifies ap of deauthentication or an ap notifies
+-- a client(s) to deauthenticate. fromap = 0 if the client has sent the deauthentication
+-- or 1 if the ap has sent it
+DROP TABLE IF EXISTS deauth;
+CREATE TABLE deauth(
+  fid bigint NOT NULL,      -- fk to frame
+  client integer,           -- fk to STA - this is the requesting STA
+  ap integer NOT NULL,      -- fk to STA - this is the bss
+  fromap smallint NOT NULL, -- {0:client initiated|1:ap initiated}
+  reason integer NOT NULL,  -- reason code for deauthentication
+  CONSTRAINT ch_fid CHECK (fid > 0),
+  CONSTRAINT ch_client CHECK (client >= 0),
+  CONSTRAINT ch_ap CHECK (ap >= 0),
+  CONSTRAINT ch_fromap CHECK (fromap >= 0 and fromap <=1),
+  CONSTRAINT ch_reason CHECK (reason >= 0),
+  FOREIGN KEY (fid) REFERENCES frame(id),
+  FOREIGN KEY (client) REFERENCES sta(id),
+  FOREIGN KEY (ap) REFERENCES sta(id)
+);
 
 DROP TYPE IF EXISTS STA_TYPE;
 CREATE TYPE STA_TYPE AS ENUM ('unknown','ap','sta','wired');
 
+-- TODO: add AID
 DROP TABLE IF EXISTS sta_info;
 CREATE TABLE sta_info(
-   sid integer NOT NULL,              -- fk to session that these details are known
    staid integer NOT NULL,            -- fk to sta
    fid bigint NOT NULL,               -- fk to frame these details were seen
-   ts TIMESTAMPTZ NOT NULL,           -- timestamp this info is knwon
-   state STA_STATE default 'unknown', -- state of sta
    type STA_TYPE default 'unknown',   -- type of sta 
    ip inet,                           -- ip if known
    os_name VARCHAR(50),               -- name of os i.e. Windows
@@ -814,6 +918,10 @@ DELETE FROM frame_path;
 DELETE FROM assocreq;
 DELETE FROM reassocreq;
 DELETE FROM assocresp;
+DELETE FROM probereq;
+DELETE FROM proberesp;
+DELETE FROM disassoc;
+DELETE FROM deauth;
 DELETE FROM beacon;
 DELETE FROM sta_activity;
 DELETE FROM sta;
@@ -858,6 +966,9 @@ select frame.ts,frame.bytes,frame.bRTAP,frame.bMPDU,frame.data,traffic.type,
 -- beacons with ap.bssid
 select beacon.ts,sta.mac,beacon.ssid,beacon.sup_rates,beacon.ext_rates,beacon.vendors 
 from beacon,sta where sta.id = beacon.ap;
+
+select sta.mac,probereq.ts,probereq.ssid,probereq.sup_rates,probereq.ext_rates,
+probereq.vendors from probereq,sta where sta.id=probereq.client;
 
 -- data sizes 
 -- size of relations

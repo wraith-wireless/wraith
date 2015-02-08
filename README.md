@@ -100,4 +100,5 @@ frames, gps location, and 'device' details/status.
  - nmp.py           nidus protocol definition
  - nidusdb.py       interface to storage system
  - simplepcap.py    pcap writer
+ - sse.py           saving, storing and extracting frames
  - nidus.sql        sql tables definition
