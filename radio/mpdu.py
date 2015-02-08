@@ -897,27 +897,6 @@ AUTH_ALGORITHM_FAST   =     2
 AUTH_ALGORITHM_SAE    =     3
 AUTH_ALGORITHM_VENDOR = 63535
 
-# action category codes Std Table 8-38
-CATEGORY_SPECTRUM_MGMT             =   0
-CATEGORY_QOS                       =   1
-CATEGORY_DLS                       =   2
-CATEGORY_BLOCK_ACK                 =   3
-CATEGORY_PUBLIC                    =   4
-CATEGORY_HT                        =   7
-CATEGORY_SA_QUERY                  =   8
-CATEGORY_PROTECTED_DUAL_OF_ACTION  =   9
-CATEGORY_TDLS                      =  12
-CATEGORY_MESH_ACTION               =  13
-CATEGORY_MULTIHOP_ACTION           =  14
-CATEGORY_SELF_PROTECTED            =  15
-CATEGORY_DMG                       =  16
-CATEGORY_WMM                       =  17
-CATEGORY_FST                       =  18
-CATEGORY_UNPROT_DMG                =  20
-CATEGORY_VHT                       =  21
-CATEGORY_VENDOR_SPECIFIC_PROTECTED = 126
-CATEGORY_VENDOR_SPECIFIC           = 127
-
 # reason code Std Table 8-36
 REASON_UNSPECIFIED                    =  1
 REASON_PREV_AUTH_NOT_VALID            =  2
@@ -973,6 +952,28 @@ REASON_MESH_PATH_DEST_UNREACHABLE     = 63
 REASON_MAC_EXISTS_IN_MBSS             = 64
 REASON_MESH_CHAN_REGULATORY           = 65
 REASON_MESH_CHAN                      = 66
+
+# action category codes Std Table 8-38
+CATEGORY_SPECTRUM_MGMT             =   0
+CATEGORY_QOS                       =   1
+CATEGORY_DLS                       =   2
+CATEGORY_BLOCK_ACK                 =   3
+CATEGORY_PUBLIC                    =   4
+CATEGORY_HT                        =   7
+CATEGORY_SA_QUERY                  =   8
+CATEGORY_PROTECTED_DUAL_OF_ACTION  =   9
+CATEGORY_TDLS                      =  12
+CATEGORY_MESH_ACTION               =  13
+CATEGORY_MULTIHOP_ACTION           =  14
+CATEGORY_SELF_PROTECTED            =  15
+CATEGORY_DMG                       =  16
+CATEGORY_WMM                       =  17
+CATEGORY_FST                       =  18
+CATEGORY_UNPROT_DMG                =  20
+CATEGORY_VHT                       =  21
+CATEGORY_VENDOR_SPECIFIC_PROTECTED = 126
+CATEGORY_VENDOR_SPECIFIC           = 127
+# 128 to 255 are error codes
 
 # SUUPORTED RATES/EXTENDED RATES Std 8.4.2.3 and 8.4.2.15
 

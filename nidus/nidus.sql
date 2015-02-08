@@ -872,6 +872,32 @@ CREATE TABLE deauth(
   FOREIGN KEY (ap) REFERENCES sta(id)
 );
 
+DROP TABLE IF EXISTS action;
+CREATE TABLE action(
+  fid bigint NOT NULL,        -- fk to frame
+  rx integer,                 -- fk to receiving STA if present
+  tx integer,                 -- fk to transmitting STA if present
+  ap integer NOT NULL,        -- fk to STA - this is the bss
+  fromap smallint NOT NULL,   -- {0:client initiated|1:ap initiated|2:intrasta}
+  noack smallint NOT NULL,    -- {0:False|1:True}
+  category smallint NOT NULL, -- category code
+  action smallint NOT NULL,   -- action code
+  has_el smallint NOT NULL,   -- {0:no action elements present|1:action elements present}
+  CONSTRAINT ch_fid CHECK (fid > 0),
+  CONSTRAINT ch_rx CHECK (rx >= 0),
+  CONSTRAINT ch_tx CHECK (tx >= 0),
+  CONSTRAINT ch_ap CHECK (ap >= 0),
+  CONSTRAINT ch_fromap CHECK (fromap >= 0 and fromap <=2),
+  CONSTRAINT ch_noack CHECK (noack >= 0 and noack <=1),
+  CONSTRAINT ch_category CHECK (category >= 0),
+  CONSTRAINT ch_action CHECK (action >= 0),
+  CONSTRAINT ch_has_el CHECK (has_el >= 0 and has_el <= 1),
+  FOREIGN KEY (fid) REFERENCES frame(id),
+  FOREIGN KEY (rx) REFERENCES sta(id),
+  FOREIGN KEY (tx) REFERENCES sta(id),
+  FOREIGN KEY (ap) REFERENCES sta(id)
+);
+
 DROP TYPE IF EXISTS STA_TYPE;
 CREATE TYPE STA_TYPE AS ENUM ('unknown','ap','sta','wired');
 
@@ -923,6 +949,8 @@ DELETE FROM proberesp;
 DELETE FROM disassoc;
 DELETE FROM deauth;
 DELETE FROM beacon;
+DELETE FROM auth;
+DELETE FROM action;
 DELETE FROM sta_activity;
 DELETE FROM sta;
 ALTER SEQUENCE sta_id_seq restart;

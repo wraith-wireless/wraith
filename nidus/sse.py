@@ -14,20 +14,20 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
 
-import os
-import threading
-import psycopg2 as psql
-from dateutil import parser as dtparser
-from wraith.radio import mcs
-from wraith.radio import channels
-from wraith.radio.oui import manufacturer
-import wraith.nidus.simplepcap as pcap
-from nidusdb import NidusDBException
+import os                                  # file functions
+import threading                           # threads
+import psycopg2 as psql                    # postgresql api
+from dateutil import parser as dtparser    # parse out timestamps
+from wraith.radio import mcs               # mcs functionality
+from wraith.radio import channels          # channesl
+from wraith.radio.oui import manufacturer  # extract manufacturer/oui from macaddr
+import wraith.radio.radiotap as rtap       # radiotap parsing
+from wraith.radio import mpdu              # mac layer parsing
+import wraith.nidus.simplepcap as pcap     # writing frames to file
+from nidusdb import NidusDBException       # nidusdb exceptions used
 from nidusdb import NidusDBServerException
 from nidusdb import NidusDBAuthException
 from nidusdb import NidusDBSubmitException
-import wraith.radio.radiotap as rtap
-from wraith.radio import mpdu
 
 # Task Definitions
 
@@ -504,44 +504,47 @@ class ExtractThread(SSEThread):
                     print 'assocreq'
                     self._insertassocreq(fid,addrs[l2.addr2]['id'],
                                          addrs[l2.addr1]['id'],l2,curs)
-                if l2.subtype == mpdu.ST_MGMT_ASSOC_RESP:
+                elif l2.subtype == mpdu.ST_MGMT_ASSOC_RESP:
                     print 'assocresp'
                     self._insertassocresp('assoc',fid,addrs[l2.addr2]['id'],
                                           addrs[l2.addr1]['id'],l2,curs)
-                if l2.subtype == mpdu.ST_MGMT_REASSOC_REQ:
+                elif l2.subtype == mpdu.ST_MGMT_REASSOC_REQ:
                     print 'reassocreq'
                     self._insertreassocreq(fid,ts,addrs[l2.addr2]['id'],
                                            addrs[l2.addr1]['id'],l2,curs)
-                if l2.subtype == mpdu.ST_MGMT_REASSOC_RESP:
+                elif l2.subtype == mpdu.ST_MGMT_REASSOC_RESP:
                     print 'reassoc'
                     self._insertassocresp('reassoc',fid,addrs[l2.addr2]['id'],
                                           addrs[l2.addr1]['id'],l2,curs)
-                if l2.subtype == mpdu.ST_MGMT_PROBE_REQ:
+                elif l2.subtype == mpdu.ST_MGMT_PROBE_REQ:
                     print 'probereq'
                     self._insertprobereq(fid,addrs[l2.addr2]['id'],
                                          addrs[l2.addr3]['id'],l2,curs)
-                if l2.subtype == mpdu.ST_MGMT_PROBE_RESP:
+                elif l2.subtype == mpdu.ST_MGMT_PROBE_RESP:
                     print 'proberesp'
                     self._insertproberesp(fid,addrs[l2.addr2]['id'],
                                          addrs[l2.addr1]['id'],l2,curs)
-                #if l2.subtype == mpdu.ST_MGMT_TIMING_ADV: pass
-                if l2.subtype == mpdu.ST_MGMT_BEACON:
+                #elif l2.subtype == mpdu.ST_MGMT_TIMING_ADV: pass
+                elif l2.subtype == mpdu.ST_MGMT_BEACON:
                     self._insertbeacon(fid,addrs[l2.addr2]['id'],l2,curs)
-                #if l2.subtype == mpdu.ST_MGMT_ATIM: pass
-                if l2.subtype == mpdu.ST_MGMT_DISASSOC:
-                    self._insertdisassoc(fid,addrs[l2.addr1]['id'],
-                                         addrs[l2.addr2]['id'],l2,curs)
-                if l2.subtype == mpdu.ST_MGMT_AUTH:
+                #elif l2.subtype == mpdu.ST_MGMT_ATIM: pass
+                elif l2.subtype == mpdu.ST_MGMT_DISASSOC:
+                    self._insertdisassaoc(fid,addrs[l2.addr1]['id'],
+                                          addrs[l2.addr2]['id'],l2,curs)
+                elif l2.subtype == mpdu.ST_MGMT_AUTH:
                     self._insertauth(fid,addrs[l2.addr1]['id'],
                                      addrs[l2.addr2]['id'],l2,curs)
-                if l2.subtype == mpdu.ST_MGMT_DEAUTH:
+                elif l2.subtype == mpdu.ST_MGMT_DEAUTH:
                     self._insertdeauth(fid,addrs[l2.addr1]['id'],
-                                      addrs[l2.addr2]['id'],l2,curs)
-                #ST_MGMT_ACTION       = 13
-                #ST_MGMT_ACTION_NOACK = 14
+                                       addrs[l2.addr2]['id'],l2,curs)
+                elif l2.subtype == mpdu.ST_MGMT_ACTION:
+                    self._insertaction(fid,addrs[l2.addr1]['id'],addrs[l2.addr2]['id'],
+                                       addrs[l2.addr3]['id'],False,l2,curs)
+                elif l2.subtype == mpdu.ST_MGMT_ACTION_NOACK:
+                    self._insertaction(fid,addrs[l2.addr1]['id'],addrs[l2.addr2]['id'],
+                                       addrs[l2.addr3]['id'],True,l2,curs)
         except psql.Error as e:
             self._conn.rollback()
-            curs.close()
             raise NidusDBSubmitException(e.pgcode,e.pgerror,self._err[0],self._err[1])
         else:
             self._conn.commit()
@@ -1062,7 +1065,50 @@ class ExtractThread(SSEThread):
          rx and details in l2 in the db using the cursors curs
         """
         try:
-            pass
+            # have to determine if this is coming from ap or from client and
+            # set ap, client appropriately
+            if l2.addr3 == l2.addr2:
+                fromap = 1
+                client = rx
+                ap = tx
+            else:
+                fromap = 0
+                client = tx
+                ap = rx
+            sql = """
+                   insert into auth (fid,client,ap,fromap,auth_alg,auth_trans,status)
+                   values (%s,%s,%s,%s,%s,%s,%s);
+                  """
+            curs.execute(sql,(fid,client,ap,fromap,l2.fixed_params['algorithm-no'],
+                                                   l2.fixed_params['auth-seq'],
+                                                   l2.fixed_params['status-code']))
+        except psql.Error:
+            self._err = ('auth',fid)
+            raise
+        except (ValueError,IndexError,AttributeError):
+            self._err = ('auth',fid)
+            raise
+
+    def _insertaction(self,fid,rx,tx,ap,noack,l2,curs):
+        """
+         inserts the action frame fid in bssid ap from tx to rx with details in
+         l2 into the db using curs. noack is True if action no ack frame
+        """
+        try:
+            # determine if this is from ap, to ap or intra sta
+            if l2.addr3 == l2.addr2: fromap = 1
+            elif l2.addr3 == l2.addr1: fromap = 0
+            else: fromap = 2
+            noack = int(noack)
+            sql = """
+                   insert into action (fid,rx,tx,ap,fromap,noack,
+                                       category,action,has_el)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                  """
+            curs.execute(sql,(fid,rx,tx,ap,noack,
+                              l2.fixed_params['category'],
+                              l2.fixed_params['action'],
+                              int('action-els' in l2.present)))
         except psql.Error:
             self._err = ('auth',fid)
             raise

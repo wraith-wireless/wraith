@@ -55,15 +55,17 @@ TODO:
 8) secured (hashed) username/password from to datastore
 10) how/when to partition table to offload older records
 12) nidusdb.py
-  - in SSE Threads handle errors in some way to at least let nidusdb know thread
-    is quitting
-     o have started using a err variable in SSEThread class, must extend that
-       to allow nidusdb to see the error
   - ensure only one radio submit per radio is allowed
   - during setsensor ensure a new session for a sensor is not created if one already
     exists
   - Save thread does not save last n frames to file
+ 13) sse.py
+  - in SSE Threads handle errors in some way to at least let nidusdb know thread
+    is quitting
+     o have started using a err variable in SSEThread class, must extend that
+       to allow nidusdb to see the error
   - TIM (#5) from beacons could be useful
+  - parse timing advance
 """
 __name__ = 'datastore'
 __license__ = 'GPL'
