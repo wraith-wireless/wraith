@@ -7,8 +7,8 @@
 
 __name__ = 'wraith-rt'
 __license__ = 'GPL'
-__version__ = '0.0.2'
-__revdate__ = 'October 2014'
+__version__ = '0.0.3'
+__revdate__ = 'February 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
@@ -17,23 +17,28 @@ __status__ = 'Development'
 import wraith                       # helpful functions
 from wraith.widgets.panel import *  # graphics suite
 
-class DataBinPanel(SlavePanel):
+class SimplePanel(SlavePanel):
+    """
+     Defines a simple panel with body
+     Derived class must implement _body()
+    """
+    def __init__(self,toplevel,chief,title,iconpath=None):
+        SlavePanel.__init__(self,toplevel,chief,iconpath)
+        self.master.title(title)
+        self.pack(expand=True,fill=BOTH,side=TOP)
+        self._body()
+    def _body(self): raise NotImplementedError("SimplePanel::_body")
+
+class DataBinPanel(SimplePanel):
     """ DataBinPanel - displays a set of data bins for retrieved data storage """
     def __init__(self,toplevel,chief):
-        SlavePanel.__init__(self,toplevel,chief,"widgets/icons/databin.png")
-        self.master.title("Bins")
-        self.pack(expand=True,fill=BOTH,side=TOP)
-        
-        # internals
-        self._bins = {}
-        
-        # create main frame
-        self._body()
+        SimplePanel.__init__(self,toplevel,chief,"Databin","widgets/icons/databin.png")
 
     def donothing(self): pass
 
     def _body(self):
         """ creates the body """
+        self._bins = {}
         frm = Frame(self)
         frm.pack(side=TOP,expand=False)
         
@@ -49,14 +54,10 @@ class DataBinPanel(SlavePanel):
                 self._bins[b]['btn'] = Button(frm,image=self._bins[b]['img'],command=self.donothing)
             self._bins[b]['btn'].grid(row=0,column=bs.index(b),sticky=W)
 
-class AboutPanel(SlavePanel):
+class AboutPanel(SimplePanel):
     """ AboutPanel - displays a simple About Panel """
     def __init__(self,toplevel,chief):
-        SlavePanel.__init__(self,toplevel,chief,None)
-        self.master.title("About Wraith")
-        self.pack(expand=True,fill=BOTH,side=TOP)
-        self._body()
-
+        SimplePanel.__init__(self,toplevel,chief,"About Wraith",None)
     def _body(self):
         frm = Frame(self)
         frm.pack(side=TOP,fill=BOTH,expand=True)
@@ -69,7 +70,7 @@ class WraithPanel(MasterPanel):
     """ WraithPanel - master panel for wraith gui """
     def __init__(self,toplevel):
         MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
-                             [],True,"widgets/icons/wraith.png")
+                             [],True,"widgets/icons/wraith2.png")
         self.tk.wm_geometry("350x3+0+0")
         self.tk.resizable(0,0)
         self.logwrite("Wraith v%s" % wraith.__version__)
@@ -91,8 +92,8 @@ class WraithPanel(MasterPanel):
         
         # Help Menu
         self.mnuHelp = Menu(self.menubar,tearoff=0)
-        self.mnuHelp.add_command(label="About",command=self.about)
-        self.mnuHelp.add_command(label="Help",command=self.help)
+        self.mnuHelp.add_command(label="About",command=self.viewabout)
+        self.mnuHelp.add_command(label="Help",command=self.viewhelp)
         
         # add the menus
         self.menubar.add_cascade(label="File",menu=self.mnuFile)
@@ -112,7 +113,7 @@ class WraithPanel(MasterPanel):
             panel[0].tk.deiconify()
             panel[0].tk.lift()
 
-    def about(self):
+    def viewabout(self):
         """ display the about panel """
         panel = self.getpanels("about",False)
         if not panel:
@@ -122,13 +123,18 @@ class WraithPanel(MasterPanel):
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
-        #showinfo("About Wraith",
-        #         "Wraith v%s Copyright %s" % (wraith.__version__,wraith.__date__),
-        #         parent=self)
 
-    def help(self):
+    def viewhelp(self):
         """ display the help panel """
         self.unimplemented()
+
+#### MINION METHODS
+
+    def showpanel(self,desc):
+        """ opens a panel of type desc """
+        if desc == 'log': self.viewlog()
+        elif desc == 'databin': self.viewdatabins()
+        else: raise RuntimeError, "WTF Cannot open %s" % desc
 
 if __name__ == 'wraith-rt':
     t = Tk()

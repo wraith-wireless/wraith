@@ -146,9 +146,8 @@ class Panel(Frame):
 
 class SlavePanel(Panel):
     """
-     SlavePanel - defines a slave panel which has a controlling panel. I.E. it
-     is not opened independtly of another panel. Includes methods to display
-     further information on an entry.
+     SlavePanel - defines a slave panel which has a controlling panel. i.e. it
+     is opened dependant on another panel.
       defines:
         pnlreset - notification that the current job is being cleared
         setstates - should be overridden if subclass needs to set states based
@@ -175,7 +174,7 @@ class SlavePanel(Panel):
         self.closepanels()
 
     def panelclose(self,name):
-        """ an open panel is desiring to close """
+        """ an open "sub" panel is desiring to close """
         self.deletepanel(name)
 
 class ListPanel(SlavePanel):
@@ -290,6 +289,7 @@ class MasterPanel(Panel):
       _makemenu -> to implement any main menu
       getstate -> if there is a State of the main panel that needs to be know
        by slave panels
+      showpanel -> derive for use in toolsload (loads saved panel configs)
     """
     def __init__(self,toplevel,ttl,datatypes=None,logpanel=True,iconPath=None):
         """
@@ -300,7 +300,6 @@ class MasterPanel(Panel):
         """
         Panel.__init__(self,toplevel,iconPath)
         self.tk = toplevel
-        self._log = None
         self.menubar = None
         
         # data bins, registered panels, and what data is hidden, selected
@@ -330,19 +329,25 @@ class MasterPanel(Panel):
         self.update_idletasks()
             
         # make the log panel?
-        if logpanel:
-            # we save the log IOT avoid calling getpanel each time
-            l = Toplevel()
-            self._log = LogPanel(l,self)
-            self.addpanel(self._log._name,PanelRecord(l,self._log,"log"))
-            self._log.update_idletasks()
-            l.wm_geometry("-0-0")
+        if logpanel: self.viewlog()
 
     def _initialize(self): pass
     def _shutdown(self): pass
     def _makemenu(self): pass
     def showpanel(self,t): raise NotImplementedError("MasterPanel::showpanel")
     def getstate(self): return None
+    def viewlog(self):
+        """ displays the log panel """
+        panel = self.getpanels("log",False)
+        if not panel:
+            t =Toplevel()
+            pnl = LogPanel(t,self)
+            self.addpanel(pnl._name,PanelRecord(t,pnl,"log"))
+            pnl.update_idletasks()
+            t.wm_geometry("-0-0")
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
 
 #### CALLBACKS ####
 
@@ -415,8 +420,9 @@ class MasterPanel(Panel):
 
     def logwrite(self,msg,mtype=LOG_NOERROR):
         """ writes msg to log or shows in error message """
-        if self._log:
-            self._log.logwrite(msg,mtype)
+        log = self.getpanel("log",True)
+        if log:
+            log.logwrite(msg,mtype)
         else:
              showerror('Error',msg,parent=self)
 
