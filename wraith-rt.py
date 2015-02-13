@@ -20,7 +20,7 @@ from wraith.widgets.panel import *  # graphics suite
 class DataBinPanel(SlavePanel):
     """ DataBinPanel - displays a set of data bins for retrieved data storage """
     def __init__(self,toplevel,chief):
-        SlavePanel.__init__(self,toplevel,chief,"icons/databin.png")
+        SlavePanel.__init__(self,toplevel,chief,"widgets/icons/databin.png")
         self.master.title("Bins")
         self.pack(expand=True,fill=BOTH,side=TOP)
         
@@ -41,7 +41,7 @@ class DataBinPanel(SlavePanel):
         bs = "ABCDEFG"
         for b in bs:
             try:
-                self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('icons/bin%s.png'%b))}
+                self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
             except:
                 self._bins[b] = {'img':None}
                 self._bins[b]['btn'] = Button(frm,text=b,command=self.donothing)
@@ -49,10 +49,27 @@ class DataBinPanel(SlavePanel):
                 self._bins[b]['btn'] = Button(frm,image=self._bins[b]['img'],command=self.donothing)
             self._bins[b]['btn'].grid(row=0,column=bs.index(b),sticky=W)
 
+class AboutPanel(SlavePanel):
+    """ AboutPanel - displays a simple About Panel """
+    def __init__(self,toplevel,chief):
+        SlavePanel.__init__(self,toplevel,chief,None)
+        self.master.title("About Wraith")
+        self.pack(expand=True,fill=BOTH,side=TOP)
+        self._body()
+
+    def _body(self):
+        frm = Frame(self)
+        frm.pack(side=TOP,fill=BOTH,expand=True)
+        self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/wraith-banner.png"))
+        Label(frm,bg="white",image=self.logo).grid(row=0,column=0,sticky=N)
+        Label(frm,text="wraith-rt %s" % __version__,fg="white",font=("Roman",16,'bold')).grid(row=1,column=0,sticky=N)
+        Label(frm,text="Wireless assault, reconnaissance, collection and exploitation toolkit").grid(row=2,column=0,sticky=N)
+
 class WraithPanel(MasterPanel):
     """ WraithPanel - master panel for wraith gui """
     def __init__(self,toplevel):
-        MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,[],True,"icons/wraith.png")
+        MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
+                             [],True,"widgets/icons/wraith.png")
         self.tk.wm_geometry("350x3+0+0")
         self.tk.resizable(0,0)
         self.logwrite("Wraith v%s" % wraith.__version__)
@@ -97,9 +114,17 @@ class WraithPanel(MasterPanel):
 
     def about(self):
         """ display the about panel """
-        showinfo("About Wraith",
-                 "Wraith v%s Copyright %s" % (wraith.__version__,wraith.__date__),
-                 parent=self)
+        panel = self.getpanels("about",False)
+        if not panel:
+            t = Toplevel()
+            pnl = AboutPanel(t,self)
+            self.addpanel(pnl._name,PanelRecord(t,pnl,"about"))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
+        #showinfo("About Wraith",
+        #         "Wraith v%s Copyright %s" % (wraith.__version__,wraith.__date__),
+        #         parent=self)
 
     def help(self):
         """ display the help panel """
@@ -115,4 +140,3 @@ if __name__ == 'wraith-rt':
     t.option_add('*disabledBackground','black')       # bg on disabled widget
     t.option_add('*troughColor','black')              # trough on scales/scrollbars
     WraithPanel(t).mainloop()
-    

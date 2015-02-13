@@ -10,6 +10,8 @@ Requires:
  pyscopg 2.5.3
  mgrs 1.3.1 (works w/ 1.1)
  dateutil 2.3
+ PIL (python-pil,python-imaging-tk,tk8.5-dev tcl8.5-dev) NOTE: I had to unistall
+  python-pil and reinstall after installing tk8.5 and tcl8.5
 """
 __name__ = 'wraith'
 __license__ = 'GPL'
