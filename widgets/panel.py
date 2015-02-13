@@ -22,14 +22,14 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
 
-#import os                         # files operations etc
+import os                        # files operations etc
 import time                       # dtg parsing etc
 import pickle                     # load and dump
-#from operator import itemgetter   # iterators
-from Tix import *                 # Tix widgets
-from Tkconstants import *         # GUI constants
-from tkMessageBox import *        # info gui
-from tkFileDialog import *        # file gui dialogs
+#from operator import itemgetter  # iterators
+import Tix                        # Tix widgets
+#import Tkconstants as TKC         # tk constants
+import tkMessageBox as tkMB        # info dialogs
+import tkFileDialog as tkFD        # file gui dialogs
 from PIL import Image,ImageTk     # image input & support
 #from wraith import intersection   # intersection of lists
 
@@ -60,7 +60,7 @@ class PanelRecord(tuple):
 
 #### SUPER GUI CLASSES ####
 
-class Panel(Frame):
+class Panel(Tix.Frame):
     """
      Panel: Superclass from which all gui classes are derived 
       1) traps the exit from the title bar and passes it to derived close
@@ -81,7 +81,7 @@ class Panel(Frame):
         self.appicon=None
         self._panels = {}
         if iconPath: self.appicon = ImageTk.PhotoImage(Image.open(iconPath))
-        Frame.__init__(self,toplevel)
+        Tix.Frame.__init__(self,toplevel)
         self.master.protocol("WM_DELETE_WINDOW",self.delete)
         if self.appicon: self.tk.call('wm','iconphoto',self.master._w,self.appicon)
 
@@ -193,26 +193,26 @@ class ListPanel(SlavePanel):
     def __init__(self,toplevel,chief,ttl,sz,cols=1,httl=None,iconPath=None):
         SlavePanel.__init__(self,toplevel,chief,iconPath)
         self.master.title(ttl)
-        self.pack(expand=True,fill=BOTH,side=TOP)
+        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
 
         # create and allow derived classes to setup top frame
-        frmTop = Frame(self)
-        if self.topframe(frmTop): frmTop.pack(side=TOP,expand=False)
+        frmTop = Tix.Frame(self)
+        if self.topframe(frmTop): frmTop.pack(side=Tix.TOP,expand=False)
 
         # need hdr value for HList init
         hdr = True
         if not httl: hdr = False
 
         # setup the hlist
-        self.frmMain = Frame(self)
-        self.frmMain.pack(side=TOP,fill=BOTH,expand=True)
+        self.frmMain = Tix.Frame(self)
+        self.frmMain.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
 
         # create the scrolled hlist
 
         # NOTE: if necessary, should be able to use Tree as below
         # self.slist = Tree(self.frmMain,options='hlist.columns %d hlist.header %d' % (cols,hdr))
-        self.slist = ScrolledHList(self.frmMain,
-                                   options='hlist.columns %d hlist.header %d' % (cols,hdr))
+        self.slist = Tix.ScrolledHList(self.frmMain,
+                                       options='hlist.columns %d hlist.header %d' % (cols,hdr))
 
         # configure the hlist
         self.list = self.slist.hlist                       # get the hlist
@@ -222,17 +222,20 @@ class ListPanel(SlavePanel):
         self.list.config(separator='\t')                   # use tab ignoring special chars
 
         style = {}
-        style['header'] = DisplayStyle(TEXT,refwindow=self.list,anchor=CENTER)
+        style['header'] = Tix.DisplayStyle(Tix.TEXT,
+                                           refwindow=self.list,
+                                           anchor=Tix.CENTER)
         for i in range(len(httl)):
-            self.list.header_create(i,itemtype=TEXT,text=httl[i],style=style['header'])
+            self.list.header_create(i,itemtype=Tix.TEXT,text=httl[i],
+                                      style=style['header'])
 
         # and pack the scrolled list
-        self.slist.pack(expand=True,fill=BOTH,side=LEFT)
+        self.slist.pack(expand=True,fill=Tix.BOTH,side=Tix.LEFT)
 
         # allow a bottom frame
-        frmBottom = Frame(self)
+        frmBottom = Tix.Frame(self)
         if self.bottomframe(frmBottom):
-            frmBottom.pack(side=TOP,expand=False)
+            frmBottom.pack(side=Tix.TOP,expand=False)
 
     # noinspection PyUnusedLocal
     def topframe(self,frm): return None # override to add widgets to topframe
@@ -247,13 +250,13 @@ class DescriptionPanel(SlavePanel):
     def __init__(self,toplevel,chief,ttl):
         SlavePanel.__init__(self,toplevel,chief,"widgets/icons/desc.png")
         self.master.title(ttl)
-        self.pack(expand=True,fill=BOTH,side=TOP)
-        frm1 = Frame(self,relief='sunken',border=2)
-        frm1.pack(side=TOP,fill=BOTH,expand=True)
+        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
+        frm1 = Tix.Frame(self,relief='sunken',border=2)
+        frm1.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
         self._chief.descriptionbody(frm1)
-        frm2 = Frame(self,relief='sunken',border=2)
-        frm2.pack(side=TOP,fill=BOTH,expand=False)
-        Button(frm2,text='Close',command=self.close).pack()
+        frm2 = Tix.Frame(self,relief='sunken',border=2)
+        frm2.pack(side=Tix.TOP,fill=Tix.BOTH,expand=False)
+        Tix.Button(frm2,text='Close',command=self.close).pack()
 
 class LogPanel(ListPanel):
     """
@@ -263,14 +266,22 @@ class LogPanel(ListPanel):
     def __init__(self,toplevel,chief):
         ListPanel.__init__(self,toplevel,chief,"Log",(60,8),2,[],"widgets/icons/log.png")
         self.n=0
-        self.LC = [DisplayStyle(TEXT,refwindow=self.list,foreground='Green',selectforeground='Green'),
-                   DisplayStyle(TEXT,refwindow=self.list,foreground='Yellow',selectforeground='Yellow'),
-                   DisplayStyle(TEXT,refwindow=self.list,foreground='Red',selectforeground='Red')]
+        self.LC = [Tix.DisplayStyle(Tix.TEXT,refwindow=self.list,
+                                    foreground='Green',
+                                    selectforeground='Green'),
+                   Tix.DisplayStyle(Tix.TEXT,
+                                    refwindow=self.list,
+                                    foreground='Yellow',
+                                    selectforeground='Yellow'),
+                   Tix.DisplayStyle(Tix.TEXT,
+                                    refwindow=self.list,
+                                    foreground='Red',
+                                    selectforeground='Red')]
     def delete(self): pass   # user can never close only the primary chief
     def pnlreset(self): pass # don't care about reseting
     def logwrite(self,msg,mtype=LOG_NOERROR):
         entry = str(self.n)
-        self.list.add(entry,itemtype=TEXT,text=time.strftime('%H:%M:%S'))
+        self.list.add(entry,itemtype=Tix.TEXT,text=time.strftime('%H:%M:%S'))
         self.list.item_create(entry,1,text=msg)
         self.list.item_configure(entry,0,style=self.LC[mtype])
         self.list.item_configure(entry,1,style=self.LC[mtype])
@@ -315,7 +326,7 @@ class MasterPanel(Panel):
 
         # set the title
         self.master.title(ttl)
-        self.grid(sticky=W+N+E+S)
+        self.grid(sticky=Tix.W+Tix.N+Tix.E+Tix.S)
         
         # try and make the menu
         self._makemenu()
@@ -340,7 +351,7 @@ class MasterPanel(Panel):
         """ displays the log panel """
         panel = self.getpanels("log",False)
         if not panel:
-            t =Toplevel()
+            t =Tix.Toplevel()
             pnl = LogPanel(t,self)
             self.addpanel(pnl._name,PanelRecord(t,pnl,"log"))
             pnl.update_idletasks()
@@ -357,12 +368,12 @@ class MasterPanel(Panel):
     
     def unimplemented(self):
         """ displays info dialog with not implmented message """
-        showinfo('Not Implemented',"This function not currently implemented",parent=self)
+        tkMB.showinfo('Not Implemented',"This function not currently implemented",parent=self)
         
     def toolssave(self):
         """ saves current toolset configuration """
-        fpath = asksaveasfilename(title='Save Toolset',
-                                  filetypes=[('Toolset files','*.ts')])
+        fpath = tkFD.asksaveasfilename(title='Save Toolset',
+                                      filetypes=[('Toolset files','*.ts')])
         if fpath:
             gs = self.tk.winfo_geometry().split('+')
             ts = {}
@@ -384,9 +395,9 @@ class MasterPanel(Panel):
     def toolsload(self,fpath=None):
         """ loads a saved toolset configuration """
         if not fpath:
-            fpath = askopenfilename(title='Open Toolset',
-                                    filetypes=[('Toolset files','*.ts')],
-                                    parent=self)
+            fpath = tkFD.askopenfilename(title='Open Toolset',
+                                        filetypes=[('Toolset files','*.ts')],
+                                        parent=self)
         
         if fpath:
             # open & get the saved windows + their geometry
@@ -410,7 +421,7 @@ class MasterPanel(Panel):
                     
     def panelquit(self):
         """ cleanly exits - shuts down as necessary """
-        ans = askquestion('Quit?','Really Quit',parent=self)
+        ans = tkMB.askquestion('Quit?','Really Quit',parent=self)
         if ans == 'no':
             return
         else:
@@ -424,7 +435,7 @@ class MasterPanel(Panel):
         if log:
             log.logwrite(msg,mtype)
         else:
-             showerror('Error',msg,parent=self)
+             tkMB.showerror('Error',msg,parent=self)
 
     def panelclose(self,panel):
         """

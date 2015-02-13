@@ -14,18 +14,20 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
 
-import wraith                       # helpful functions
-from wraith.widgets.panel import *  # graphics suite
+import wraith                        # helpful functions
+import Tix                           # Tix gui stuff
+from PIL import Image,ImageTk        # image input & support
+import wraith.widgets.panel as Panel # graphics suite
 
-class SimplePanel(SlavePanel):
+class SimplePanel(Panel.SlavePanel):
     """
      Defines a simple panel with body
      Derived class must implement _body()
     """
     def __init__(self,toplevel,chief,title,iconpath=None):
-        SlavePanel.__init__(self,toplevel,chief,iconpath)
+        Panel.SlavePanel.__init__(self,toplevel,chief,iconpath)
         self.master.title(title)
-        self.pack(expand=True,fill=BOTH,side=TOP)
+        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
         self._body()
     def _body(self): raise NotImplementedError("SimplePanel::_body")
 
@@ -39,8 +41,8 @@ class DataBinPanel(SimplePanel):
     def _body(self):
         """ creates the body """
         self._bins = {}
-        frm = Frame(self)
-        frm.pack(side=TOP,expand=False)
+        frm = Tix.Frame(self)
+        frm.pack(side=Tix.TOP,expand=False)
         
         # add the bin buttons
         bs = "ABCDEFG"
@@ -49,28 +51,32 @@ class DataBinPanel(SimplePanel):
                 self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
             except:
                 self._bins[b] = {'img':None}
-                self._bins[b]['btn'] = Button(frm,text=b,command=self.donothing)
+                self._bins[b]['btn'] = Tix.Button(frm,text=b,command=self.donothing)
             else:
-                self._bins[b]['btn'] = Button(frm,image=self._bins[b]['img'],command=self.donothing)
-            self._bins[b]['btn'].grid(row=0,column=bs.index(b),sticky=W)
+                self._bins[b]['btn'] = Tix.Button(frm,image=self._bins[b]['img'],command=self.donothing)
+            self._bins[b]['btn'].grid(row=0,column=bs.index(b),sticky=Tix.W)
 
 class AboutPanel(SimplePanel):
     """ AboutPanel - displays a simple About Panel """
     def __init__(self,toplevel,chief):
         SimplePanel.__init__(self,toplevel,chief,"About Wraith",None)
     def _body(self):
-        frm = Frame(self)
-        frm.pack(side=TOP,fill=BOTH,expand=True)
+        frm = Tix.Frame(self)
+        frm.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
         self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/wraith-banner.png"))
-        Label(frm,bg="white",image=self.logo).grid(row=0,column=0,sticky=N)
-        Label(frm,text="wraith-rt %s" % __version__,fg="white",font=("Roman",16,'bold')).grid(row=1,column=0,sticky=N)
-        Label(frm,text="Wireless assault, reconnaissance, collection and exploitation toolkit").grid(row=2,column=0,sticky=N)
+        Tix.Label(frm,bg="white",image=self.logo).grid(row=0,column=0,sticky=Tix.N)
+        Tix.Label(frm,
+                  text="wraith-rt %s" % __version__,
+                  fg="white",
+                  font=("Roman",16,'bold')).grid(row=1,column=0,sticky=Tix.N)
+        Tix.Label(frm,
+                  text="Wireless assault, reconnaissance, collection and exploitation toolkit").grid(row=2,column=0,sticky=Tix.N)
 
-class WraithPanel(MasterPanel):
+class WraithPanel(Panel.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
     def __init__(self,toplevel):
-        MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
-                             [],True,"widgets/icons/wraith2.png")
+        Panel.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
+                                   [],True,"widgets/icons/wraith2.png")
         self.tk.wm_geometry("350x3+0+0")
         self.tk.resizable(0,0)
         self.logwrite("Wraith v%s" % wraith.__version__)
@@ -80,18 +86,18 @@ class WraithPanel(MasterPanel):
     
     def _makemenu(self):
         """ make the menu """
-        self.menubar = Menu(self)
+        self.menubar = Tix.Menu(self)
         
         # File Menu
-        self.mnuFile = Menu(self.menubar,tearoff=0)
+        self.mnuFile = Tix.Menu(self.menubar,tearoff=0)
         self.mnuFile.add_command(label="Exit",command=self.panelquit)
         
         # View Menu
-        self.mnuView = Menu(self.menubar,tearoff=0)
+        self.mnuView = Tix.Menu(self.menubar,tearoff=0)
         self.mnuView.add_command(label="Data Bins",command=self.viewdatabins)
         
         # Help Menu
-        self.mnuHelp = Menu(self.menubar,tearoff=0)
+        self.mnuHelp = Tix.Menu(self.menubar,tearoff=0)
         self.mnuHelp.add_command(label="About",command=self.viewabout)
         self.mnuHelp.add_command(label="Help",command=self.viewhelp)
         
@@ -106,9 +112,9 @@ class WraithPanel(MasterPanel):
         """ display the data bins panel """
         panel = self.getpanels("databin",False)
         if not panel:
-            t = Toplevel()
+            t = Tix.Toplevel()
             pnl = DataBinPanel(t,self)
-            self.addpanel(pnl._name,PanelRecord(t,pnl,"databin"))
+            self.addpanel(pnl._name,Panel.PanelRecord(t,pnl,"databin"))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -117,9 +123,9 @@ class WraithPanel(MasterPanel):
         """ display the about panel """
         panel = self.getpanels("about",False)
         if not panel:
-            t = Toplevel()
+            t = Tix.Toplevel()
             pnl = AboutPanel(t,self)
-            self.addpanel(pnl._name,PanelRecord(t,pnl,"about"))
+            self.addpanel(pnl._name,Panel.PanelRecord(t,pnl,"about"))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -137,7 +143,7 @@ class WraithPanel(MasterPanel):
         else: raise RuntimeError, "WTF Cannot open %s" % desc
 
 if __name__ == 'wraith-rt':
-    t = Tk()
+    t = Tix.Tk()
     t.option_add('*foreground','blue')                # normal fg color
     t.option_add('*background','black')               # normal bg color
     t.option_add('*activeBackground','black')         # bg on mouseover
