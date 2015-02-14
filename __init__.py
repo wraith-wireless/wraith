@@ -21,11 +21,3 @@ __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
-import datetime as dt
-from dateutil import parser as dtparser
-
-# convert unix timestamp to utc in isoformat
-def ts2iso(ts): return dt.datetime.utcfromtimestamp(ts).isoformat()
-
-# convert isoformat to unix timestamp
-def iso2ts(iso): return (dtparser.parse(iso)-dt.datetime.utcfromtimestamp(0)).total_seconds()

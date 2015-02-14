@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" dyktt: Dynamic Small Kill Team (Wraith Sensor)
+""" dyskt: Dynamic Small Kill Team (Wraith Sensor)
 
 DySKT is a 802.11 sensor consisting of an optional collection radio (i.e.
 spotter), a mandatory reconnaissance radio (i.e. shooter) and an RTO which relays

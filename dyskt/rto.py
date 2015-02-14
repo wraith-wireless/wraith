@@ -14,16 +14,16 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
 
-import signal                   # signal processing
-import time                     # sleep and timestamps
-import socket                   # connection to nidus and gps device
-import threading                # threads
-import mgrs                     # lat/lon to mgrs conversion
-import gps                      # gps device access
-from Queue import Queue, Empty  # thread-safe queue
-import multiprocessing as mp    # multiprocessing
-from internal import Report     # report class
-from wraith import ts2iso       # timestamp conversion
+import signal                              # signal processing
+import time                                # sleep and timestamps
+import socket                              # connection to nidus and gps device
+import threading                           # threads
+import mgrs                                # lat/lon to mgrs conversion
+import gps                                 # gps device access
+from Queue import Queue, Empty             # thread-safe queue
+import multiprocessing as mp               # multiprocessing
+from internal import Report                # report class
+from wraith.utils.timestamps import ts2iso # timestamp conversion
 
 class GPSPoller(threading.Thread):
     """ periodically checks gps for current location """

@@ -39,6 +39,7 @@ def intersection(l1,l2): return filter(lambda x:x in l1,l2)
 LOG_NOERROR = 0
 LOG_WARNING = 1
 LOG_ERROR   = 2
+LOG_ALERT   = 3
 
 #### PANEL EXCEPTIONS ####
 class PanelException(Exception): pass            # TopLevel generic error
@@ -268,7 +269,8 @@ class LogPanel(ListPanel):
     def __init__(self,toplevel,chief):
         ListPanel.__init__(self,toplevel,chief,"Log",(60,8),2,[],"widgets/icons/log.png")
         self.n=0
-        self.LC = [Tix.DisplayStyle(Tix.TEXT,refwindow=self.list,
+        self.LC = [Tix.DisplayStyle(Tix.TEXT,
+                                    refwindow=self.list,
                                     foreground='Green',
                                     selectforeground='Green'),
                    Tix.DisplayStyle(Tix.TEXT,
@@ -278,13 +280,19 @@ class LogPanel(ListPanel):
                    Tix.DisplayStyle(Tix.TEXT,
                                     refwindow=self.list,
                                     foreground='Red',
-                                    selectforeground='Red')]
+                                    selectforeground='Red'),
+                   Tix.DisplayStyle(Tix.TEXT,
+                                    refwindow=self.list,
+                                    foreground='Blue',
+                                    selectforeground='Blue')]
+        self.pre = ["[+] ","[?] ","[-] ","[!] "]
     def delete(self): pass   # user can never close only the primary chief
     def pnlreset(self): pass # don't care about reseting
     def logwrite(self,msg,mtype=LOG_NOERROR):
+        """ writes message msg of type mtype to the log """
         entry = str(self.n)
         self.list.add(entry,itemtype=Tix.TEXT,text=time.strftime('%H:%M:%S'))
-        self.list.item_create(entry,1,text=msg)
+        self.list.item_create(entry,1,text=self.pre[mtype] + msg)
         self.list.item_configure(entry,0,style=self.LC[mtype])
         self.list.item_configure(entry,1,style=self.LC[mtype])
         self.n += 1
@@ -344,10 +352,14 @@ class MasterPanel(Panel):
         # make the log panel?
         if logpanel: self.viewlog()
 
+        # initialiez
+        self._initialize()
+
     def _initialize(self): pass
     def _shutdown(self): pass
     def _makemenu(self): pass
     def showpanel(self,t): raise NotImplementedError("MasterPanel::showpanel")
+    @property
     def getstate(self): return None
     def viewlog(self):
         """ displays the log panel """

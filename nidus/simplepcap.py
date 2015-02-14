@@ -15,7 +15,7 @@ __email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
 
 import struct
-from wraith import iso2ts
+from wraith.utils.timestamps import iso2ts
 
 class PCAPException(Exception): pass         # generic pcap exception
 class PCAPIOException(PCAPException): pass   # pcap IO error

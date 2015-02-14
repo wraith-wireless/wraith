@@ -13,9 +13,12 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
 
-import wraith                        # helpful functions
+import psycopg2 as psql              # postgresql api
 import Tix                           # Tix gui stuff
 from PIL import Image,ImageTk        # image input & support
+#import argparse as ap                # for command line arg parsing
+import ConfigParser                  # config file parsing
+import wraith                        # helpful functions/version etc
 import wraith.widgets.panel as Panel # graphics suite
 
 class SimplePanel(Panel.SlavePanel):
@@ -71,17 +74,43 @@ class AboutPanel(SimplePanel):
         Tix.Label(frm,
                   text="Wireless assault, reconnaissance, collection and exploitation toolkit").grid(row=2,column=0,sticky=Tix.N)
 
+#### STATE DEFINITIONS
+_STATE_ = {'init':(1 << 0),       # initialized properly
+           'storage':(1 << 1),    # storage instance is running (i.e. postgresql)
+           'connected':(1 << 2),  # connected to storage instance
+           'sensor':(1 << 3),     # at least one sensor is collecting data
+           'exit':(1 << 4)}       # exiting/shutting down
+
 class WraithPanel(Panel.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
     def __init__(self,toplevel):
+        # our variables
+        self._conf = None
+        self._state = 0   # bitstring state
+        self._conn = None # connection to data storage
+
+        # set up super
         Panel.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
                                    [],True,"widgets/icons/wraith2.png")
+
+#### OVERRIDES
+
+    @property
+    def getstate(self): return self._state
+
+    def _initialize(self):
+        """ attempts connect to datastorage server """
+        # configure panel & write initial message
         self.tk.wm_geometry("350x3+0+0")
         self.tk.resizable(0,0)
         self.logwrite("Wraith v%s" % wraith.__version__)
 
-    def _initialize(self): pass
-    def _shutdown(self): pass
+        confMsg = self._readconf()
+        if confMsg: self.logwrite(confMsg,Panel.LOG_ERROR)
+
+    def _shutdown(self):
+        """ if connected to datastorage, closes connection """
+        if self._conn: self._conn.close()
     
     def _makemenu(self):
         """ make the menu """
@@ -140,6 +169,21 @@ class WraithPanel(Panel.MasterPanel):
         if desc == 'log': self.viewlog()
         elif desc == 'databin': self.viewdatabins()
         else: raise RuntimeError, "WTF Cannot open %s" % desc
+
+#### HELPER FUNCTIONS
+
+    def _readconf(self):
+        """ read in configuration file """
+        conf = ConfigParser.RawConfigParser()
+        if not conf.read("wraith.conf"): return "wraith.conf does not exist"
+
+        self._conf = {}
+        try:
+            self._conf['store'] = {'host':conf.get('Storage','host'),
+                                   'port':conf.get('Storage','port')}
+            return ''
+        except (ConfigParser.NoSectionError,ConfigParser.NoOptionError,ValueError) as e:
+            return e
 
 if __name__ == 'wraith-rt':
     t = Tix.Tk()

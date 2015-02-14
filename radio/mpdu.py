@@ -18,7 +18,7 @@ __status__ = 'Development'
 
 import struct
 from binascii import hexlify
-from wraith.radio.bits import *
+from wraith.utils.bits import *
 
 class MPDUException(Exception): pass                    # generic mpdu exception
 class MPDUUninstantiatedException(MPDUException): pass  # class not instantiated
