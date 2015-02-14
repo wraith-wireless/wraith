@@ -52,7 +52,6 @@ TODO:
            - hold stop scanning on current channel
            - listen stop scanning on specified channel
            - pause stop scanning and recording
-     40) look into socket options (and pcapy code) to ensure best performance
      41) need to handle tuner thread failure in rdoctl
      42) consider sending multiple frames as a single compressed/encrypted
          packet for efficiency and security

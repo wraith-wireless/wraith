@@ -7,9 +7,6 @@ Panels can be configured so that they can be opened, closed, "raised", minimized
 by the user or only by a calling panel
 
  TODO:
-   1) See http://lukasz.langa.pl/5/error-opening-file-for-reading-permission-denied/
-      setcap cap_net_raw=+ep /usr/bin/python2.7 will cause the import of PIL to 
-      display Error opening file for reading: Permission denied 
    3) handle no icons
 """
 
@@ -31,9 +28,6 @@ import Tix                        # Tix widgets
 import tkMessageBox as tkMB        # info dialogs
 import tkFileDialog as tkFD        # file gui dialogs
 from PIL import Image,ImageTk     # image input & support
-
-# intersection of two lists
-def intersection(l1,l2): return filter(lambda x:x in l1,l2)
 
 #### LOG MESSAGE TYPES ####
 LOG_NOERROR = 0

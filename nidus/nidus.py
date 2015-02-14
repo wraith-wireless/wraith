@@ -204,8 +204,8 @@ if __name__ == 'nidus':
 
         # create Wasp and start execution
         logging.info("Nidus %s",nidus.__version__)
-        nidus = Nidus()
-        nidus.start()
+        store = Nidus()
+        store.start()
     except NidusConfException as e:
         # w failed to start, no need to stop
         logging.error("Configuration Error: %s",e)

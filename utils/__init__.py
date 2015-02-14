@@ -10,3 +10,7 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Production'
 
+# singular functions with nowhere else to go
+
+# intersection of two lists
+def intersection(l1,l2): return filter(lambda x:x in l1,l2)
