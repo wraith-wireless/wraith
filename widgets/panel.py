@@ -31,7 +31,9 @@ import Tix                        # Tix widgets
 import tkMessageBox as tkMB        # info dialogs
 import tkFileDialog as tkFD        # file gui dialogs
 from PIL import Image,ImageTk     # image input & support
-#from wraith import intersection   # intersection of lists
+
+# intersection of two lists
+def intersection(l1,l2): return filter(lambda x:x in l1,l2)
 
 #### LOG MESSAGE TYPES ####
 LOG_NOERROR = 0

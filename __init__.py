@@ -24,9 +24,6 @@ __status__ = 'Development'
 import datetime as dt
 from dateutil import parser as dtparser
 
-# intersection of two lists
-def intersection(l1,l2): return filter(lambda x:x in l1,l2)
-
 # convert unix timestamp to utc in isoformat
 def ts2iso(ts): return dt.datetime.utcfromtimestamp(ts).isoformat()
 

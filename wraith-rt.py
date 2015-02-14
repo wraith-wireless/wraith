@@ -2,7 +2,6 @@
 """ wraith-rt.py - defines the wraith gui
 
  TODO:
-   
 """
 
 __name__ = 'wraith-rt'
