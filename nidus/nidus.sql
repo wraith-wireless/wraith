@@ -40,6 +40,7 @@ CREATE TABLE sensor(
    PRIMARY KEY (session_id),
    EXCLUDE USING gist (hostname WITH =, period WITH &&)
 );
+CREATE INDEX sensor_period_idx ON sensor USING GIST (period);
 
 -- gpsd table
 -- details of a gps device

@@ -13,7 +13,7 @@ by the user or only by a calling panel
 __name__ = 'panel'
 __license__ = 'GPL'
 __version__ = '0.13.5'
-__date__ = 'June 2013'
+__date__ = 'February 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
@@ -27,6 +27,7 @@ import Tix                        # Tix widgets
 #import Tkconstants as TKC         # tk constants
 import tkMessageBox as tkMB        # info dialogs
 import tkFileDialog as tkFD        # file gui dialogs
+import tkSimpleDialog as tkSD      # input dialogs
 from PIL import Image,ImageTk     # image input & support
 
 #### LOG MESSAGE TYPES ####
@@ -54,6 +55,30 @@ class PanelRecord(tuple):
     def pnl(self): return self[1]
     @property
     def desc(self): return self[2]
+
+
+#### helper dialogs
+
+class PasswordDialog(tkSD.Dialog):
+    """
+     PasswordDialog - prompts user for password, hiding input
+    """
+    def __init__(self,parent):
+        tkSD.Dialog.__init__(self,parent)
+        self.pwd = None
+        self.entPWD = None
+    def body(self,master):
+        self.title('sudo Password')
+        Tix.Label(master,text='Password: ').grid(row=0,column=1)
+        self.entPWD = Tix.Entry(master,show='*')
+        self.entPWD.grid(row=0,column=1)
+        return self.entPWD
+    def validate(self):
+        if self.entPWD.get() == '': return 0
+        return 1
+    def apply(self):
+        self.pwd = self.entPWD.get()
+
 
 #### SUPER GUI CLASSES ####
 

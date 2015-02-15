@@ -11,12 +11,12 @@ defines
 
 __name__ = 'bits'
 __license__ = 'GPL'
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 __date__ = 'November 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
-__status__ = 'Development'
+__status__ = 'Production'
 
 def bitmask(bm,mn):
     """ returns a list of names defined in bitmask bm that are present in mn """
@@ -38,10 +38,17 @@ def bitmask_get(bm,mn,f):
 
 def bitmask_set(bm,mn,f):
     """
-     sets the flag in mn (as defined by bm to True (or 1)
-     throws KeyError if f is not defined in bitmask
+     sets the flag f in mn as defined by the bitmask bm to True (or 1)
+     throws KeyError if f is not defined
     """
     return mn | bm[f]
+
+def bitmask_unset(bm,mn,f):
+    """
+     unsets the flag f as defined in the bitmask bm to False (or 0)
+     throws KeyError if f is not defined
+    """
+    return mn & ~bm[f]
 
 def leastx(x,v):
     """ returns the (unsigned int) value of the x least most significant bits in v """

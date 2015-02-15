@@ -13,13 +13,26 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@hushmail.com'
 __status__ = 'Development'
 
-import psycopg2 as psql              # postgresql api
-import Tix                           # Tix gui stuff
-from PIL import Image,ImageTk        # image input & support
-#import argparse as ap                # for command line arg parsing
-import ConfigParser                  # config file parsing
-import wraith                        # helpful functions/version etc
-import wraith.widgets.panel as Panel # graphics suite
+import os                                  # popen and path functions
+import time                                # timestamps
+import psycopg2 as psql                    # postgresql api
+import Tix                                 # Tix gui stuff
+from PIL import Image,ImageTk              # image input & support
+import ConfigParser                        # config file parsing
+import wraith                              # helpful functions/version etc
+import wraith.widgets.panel as Panel       # graphics suite
+from wraith.utils import bits              # bitmask functions
+from wraith.utils.timestamps import ts2iso # timestamp conversions
+
+#### HELPER FUNCTIONS
+
+# returns the pid(s) of process if running or the empty list
+def runningprocess(process):
+    pids = []
+    for proc in os.popen("ps -ef"):
+        fields = proc.split()
+        if os.path.split(fields[7])[1] == process: pids.append(int(fields[1]))
+    return pids
 
 class SimplePanel(Panel.SlavePanel):
     """
@@ -68,30 +81,37 @@ class AboutPanel(SimplePanel):
         self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/wraith-banner.png"))
         Tix.Label(frm,bg="white",image=self.logo).grid(row=0,column=0,sticky=Tix.N)
         Tix.Label(frm,
-                  text="wraith-rt %s" % __version__,
+                  text="wraith-rt %s" % wraith.__version__,
                   fg="white",
                   font=("Roman",16,'bold')).grid(row=1,column=0,sticky=Tix.N)
         Tix.Label(frm,
                   text="Wireless assault, reconnaissance, collection and exploitation toolkit").grid(row=2,column=0,sticky=Tix.N)
 
 #### STATE DEFINITIONS
-_STATE_ = {'init':(1 << 0),       # initialized properly
-           'storage':(1 << 1),    # storage instance is running (i.e. postgresql)
-           'connected':(1 << 2),  # connected to storage instance
-           'sensor':(1 << 3),     # at least one sensor is collecting data
-           'exit':(1 << 4)}       # exiting/shutting down
+_STATE_INIT_   = 0
+_STATE_STORE_  = 1
+_STATE_CONN_   = 2
+_STATE_SENSOR_ = 3
+_STATE_EXIT_   = 4
+_STATE_FLAGS_NAME_ = ['init','store','conn','sensor','exit']
+_STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
+                 'store':(1 << 1),  # storage instance is running (i.e. postgresql)
+                 'conn':(1 << 2),   # connected to storage instance
+                 'sensor':(1 << 3), # at least one sensor is collecting data
+                 'exit':(1 << 4)}   # exiting/shutting down
 
 class WraithPanel(Panel.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
     def __init__(self,toplevel):
         # our variables
-        self._conf = None
-        self._state = 0   # bitstring state
+        self._conf = None # configuration
+        self._state = 0   # bitmask state
         self._conn = None # connection to data storage
 
         # set up super
         Panel.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
                                    [],True,"widgets/icons/wraith2.png")
+        print self._state
 
 #### OVERRIDES
 
@@ -105,8 +125,57 @@ class WraithPanel(Panel.MasterPanel):
         self.tk.resizable(0,0)
         self.logwrite("Wraith v%s" % wraith.__version__)
 
+        # read in conf file
         confMsg = self._readconf()
-        if confMsg: self.logwrite(confMsg,Panel.LOG_ERROR)
+        if confMsg:
+            self.logwrite(confMsg,Panel.LOG_ERROR)
+            return
+        self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
+                                       _STATE_FLAGS_NAME_[_STATE_INIT_])
+
+        # determine if postgresql is running, if so attempt connect
+        if runningprocess('postgres'):
+            self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
+                                           _STATE_FLAGS_NAME_[_STATE_STORE_])
+        curs = None
+        try:
+            # attempt to connect and set state accordingly
+            self._conn = psql.connect(host=self._conf['store']['host'],
+                                      dbname=self._conf['store']['db'],
+                                      user=self._conf['store']['user'],
+                                      password=self._conf['store']['pwd'],)
+            self.logwrite("Connected to database")
+            self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
+                                           _STATE_FLAGS_NAME_[_STATE_CONN_])
+
+            # make connection use UTC
+            curs = self._conn.cursor()
+            curs.execute("set time zone 'UTC';")
+            self._conn.commit()
+
+            # query for running sensors
+            sql = """
+                   select * from sensor
+                   where %s BETWEEN lower(period) and upper(period);
+                  """
+            curs.execute(sql,(ts2iso(time.time()),))
+            if curs.fetchall():
+                self._state = bits.bitmask.set(_STATE_FLAGS_,self._state,
+                                               _STATE_FLAGS_NAME_[_STATE_SENSOR_])
+            else:
+                self.logwrite("No running sensors",Panel.LOG_ALERT)
+        except psql.OperationalError as e:
+            if e.__str__().find('connect') > 0:
+                self.logwrite("PostgreSQL is not running",Panel.LOG_ALERT)
+                self._state = bits.bitmask_unset(_STATE_FLAGS_,self._state,
+                                                 _STATE_FLAGS_NAME_[_STATE_STORE_])
+            elif e.__str__().find('authentication') > 0:
+                self.logwrite("Authentication string is invalid",Panel.LOG_ERROR)
+            else:
+                self.logwrite("Unspecified DB error occurred",Panel.LOG_ERROR)
+                self._conn.rollback()
+        finally:
+            if curs: curs.close()
 
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
@@ -180,9 +249,11 @@ class WraithPanel(Panel.MasterPanel):
         self._conf = {}
         try:
             self._conf['store'] = {'host':conf.get('Storage','host'),
-                                   'port':conf.get('Storage','port')}
+                                   'db':conf.get('Storage','db'),
+                                   'user':conf.get('Storage','user'),
+                                   'pwd':conf.get('Storage','pwd')}
             return ''
-        except (ConfigParser.NoSectionError,ConfigParser.NoOptionError,ValueError) as e:
+        except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
             return e
 
 if __name__ == 'wraith-rt':

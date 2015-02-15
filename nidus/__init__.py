@@ -49,7 +49,7 @@ TODO:
 2) need constraints either through postgresql (preferred) or nidusdb - one example
    for each geo inserted verify first that the ts is within the period defined for
    the corresponding sensor
-3) Optimize datastore storage and retrieval
+3) Optimize postgresql database, storage, retrieval, indexing etc
 4) identify postgresql server not running prior to request handler
 7) encrypted socket connection from wasp to nidus?
 8) secured (hashed) username/password from to datastore
