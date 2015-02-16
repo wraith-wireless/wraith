@@ -38,11 +38,12 @@ postgres=# CREATE EXTENSION btree_gist;
    o dysktd
      1) copy <pathtowraith>/dyskt/dysktd to /etc/init.d
      2) change ownership to root/root (if necessary)
-     3) change permissions to 755
+     3) make dyskt.py executable (change permissions of dyskt.py to 755)
    o nidusd
      1) copy <pathtowraith>/nidus/nidusd to /etc/init.d
      2) change ownership to root/root (if necessary)
-     3) change permissions to 755
+     3) make nidus.py executable (change permissions of nidus.py to 755)
+   o verify both do not start on boot (unless desired)
  
   - Set up logs
      cd /var/logs

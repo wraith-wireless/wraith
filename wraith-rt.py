@@ -247,13 +247,34 @@ class WraithPanel(Panel.MasterPanel):
 
         self._conf = {}
         try:
+            # read in mandatory
             self._conf['store'] = {'host':conf.get('Storage','host'),
                                    'db':conf.get('Storage','db'),
                                    'user':conf.get('Storage','user'),
                                    'pwd':conf.get('Storage','pwd')}
+
+            # read in optional
+            start = 'manual'
+            stop = 'manual'
+            if conf.has_option('Storage','start'):
+                opt = conf.get('Storage','start').lower()
+                if opt == 'auto': start = 'auto'
+            if conf.has_option('Storage','stop'):
+                opt = conf.get('Storage','stop').lower()
+                if opt == 'auto': stop = 'auto'
+
+            # return no errors
             return ''
         except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
             return e
+
+    def _startstorage(self):
+        """ start postgresql db and nidus storage manager """
+        pass
+
+    def _stopstorage(self):
+        """ stop posgresql db and nidus storage manager """
+        pass
 
 if __name__ == 'wraith-rt':
     t = Tix.Tk()

@@ -189,6 +189,7 @@ class Nidus(object):
 
 if __name__ == 'nidus':
     try:
+        global CONFPATH
         # command line parsing
         opts = ap.ArgumentParser(description="Nidus %s (C) %s %s" % (nidus.__version__,
                                                                      nidus.__date__.split(" ")[1],
@@ -196,11 +197,15 @@ if __name__ == 'nidus':
         opts.add_argument("--config",help="load specified config file")
         args = opts.parse_args()
 
-        cpath = args.config if args.config else 'nidus.conf'
-        if not os.path.exists(cpath):
-            raise NidusConfException("Config file %s does not exist" % cpath)
+        cpath = args.config if args.config else None
+        if cpath:
+            if not os.path.exists(cpath):
+                logging.error("Config file %s does not exist" % cpath)
+                raise NidusConfException("Config file %s does not exist" % cpath)
+            else:
+                CONFPATH = cpath
         else:
-            CONFPATH = cpath
+            CONFPATH = 'nidus.conf'
 
         # create Wasp and start execution
         logging.info("Nidus %s",nidus.__version__)

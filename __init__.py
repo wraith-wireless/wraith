@@ -12,6 +12,11 @@ Requires:
  dateutil 2.3
  PIL (python-pil,python-imaging-tk,tk8.5-dev tcl8.5-dev) NOTE: I had to unistall
   python-pil and reinstall after installing tk8.5 and tcl8.5
+
+ TODO:
+  1) tried --remove-pid/--remove-pidfile to remove pids of dysktd and nidusd
+     from /var/run but does not work - figure out how to delete the pidfile
+     on daemon exit
 """
 __name__ = 'wraith'
 __license__ = 'GPL'

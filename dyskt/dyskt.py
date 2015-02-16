@@ -367,6 +367,7 @@ if __name__ == 'dyskt':
         # verify validity
         if cpath:
             if not os.path.exists(cpath):
+                logging.error("Config file %s does not exits" % cpath)
                 raise DySKTConfException("Config file %s does not exist" % cpath)
         
         # create DySKT and start execution

@@ -252,7 +252,7 @@ class ListPanel(SlavePanel):
         if self.bottomframe(frmBottom):
             frmBottom.pack(side=Tix.TOP,expand=False)
 
-    # noinspection PyUnusedLocal
+    # noinspection prPyUnusedLocal
     def topframe(self,frm): return None # override to add widgets to topframe
     # noinspection PyUnusedLocal
     def bottomframe(self,frm): return None # override to add widgets to bottomframe

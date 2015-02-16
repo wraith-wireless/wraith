@@ -9,9 +9,9 @@
 
 # Author: Dale Patterson <wraith.wireless@hushmail.com>
 
-# Change the next 3 lines to suit where you install your script and what you want to call it
+# Change the next 3 lines to suit where script is installed and what its called
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
-DAEMON=/home/<user/workspace/projects/Python/wraith/dyskt/dyskt.py
+DAEMON=/home/<user>/workspace/projects/Python/wraith/dyskt/dyskt.py
 DAEMON_NAME=dysktd
 
 # This next line determines what user the script runs as.
@@ -28,9 +28,9 @@ do_start() {
     setcap cap_net_raw=+ep /usr/bin/python2.7
     log_daemon_msg "Starting $DAEMON_NAME"
     start-stop-daemon --start --background --pidfile $PIDFILE --make-pid --user $DAEMON_USER --chuid $DAEMON_USER --startas $DAEMON
-    log_end_msg $?
     log_daemon_msg "Removing capability cap_net_raw"
     setcap cap_net_raw=-ep /usr/bin/python2.7
+    log_end_msg $?
 }
 
 do_stop() {
