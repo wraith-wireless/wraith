@@ -70,9 +70,9 @@ frames, gps location, and 'device' details/status.
  - README.txt           details
  - CONFIGURE.txt        setup details
  * widgets              gui subpackage
-   *  icons            icons folder
-   -  \_\_init\_\_.py      initialize widgets subpackage
-   -  panel.py         defines Panel and subclasses for gui
+     *  icons            icons folder
+     -  \_\_init\_\_.py      initialize widgets subpackage
+     -  panel.py         defines Panel and subclasses for gui
  *  radio                subpackage for radio/radiotap
   - \_\_init\_\_.py      initialize radio subpackage
   - bits.py          bitmask related funcs, bit extraction functions
