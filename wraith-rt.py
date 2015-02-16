@@ -20,7 +20,7 @@ import Tix                                 # Tix gui stuff
 from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import wraith                              # helpful functions/version etc
-import wraith.widgets.panel as Panel       # graphics suite
+import wraith.widgets.panel as gui         # graphics suite
 from wraith.utils import bits              # bitmask functions
 from wraith.utils.timestamps import ts2iso # timestamp conversions
 
@@ -34,13 +34,13 @@ def runningprocess(process):
         if os.path.split(fields[7])[1] == process: pids.append(int(fields[1]))
     return pids
 
-class SimplePanel(Panel.SlavePanel):
+class SimplePanel(gui.SlavePanel):
     """
      Defines a simple panel with body
      Derived class must implement _body()
     """
     def __init__(self,toplevel,chief,title,iconpath=None):
-        Panel.SlavePanel.__init__(self,toplevel,chief,iconpath)
+        gui.SlavePanel.__init__(self,toplevel,chief,iconpath)
         self.master.title(title)
         self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
         self._body()
@@ -58,7 +58,7 @@ class DataBinPanel(SimplePanel):
         self._bins = {}
         frm = Tix.Frame(self)
         frm.pack(side=Tix.TOP,expand=False)
-        
+
         # add the bin buttons
         bs = "ABCDEFG"
         for b in bs:
@@ -100,18 +100,18 @@ _STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
                  'sensor':(1 << 3), # at least one sensor is collecting data
                  'exit':(1 << 4)}   # exiting/shutting down
 
-class WraithPanel(Panel.MasterPanel):
+class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
     def __init__(self,toplevel):
         # our variables
         self._conf = None # configuration
         self._state = 0   # bitmask state
         self._conn = None # connection to data storage
+        self._pwd = None  # sudo password (should we not save it?)
 
         # set up super
-        Panel.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
-                                   [],True,"widgets/icons/wraith2.png")
-        print self._state
+        gui.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
+                                 [],True,"widgets/icons/wraith2.png")
 
 #### OVERRIDES
 
@@ -128,15 +128,28 @@ class WraithPanel(Panel.MasterPanel):
         # read in conf file
         confMsg = self._readconf()
         if confMsg:
-            self.logwrite(confMsg,Panel.LOG_ERROR)
+            self.logwrite(confMsg,gui.LOG_ERROR)
             return
         self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
                                        _STATE_FLAGS_NAME_[_STATE_INIT_])
 
-        # determine if postgresql is running, if so attempt connect
+        # determine if postgresql is running
         if runningprocess('postgres'):
             self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
                                            _STATE_FLAGS_NAME_[_STATE_STORE_])
+        elif self._conf['store']['start'] == 'auto':
+            print 'getting pwd'
+            # auto start postgresql
+            pwd = self._getpwd()
+            while pwd == -1:
+                self.logwrite("Incorrect password entered",gui.LOG_ERROR)
+                pwd = self._getpwd()
+            if pwd is not None:
+                self._pwd = pwd
+            else:
+                # user canceled
+                self.logwrite("Password entry canceled",gui.LOG_WARNING)
+
         curs = None
         try:
             # attempt to connect and set state accordingly
@@ -148,7 +161,7 @@ class WraithPanel(Panel.MasterPanel):
             self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
                                            _STATE_FLAGS_NAME_[_STATE_CONN_])
 
-            # make connection use UTC
+            # make connection & set use UTC
             curs = self._conn.cursor()
             curs.execute("set time zone 'UTC';")
             self._conn.commit()
@@ -160,18 +173,18 @@ class WraithPanel(Panel.MasterPanel):
             if rows:
                 self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
                                                _STATE_FLAGS_NAME_[_STATE_SENSOR_])
-                self.logwrite("Currently, %d sensors running" % rows[0][0],Panel.LOG_ALERT)
+                self.logwrite("Currently, %d sensors running" % rows[0][0],gui.LOG_ALERT)
             else:
-                self.logwrite("No running sensors",Panel.LOG_ALERT)
+                self.logwrite("No running sensors",gui.LOG_ALERT)
         except psql.OperationalError as e:
             if e.__str__().find('connect') > 0:
-                self.logwrite("PostgreSQL is not running",Panel.LOG_ALERT)
+                self.logwrite("PostgreSQL is not running",gui.LOG_ALERT)
                 self._state = bits.bitmask_unset(_STATE_FLAGS_,self._state,
                                                  _STATE_FLAGS_NAME_[_STATE_STORE_])
             elif e.__str__().find('authentication') > 0:
-                self.logwrite("Authentication string is invalid",Panel.LOG_ERROR)
+                self.logwrite("Authentication string is invalid",gui.LOG_ERROR)
             else:
-                self.logwrite("Unspecified DB error occurred",Panel.LOG_ERROR)
+                self.logwrite("Unspecified DB error occurred",gui.LOG_ERROR)
                 self._conn.rollback()
         finally:
             if curs: curs.close()
@@ -179,24 +192,24 @@ class WraithPanel(Panel.MasterPanel):
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
         if self._conn: self._conn.close()
-    
+
     def _makemenu(self):
         """ make the menu """
         self.menubar = Tix.Menu(self)
-        
+
         # File Menu
         self.mnuFile = Tix.Menu(self.menubar,tearoff=0)
         self.mnuFile.add_command(label="Exit",command=self.panelquit)
-        
+
         # View Menu
         self.mnuView = Tix.Menu(self.menubar,tearoff=0)
         self.mnuView.add_command(label="Data Bins",command=self.viewdatabins)
-        
+
         # Help Menu
         self.mnuHelp = Tix.Menu(self.menubar,tearoff=0)
         self.mnuHelp.add_command(label="About",command=self.viewabout)
         self.mnuHelp.add_command(label="Help",command=self.viewhelp)
-        
+
         # add the menus
         self.menubar.add_cascade(label="File",menu=self.mnuFile)
         self.menubar.add_cascade(label="View",menu=self.mnuView)
@@ -210,7 +223,7 @@ class WraithPanel(Panel.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = DataBinPanel(t,self)
-            self.addpanel(pnl._name,Panel.PanelRecord(t,pnl,"databin"))
+            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"databin"))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -221,7 +234,7 @@ class WraithPanel(Panel.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = AboutPanel(t,self)
-            self.addpanel(pnl._name,Panel.PanelRecord(t,pnl,"about"))
+            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"about"))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -254,14 +267,14 @@ class WraithPanel(Panel.MasterPanel):
                                    'pwd':conf.get('Storage','pwd')}
 
             # read in optional
-            start = 'manual'
-            stop = 'manual'
+            self._conf['store']['start'] = 'manual'
+            self._conf['store']['stop'] = 'manual'
             if conf.has_option('Storage','start'):
                 opt = conf.get('Storage','start').lower()
-                if opt == 'auto': start = 'auto'
+                if opt == 'auto': self._conf['store']['start'] = 'auto'
             if conf.has_option('Storage','stop'):
                 opt = conf.get('Storage','stop').lower()
-                if opt == 'auto': stop = 'auto'
+                if opt == 'auto': self._conf['store']['stop'] = 'auto'
 
             # return no errors
             return ''
@@ -275,6 +288,18 @@ class WraithPanel(Panel.MasterPanel):
     def _stopstorage(self):
         """ stop posgresql db and nidus storage manager """
         pass
+
+    def _getpwd(self):
+        """ prompt for sudo password """
+        dlg = gui.PasswordDialog(self)
+        try:
+            # try pwd out on a simple ls sending results to bit bucket
+            if os.system("echo '%s' | sudo -k -S %s > /dev/null" % (dlg.pwd,'ls -al')) == 0:
+                return dlg.pwd
+            else:
+                return -1 # bad password
+        except AttributeError:
+            return None # canceled
 
 if __name__ == 'wraith-rt':
     t = Tix.Tk()

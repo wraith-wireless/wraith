@@ -54,13 +54,11 @@ class PanelRecord(tuple):
 #### helper dialogs
 
 class PasswordDialog(tkSD.Dialog):
-    """
-     PasswordDialog - prompts user for password, hiding input
-    """
+    """ PasswordDialog - prompts user for password, hiding input """
     def __init__(self,parent):
         tkSD.Dialog.__init__(self,parent)
-        self.pwd = None
         self.entPWD = None
+        self.canceled = False
     def body(self,master):
         self.title('sudo Password')
         Tix.Label(master,text='Password: ').grid(row=0,column=1)
