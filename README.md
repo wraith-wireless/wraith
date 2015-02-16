@@ -63,18 +63,22 @@ frames, gps location, and 'device' details/status.
 ## 4. ARCHITECTURE/HEIRARCHY: Brief Overview of the project file structure
 
 * wraith/                Top-level package
- - \_\_init\_\_.py          this file - initialize the top-level (includes misc functions)
+ - \_\_init\_\_.py      initialize the top-level
  - wraith-rt.py         the gui
  - wraith.conf          gui configuration file
  - LICENSE              software license
  - README.txt           details
  - CONFIGURE.txt        setup details
  * widgets              gui subpackage
-     *  icons            icons folder
-     -  \_\_init\_\_.py      initialize widgets subpackage
-     -  panel.py         defines Panel and subclasses for gui
- *  radio                subpackage for radio/radiotap
-     - \_\_init\_\_.py      initialize radio subpackage
+     *  icons           icons folder
+     -  \_\_init\_\_.py initialize widgets subpackage
+     -  panel.py        defines Panel and subclasses for gui
+ * utils                utility functions
+    -  \_\_init\_\_.py  initialize utils subpackage
+    - bits.py           bitmask functions
+    - timestamps        timestamp conversion functions
+ *  radio               subpackage for radio/radiotap
+     - \_\_init\_\_.py  initialize radio subpackage
      - bits.py          bitmask related funcs, bit extraction functions
      - iwtools.py       iwconfig, ifconfig interface and nic utilities
      - iw.py            iw 3.17 interface
@@ -84,22 +88,22 @@ frames, gps location, and 'device' details/status.
      - channels.py      802.11 channel, freq utilities
      - mcs.py           mcs index functions
      - oui.py           oui/manuf related functions
- *  dyskt            subpackage for wraith sensor
-  - \_\_init\_\_.py  initialize dyskt package
-  - dyskt.conf       configuration file for dyskt
-  - dyskt.log.conf   configuration file for dyskt logging
-  - dyskt.py         primary module
-  - internal.py      defines the Report class
-  - rdoctl.py        radio controler with tuner, sniffer
-  - rto.py           data collation and forwarding
-  - dysktd           dyskt daemon
- *  nidus            subpackage for datamanager
-  - \_\_init\_\_.py  initialize nidus package
-  - nidus.conf       nidus configuration
-  - nidus.log.conf   nidus logging configuration
-  - nidus.py         nidus server
-  - nmp.py           nidus protocol definition
-  - nidusdb.py       interface to storage system
-  - simplepcap.py    pcap writer
-  - nidus.sql        sql tables definition
-  - nidusd           nidus daemon
+ *  dyskt               subpackage for wraith sensor
+     - \_\_init\_\_.py  initialize dyskt package
+     - dyskt.conf       configuration file for dyskt
+     - dyskt.log.conf   configuration file for dyskt logging
+     - dyskt.py         primary module
+     - internal.py      defines the Report class
+     - rdoctl.py        radio controler with tuner, sniffer
+     - rto.py           data collation and forwarding
+     - dysktd           dyskt daemon
+ *  nidus               subpackage for datamanager
+     - \_\_init\_\_.py  initialize nidus package
+     - nidus.conf       nidus configuration
+     - nidus.log.conf   nidus logging configuration
+     - nidus.py         nidus server
+     - nmp.py           nidus protocol definition
+     - nidusdb.py       interface to storage system
+     - simplepcap.py    pcap writer
+     - nidus.sql        sql tables definition
+     - nidusd           nidus daemon
