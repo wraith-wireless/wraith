@@ -30,12 +30,6 @@ import tkFileDialog as tkFD        # file gui dialogs
 import tkSimpleDialog as tkSD      # input dialogs
 from PIL import Image,ImageTk     # image input & support
 
-#### LOG MESSAGE TYPES ####
-LOG_NOERROR = 0
-LOG_WARNING = 1
-LOG_ERROR   = 2
-LOG_ALERT   = 3
-
 #### PANEL EXCEPTIONS ####
 class PanelException(Exception): pass            # TopLevel generic error
 
@@ -78,7 +72,6 @@ class PasswordDialog(tkSD.Dialog):
         return 1
     def apply(self):
         self.pwd = self.entPWD.get()
-
 
 #### SUPER GUI CLASSES ####
 
@@ -279,6 +272,12 @@ class DescriptionPanel(SlavePanel):
         frm2 = Tix.Frame(self,relief='sunken',border=2)
         frm2.pack(side=Tix.TOP,fill=Tix.BOTH,expand=False)
         Tix.Button(frm2,text='Close',command=self.close).pack()
+
+#### LOG MESSAGE TYPES ####
+LOG_NOERROR = 0
+LOG_WARNING = 1
+LOG_ERROR   = 2
+LOG_ALERT   = 3
 
 class LogPanel(ListPanel):
     """

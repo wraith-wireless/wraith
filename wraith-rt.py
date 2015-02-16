@@ -154,14 +154,13 @@ class WraithPanel(Panel.MasterPanel):
             self._conn.commit()
 
             # query for running sensors
-            sql = """
-                   select * from sensor
-                   where %s BETWEEN lower(period) and upper(period);
-                  """
+            sql = "select count(*) from sensor where period @> %s::timestamptz;"
             curs.execute(sql,(ts2iso(time.time()),))
-            if curs.fetchall():
-                self._state = bits.bitmask.set(_STATE_FLAGS_,self._state,
+            rows = curs.fetchall()
+            if rows:
+                self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
                                                _STATE_FLAGS_NAME_[_STATE_SENSOR_])
+                self.logwrite("Currently, %d sensors running" % rows[0][0],Panel.LOG_ALERT)
             else:
                 self.logwrite("No running sensors",Panel.LOG_ALERT)
         except psql.OperationalError as e:
