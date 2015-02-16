@@ -74,16 +74,16 @@ frames, gps location, and 'device' details/status.
      -  \_\_init\_\_.py      initialize widgets subpackage
      -  panel.py         defines Panel and subclasses for gui
  *  radio                subpackage for radio/radiotap
-  - \_\_init\_\_.py      initialize radio subpackage
-  - bits.py          bitmask related funcs, bit extraction functions
-  - iwtools.py       iwconfig, ifconfig interface and nic utilities
-  - iw.py            iw 3.17 interface
-  - radiotap.py      radiotap parsing
-  - mpdu.py          IEEE 802.11 MAC (MPDU) parsing
-  - dott1u.py        contstants for 802.11u (not currently used)
-  - channels.py      802.11 channel, freq utilities
-  - mcs.py           mcs index functions
-  - oui.py           oui/manuf related functions
+     - \_\_init\_\_.py      initialize radio subpackage
+     - bits.py          bitmask related funcs, bit extraction functions
+     - iwtools.py       iwconfig, ifconfig interface and nic utilities
+     - iw.py            iw 3.17 interface
+     - radiotap.py      radiotap parsing
+     - mpdu.py          IEEE 802.11 MAC (MPDU) parsing
+     - dott1u.py        contstants for 802.11u (not currently used)
+     - channels.py      802.11 channel, freq utilities
+     - mcs.py           mcs index functions
+     - oui.py           oui/manuf related functions
  *  dyskt            subpackage for wraith sensor
   - \_\_init\_\_.py  initialize dyskt package
   - dyskt.conf       configuration file for dyskt
