@@ -34,12 +34,12 @@ NOTE:
 
 """
 __name__ = 'nmp'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.0.2'
 __date__ = 'September 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Production'
 
 #import datetime as dt

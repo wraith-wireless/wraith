@@ -39,10 +39,10 @@ TODO:
  6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
 """
 __name__ = 'radio'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.0.4'
 __date__ = 'Janurary 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'

@@ -6,12 +6,12 @@ provides a pythonic pcap writer for 802.11 frames w/o requiring additional libra
 see http://wiki.wireshark.org/Development/LibpcapFileFormat
 """
 __name__ = 'simplepcap'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.0.1'
 __date__ = 'November 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import struct

@@ -4,12 +4,12 @@
 Only defines ISM 2.4Ghz and UNII 5Ghz
 """
 __name__ = 'channels'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.0.1'
 __date__ = 'August 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Production'
 
 # ISM Bands

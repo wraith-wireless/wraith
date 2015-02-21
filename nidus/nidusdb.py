@@ -10,12 +10,12 @@ underlying storage system, serving a two-fold service:
     modified to fit the storage system
 """
 __name__ = 'nidusdb'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.1.3'
 __date__ = 'January 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import time                                          # timestamps

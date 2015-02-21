@@ -6,12 +6,12 @@ Processes and forwards 1) frames from the sniffer(s) 2) gps data (if any) collec
 by a pf and 3) messages from tuner(s) and sniffer(s0
 """
 __name__ = 'rto'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.0.10'
 __date__ = 'January 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import signal                              # signal processing

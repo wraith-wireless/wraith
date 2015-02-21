@@ -22,12 +22,12 @@ TODO:
  look into using iwlist 
 """
 __name__ = 'iw'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.1.0'
 __date__ = 'November 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import os                # getuid()

@@ -24,12 +24,12 @@ with security. See below
 Tested on Ubuntu 12.04 with net-tools 1.60, ifconfig 1.42, Wireless-Tools version 30
 """
 __name__ = 'iwtools'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.0.12'
 __date__ = 'April 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import os                # getuid & file hierarchy

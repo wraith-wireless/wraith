@@ -7,12 +7,12 @@ if extended fields are present prior to defined fields. It is recommended not
 to import * as it may cause conflicts with other modules
 """
 __name__ = 'radiotap'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.0.4'
 __date__ = 'August 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import struct

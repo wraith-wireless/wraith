@@ -11,12 +11,12 @@ by the user or only by a calling panel
 """
 
 __name__ = 'panel'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.13.5'
 __date__ = 'February 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import os                        # files operations etc

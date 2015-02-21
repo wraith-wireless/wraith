@@ -2,12 +2,12 @@
 
 """ dot11u 802.11u constants """
 __name__ = 'dot11u'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.0.1'
 __date__ = 'December 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Production'
 
 # venue group codes type assignments Std Table 8-52 and Table 8-53 802.11u

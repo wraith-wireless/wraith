@@ -57,10 +57,10 @@ TODO:
          packet for efficiency and security
 """
 __name__ = 'dyskt'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.1.5'
 __date__ = 'December 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'

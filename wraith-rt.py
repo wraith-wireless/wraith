@@ -12,16 +12,15 @@
 """
 
 __name__ = 'wraith-rt'
-__license__ = 'GPL'
+__license__ = 'GPL v3.0'
 __version__ = '0.0.3'
 __revdate__ = 'February 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
-__email__ = 'wraith.wireless@hushmail.com'
+__email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import os                                  # popen and path functions
-import time                                # timestamps
 import psycopg2 as psql                    # postgresql api
 import Tix                                 # Tix gui stuff
 from PIL import Image,ImageTk              # image input & support
@@ -30,7 +29,6 @@ import ConfigParser                        # config file parsing
 import wraith                              # helpful functions/version etc
 import wraith.widgets.panel as gui         # graphics suite
 from wraith.utils import bits              # bitmask functions
-from wraith.utils.timestamps import ts2iso # timestamp conversions
 
 #### CONSTANTS
 
@@ -46,7 +44,7 @@ def runningprocess(process):
         if os.path.split(fields[7])[1] == process: pids.append(int(fields[1]))
     return pids
 
-# the following check if nidus/dyskt are running. Because they run under python,
+# the following checks if nidus/dyskt are running. Because they run under python,
 # we cannot use the above, rather check their pid file for a valid pid and just
 # in case a pid file was left lying around, verify the pid is still running
 # this assumes that a) nidus/dyskt were executed using the service start and
@@ -70,9 +68,9 @@ def dysktrunning():
 def testsudopwd(pwd):
     """ tests pwd for sudo rights """
     p = sp.Popen(['sudo','-S','ls','-l'],stdout=sp.PIPE,
-                                    stdin=sp.PIPE,
-                                    stderr=sp.PIPE,
-                                    universal_newlines=True)
+                                         stdin=sp.PIPE,
+                                         stderr=sp.PIPE,
+                                         universal_newlines=True)
     out,err=p.communicate(pwd+'\n')
     if out: return True
     return False
@@ -480,12 +478,9 @@ class WraithPanel(gui.MasterPanel):
         # do we have a password
         if not self._pwd:
             pwd = self._getpwd()
-            while pwd == -1:
-                self.logwrite("Bad password entered. Try Again",gui.LOG_ERROR)
-                pwd = self._getpwd()
-            if pwd is not None: self._pwd = pwd
-            else:
-                self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARNING)
+            if pwd is None:
+                self.logwrite("Password entry canceled. Cannot continue",
+                              gui.LOG_WARNING)
                 return
 
         # get our flags
@@ -494,21 +489,19 @@ class WraithPanel(gui.MasterPanel):
         if not flags['store']:
             self.logwrite("Starting PostgreSQL...")
 
-
     def _stopstorage(self):
         """ stop posgresql db and nidus storage manager """
         pass
 
     def _getpwd(self):
-        """ prompt for sudo password """
+        """ prompts for sudo password until correct or canceled"""
         dlg = gui.PasswordDialog(self)
         try:
-            # try pwd out on a simple ls sending results to bit bucket
-            if testsudopwd(dlg.pwd):
-            #if os.system("echo '%s' | sudo -k -S %s > /dev/null" % (dlg.pwd,'ls -al')) == 0:
-                return dlg.pwd
-            else:
-                return -1 # bad password
+            # test out sudo pwd
+            while not testsudopwd(dlg.pwd):
+                self.logwrite("Bad password entered. Try Again",gui.LOG_ERROR)
+                dlg = gui.PasswordDialog(self)
+            return dlg.pwd
         except AttributeError:
             return None # canceled
 
