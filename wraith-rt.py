@@ -20,60 +20,18 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                                  # popen and path functions
 import psycopg2 as psql                    # postgresql api
 import Tix                                 # Tix gui stuff
 from PIL import Image,ImageTk              # image input & support
-import subprocess as sp                    # Popen
 import ConfigParser                        # config file parsing
 import wraith                              # helpful functions/version etc
 import wraith.widgets.panel as gui         # graphics suite
 from wraith.utils import bits              # bitmask functions
+from wraith.utils import cmdline           # command line stuff
 
 #### CONSTANTS
 
 _BINS_ = "ABCDEFG" # data bin ids
-
-#### HELPER FUNCTIONS
-
-# returns the pid(s) of process if running or the empty list
-def runningprocess(process):
-    pids = []
-    for proc in os.popen("ps -ef"):
-        fields = proc.split()
-        if os.path.split(fields[7])[1] == process: pids.append(int(fields[1]))
-    return pids
-
-# the following checks if nidus/dyskt are running. Because they run under python,
-# we cannot use the above, rather check their pid file for a valid pid and just
-# in case a pid file was left lying around, verify the pid is still running
-# this assumes that a) nidus/dyskt were executed using the service start and
-# b) the pid file is stored in /var/run/<name>.pid
-def nidusrunning():
-    try:
-        # open the pid file and check running status with signal = 0
-        with open('/var/run/nidusd.pid') as fin: os.kill(int(fin.read()),0)
-        return True
-    except (TypeError,IOError,OSError):
-        return False
-
-def dysktrunning():
-    try:
-        # open the pid file and check running status with signal = 0
-        with open('/var/run/dysktd.pid') as fin: os.kill(int(fin.read()),0)
-        return True
-    except (TypeError,IOError,OSError):
-        return False
-
-def testsudopwd(pwd):
-    """ tests pwd for sudo rights """
-    p = sp.Popen(['sudo','-S','ls','-l'],stdout=sp.PIPE,
-                                         stdin=sp.PIPE,
-                                         stderr=sp.PIPE,
-                                         universal_newlines=True)
-    out,err=p.communicate(pwd+'\n')
-    if out: return True
-    return False
 
 ##### THE GUI(s)
 
@@ -179,12 +137,12 @@ class WraithPanel(gui.MasterPanel):
             return
 
         # nidus running?
-        if nidusrunning(): self._setstate(_STATE_NIDUS_)
+        if cmdline.nidusrunning(): self._setstate(_STATE_NIDUS_)
 
-        if dysktrunning(): self._setstate(_STATE_DYSKT_)
+        if cmdline.dysktrunning(): self._setstate(_STATE_DYSKT_)
 
         # determine if postgresql is running
-        if runningprocess('postgres'):
+        if cmdline.runningprocess('postgres'):
             # update state
             self._setstate(_STATE_STORE_)
 
@@ -379,15 +337,15 @@ class WraithPanel(gui.MasterPanel):
     def _updatestate(self):
         """ reevaluates internal state """
         # state of nidus
-        if nidusrunning(): self._setstate(_STATE_NIDUS_)
+        if cmdline.nidusrunning(): self._setstate(_STATE_NIDUS_)
         else: self._setstate(_STATE_NIDUS_,False)
 
         # state of dyskt
-        if dysktrunning(): self._setstate(_STATE_DYSKT_)
+        if cmdline.dysktrunning(): self._setstate(_STATE_DYSKT_)
         else:  self._setstate(_STATE_DYSKT_,False)
 
         # state of postgres i.e. store
-        if runningprocess('postgres'): self._setstate(_STATE_STORE_)
+        if cmdline.runningprocess('postgres'): self._setstate(_STATE_STORE_)
         else: self._setstate(_STATE_STORE_,False)
 
         # state of our connection - should figure out a way to determine if
@@ -498,7 +456,7 @@ class WraithPanel(gui.MasterPanel):
         dlg = gui.PasswordDialog(self)
         try:
             # test out sudo pwd
-            while not testsudopwd(dlg.pwd):
+            while not cmdline.testsudopwd(dlg.pwd):
                 self.logwrite("Bad password entered. Try Again",gui.LOG_ERROR)
                 dlg = gui.PasswordDialog(self)
             return dlg.pwd
