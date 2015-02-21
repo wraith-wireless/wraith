@@ -261,15 +261,16 @@ class WraithPanel(gui.MasterPanel):
 
         # Nidus Menu
         self.mnuNidus = Tix.Menu(self.menubar,tearoff=0)
-        self.mnuNidus.add_command(label='Start',command=self.startnidus) # 0
-        self.mnuNidus.add_command(label='Stop',command=self.stopnidus)   # 1
+        self.mnuNidus.add_command(label='Start',command=self.nidusstart) # 0
+        self.mnuNidus.add_command(label='Stop',command=self.nidusstop)   # 1
 
         # DySKT Menu
         self.mnuDySKT = Tix.Menu(self.menubar,tearoff=0)
-        self.mnuDySKT.add_command(label='Start',command=self.startdyskt)           # 0
-        self.mnuDySKT.add_command(label='Stop',command=self.stopdyskt)             # 1
-        self.mnuDySKT.add_separator()                                              # 2
-        self.mnuDySKT.add_command(label='Control Panel',command=self.dysktctrlpnl) # 3
+        self.mnuDySKT.add_command(label='Start',command=self.dysktstart) # 0
+        self.mnuDySKT.add_command(label='Stop',command=self.dysktstop)   # 1
+        self.mnuDySKT.add_separator()                                    # 2
+        self.mnuDySKT.add_command(label='Control Panel',
+                                  command=self.dysktctrlpnl)             # 3
 
         # Help Menu
         self.mnuHelp = Tix.Menu(self.menubar,tearoff=0)
@@ -321,19 +322,19 @@ class WraithPanel(gui.MasterPanel):
         """ display data panel """
         self.unimplemented()
 
-    def startnidus(self):
+    def nidusstart(self):
         """ starts database and storage manager """
-        pass
+        self._startstorage()
 
-    def stopnidus(self):
+    def nidusstop(self):
         """ stops database and storage manager """
-        self.unimplemented()
+        self._stopstorage()
 
-    def startdyskt(self):
+    def dysktstart(self):
         """ starts DySKT sensor """
         self.unimplemented()
 
-    def stopdyskt(self):
+    def dysktstop(self):
         """ stops DySKT sensor """
         self.unimplemented()
 
@@ -365,6 +366,25 @@ class WraithPanel(gui.MasterPanel):
         else: raise RuntimeError, "WTF Cannot open %s" % desc
 
 #### HELPER FUNCTIONS
+
+    def _updatestate(self):
+        """ reevaluates internal state """
+        # state of nidus
+        if nidusrunning(): self._setstate(_STATE_NIDUS_)
+        else: self._setstate(_STATE_NIDUS_,False)
+
+        # state of dyskt
+        if dysktrunning(): self._setstate(_STATE_DYSKT_)
+        else:  self._setstate(_STATE_DYSKT_,False)
+
+        # state of postgres i.e. store
+        if runningprocess('postgres'): self._setstate(_STATE_STORE_)
+        else: self._setstate(_STATE_STORE_,False)
+
+        # state of our connection - should figure out a way to determine if
+        # connection is still 'alive'
+        if self._conn: self._setstate(_STATE_CONN_)
+        else: self._setstate(_STATE_CONN_,False)
 
     def _setstate(self,f,up=True):
         """
@@ -445,7 +465,24 @@ class WraithPanel(gui.MasterPanel):
 
     def _startstorage(self):
         """ start postgresql db and nidus storage manager """
-        pass
+
+        # do we have a password
+        if not self._pwd:
+            pwd = self._getpwd()
+            while pwd == -1:
+                self.logwrite("Bad password entered. Try Again",gui.LOG_ERROR)
+                pwd = self._getpwd()
+            if pwd is not None: self._pwd = pwd
+            else:
+                self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARNING)
+                return
+
+        # get our flags
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+
+        if not flags['store']:
+            self.logwrite("Starting PostgreSQL...")
+
 
     def _stopstorage(self):
         """ stop posgresql db and nidus storage manager """
