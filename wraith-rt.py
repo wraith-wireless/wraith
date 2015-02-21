@@ -170,19 +170,14 @@ class WraithPanel(gui.MasterPanel):
             return
 
         # nidus running?
-        if nidusrunning():
-            self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                           _STATE_FLAGS_NAME_[_STATE_NIDUS_])
+        if nidusrunning(): self._setstate(_STATE_NIDUS_)
 
-        if dysktrunning():
-            self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                           _STATE_FLAGS_NAME_[_STATE_DYSKT_])
+        if dysktrunning(): self._setstate(_STATE_DYSKT_)
 
         # determine if postgresql is running
         if runningprocess('postgres'):
             # update state
-            self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                           _STATE_FLAGS_NAME_[_STATE_STORE_])
+            self._setstate(_STATE_STORE_)
 
             curs = None
             try:
@@ -191,19 +186,18 @@ class WraithPanel(gui.MasterPanel):
                                           dbname=self._conf['store']['db'],
                                           user=self._conf['store']['user'],
                                           password=self._conf['store']['pwd'],)
-                self.logwrite("Connected to database")
-                self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                               _STATE_FLAGS_NAME_[_STATE_CONN_])
 
-                # make connection & set use UTC
+                # set to use UTC and enable CONN flag
                 curs = self._conn.cursor()
                 curs.execute("set time zone 'UTC';")
                 self._conn.commit()
+
+                self.logwrite("Connected to database")
+                self._setstate(_STATE_CONN_)
             except psql.OperationalError as e:
                 if e.__str__().find('connect') > 0:
                     self.logwrite("PostgreSQL is not running",gui.LOG_WARNING)
-                    self._state = bits.bitmask_unset(_STATE_FLAGS_,self._state,
-                                                     _STATE_FLAGS_NAME_[_STATE_STORE_])
+                    self._setstate(_STATE_STORE_,False)
                 elif e.__str__().find('authentication') > 0:
                     self.logwrite("Authentication string is invalid",gui.LOG_ERROR)
                 else:
@@ -215,14 +209,14 @@ class WraithPanel(gui.MasterPanel):
             self.logwrite("PostgreSQL is not running",gui.LOG_WARNING)
 
         # set initial state to initialized
-        self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                       _STATE_FLAGS_NAME_[_STATE_INIT_])
+        self._setstate(_STATE_INIT_)
 
+        # adjust menu options accordingly
+        self._menuenable()
 
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
-        self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                       _STATE_FLAGS_NAME_[_STATE_EXIT_])
+        self._setstate(_STATE_EXIT_)
         if self._conn: self._conn.close()
 
     def _makemenu(self):
@@ -239,6 +233,10 @@ class WraithPanel(gui.MasterPanel):
         self.mnuWraith.add_separator()
         self.mnuWraithEdit = Tix.Menu(self.mnuWraith,tearoff=0)
         self.mnuWraithEdit.add_command(label='Preferences',command=self.editprefs)
+        self.mnuWraithEdit.add_command(label='Nidus Preferences',
+                                       command=self.editdysktprefs)
+        self.mnuWraithEdit.add_command(label='DySKT Preferences',
+                                       command=self.editnidusprefs)
         self.mnuWraith.add_cascade(label='Edit',menu=self.mnuWraithEdit)
         self.mnuWraith.add_separator()
         self.mnuWraith.add_command(label='Exit',command=self.panelquit)
@@ -290,6 +288,14 @@ class WraithPanel(gui.MasterPanel):
 
     def editprefs(self):
         """ display config file preference editor """
+        self.unimplemented()
+
+    def editnidusprefs(self):
+        """ display nidus config file preference editor """
+        self.unimplemented()
+
+    def editdysktprefs(self):
+        """ display dyskt config file preference editor """
         self.unimplemented()
 
     def viewdatabins(self):
@@ -360,6 +366,19 @@ class WraithPanel(gui.MasterPanel):
 
 #### HELPER FUNCTIONS
 
+    def _setstate(self,f,up=True):
+        """
+         sets internal state's flag f to 1 if up is True or 0 otherwise
+        """
+        if up:
+            self._state = bits.bitmask_set(_STATE_FLAGS_,
+                                           self._state,
+                                           _STATE_FLAGS_NAME_[f])
+        else:
+            self._state = bits.bitmask_unset(_STATE_FLAGS_,
+                                             self._state,
+                                             _STATE_FLAGS_NAME_[f])
+
     def _readconf(self):
         """ read in configuration file """
         conf = ConfigParser.RawConfigParser()
@@ -371,12 +390,58 @@ class WraithPanel(gui.MasterPanel):
             self._conf['store'] = {'host':conf.get('Storage','host'),
                                    'db':conf.get('Storage','db'),
                                    'user':conf.get('Storage','user'),
-                                   'pwd':conf.get('Storage','pwd')}
+                                   'pwd':conf.get('Storage','pwd'),
+                                   'polite':True,
+                                   'shutdown':True}
+
+            # optional
+            if conf.has_option('Storage','polite'):
+                if conf.get('Storage','polite').lower() == 'off':
+                    self._conf['store']['polite'] = False
+            if conf.has_option('Storage','shutdown'):
+                if conf.get('Storage','shutdown').lower() == 'manual':
+                    self._conf['store']['shutdown'] = False
+
 
             # return no errors
             return ''
         except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
             return e
+
+    def _menuenable(self):
+        """ enable/disable menus as necessary """
+        # get all flags
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+
+        # adjust nidus/dyskt menu
+        if flags['store'] and flags['conn'] and flags['nidus']:
+            # all storage components are 'up'
+            self.mnuNidus.entryconfig(0,state=Tix.DISABLED) # start
+            self.mnuNidus.entryconfig(1,state=Tix.NORMAL)   # stop
+
+            # we can start,stop,configure dyskt
+            self.mnuDySKT.entryconfig(0,state=Tix.NORMAL)  # start
+            self.mnuDySKT.entryconfig(1,state=Tix.NORMAL)  # stop
+            self.mnuDySKT.entryconfig(3,state=Tix.NORMAL) # ctrl panel
+        elif not flags['store'] and not flags['conn'] and not flags['nidus']:
+            # no storage component is 'up'
+            self.mnuNidus.entryconfig(0,state=Tix.NORMAL)   # start
+            self.mnuNidus.entryconfig(1,state=Tix.DISABLED) # stop
+
+            # we cannot do anything with dyskt
+            self.mnuDySKT.entryconfig(0,state=Tix.DISABLED)  # start
+            self.mnuDySKT.entryconfig(1,state=Tix.DISABLED)  # stop
+            self.mnuDySKT.entryconfig(3,state=Tix.DISABLED) # ctrl panel
+        else:
+            # storage components are in a 'mixed' state
+            self.mnuNidus.entryconfig(0,state=Tix.NORMAL) # start
+            self.mnuNidus.entryconfig(1,state=Tix.NORMAL) # stop
+
+            # we can start/stop, configure dyskt only if store and nidus are up
+            if flags['store'] and flags['nidus']:
+                self.mnuDySKT.entryconfig(0,state=Tix.NORMAL)  # start
+                self.mnuDySKT.entryconfig(1,state=Tix.NORMAL)  # stop
+                self.mnuDySKT.entryconfig(3,state=Tix.NORMAL) # ctrl panel
 
     def _startstorage(self):
         """ start postgresql db and nidus storage manager """
