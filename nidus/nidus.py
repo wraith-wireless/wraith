@@ -34,7 +34,7 @@ logpath = os.path.join(GPATH,'nidus.log.conf')
 logging.config.fileConfig(logpath)
 
 # CONF FILE path
-CONFPATH = None
+global CONFPATH
 
 #### OUR EXCEPTIONS
 class NidusException(Exception): pass
@@ -54,7 +54,6 @@ class NidusRequestHandler(ss.BaseRequestHandler):
         connected = True
         try:
             # interface to db
-            global CONFPATH
             db = nidusdb.NidusDB(CONFPATH)
             db.connect() 
         except nidusdb.NidusDBException as e:
@@ -189,7 +188,6 @@ class Nidus(object):
 
 if __name__ == 'nidus':
     try:
-        global CONFPATH
         # command line parsing
         opts = ap.ArgumentParser(description="Nidus %s (C) %s %s" % (nidus.__version__,
                                                                      nidus.__date__.split(" ")[1],

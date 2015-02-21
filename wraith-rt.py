@@ -102,14 +102,16 @@ class AboutPanel(SimplePanel):
 _STATE_INIT_   = 0
 _STATE_STORE_  = 1
 _STATE_CONN_   = 2
-_STATE_SENSOR_ = 3
-_STATE_EXIT_   = 4
-_STATE_FLAGS_NAME_ = ['init','store','conn','sensor','exit']
+_STATE_NIDUS_  = 3
+_STATE_DYSKT_  = 4
+_STATE_EXIT_   = 5
+_STATE_FLAGS_NAME_ = ['init','store','conn','nidus','dyskt','exit']
 _STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
                  'store':(1 << 1),  # storage instance is running (i.e. postgresql)
                  'conn':(1 << 2),   # connected to storage instance
-                 'sensor':(1 << 3), # at least one sensor is collecting data
-                 'exit':(1 << 4)}   # exiting/shutting down
+                 'nidus':(1 << 3),  # nidus storage manager running
+                 'dyskt':(1 << 4),  # at least one sensor is collecting data
+                 'exit':(1 << 5)}   # exiting/shutting down
 
 class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
@@ -136,18 +138,22 @@ class WraithPanel(gui.MasterPanel):
         self.tk.resizable(0,0)
         self.logwrite("Wraith v%s" % wraith.__version__)
 
-        # read in conf file
+        # read in conf file, exit on error
         confMsg = self._readconf()
         if confMsg:
             self.logwrite(confMsg,gui.LOG_ERROR)
             return
+
+        # set initial state to initialization
         self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
                                        _STATE_FLAGS_NAME_[_STATE_INIT_])
 
         # determine if postgresql is running
         if runningprocess('postgres'):
+            # update state
             self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
                                            _STATE_FLAGS_NAME_[_STATE_STORE_])
+
             curs = None
             try:
                 # attempt to connect and set state accordingly
@@ -171,11 +177,10 @@ class WraithPanel(gui.MasterPanel):
                 nS = rows[0][0]
                 if nS:
                     self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                                   _STATE_FLAGS_NAME_[_STATE_SENSOR_])
-                    self.logwrite("Currently, %d DySKT sensor(s) running" % nS,
-                                  gui.LOG_ALERT)
+                                                   _STATE_FLAGS_NAME_[_STATE_DYSKT_])
+                    self.logwrite("Currently, %d DySKT sensor(s) running" % nS)
                 else:
-                    self.logwrite("No running sensors",gui.LOG_ALERT)
+                    self.logwrite("No running sensors",gui.LOG_WARNING)
             except psql.OperationalError as e:
                 if e.__str__().find('connect') > 0:
                     self.logwrite("PostgreSQL is not running",gui.LOG_WARNING)
@@ -255,7 +260,7 @@ class WraithPanel(gui.MasterPanel):
         self.menubar.add_cascade(label="Tools",menu=self.mnuTools)
         self.menubar.add_cascade(label='View',menu=self.mnuView)
         self.menubar.add_cascade(label='Nidus',menu=self.mnuNidus)
-        self.menubar.add_cascade(label='Nidus',menu=self.mnuDySKT)
+        self.menubar.add_cascade(label='DySKT',menu=self.mnuDySKT)
         self.menubar.add_cascade(label='Help',menu=self.mnuHelp)
 
 #### MENU CALLBACKS
