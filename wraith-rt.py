@@ -2,6 +2,13 @@
 """ wraith-rt.py - defines the wraith gui
 
  TODO:
+  1) make tkMessageBox,tkFileDialog and tkSimpleDialog derive match
+    main color scheme
+  2) Disable menu options as necessary
+  3) should we add a Database submenu for options like fix database?
+  4) move display of log panel to after intializiation() so that
+     wraith panel is 'first', leftmost panel - will have to figure out
+     how to save messages from init to later
 """
 
 __name__ = 'wraith-rt'
@@ -23,6 +30,10 @@ import wraith                              # helpful functions/version etc
 import wraith.widgets.panel as gui         # graphics suite
 from wraith.utils import bits              # bitmask functions
 from wraith.utils.timestamps import ts2iso # timestamp conversions
+
+#### CONSTANTS
+
+_BINS_ = "ABCDEFG" # data bin ids
 
 #### HELPER FUNCTIONS
 
@@ -60,8 +71,8 @@ class DataBinPanel(SimplePanel):
         frm.pack(side=Tix.TOP,expand=False)
 
         # add the bin buttons
-        bs = "ABCDEFG"
-        for b in bs:
+
+        for b in _BINS_:
             try:
                 self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
             except:
@@ -69,7 +80,7 @@ class DataBinPanel(SimplePanel):
                 self._bins[b]['btn'] = Tix.Button(frm,text=b,command=self.donothing)
             else:
                 self._bins[b]['btn'] = Tix.Button(frm,image=self._bins[b]['img'],command=self.donothing)
-            self._bins[b]['btn'].grid(row=0,column=bs.index(b),sticky=Tix.W)
+            self._bins[b]['btn'].grid(row=0,column=_BINS_.index(b),sticky=Tix.W)
 
 class AboutPanel(SimplePanel):
     """ AboutPanel - displays a simple About Panel """
@@ -137,60 +148,53 @@ class WraithPanel(gui.MasterPanel):
         if runningprocess('postgres'):
             self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
                                            _STATE_FLAGS_NAME_[_STATE_STORE_])
-        elif self._conf['store']['start'] == 'auto':
-            print 'getting pwd'
-            # auto start postgresql
-            pwd = self._getpwd()
-            while pwd == -1:
-                self.logwrite("Incorrect password entered",gui.LOG_ERROR)
-                pwd = self._getpwd()
-            if pwd is not None:
-                self._pwd = pwd
-            else:
-                # user canceled
-                self.logwrite("Password entry canceled",gui.LOG_WARNING)
-
-        curs = None
-        try:
-            # attempt to connect and set state accordingly
-            self._conn = psql.connect(host=self._conf['store']['host'],
-                                      dbname=self._conf['store']['db'],
-                                      user=self._conf['store']['user'],
-                                      password=self._conf['store']['pwd'],)
-            self.logwrite("Connected to database")
-            self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                           _STATE_FLAGS_NAME_[_STATE_CONN_])
-
-            # make connection & set use UTC
-            curs = self._conn.cursor()
-            curs.execute("set time zone 'UTC';")
-            self._conn.commit()
-
-            # query for running sensors
-            sql = "select count(*) from sensor where period @> %s::timestamptz;"
-            curs.execute(sql,(ts2iso(time.time()),))
-            rows = curs.fetchall()
-            if rows:
+            curs = None
+            try:
+                # attempt to connect and set state accordingly
+                self._conn = psql.connect(host=self._conf['store']['host'],
+                                          dbname=self._conf['store']['db'],
+                                          user=self._conf['store']['user'],
+                                          password=self._conf['store']['pwd'],)
+                self.logwrite("Connected to database")
                 self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                               _STATE_FLAGS_NAME_[_STATE_SENSOR_])
-                self.logwrite("Currently, %d sensors running" % rows[0][0],gui.LOG_ALERT)
-            else:
-                self.logwrite("No running sensors",gui.LOG_ALERT)
-        except psql.OperationalError as e:
-            if e.__str__().find('connect') > 0:
-                self.logwrite("PostgreSQL is not running",gui.LOG_ALERT)
-                self._state = bits.bitmask_unset(_STATE_FLAGS_,self._state,
-                                                 _STATE_FLAGS_NAME_[_STATE_STORE_])
-            elif e.__str__().find('authentication') > 0:
-                self.logwrite("Authentication string is invalid",gui.LOG_ERROR)
-            else:
-                self.logwrite("Unspecified DB error occurred",gui.LOG_ERROR)
-                self._conn.rollback()
-        finally:
-            if curs: curs.close()
+                                               _STATE_FLAGS_NAME_[_STATE_CONN_])
+
+                # make connection & set use UTC
+                curs = self._conn.cursor()
+                curs.execute("set time zone 'UTC';")
+                self._conn.commit()
+
+                # query for running sensors
+                sql = "select count(*) from sensor where period @> %s::timestamptz;"
+                curs.execute(sql,(ts2iso(time.time()),))
+                rows = curs.fetchall()
+                nS = rows[0][0]
+                if nS:
+                    self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
+                                                   _STATE_FLAGS_NAME_[_STATE_SENSOR_])
+                    self.logwrite("Currently, %d DySKT sensor(s) running" % nS,
+                                  gui.LOG_ALERT)
+                else:
+                    self.logwrite("No running sensors",gui.LOG_ALERT)
+            except psql.OperationalError as e:
+                if e.__str__().find('connect') > 0:
+                    self.logwrite("PostgreSQL is not running",gui.LOG_WARNING)
+                    self._state = bits.bitmask_unset(_STATE_FLAGS_,self._state,
+                                                     _STATE_FLAGS_NAME_[_STATE_STORE_])
+                elif e.__str__().find('authentication') > 0:
+                    self.logwrite("Authentication string is invalid",gui.LOG_ERROR)
+                else:
+                    self.logwrite("Unspecified DB error occurred",gui.LOG_ERROR)
+                    self._conn.rollback()
+            finally:
+                if curs: curs.close()
+        else:
+            self.logwrite("PostgreSQL is not running",gui.LOG_WARNING)
 
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
+        self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
+                                       _STATE_FLAGS_NAME_[_STATE_EXIT_])
         if self._conn: self._conn.close()
 
     def _makemenu(self):
@@ -198,24 +202,67 @@ class WraithPanel(gui.MasterPanel):
         self.menubar = Tix.Menu(self)
 
         # File Menu
-        self.mnuFile = Tix.Menu(self.menubar,tearoff=0)
-        self.mnuFile.add_command(label="Exit",command=self.panelquit)
+        # all options will always be enabled
+        self.mnuWraith = Tix.Menu(self.menubar,tearoff=0)
+        self.mnuWraithGui = Tix.Menu(self.mnuWraith,tearoff=0)
+        self.mnuWraithGui.add_command(label='Save',command=self.guisave)
+        self.mnuWraithGui.add_command(label='Load',command=self.guiload)
+        self.mnuWraith.add_cascade(label='Gui',menu=self.mnuWraithGui)
+        self.mnuWraith.add_separator()
+        self.mnuWraithEdit = Tix.Menu(self.mnuWraith,tearoff=0)
+        self.mnuWraithEdit.add_command(label='Preferences',command=self.editprefs)
+        self.mnuWraith.add_cascade(label='Edit',menu=self.mnuWraithEdit)
+        self.mnuWraith.add_separator()
+        self.mnuWraith.add_command(label='Exit',command=self.panelquit)
+
+        # Tools Menu
+        # all options will always be enabled
+        self.mnuTools = Tix.Menu(self.menubar,tearoff=0)
+        self.mnuToolsCalcs = Tix.Menu(self.mnuTools,tearoff=0)
+        self.mnuTools.add_cascade(label="Calcuators",menu=self.mnuToolsCalcs)
 
         # View Menu
+        # all options will always be enabled
         self.mnuView = Tix.Menu(self.menubar,tearoff=0)
-        self.mnuView.add_command(label="Data Bins",command=self.viewdatabins)
+        self.mnuView.add_command(label='Data Bins',command=self.viewdatabins)
+        self.mnuView.add_separator()
+        self.mnuView.add_command(label='Data',command=self.viewdata)
+        self.mnuView.add_separator()
+        self.mnuViewLogs = Tix.Menu(self.mnuView,tearoff=0)
+        self.mnuViewLogs.add_command(label='Nidus',command=self.viewniduslog)
+        self.mnuViewLogs.add_command(label='DySKT',command=self.viewdysktlog)
+        self.mnuView.add_cascade(label='Logs',menu=self.mnuViewLogs)
+
+        # Nidus Menu
+        self.mnuNidus = Tix.Menu(self.menubar,tearoff=0)
+        self.mnuNidus.add_command(label='Start',command=self.startnidus) # 0
+        self.mnuNidus.add_command(label='Stop',command=self.stopnidus)   # 1
+
+        # DySKT Menu
+        self.mnuDySKT = Tix.Menu(self.menubar,tearoff=0)
+        self.mnuDySKT.add_command(label='Start',command=self.startdyskt)           # 0
+        self.mnuDySKT.add_command(label='Stop',command=self.stopdyskt)             # 1
+        self.mnuDySKT.add_separator()                                              # 2
+        self.mnuDySKT.add_command(label='Control Panel',command=self.dysktctrlpnl) # 3
 
         # Help Menu
         self.mnuHelp = Tix.Menu(self.menubar,tearoff=0)
-        self.mnuHelp.add_command(label="About",command=self.viewabout)
-        self.mnuHelp.add_command(label="Help",command=self.viewhelp)
+        self.mnuHelp.add_command(label='About',command=self.about)
+        self.mnuHelp.add_command(label='Help',command=self.help)
 
         # add the menus
-        self.menubar.add_cascade(label="File",menu=self.mnuFile)
-        self.menubar.add_cascade(label="View",menu=self.mnuView)
-        self.menubar.add_cascade(label="Help",menu=self.mnuHelp)
+        self.menubar.add_cascade(label='Wraith',menu=self.mnuWraith)
+        self.menubar.add_cascade(label="Tools",menu=self.mnuTools)
+        self.menubar.add_cascade(label='View',menu=self.mnuView)
+        self.menubar.add_cascade(label='Nidus',menu=self.mnuNidus)
+        self.menubar.add_cascade(label='Nidus',menu=self.mnuDySKT)
+        self.menubar.add_cascade(label='Help',menu=self.mnuHelp)
 
 #### MENU CALLBACKS
+
+    def editprefs(self):
+        """ display config file preference editor """
+        self.unimplemented()
 
     def viewdatabins(self):
         """ display the data bins panel """
@@ -228,7 +275,39 @@ class WraithPanel(gui.MasterPanel):
             panel[0].tk.deiconify()
             panel[0].tk.lift()
 
-    def viewabout(self):
+    def viewdata(self):
+        """ display data panel """
+        self.unimplemented()
+
+    def viewniduslog(self):
+        """ display data panel """
+        self.unimplemented()
+
+    def viewdysktlog(self):
+        """ display data panel """
+        self.unimplemented()
+
+    def startnidus(self):
+        """ starts database and storage manager """
+        pass
+
+    def stopnidus(self):
+        """ stops database and storage manager """
+        self.unimplemented()
+
+    def startdyskt(self):
+        """ starts DySKT sensor """
+        self.unimplemented()
+
+    def stopdyskt(self):
+        """ stops DySKT sensor """
+        self.unimplemented()
+
+    def dysktctrlpnl(self):
+        """ displays DySKT Control Panel """
+        self.unimplemented()
+
+    def about(self):
         """ display the about panel """
         panel = self.getpanels("about",False)
         if not panel:
@@ -239,7 +318,7 @@ class WraithPanel(gui.MasterPanel):
             panel[0].tk.deiconify()
             panel[0].tk.lift()
 
-    def viewhelp(self):
+    def help(self):
         """ display the help panel """
         self.unimplemented()
 
@@ -265,16 +344,6 @@ class WraithPanel(gui.MasterPanel):
                                    'db':conf.get('Storage','db'),
                                    'user':conf.get('Storage','user'),
                                    'pwd':conf.get('Storage','pwd')}
-
-            # read in optional
-            self._conf['store']['start'] = 'manual'
-            self._conf['store']['stop'] = 'manual'
-            if conf.has_option('Storage','start'):
-                opt = conf.get('Storage','start').lower()
-                if opt == 'auto': self._conf['store']['start'] = 'auto'
-            if conf.has_option('Storage','stop'):
-                opt = conf.get('Storage','stop').lower()
-                if opt == 'auto': self._conf['store']['stop'] = 'auto'
 
             # return no errors
             return ''

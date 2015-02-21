@@ -360,16 +360,16 @@ class MasterPanel(Panel):
             self.master.config(menu=self.menubar)
         except AttributeError:
             self.master.tk.call(self.master,"config","-menu",self.menubar)
-                 
-        # is there a default toolset saved?
-        if os.path.exists('default.ts'): self.toolsload('default.ts')
-        self.update_idletasks()
             
         # make the log panel?
         if logpanel: self.viewlog()
 
         # initialiez
         self._initialize()
+
+        # is there a default toolset saved?
+        if os.path.exists('default.ts'): self.guiload('default.ts')
+        self.update_idletasks()
 
     def _initialize(self): pass
     def _shutdown(self): pass
@@ -400,7 +400,7 @@ class MasterPanel(Panel):
         """ displays info dialog with not implmented message """
         tkMB.showinfo('Not Implemented',"This function not currently implemented",parent=self)
         
-    def toolssave(self):
+    def guisave(self):
         """ saves current toolset configuration """
         fpath = tkFD.asksaveasfilename(title='Save Toolset',
                                       filetypes=[('Toolset files','*.ts')])
@@ -422,7 +422,7 @@ class MasterPanel(Panel):
             except Exception as e:
                 self.logwrite(e,LOG_ERROR)
 
-    def toolsload(self,fpath=None):
+    def guiload(self,fpath=None):
         """ loads a saved toolset configuration """
         if not fpath:
             fpath = tkFD.askopenfilename(title='Open Toolset',
