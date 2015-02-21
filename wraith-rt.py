@@ -9,6 +9,7 @@
   4) move display of log panel to after intializiation() so that
      wraith panel is 'first', leftmost panel - will have to figure out
      how to save messages from init to later
+  5) don't show password prompt on getpwd
 """
 
 __name__ = 'wraith-rt'
@@ -25,6 +26,7 @@ import time                                # timestamps
 import psycopg2 as psql                    # postgresql api
 import Tix                                 # Tix gui stuff
 from PIL import Image,ImageTk              # image input & support
+import subprocess as sp                    # Popen
 import ConfigParser                        # config file parsing
 import wraith                              # helpful functions/version etc
 import wraith.widgets.panel as gui         # graphics suite
@@ -65,6 +67,16 @@ def dysktrunning():
         return True
     except (TypeError,IOError,OSError):
         return False
+
+def testsudopwd(pwd):
+    """ tests pwd for sudo rights """
+    p = sp.Popen(['sudo','-S','ls','-l'],stdout=sp.PIPE,
+                                    stdin=sp.PIPE,
+                                    stderr=sp.PIPE,
+                                    universal_newlines=True)
+    out,err=p.communicate(pwd+'\n')
+    if out: return True
+    return False
 
 ##### THE GUI(s)
 
@@ -493,7 +505,8 @@ class WraithPanel(gui.MasterPanel):
         dlg = gui.PasswordDialog(self)
         try:
             # try pwd out on a simple ls sending results to bit bucket
-            if os.system("echo '%s' | sudo -k -S %s > /dev/null" % (dlg.pwd,'ls -al')) == 0:
+            if testsudopwd(dlg.pwd):
+            #if os.system("echo '%s' | sudo -k -S %s > /dev/null" % (dlg.pwd,'ls -al')) == 0:
                 return dlg.pwd
             else:
                 return -1 # bad password
