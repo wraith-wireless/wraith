@@ -31,7 +31,11 @@ from wraith.utils import cmdline           # command line stuff
 
 #### CONSTANTS
 
-_BINS_ = "ABCDEFG" # data bin ids
+_BINS_ = "ABCDEFG"                     # data bin ids
+NIDUSLOG = '/var/log/wraith/nidus.log' # path to nidus log
+DYSKTLOG = '/var/log/wraith/dyskt.log' # path to dyskt log
+NIDUSPID = '/var/run/nidusd.pid'       # path to nidus pidfile
+DYSKTPID = '/var/run/dysktd.pid'       # path to dyskt pidfile
 
 ##### THE GUI(s)
 
@@ -133,13 +137,13 @@ class WraithPanel(gui.MasterPanel):
         # read in conf file, exit on error
         confMsg = self._readconf()
         if confMsg:
-            self.logwrite(confMsg,gui.LOG_ERROR)
+            self.logwrite(confMsg,gui.LOG_ERR)
             return
 
         # nidus running?
-        if cmdline.nidusrunning(): self._setstate(_STATE_NIDUS_)
+        if cmdline.nidusrunning(NIDUSPID): self._setstate(_STATE_NIDUS_)
 
-        if cmdline.dysktrunning(): self._setstate(_STATE_DYSKT_)
+        if cmdline.dysktrunning(DYSKTPID): self._setstate(_STATE_DYSKT_)
 
         # determine if postgresql is running
         if cmdline.runningprocess('postgres'):
@@ -163,17 +167,17 @@ class WraithPanel(gui.MasterPanel):
                 self._setstate(_STATE_CONN_)
             except psql.OperationalError as e:
                 if e.__str__().find('connect') > 0:
-                    self.logwrite("PostgreSQL is not running",gui.LOG_WARNING)
+                    self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
                     self._setstate(_STATE_STORE_,False)
                 elif e.__str__().find('authentication') > 0:
-                    self.logwrite("Authentication string is invalid",gui.LOG_ERROR)
+                    self.logwrite("Authentication string is invalid",gui.LOG_ERR)
                 else:
-                    self.logwrite("Unspecified DB error occurred",gui.LOG_ERROR)
+                    self.logwrite("Unspecified DB error occurred",gui.LOG_ERR)
                     self._conn.rollback()
             finally:
                 if curs: curs.close()
         else:
-            self.logwrite("PostgreSQL is not running",gui.LOG_WARNING)
+            self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
 
         # set initial state to initialized
         self._setstate(_STATE_INIT_)
@@ -337,11 +341,11 @@ class WraithPanel(gui.MasterPanel):
     def _updatestate(self):
         """ reevaluates internal state """
         # state of nidus
-        if cmdline.nidusrunning(): self._setstate(_STATE_NIDUS_)
+        if cmdline.nidusrunning(NIDUSPID): self._setstate(_STATE_NIDUS_)
         else: self._setstate(_STATE_NIDUS_,False)
 
         # state of dyskt
-        if cmdline.dysktrunning(): self._setstate(_STATE_DYSKT_)
+        if cmdline.dysktrunning(DYSKTPID): self._setstate(_STATE_DYSKT_)
         else:  self._setstate(_STATE_DYSKT_,False)
 
         # state of postgres i.e. store
@@ -373,6 +377,7 @@ class WraithPanel(gui.MasterPanel):
 
         self._conf = {}
         try:
+            ## STORAGE
             # read in mandatory
             self._conf['store'] = {'host':conf.get('Storage','host'),
                                    'db':conf.get('Storage','db'),
@@ -388,7 +393,6 @@ class WraithPanel(gui.MasterPanel):
             if conf.has_option('Storage','shutdown'):
                 if conf.get('Storage','shutdown').lower() == 'manual':
                     self._conf['store']['shutdown'] = False
-
 
             # return no errors
             return ''
@@ -437,8 +441,7 @@ class WraithPanel(gui.MasterPanel):
         if not self._pwd:
             pwd = self._getpwd()
             if pwd is None:
-                self.logwrite("Password entry canceled. Cannot continue",
-                              gui.LOG_WARNING)
+                self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
                 return
 
         # get our flags
@@ -457,7 +460,7 @@ class WraithPanel(gui.MasterPanel):
         try:
             # test out sudo pwd
             while not cmdline.testsudopwd(dlg.pwd):
-                self.logwrite("Bad password entered. Try Again",gui.LOG_ERROR)
+                self.logwrite("Bad password entered. Try Again",gui.LOG_ERR)
                 dlg = gui.PasswordDialog(self)
             return dlg.pwd
         except AttributeError:

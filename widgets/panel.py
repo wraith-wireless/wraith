@@ -272,10 +272,10 @@ class DescriptionPanel(SlavePanel):
         Tix.Button(frm2,text='Close',command=self.close).pack()
 
 #### LOG MESSAGE TYPES ####
-LOG_NOERROR = 0
-LOG_WARNING = 1
-LOG_ERROR   = 2
-LOG_ALERT   = 3
+LOG_NOERR = 0
+LOG_WARN  = 1
+LOG_ERR   = 2
+LOG_NOTE  = 3
 
 class LogPanel(ListPanel):
     """
@@ -304,7 +304,7 @@ class LogPanel(ListPanel):
         self.pre = ["[+] ","[?] ","[-] ","[!] "]
     def delete(self): pass   # user can never close only the primary chief
     def pnlreset(self): pass # don't care about reseting
-    def logwrite(self,msg,mtype=LOG_NOERROR):
+    def logwrite(self,msg,mtype=LOG_NOERR):
         """ writes message msg of type mtype to the log """
         entry = str(self.n)
         self.list.add(entry,itemtype=Tix.TEXT,text=time.strftime('%H:%M:%S'))
@@ -420,7 +420,7 @@ class MasterPanel(Panel):
                 pickle.dump(ts,f)
                 f.close()
             except Exception as e:
-                self.logwrite(e,LOG_ERROR)
+                self.logwrite(e,LOG_ERR)
 
     def guiload(self,fpath=None):
         """ loads a saved toolset configuration """
@@ -436,7 +436,7 @@ class MasterPanel(Panel):
                 ts = pickle.load(f)
                 f.close()
             except Exception as e:
-                self.logwrite(e,LOG_ERROR)
+                self.logwrite(e,LOG_ERR)
             else:
                 # for each saved open it (unless it already exists) and move to 
                 # saved position
@@ -459,7 +459,7 @@ class MasterPanel(Panel):
             self._shutdown()
             self.quit()
 
-    def logwrite(self,msg,mtype=LOG_NOERROR):
+    def logwrite(self,msg,mtype=LOG_NOERR):
         """ writes msg to log or shows in error message """
         log = self.getpanel("log",True)
         if log:
