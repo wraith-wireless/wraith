@@ -4,12 +4,11 @@
  TODO:
   1) make tkMessageBox,tkFileDialog and tkSimpleDialog derive match
     main color scheme
-  2) Disable menu options as necessary
   3) should we add a Database submenu for options like fix database?
   4) move display of log panel to after intializiation() so that
      wraith panel is 'first', leftmost panel - will have to figure out
      how to save messages from init to later
-  5) don't show password prompt on getpwd
+  6)
 """
 
 __name__ = 'wraith-rt'
