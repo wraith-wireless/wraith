@@ -45,6 +45,29 @@ def runningprocess(process):
         if os.path.split(fields[7])[1] == process: pids.append(int(fields[1]))
     return pids
 
+# the following check if nidus/dyskt are running. Because they run under python,
+# we cannot use the above, rather check their pid file for a valid pid and just
+# in case a pid file was left lying around, verify the pid is still running
+# this assumes that a) nidus/dyskt were executed using the service start and
+# b) the pid file is stored in /var/run/<name>.pid
+def nidusrunning():
+    try:
+        # open the pid file and check running status with signal = 0
+        with open('/var/run/nidusd.pid') as fin: os.kill(int(fin.read()),0)
+        return True
+    except (TypeError,IOError,OSError):
+        return False
+
+def dysktrunning():
+    try:
+        # open the pid file and check running status with signal = 0
+        with open('/var/run/dysktd.pid') as fin: os.kill(int(fin.read()),0)
+        return True
+    except (TypeError,IOError,OSError):
+        return False
+
+##### THE GUI(s)
+
 class SimplePanel(gui.SlavePanel):
     """
      Defines a simple panel with body
@@ -126,6 +149,8 @@ class WraithPanel(gui.MasterPanel):
         gui.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
                                  [],True,"widgets/icons/wraith2.png")
 
+        print self._state
+
 #### OVERRIDES
 
     @property
@@ -144,9 +169,14 @@ class WraithPanel(gui.MasterPanel):
             self.logwrite(confMsg,gui.LOG_ERROR)
             return
 
-        # set initial state to initialization
-        self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                       _STATE_FLAGS_NAME_[_STATE_INIT_])
+        # nidus running?
+        if nidusrunning():
+            self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
+                                           _STATE_FLAGS_NAME_[_STATE_NIDUS_])
+
+        if dysktrunning():
+            self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
+                                           _STATE_FLAGS_NAME_[_STATE_DYSKT_])
 
         # determine if postgresql is running
         if runningprocess('postgres'):
@@ -169,18 +199,6 @@ class WraithPanel(gui.MasterPanel):
                 curs = self._conn.cursor()
                 curs.execute("set time zone 'UTC';")
                 self._conn.commit()
-
-                # query for running sensors
-                sql = "select count(*) from sensor where period @> %s::timestamptz;"
-                curs.execute(sql,(ts2iso(time.time()),))
-                rows = curs.fetchall()
-                nS = rows[0][0]
-                if nS:
-                    self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
-                                                   _STATE_FLAGS_NAME_[_STATE_DYSKT_])
-                    self.logwrite("Currently, %d DySKT sensor(s) running" % nS)
-                else:
-                    self.logwrite("No running sensors",gui.LOG_WARNING)
             except psql.OperationalError as e:
                 if e.__str__().find('connect') > 0:
                     self.logwrite("PostgreSQL is not running",gui.LOG_WARNING)
@@ -195,6 +213,11 @@ class WraithPanel(gui.MasterPanel):
                 if curs: curs.close()
         else:
             self.logwrite("PostgreSQL is not running",gui.LOG_WARNING)
+
+        # set initial state to initialized
+        self._state = bits.bitmask_set(_STATE_FLAGS_,self._state,
+                                       _STATE_FLAGS_NAME_[_STATE_INIT_])
+
 
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
