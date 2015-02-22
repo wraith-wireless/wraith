@@ -22,8 +22,9 @@ wraith 0.0.2
 
  TODO:
   1) tried --remove-pid/--remove-pidfile to remove pids of dysktd and nidusd
-     from /var/run but does not work - figure out how to delete the pidfile
-     on daemon exit
+     from /var/run but does not work. Have to use --make-pid to force creation
+     of pid file but then, the pidfile is not removed (ubuntu does not have
+     --remove-pid flag
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

@@ -8,7 +8,8 @@
   4) move display of log panel to after intializiation() so that
      wraith panel is 'first', leftmost panel - will have to figure out
      how to save messages from init to later
-  6)
+  6) fix menu enable/disable
+  8) need to periodically check status of postgres,nidusd and dyskt
 """
 
 __name__ = 'wraith-rt'
@@ -616,7 +617,8 @@ class WraithPanel(gui.MasterPanel):
         if cmdline.runningprocess('postgres'):
             try:
                 self.logwrite("Shutting down PostgreSQL",gui.LOG_NOTE)
-                while cmdline.runningprocess('postgresql'):
+                cmdline.service('postgresql',self._pwd,False)
+                while cmdline.runningprocess('postgres'):
                     self.logwrite("PostgreSQL shutting down...",gui.LOG_NOTE)
                     time.sleep(1.0)
             except RuntimeError as e:
