@@ -8,8 +8,9 @@
   4) move display of log panel to after intializiation() so that
      wraith panel is 'first', leftmost panel - will have to figure out
      how to save messages from init to later
-  6) fix menu enable/disable
+  6) why is clear dyskt log getting disabled
   8) need to periodically check status of postgres,nidusd and dyskt
+  9) get log panel to scroll automatically
 """
 
 __name__ = 'wraith-rt'
@@ -267,8 +268,8 @@ class WraithPanel(gui.MasterPanel):
         self.mnuDySKTLog.add_command(label='View',command=self.viewdysktlog)   # 0
         self.mnuDySKTLog.add_command(label='Clear',command=self.cleardysktlog) # 1
         self.mnuDySKT.add_cascade(label='Log',menu=self.mnuNidusLog)       # 5
-        self.mnuDySKT.add_separator()
-        self.mnuDySKT.add_command(label='Config',command=self.configdyskt) # 6
+        self.mnuDySKT.add_separator()                                      # 6
+        self.mnuDySKT.add_command(label='Config',command=self.configdyskt) # 7
 
         # Help Menu
         self.mnuHelp = Tix.Menu(self.menubar,tearoff=0)
@@ -454,27 +455,17 @@ class WraithPanel(gui.MasterPanel):
         # get all flags
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
 
-        # adjust nidus/dyskt menu
+        # adjust nidus menu
         if flags['store'] and flags['nidus']:
             # all storage components are 'up'
             self.mnuNidus.entryconfig(0,state=Tix.DISABLED)    # start
             self.mnuNidus.entryconfig(1,state=Tix.NORMAL)      # stop
             self.mnuNidusLog.entryconfig(1,state=Tix.DISABLED) # clear log
-
-            # we can start,stop,configure dyskt
-            self.mnuDySKT.entryconfig(0,state=Tix.NORMAL)  # start
-            self.mnuDySKT.entryconfig(1,state=Tix.NORMAL)  # stop
-            self.mnuDySKT.entryconfig(3,state=Tix.NORMAL)  # ctrl panel
         elif not flags['store'] and not flags['nidus']:
             # no storage component is 'up'
             self.mnuNidus.entryconfig(0,state=Tix.NORMAL)    # start
             self.mnuNidus.entryconfig(1,state=Tix.DISABLED)  # stop
             self.mnuNidusLog.entryconfig(1,state=Tix.NORMAL) # clear log
-
-            # cannot do anything with dyskt
-            self.mnuDySKT.entryconfig(0,state=Tix.DISABLED)  # start
-            self.mnuDySKT.entryconfig(1,state=Tix.DISABLED)  # stop
-            self.mnuDySKT.entryconfig(3,state=Tix.DISABLED)  # ctrl panel
         else:
             # storage components are in a 'mixed' state
             self.mnuNidus.entryconfig(0,state=Tix.NORMAL) # start
@@ -484,16 +475,32 @@ class WraithPanel(gui.MasterPanel):
             else:
                 self.mnuNidusLog.entryconfig(1,state=Tix.DISABLED) # clear log
 
-            # cannot start/stop, configure dyskt
+        # adjust dyskt menu
+        if not flags['store'] and not flags['nidus']:
+            # cannot start/stop/control dyskt unless nidus & postgres is running
             self.mnuDySKT.entryconfig(0,state=Tix.DISABLED)  # start
             self.mnuDySKT.entryconfig(1,state=Tix.DISABLED)  # stop
             self.mnuDySKT.entryconfig(3,state=Tix.DISABLED)  # ctrl panel
-
-        # dyskt clear log only
-        if flags['dyskt']:
-            self.mnuDySKTLog.entryconfig(1,state=Tix.DISABLED)
+            self.mnuDySKTLog.entryconfig(0,state=Tix.NORMAL) # view log
+            self.mnuDySKTLog.entryconfig(1,state=Tix.NORMAL) # clear log
+            self.mnuDySKT.entryconfig(7,state=Tix.NORMAL)    # configure
         else:
-            self.mnuDySKTLog.entryconfig(1,state=Tix.NORMAL)
+            if flags['dyskt']:
+                # DySKT sensor is running
+                self.mnuDySKT.entryconfig(0,state=Tix.DISABLED)    # start
+                self.mnuDySKT.entryconfig(1,state=Tix.NORMAL)      # stop
+                self.mnuDySKT.entryconfig(3,state=Tix.NORMAL)      # ctrl panel
+                self.mnuDySKTLog.entryconfig(0,state=Tix.NORMAL)   # view log
+                self.mnuDySKTLog.entryconfig(1,state=Tix.DISABLED) # clear log
+                self.mnuDySKT.entryconfig(7,state=Tix.NORMAL)      # configure
+            else:
+                # DySKT sensor is not running
+                self.mnuDySKT.entryconfig(0,state=Tix.NORMAL)    # start
+                self.mnuDySKT.entryconfig(1,state=Tix.DISABLED)  # stop
+                self.mnuDySKT.entryconfig(3,state=Tix.DISABLED)  # ctrl panel
+                self.mnuDySKTLog.entryconfig(0,state=Tix.NORMAL) # view log
+                self.mnuDySKTLog.entryconfig(1,state=Tix.NORMAL) # clear log
+                self.mnuDySKT.entryconfig(7,state=Tix.NORMAL)    # configure
 
     def _startstorage(self):
         """ start postgresql db and nidus storage manager """

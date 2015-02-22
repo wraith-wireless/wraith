@@ -323,8 +323,8 @@ class MasterPanel(Panel):
      Derived classes should implement:
       _initialize -> if there is functionality that should be started
       _shutdown -> if there is functionality that should be cleanly stopped
-      _makemenu -> to implement any main menu
-      getstate -> if there is a State of the main panel that needs to be know
+      _makemenu -> to implement any menu
+      getstate -> if there is a State of the main panel that needs to be known
        by slave panels
       showpanel -> derive for use in toolsload (loads saved panel configs)
     """
