@@ -7,7 +7,7 @@
 # Short-Description: Initiates DySKT, an Wraith sensor
 ### END INIT INFO
 
-# Author: Dale Patterson <wraith.wireless@hushmail.com>
+# Author: Dale Patterson <wraith.wireless@yandex.com>
 
 # Change the next 3 lines to suit where script is installed and what its called
 PATH=/sbin:/bin:/usr/sbin:/usr/bin

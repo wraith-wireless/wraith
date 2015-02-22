@@ -20,6 +20,7 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
+import time                                # sleeping
 import psycopg2 as psql                    # postgresql api
 import Tix                                 # Tix gui stuff
 from PIL import Image,ImageTk              # image input & support
@@ -90,7 +91,9 @@ class AboutPanel(SimplePanel):
                   fg="white",
                   font=("Roman",16,'bold')).grid(row=1,column=0,sticky=Tix.N)
         Tix.Label(frm,
-                  text="Wireless assault, reconnaissance, collection and exploitation toolkit").grid(row=2,column=0,sticky=Tix.N)
+                  text="Wireless assault, reconnaissance, collection and exploitation toolkit",
+                  fg="white",
+                  font=("Roman",8,'bold')).grid(row=2,column=0,sticky=Tix.N)
 
 #### STATE DEFINITIONS
 _STATE_INIT_   = 0
@@ -120,8 +123,6 @@ class WraithPanel(gui.MasterPanel):
         gui.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
                                  [],True,"widgets/icons/wraith2.png")
 
-        print self._state
-
 #### OVERRIDES
 
     @property
@@ -139,11 +140,6 @@ class WraithPanel(gui.MasterPanel):
         if confMsg:
             self.logwrite(confMsg,gui.LOG_ERR)
             return
-
-        # nidus running?
-        if cmdline.nidusrunning(NIDUSPID): self._setstate(_STATE_NIDUS_)
-
-        if cmdline.dysktrunning(DYSKTPID): self._setstate(_STATE_DYSKT_)
 
         # determine if postgresql is running
         if cmdline.runningprocess('postgres'):
@@ -178,6 +174,19 @@ class WraithPanel(gui.MasterPanel):
                 if curs: curs.close()
         else:
             self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
+
+                # nidus running?
+        if cmdline.nidusrunning(NIDUSPID):
+            self.logwrite("Nidus is running")
+            self._setstate(_STATE_NIDUS_)
+        else:
+            self.logwrite("Nidus is not running",gui.LOG_WARN)
+
+        if cmdline.dysktrunning(DYSKTPID):
+            self.logwrite("DySKT is running")
+            self._setstate(_STATE_DYSKT_)
+        else:
+            self.logwrite("DySKT is not running",gui.LOG_WARN)
 
         # set initial state to initialized
         self._setstate(_STATE_INIT_)
@@ -296,6 +305,8 @@ class WraithPanel(gui.MasterPanel):
     def nidusstart(self):
         """ starts database and storage manager """
         self._startstorage()
+        self._updatestate()
+        self._menuenable()
 
     def nidusstop(self):
         """ stops database and storage manager """
@@ -358,9 +369,7 @@ class WraithPanel(gui.MasterPanel):
         else: self._setstate(_STATE_CONN_,False)
 
     def _setstate(self,f,up=True):
-        """
-         sets internal state's flag f to 1 if up is True or 0 otherwise
-        """
+        """ sets internal state's flag f to 1 if up is True or 0 otherwise """
         if up:
             self._state = bits.bitmask_set(_STATE_FLAGS_,
                                            self._state,
@@ -405,7 +414,7 @@ class WraithPanel(gui.MasterPanel):
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
 
         # adjust nidus/dyskt menu
-        if flags['store'] and flags['conn'] and flags['nidus']:
+        if flags['store'] and flags['nidus']:
             # all storage components are 'up'
             self.mnuNidus.entryconfig(0,state=Tix.DISABLED) # start
             self.mnuNidus.entryconfig(1,state=Tix.NORMAL)   # stop
@@ -413,42 +422,63 @@ class WraithPanel(gui.MasterPanel):
             # we can start,stop,configure dyskt
             self.mnuDySKT.entryconfig(0,state=Tix.NORMAL)  # start
             self.mnuDySKT.entryconfig(1,state=Tix.NORMAL)  # stop
-            self.mnuDySKT.entryconfig(3,state=Tix.NORMAL) # ctrl panel
-        elif not flags['store'] and not flags['conn'] and not flags['nidus']:
+            self.mnuDySKT.entryconfig(3,state=Tix.NORMAL)  # ctrl panel
+        elif not flags['store'] and not flags['nidus']:
             # no storage component is 'up'
             self.mnuNidus.entryconfig(0,state=Tix.NORMAL)   # start
             self.mnuNidus.entryconfig(1,state=Tix.DISABLED) # stop
 
-            # we cannot do anything with dyskt
+            # cannot do anything with dyskt
             self.mnuDySKT.entryconfig(0,state=Tix.DISABLED)  # start
             self.mnuDySKT.entryconfig(1,state=Tix.DISABLED)  # stop
-            self.mnuDySKT.entryconfig(3,state=Tix.DISABLED) # ctrl panel
+            self.mnuDySKT.entryconfig(3,state=Tix.DISABLED)  # ctrl panel
         else:
             # storage components are in a 'mixed' state
             self.mnuNidus.entryconfig(0,state=Tix.NORMAL) # start
             self.mnuNidus.entryconfig(1,state=Tix.NORMAL) # stop
 
-            # we can start/stop, configure dyskt only if store and nidus are up
-            if flags['store'] and flags['nidus']:
-                self.mnuDySKT.entryconfig(0,state=Tix.NORMAL)  # start
-                self.mnuDySKT.entryconfig(1,state=Tix.NORMAL)  # stop
-                self.mnuDySKT.entryconfig(3,state=Tix.NORMAL) # ctrl panel
+            # cannot start/stop, configure dyskt
+            self.mnuDySKT.entryconfig(0,state=Tix.DISABLED)  # start
+            self.mnuDySKT.entryconfig(1,state=Tix.DISABLED)  # stop
+            self.mnuDySKT.entryconfig(3,state=Tix.DISABLED)  # ctrl panel
 
     def _startstorage(self):
         """ start postgresql db and nidus storage manager """
-
         # do we have a password
         if not self._pwd:
             pwd = self._getpwd()
             if pwd is None:
                 self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
                 return
+            self._pwd = pwd
 
         # get our flags
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
 
+        # start necessary storage components
         if not flags['store']:
             self.logwrite("Starting PostgreSQL...")
+            try:
+                # try sudo /etc/init.d/postgresql start
+                cmdline.service('postgresql',self._pwd)
+                time.sleep(0.5)
+                if not cmdline.runningprocess('postgres'):
+                    raise RuntimeError('unknown')
+            except RuntimeError as e:
+                self.logwrite("Error starting PostgreSQL: %s" % e,gui.LOG_ERR)
+                return
+
+        # start nidus
+        if not flags['nidus']:
+            self.logwrite("Starting Nidus...")
+            try:
+                cmdline.service('nidusd',self._pwd)
+                time.sleep(0.5)
+                if not cmdline.nidusrunning(NIDUSPID):
+                    raise RuntimeError('unknown')
+            except RuntimeError as e:
+                self.logwrite("Error starting Nidus: %s" % e,gui.LOG_ERR)
+                return
 
     def _stopstorage(self):
         """ stop posgresql db and nidus storage manager """
