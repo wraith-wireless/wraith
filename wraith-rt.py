@@ -20,15 +20,16 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import time                                # sleeping
-import psycopg2 as psql                    # postgresql api
-import Tix                                 # Tix gui stuff
-from PIL import Image,ImageTk              # image input & support
-import ConfigParser                        # config file parsing
-import wraith                              # helpful functions/version etc
-import wraith.widgets.panel as gui         # graphics suite
-from wraith.utils import bits              # bitmask functions
-from wraith.utils import cmdline           # command line stuff
+import time                        # sleeping
+import psycopg2 as psql            # postgresql api
+import Tix                         # Tix gui stuff
+import tkMessageBox as tkMB        # info dialogs
+from PIL import Image,ImageTk      # image input & support
+import ConfigParser                # config file parsing
+import wraith                      # helpful functions/version etc
+import wraith.widgets.panel as gui # graphics suite
+from wraith.utils import bits      # bitmask functions
+from wraith.utils import cmdline   # command line stuff
 
 #### CONSTANTS
 
@@ -114,10 +115,11 @@ class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
     def __init__(self,toplevel):
         # our variables
-        self._conf = None # configuration
-        self._state = 0   # bitmask state
-        self._conn = None # connection to data storage
-        self._pwd = None  # sudo password (should we not save it?)
+        self._conf = None  # configuration
+        self._state = 0    # bitmask state
+        self._conn = None  # connection to data storage
+        self._bSQL = False # postgresql was running on startup
+        self._pwd = None   # sudo password (should we not save it?)
 
         # set up super
         gui.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
@@ -143,6 +145,8 @@ class WraithPanel(gui.MasterPanel):
 
         # determine if postgresql is running
         if cmdline.runningprocess('postgres'):
+            self._bSQL = True
+
             # update state
             self._setstate(_STATE_STORE_)
 
@@ -196,8 +200,14 @@ class WraithPanel(gui.MasterPanel):
 
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
+        # set the state
         self._setstate(_STATE_EXIT_)
-        if self._conn: self._conn.close()
+
+        # shutdown dyskt
+        self._stopsensor()
+
+        # shutdown storage
+        self._stopstorage()
 
     def _makemenu(self):
         """ make the menu """
@@ -211,13 +221,7 @@ class WraithPanel(gui.MasterPanel):
         self.mnuWraithGui.add_command(label='Load',command=self.guiload)
         self.mnuWraith.add_cascade(label='Gui',menu=self.mnuWraithGui)
         self.mnuWraith.add_separator()
-        self.mnuWraithEdit = Tix.Menu(self.mnuWraith,tearoff=0)
-        self.mnuWraithEdit.add_command(label='Preferences',command=self.editprefs)
-        self.mnuWraithEdit.add_command(label='Nidus Preferences',
-                                       command=self.editdysktprefs)
-        self.mnuWraithEdit.add_command(label='DySKT Preferences',
-                                       command=self.editnidusprefs)
-        self.mnuWraith.add_cascade(label='Edit',menu=self.mnuWraithEdit)
+        self.mnuWraith.add_command(label='Configure',command=self.configwraith)
         self.mnuWraith.add_separator()
         self.mnuWraith.add_command(label='Exit',command=self.panelquit)
 
@@ -233,24 +237,32 @@ class WraithPanel(gui.MasterPanel):
         self.mnuView.add_command(label='Data Bins',command=self.viewdatabins)
         self.mnuView.add_separator()
         self.mnuView.add_command(label='Data',command=self.viewdata)
-        self.mnuView.add_separator()
-        self.mnuViewLogs = Tix.Menu(self.mnuView,tearoff=0)
-        self.mnuViewLogs.add_command(label='Nidus',command=self.viewniduslog)
-        self.mnuViewLogs.add_command(label='DySKT',command=self.viewdysktlog)
-        self.mnuView.add_cascade(label='Logs',menu=self.mnuViewLogs)
 
         # Nidus Menu
         self.mnuNidus = Tix.Menu(self.menubar,tearoff=0)
-        self.mnuNidus.add_command(label='Start',command=self.nidusstart) # 0
-        self.mnuNidus.add_command(label='Stop',command=self.nidusstop)   # 1
+        self.mnuNidus.add_command(label='Start',command=self.nidusstart)     # 0
+        self.mnuNidus.add_command(label='Stop',command=self.nidusstop)       # 1
+        self.mnuNidus.add_separator()                                        # 2
+        self.mnuNidusLog = Tix.Menu(self.mnuNidus,tearoff=0)
+        self.mnuNidusLog.add_command(label='View',command=self.viewniduslog)   # 0
+        self.mnuNidusLog.add_command(label='Clear',command=self.clearniduslog) # 1
+        self.mnuNidus.add_cascade(label='Log',menu=self.mnuNidusLog)         # 3
+        self.mnuNidus.add_separator()
+        self.mnuNidus.add_command(label='Config',command=self.confignidus)   # 4
 
         # DySKT Menu
         self.mnuDySKT = Tix.Menu(self.menubar,tearoff=0)
-        self.mnuDySKT.add_command(label='Start',command=self.dysktstart) # 0
-        self.mnuDySKT.add_command(label='Stop',command=self.dysktstop)   # 1
-        self.mnuDySKT.add_separator()                                    # 2
-        self.mnuDySKT.add_command(label='Control Panel',
-                                  command=self.dysktctrlpnl)             # 3
+        self.mnuDySKT.add_command(label='Start',command=self.dysktstart)   # 0
+        self.mnuDySKT.add_command(label='Stop',command=self.dysktstop)     # 1
+        self.mnuDySKT.add_separator()                                      # 2
+        self.mnuDySKT.add_command(label='Control',command=self.dysktctrl)  # 3            # 3
+        self.mnuDySKT.add_separator()                                      # 4
+        self.mnuDySKTLog = Tix.Menu(self.mnuNidus,tearoff=0)
+        self.mnuDySKTLog.add_command(label='View',command=self.viewdysktlog)   # 0
+        self.mnuDySKTLog.add_command(label='Clear',command=self.cleardysktlog) # 1
+        self.mnuDySKT.add_cascade(label='Log',menu=self.mnuNidusLog)       # 5
+        self.mnuDySKT.add_separator()
+        self.mnuDySKT.add_command(label='Config',command=self.configdyskt) # 6
 
         # Help Menu
         self.mnuHelp = Tix.Menu(self.menubar,tearoff=0)
@@ -267,17 +279,12 @@ class WraithPanel(gui.MasterPanel):
 
 #### MENU CALLBACKS
 
-    def editprefs(self):
+    #### Wraith Menu
+    def configwraith(self):
         """ display config file preference editor """
         self.unimplemented()
 
-    def editnidusprefs(self):
-        """ display nidus config file preference editor """
-        self.unimplemented()
-
-    def editdysktprefs(self):
-        """ display dyskt config file preference editor """
-        self.unimplemented()
+#### View Menu
 
     def viewdatabins(self):
         """ display the data bins panel """
@@ -294,13 +301,7 @@ class WraithPanel(gui.MasterPanel):
         """ display data panel """
         self.unimplemented()
 
-    def viewniduslog(self):
-        """ display data panel """
-        self.unimplemented()
-
-    def viewdysktlog(self):
-        """ display data panel """
-        self.unimplemented()
+#### Nidus Menu
 
     def nidusstart(self):
         """ starts database and storage manager """
@@ -311,18 +312,52 @@ class WraithPanel(gui.MasterPanel):
     def nidusstop(self):
         """ stops database and storage manager """
         self._stopstorage()
+        self._updatestate()
+        self._menuenable()
+
+    def viewniduslog(self):
+        """ display Nidus log """
+        self.unimplemented()
+
+    def clearniduslog(self):
+        """ clear nidus log """
+        self.unimplemented()
+
+    def confignidus(self):
+        """ display nidus config file preference editor """
+        self.unimplemented()
+
+#### DySKT Menu
 
     def dysktstart(self):
         """ starts DySKT sensor """
-        self.unimplemented()
+        self._startsensor()
+        self._updatestate()
+        self._menuenable()
 
     def dysktstop(self):
         """ stops DySKT sensor """
-        self.unimplemented()
+        self._stopsensor()
+        self._updatestate()
+        self._menuenable()
 
-    def dysktctrlpnl(self):
+    def dysktctrl(self):
         """ displays DySKT Control Panel """
         self.unimplemented()
+
+    def viewdysktlog(self):
+        """ display DySKT log """
+        self.unimplemented()
+
+    def cleardysktlog(self):
+        """ clears the DySKT log """
+        self.unimplemented()
+
+    def configdyskt(self):
+        """ display dyskt config file preference editor """
+        self.unimplemented()
+
+#### HELP MENU
 
     def about(self):
         """ display the about panel """
@@ -387,21 +422,21 @@ class WraithPanel(gui.MasterPanel):
         self._conf = {}
         try:
             ## STORAGE
-            # read in mandatory
             self._conf['store'] = {'host':conf.get('Storage','host'),
                                    'db':conf.get('Storage','db'),
                                    'user':conf.get('Storage','user'),
-                                   'pwd':conf.get('Storage','pwd'),
-                                   'polite':True,
+                                   'pwd':conf.get('Storage','pwd')}
+
+            ## POLICY
+            self._conf['policy'] = {'polite':True,
                                    'shutdown':True}
 
-            # optional
-            if conf.has_option('Storage','polite'):
-                if conf.get('Storage','polite').lower() == 'off':
-                    self._conf['store']['polite'] = False
-            if conf.has_option('Storage','shutdown'):
-                if conf.get('Storage','shutdown').lower() == 'manual':
-                    self._conf['store']['shutdown'] = False
+            if conf.has_option('Policy','polite'):
+                if conf.get('Policy','polite').lower() == 'off':
+                    self._conf['policy']['polite'] = False
+            if conf.has_option('Policy','shutdown'):
+                if conf.get('Policy','shutdown').lower() == 'manual':
+                    self._conf['ploicy']['shutdown'] = False
 
             # return no errors
             return ''
@@ -416,8 +451,9 @@ class WraithPanel(gui.MasterPanel):
         # adjust nidus/dyskt menu
         if flags['store'] and flags['nidus']:
             # all storage components are 'up'
-            self.mnuNidus.entryconfig(0,state=Tix.DISABLED) # start
-            self.mnuNidus.entryconfig(1,state=Tix.NORMAL)   # stop
+            self.mnuNidus.entryconfig(0,state=Tix.DISABLED)    # start
+            self.mnuNidus.entryconfig(1,state=Tix.NORMAL)      # stop
+            self.mnuNidusLog.entryconfig(1,state=Tix.DISABLED) # clear log
 
             # we can start,stop,configure dyskt
             self.mnuDySKT.entryconfig(0,state=Tix.NORMAL)  # start
@@ -425,8 +461,9 @@ class WraithPanel(gui.MasterPanel):
             self.mnuDySKT.entryconfig(3,state=Tix.NORMAL)  # ctrl panel
         elif not flags['store'] and not flags['nidus']:
             # no storage component is 'up'
-            self.mnuNidus.entryconfig(0,state=Tix.NORMAL)   # start
-            self.mnuNidus.entryconfig(1,state=Tix.DISABLED) # stop
+            self.mnuNidus.entryconfig(0,state=Tix.NORMAL)    # start
+            self.mnuNidus.entryconfig(1,state=Tix.DISABLED)  # stop
+            self.mnuNidusLog.entryconfig(1,state=Tix.NORMAL) # clear log
 
             # cannot do anything with dyskt
             self.mnuDySKT.entryconfig(0,state=Tix.DISABLED)  # start
@@ -436,11 +473,21 @@ class WraithPanel(gui.MasterPanel):
             # storage components are in a 'mixed' state
             self.mnuNidus.entryconfig(0,state=Tix.NORMAL) # start
             self.mnuNidus.entryconfig(1,state=Tix.NORMAL) # stop
+            if not flags['nidus']:
+                self.mnuNidusLog.entryconfig(1,state=Tix.NORMAL)   # clear log
+            else:
+                self.mnuNidusLog.entryconfig(1,state=Tix.DISABLED) # clear log
 
             # cannot start/stop, configure dyskt
             self.mnuDySKT.entryconfig(0,state=Tix.DISABLED)  # start
             self.mnuDySKT.entryconfig(1,state=Tix.DISABLED)  # stop
             self.mnuDySKT.entryconfig(3,state=Tix.DISABLED)  # ctrl panel
+
+        # dyskt clear log only
+        if flags['dyskt']:
+            self.mnuDySKTLog.entryconfig(1,state=Tix.DISABLED)
+        else:
+            self.mnuDySKTLog.entryconfig(1,state=Tix.NORMAL)
 
     def _startstorage(self):
         """ start postgresql db and nidus storage manager """
@@ -457,7 +504,7 @@ class WraithPanel(gui.MasterPanel):
 
         # start necessary storage components
         if not flags['store']:
-            self.logwrite("Starting PostgreSQL...")
+            self.logwrite("Starting PostgreSQL...",gui.LOG_NOTE)
             try:
                 # try sudo /etc/init.d/postgresql start
                 cmdline.service('postgresql',self._pwd)
@@ -467,10 +514,13 @@ class WraithPanel(gui.MasterPanel):
             except RuntimeError as e:
                 self.logwrite("Error starting PostgreSQL: %s" % e,gui.LOG_ERR)
                 return
+            else:
+                self.logwrite("PostgreSQL started")
+                self._setstate(_STATE_STORE_)
 
         # start nidus
         if not flags['nidus']:
-            self.logwrite("Starting Nidus...")
+            self.logwrite("Starting Nidus...",gui.LOG_NOTE)
             try:
                 cmdline.service('nidusd',self._pwd)
                 time.sleep(0.5)
@@ -478,10 +528,104 @@ class WraithPanel(gui.MasterPanel):
                     raise RuntimeError('unknown')
             except RuntimeError as e:
                 self.logwrite("Error starting Nidus: %s" % e,gui.LOG_ERR)
-                return
+            else:
+                self.logwrite("Nidus Started")
+                self._setstate(_STATE_NIDUS_)
+
+        # connect to db
+        self.logwrite("Connecting to Nidus Datastore...",gui.LOG_NOTE)
+        curs = None
+        try:
+            # attempt to connect and set state accordingly
+            self._conn = psql.connect(host=self._conf['store']['host'],
+                                      dbname=self._conf['store']['db'],
+                                      user=self._conf['store']['user'],
+                                      password=self._conf['store']['pwd'],)
+
+            # set to use UTC and enable CONN flag
+            curs = self._conn.cursor()
+            curs.execute("set time zone 'UTC';")
+            self._conn.commit()
+
+            self.logwrite("Connected to datastore")
+            self._setstate(_STATE_CONN_)
+        except psql.OperationalError as e:
+            if e.__str__().find('connect') > 0:
+                self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
+                self._setstate(_STATE_STORE_,False)
+            elif e.__str__().find('authentication') > 0:
+                self.logwrite("Authentication string is invalid",gui.LOG_ERR)
+            else:
+                self.logwrite("Unspecified DB error occurred",gui.LOG_ERR)
+                self._conn.rollback()
+        finally:
+            if curs: curs.close()
 
     def _stopstorage(self):
         """ stop posgresql db and nidus storage manager """
+        # get our flags
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+
+        # if DySKT is running, prompt for clearance
+        if flags['dyskt']:
+            ans = tkMB.askquestion('DySKT Running',
+                                   'Shutdown and lose queued data?',parent=self)
+            if ans == 'no': return
+
+        # do we have a password
+        if not self._pwd:
+            pwd = self._getpwd()
+            if pwd is None:
+                self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
+                return
+            self._pwd = pwd
+
+        # disconnect from db
+        if self._conn:
+            self.logwrite("Disconnecting from Nidus datastore",gui.LOG_NOTE)
+            self._conn.close()
+            self._conn = None
+            self._setstate(_STATE_CONN_,False)
+            self.logwrite("Disconnected from Nidus datastore")
+
+        # before shutting down nidus & postgresql, confirm auto shutdown is enabled
+        if not self._conf['policy']['shutdown']: return
+
+        # shutdown nidus
+        if flags['nidus']:
+            try:
+                self.logwrite("Shutting down Nidus",gui.LOG_NOTE)
+                cmdline.service('nidusd',self._pwd,False)
+                while cmdline.nidusrunning(NIDUSPID):
+                    self.logwrite("Nidus still processing data...",gui.LOG_NOTE)
+                    time.sleep(1.0)
+            except RuntimeError as e:
+                self.logwrite("Error shutting down Nidus: %s" % e,gui.LOG_ERR)
+            else:
+                self._setstate(_STATE_NIDUS_,False)
+                self.logwrite("Nidus shut down")
+
+        # shutdown postgresql (check first if polite)
+        if self._conf['policy']['polite'] and self._bSQL: return
+
+        if cmdline.runningprocess('postgres'):
+            try:
+                self.logwrite("Shutting down PostgreSQL",gui.LOG_NOTE)
+                while cmdline.runningprocess('postgresql'):
+                    self.logwrite("PostgreSQL shutting down...",gui.LOG_NOTE)
+                    time.sleep(1.0)
+            except RuntimeError as e:
+                self.logwrite("Error shutting down PostgreSQL",gui.LOG_ERR)
+            else:
+                self._setstate(_STATE_STORE_,False)
+                self.logwrite("PostgreSQL shut down")
+
+    def _startsensor(self):
+        """ starts the DySKT sensor """
+        pass
+
+    def _stopsensor(self):
+        """ stops the DySKT sensor """
         pass
 
     def _getpwd(self):

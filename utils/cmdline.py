@@ -24,13 +24,12 @@ def runningprocess(process):
         if os.path.split(fields[7])[1] == process: pids.append(int(fields[1]))
     return pids
 
-def nidusrunning(pidfile=None):
+def nidusrunning(pidfile):
     """
      the following checks if nidus is running. Because it runs under python,
      we cannot use ps, rather check the pidfile for a valid pid assumes that
      nidus was executed using the service start
     """
-    if not pidfile: pidfile = '/var/run/nidusd.pid'
     try:
         # open the pid file and check running status with signal = 0
         with open(pidfile) as fin: os.kill(int(fin.read()),0)
@@ -38,9 +37,8 @@ def nidusrunning(pidfile=None):
     except (TypeError,IOError,OSError):
         return False
 
-def dysktrunning(pidfile=None):
+def dysktrunning(pidfile):
     """ see nidusrunning """
-    if not pidfile: pidfile = '/var/run/dysktd.pid'
     try:
         # open the pid file and check running status with signal = 0
         with open(pidfile) as fin: os.kill(int(fin.read()),0)
