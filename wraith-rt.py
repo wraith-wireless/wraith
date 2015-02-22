@@ -125,10 +125,15 @@ class WraithPanel(gui.MasterPanel):
         gui.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
                                  [],True,"widgets/icons/wraith2.png")
 
-#### OVERRIDES
+#### PROPS
 
     @property
     def getstate(self): return self._state
+
+    @property
+    def getstateflags(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)
+
+#### OVERRIDES
 
     def _initialize(self):
         """ attempts connect to datastorage server """
