@@ -123,6 +123,9 @@ class WraithPanel(gui.MasterPanel):
         self._bSQL = False # postgresql was running on startup
         self._pwd = None   # sudo password (should we not save it?)
 
+        # load icons
+        #self.
+
         # set up super
         gui.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
                                  [],True,"widgets/icons/wraith2.png")
@@ -209,6 +212,9 @@ class WraithPanel(gui.MasterPanel):
         """ if connected to datastorage, closes connection """
         # set the state
         self._setstate(_STATE_EXIT_)
+
+        # get all flags
+        #flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
 
         # shutdown dyskt
         self._stopsensor()
@@ -584,6 +590,9 @@ class WraithPanel(gui.MasterPanel):
             ans = tkMB.askquestion('DySKT Running',
                                    'Shutdown and lose queued data?',parent=self)
             if ans == 'no': return
+
+        # return if no storage component is running
+        if not (flags['store'] or flags['conn'] or flags['nidus']): return
 
         # do we have a password
         if not self._pwd:
