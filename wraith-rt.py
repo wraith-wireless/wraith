@@ -138,7 +138,7 @@ class WraithPanel(gui.MasterPanel):
 #### OVERRIDES
 
     def _initialize(self):
-        """ attempts connect to datastorage server """
+        """ initialize gui, determine initial state """
         # configure panel & write initial message
         self.tk.wm_geometry("350x3+0+0")
         self.tk.resizable(0,0)
