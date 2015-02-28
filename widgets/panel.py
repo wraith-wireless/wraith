@@ -7,7 +7,7 @@ Panels can be configured so that they can be opened, closed, "raised", minimized
 by the user or only by a calling panel
 
  TODO:
-   3) handle no icons
+   3) handle no icons or invalid icon paths
 """
 
 __name__ = 'panel'
@@ -75,7 +75,7 @@ class PasswordDialog(tkSD.Dialog):
 
 class Panel(Tix.Frame):
     """
-     Panel: Superclass from which all gui classes are derived 
+     Panel: Superclass from which all non-modal gui classes are derived
       1) traps the exit from the title bar and passes it to derived close
       2) maintains a dictionary of opened slave panels
         self._panels["panelname"] => [panel1,panel2,...,paneln]

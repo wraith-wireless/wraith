@@ -11,6 +11,7 @@
   6) why is clear dyskt log getting disabled
   8) need to periodically check status of postgres,nidusd and dyskt
   9) get log panel to scroll automatically
+ 10) add labels to frames
 """
 
 __name__ = 'wraith-rt'
@@ -83,7 +84,8 @@ class DataBinPanel(SimplePanel):
 class AboutPanel(SimplePanel):
     """ AboutPanel - displays a simple About Panel """
     def __init__(self,toplevel,chief):
-        SimplePanel.__init__(self,toplevel,chief,"About Wraith",None)
+        SimplePanel.__init__(self,toplevel,chief,"About Wraith","widgets/icons/about.png")
+
     def _body(self):
         frm = Tix.Frame(self)
         frm.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
@@ -97,6 +99,24 @@ class AboutPanel(SimplePanel):
                   text="Wireless assault, reconnaissance, collection and exploitation toolkit",
                   fg="white",
                   font=("Roman",8,'bold')).grid(row=2,column=0,sticky=Tix.N)
+
+class WraithConfigPanel(SimplePanel):
+    """ Display Wraith Configuration Panel """
+    def __init__(self,toplevel,chief):
+        SimplePanel.__init__(self,toplevel,chief,"Configure Wraith","widgets/icons/config.png")
+
+    def _body(self):
+        """ make wigets for the body """
+        # main frame
+        frm = Tix.Frame(self)
+        frm.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+
+        # Two subframes, Storage and Policy
+        frmS = Tix.LabelFrame(frm)
+        frmS.grid(row=0,column=0,sticky=Tix.N)
+
+        frmP = Tix.LabelFrame(frm)
+        frmP.grid(row=1,column=0,sticky=Tix.N)
 
 #### STATE DEFINITIONS
 _STATE_INIT_   = 0
@@ -116,15 +136,13 @@ _STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
 class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
     def __init__(self,toplevel):
+        # set up, initialize parent and then initialize the gui
         # our variables
         self._conf = None  # configuration
         self._state = 0    # bitmask state
         self._conn = None  # connection to data storage
         self._bSQL = False # postgresql was running on startup
         self._pwd = None   # sudo password (should we not save it?)
-
-        # load icons
-        #self.
 
         # set up super
         gui.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
@@ -143,7 +161,9 @@ class WraithPanel(gui.MasterPanel):
     def _initialize(self):
         """ initialize gui, determine initial state """
         # configure panel & write initial message
-        self.tk.wm_geometry("350x3+0+0")
+        # have to manually enter the desired size, as the menu does not expand
+        # the visibile portion automatically
+        self.tk.wm_geometry("280x1+0+0")
         self.tk.resizable(0,0)
         self.logwrite("Wraith v%s" % wraith.__version__)
 
@@ -212,9 +232,6 @@ class WraithPanel(gui.MasterPanel):
         """ if connected to datastorage, closes connection """
         # set the state
         self._setstate(_STATE_EXIT_)
-
-        # get all flags
-        #flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
 
         # shutdown dyskt
         self._stopsensor()
@@ -292,10 +309,17 @@ class WraithPanel(gui.MasterPanel):
 
 #### MENU CALLBACKS
 
-    #### Wraith Menu
+#### Wraith Menu
     def configwraith(self):
         """ display config file preference editor """
-        self.unimplemented()
+        panel = self.getpanels("preferences",False)
+        if not panel:
+            t = Tix.Toplevel()
+            pnl = WraithConfigPanel(t,self)
+            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"preferences"))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
 
 #### View Menu
 

@@ -29,7 +29,7 @@ from internal import Report         # message report template
 from rto import RTO                 # the rto
 from rdoctl import RadioController  # Radio object etc
 from wraith.radio import channels   # channel specifications
-from wraith.radio.iw import IW_CHWS # channel widths
+from wraith.radio import iw         # channel widths and region set/get
 
 #### set up log
 # have to configure absolute path
@@ -70,6 +70,7 @@ class DySKT(object):
         self._rto = None            # data collation/forwarding
         self._rr = None             # recon radio
         self._cr = None             # collection radio
+        self._rd = None             # regulatory domain
     
     def _create(self):
         """ create DySKT and member processes """
@@ -78,7 +79,7 @@ class DySKT(object):
 
         # intialize shared objects
         self._halt = mp.Event() # our stop event
-        self._ic = mp.Queue()         # comms for children
+        self._ic = mp.Queue()   # comms for children
         self._pConns = {}       # dict of connections to children
 
         # initialize children
@@ -86,6 +87,17 @@ class DySKT(object):
         # a RuntimeError failure
         logging.info("Initializing subprocess...")
         try:
+            # set the region? if so, we need to do it prior to starting the
+            # RadioController
+            if self._conf['local']['region']:
+                logging.info("Setting regulatory domain to %s",
+                             self._conf['local']['region'])
+                self._rd = iw.regget()
+                iw.regset(self._conf['local']['region'])
+                if iw.regget() != self._conf['local']['region']:
+                    logging.warn("Failed to set regulatory domain to %s",
+                                 self._conf['local']['region'])
+
             # recon radio is mandatory
             logging.info("Starting Reconnaissance Radio")
             (conn1,conn2) = mp.Pipe()
@@ -131,9 +143,20 @@ class DySKT(object):
         # change our state
         self._state = DYSKT_EXITING
 
+        # reset regulatory domain if necessary
+        logging.info("Resetting regulatory domain")
+        if self._rd:
+            try:
+                iw.regset(self._rd)
+                if iw.regget() != self._rd: raise RuntimeError
+            except:
+                logging.warn("Failed to reset regulatory domain")
+
         # halt main execution loop & send out poison pills
+        # put a token on the internal comms from us to break the RTO out of
+        # any holding for data block
         logging.info("Stopping Sub-processes")
-        self._halt.set() # stops main loop in start
+        self._halt.set()
         self._ic.put(Report('dyskt',time.time(),'!CHECK!',[]))
         for key in self._pConns.keys():
             try:
@@ -245,8 +268,16 @@ class DySKT(object):
             self._conf['store'] = {'host':conf.get('Storage','host'),
                                    'port':conf.getint('Storage','port')}
 
-            # C2C section
-            self._conf['c2c'] = {'port',conf.getint('C2C','port')}
+            # Local section
+            self._conf['local'] = {'region':None,'c2c':None}
+            if conf.has_option('Lcoal','C2C'):
+                self._conf['local']['c2c'] = conf.getint('Local','C2C')
+            if conf.has_option('Local','region'):
+                reg = conf.get('Local','region')
+                if len(reg) != 2:
+                    logging.warn("Regulatory domain %s is invalid" % reg)
+                else:
+                    self._conf['local']['region'] = conf.get('Local','region')
         except ConfigParser.NoSectionError as e:
             raise DySKTConfException("%s" % e)
         except ConfigParser.NoOptionError as e:
@@ -290,7 +321,7 @@ class DySKT(object):
             try:
                 (ch,chw) = conf.get(rtype,'scan_start').split(':')
                 ch = int(ch) if ch else r['scan'][0][0]
-                if not chw in IW_CHWS: chw = r['scan'][0][1]
+                if not chw in iw.IW_CHWS: chw = r['scan'][0][1]
                 r['scan_start'] = (ch,chw) if (ch,chw) in r['scan'] else r['scan'][0]
             except ValueError:
                 # use default
@@ -341,11 +372,11 @@ class DySKT(object):
 
         # compile all possible combinations
         if (chs,ws) == ([],[]):
-            if ptype == 'scan': return [(ch,chw) for chw in IW_CHWS for ch in channels.channels()]
+            if ptype == 'scan': return [(ch,chw) for chw in iw.IW_CHWS for ch in channels.channels()]
         elif not chs:
             return [(ch,chw) for chw in ws for ch in channels.channels()]
         elif not ws:
-            return [(ch,chw) for chw in IW_CHWS for ch in chs]
+            return [(ch,chw) for chw in iw.IW_CHWS for ch in chs]
         else:
             return [(ch,chw) for chw in ws for ch in chs]
 

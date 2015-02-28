@@ -39,6 +39,7 @@ dyskt 0.1.5
  - removed signal handling as a means to pass commands
    o need to code command interface
  - added mac spoofing cability on start of each radio
+ - added regulatory domain setting/resetting capability to sensor
 
 TODO:
      ** After testing remove set raw capability from python **

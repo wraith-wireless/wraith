@@ -25,6 +25,7 @@ radio 0.0.5
     o defined a 'wrapper' class around the mpdu dict
     o added wep, tkip and ccmp parsing
     o decided to pass on parsing msb of qosctrl to 'clients'
+  - modified regget in iw to allow partial parsing of regulatory domain
 
 TODO:
  1) Should we add support for AVS, Prism headers ?

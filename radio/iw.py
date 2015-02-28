@@ -222,30 +222,34 @@ def txpwrget(nic):
         raise IWException("Failed to get txpower of %s" % nic)
     else:
         return int(pwr)
-"""
- regulatory domain
- NOTE: to set to BO reg use 
- sudo iw reg set BO
- sudo ifconfig alfa0 down
- sudo ifconfig alfa0 up
-"""
 
-def regget():
+def regset(region):
     """
-     a sub of iw for retrieving regulatory domain info
-     parsing output is left to caller
+     a sub of iw for setting regulatory domain to <region>
+     NOTE: IOT take effect, reg set should be called first, then take the
+     card and bring it back up
+    """
+    cmd = ['iw','reg','set',region]
+    if os.getuid() != 0: cmd.insert(0,'sudo')
+    p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
+    out,err = p.communicate()
+    if err: raise IWException(err.split(':')[1].strip())
+
+def regget(regOnly=True):
+    """
+     a sub of iw for retrieving regulatory domain info. if regOnly, will return
+     the two-alphanumeric code for the current region, otherwise will return
+     the entire output, leaving parsing up to the caller
     """
     cmd = ['iw','reg','get']
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
     if err: raise IWException(err.split(':')[1].strip())
-    return out
-
-def regset(region):
-    """ a sub of iw for setting regulatory domain to <region> """
-    cmd = ['iw','reg','get',region]
-    if os.getuid() != 0: cmd.insert(0,'sudo')
-    p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
-    out,err = p.communicate()
-    if err: raise IWException(err.split(':')[1].strip())
-    
+    if regOnly:
+        try:
+            return re.search(r'country (.*):',out).group(1)
+        except AttributeError:
+            # re error raise an unknown
+            raise IWException("Failed to get regulatory domain")
+    else:
+        return out
