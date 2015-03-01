@@ -7,13 +7,15 @@ by a pf and 3) messages from tuner(s) and sniffer(s0
 """
 __name__ = 'rto'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.10'
-__date__ = 'January 2015'
+__version__ = '0.0.11'
+__date__ = 'March 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
+import platform                            # system details
+import sys                                 # python intepreter details
 import signal                              # signal processing
 import time                                # sleep and timestamps
 import socket                              # connection to nidus and gps device
@@ -22,7 +24,6 @@ import mgrs                                # lat/lon to mgrs conversion
 import gps                                 # gps device access
 from Queue import Queue, Empty             # thread-safe queue
 import multiprocessing as mp               # multiprocessing
-from internal import Report                # report class
 from wraith.utils.timestamps import ts2iso # timestamp conversion
 
 class GPSPoller(threading.Thread):
@@ -136,13 +137,14 @@ class RTO(mp.Process):
          conf - necessary config details
         """
         mp.Process.__init__(self)
-        self._comms = comms       # communications deque
-        self._conn = conn         # message queue to/from DySKT
-        self._mgrs = None         # lat/lon to mgrs conversion
-        self._conf = conf['gps']  # configuration for gps/datastore
-        self._nidus = None        # nidus server
-        self._flt = None          # geo thread
-        self._q = None            # our queue to gps poller
+        self._comms = comms                # communications queue
+        self._conn = conn                  # message queue to/from DySKT
+        self._mgrs = None                  # lat/lon to mgrs conversion
+        self._conf = conf['gps']           # configuration for gps/datastore
+        self._rd = conf['local']['region'] # regulatory domain
+        self._nidus = None                 # nidus server
+        self._flt = None                   # geo thread
+        self._q = None                     # our queue to gps poller
         self._setup(conf['store']['host'],conf['store']['port'])
 
     def _setup(self,host,port):
@@ -170,10 +172,14 @@ class RTO(mp.Process):
         # radio map: maps callsigns to mac addr
         rmap = {}
 
-        # send sensor up notification and gps
+        # send sensor up notification, platform details and gpsid
+        gpsid = None
         ret = self._send('DEVICE',time.time(),['sensor',socket.gethostname(),1])
         if ret: self._conn.send(('err','RTO','Nidus',ret))
-        gpsid = self._setgpsd()
+        else:
+            ret = self._send('PLATFORM',time.time(),self._pfdetails())
+            if ret: self._conn.send(('err','RTO','Nidus',ret))
+            else: gpsid = self._setgpsd()
 
         # execution loop
         tkn = None
@@ -297,6 +303,7 @@ class RTO(mp.Process):
         try:
             send = "\x01*%s:\x02" % t
             if t == 'DEVICE': send += self._craftdevice(ts,d)
+            elif t == 'PLATFORM': send += self._craftplatform(d)
             elif t == 'RADIO': send += self._craftradio(ts,d)
             elif t == 'GPSD': send += self._craftgpsd(ts,d)
             elif t == 'FRAME': send += self._craftframe(ts,d)
@@ -309,6 +316,24 @@ class RTO(mp.Process):
             return ret
         except Exception, ret:
             return ret
+
+    def _pfdetails(self):
+        """ get platform details as dict and return """
+        d = {'rd':self._rd,'dist':None,'osvers':None,'name':None}
+        d['os'] = platform.system().capitalize()
+        try:
+            d['dist'],d['osvers'],d['name'] = platform.linux_distribution()
+        except:
+            pass
+        d['kernel'] = platform.release()
+        d['arch'] = platform.machine()
+        d['pyvers'] = "%d.%d.%d" % (sys.version_info.major,
+                                    sys.version_info.minor,
+                                    sys.version_info.micro)
+        d['bits'],d['link'] = platform.architecture()
+        d['compiler'] = platform.python_compiler()
+        d['libcvers'] = " ".join(platform.libc_ver())
+        return d
 
     def _setgpsd(self):
         """ determines whether to use no gps, fixed gps or gps device """
@@ -354,6 +379,13 @@ class RTO(mp.Process):
     def _craftdevice(ts,d):
         """ create body of device message """
         return "%s %s \x1EFB\x1F%s\x1FFE\x1E %d" % (ts,d[0],d[1],d[2])
+
+    @staticmethod
+    def _craftplatform(d):
+        """ create body of platform message """
+        return "%s \x1EFB\x1F%s\x1FFE\x1E %s \x1EFB\x1F%s\x1FFE\x1E %s %s %s %s %s %s %s %s" % \
+                (d['os'],d['dist'],d['osvers'],d['name'],d['kernel'],d['arch'],
+                 d['pyvers'],d['bits'],d['link'],d['compiler'],d['libcvers'],d['rd'])
 
     @staticmethod
     def _craftradio(ts,d):

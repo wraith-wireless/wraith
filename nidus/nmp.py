@@ -35,8 +35,8 @@ NOTE:
 """
 __name__ = 'nmp'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.2'
-__date__ = 'September 2014'
+__version__ = '0.0.3'
+__date__ = 'March 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -105,7 +105,24 @@ DEVICE_TYPE      = 1 # type of device one of {'sensor','radio','gpsd'}
 DEVICE_ID        = 2 # id of the device (hostname, mac or device id)
 DEVICE_STATE     = 3 # true = up, false = down
 
-#### DEVICE ####
+#### PLATFORM ####
+PLATFORM_FIELDS = ['os','dist','osv','name','kernel','machine','pyv','bits','link',
+                   'compiler','libcv','regdom']
+PLATFORM_WFIELDS = [('os',str),('dist',str),('osv',str),('name',str),('kernel',str),
+                    ('machine',str),('pyv',str),('bits',str),('link',str),
+                    ('compiler',str),('libcv',str),('regdom',str)]
+PLATFORM_OS        =  0 # os name
+PLATFORM_OS_DIST   =  1 # os distribution
+PLATFORM_OS_VERS   =  2 # os version
+PLATFORM_OS_NAME   =  3 # os name i.e. Narwhal
+PLATFORM_KERNEL    =  4 # os kernel version
+PLATFORM_MACHINE   =  5 # os architecture i.e. i386
+PLATFORM_PY_VERS   =  6 # python version
+PLATFORM_PY_BITS   =  7 # python interpreter bit architecture
+PLATFORM_PY_LINK   =  8 # python interpreter linkage
+PLATFORM_COMPILER  =  9 # python compiler/version
+PLATFORM_LIBC_VERS = 10 # libc version
+PLATFORM_REG_DOM   = 11 # current regulatory domain
 
 #### RADIO ####
 RADIO_FIELDS = ['ts','mac','role','spoofed','phy','nic','vnic','driver','chipset',

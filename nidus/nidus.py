@@ -111,13 +111,15 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 # parse out TYPE and FIELDS - leave fields as string to minimize 
                 # memory requirements of a list of tokens
                 (t,f) = re.match(NMP,r,re.S).groups()
+
                 # send message to storage db
-                if t == "DEVICE": db.submitdevice(f,self.client_address[0])
-                elif t == "RADIO": db.submitradio(f)
-                elif t == "RADIO_EVENT": db.submitradioevent(f)
-                elif t == "GPSD": db.submitgpsd(f)
-                elif t == "FRAME": db.submitframe(f)
-                elif t == "GPS": db.submitgeo(f)
+                if t == 'DEVICE': db.submitdevice(f,self.client_address[0])
+                elif t == 'PLATFORM': db.submitplatform(f)
+                elif t == 'RADIO': db.submitradio(f)
+                elif t == 'RADIO_EVENT': db.submitradioevent(f)
+                elif t == 'GPSD': db.submitgpsd(f)
+                elif t == 'FRAME': db.submitframe(f)
+                elif t == 'GPS': db.submitgeo(f)
                 else:
                     logging.warning("Sensor %s:%d sent data with invalid header %s",
                                     self.client_address[0],

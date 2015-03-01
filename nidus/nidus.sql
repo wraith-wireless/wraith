@@ -42,6 +42,30 @@ CREATE TABLE sensor(
 );
 CREATE INDEX sensor_period_idx ON sensor USING GIST (period);
 
+-- platform table
+-- defines the platform a sensor is running on to include the regulatory domain
+-- the wireless nics are defined under. This should not change much over 
+-- any conceivable time except for kernel upgrade, os upgrade and reg. domain. 
+-- useful for debugging? performance metrics?
+DROP TABLE IF EXISTS platform;
+CREATE TABLE platform(
+   sid integer NOT NULL UNIQUE,     -- foreign key to session
+   os varchar(20) default 'Linux',  -- OS
+   dist varchar(15),                -- OS distribution, allow null for non linux
+   version varchar(10),             -- OS version, allow null for non linux
+   name varchar(10),                -- OS name, allow null for non linux
+   kernel varchar(25),              -- kernel version assumes linux allow for null if other
+   machine varchar(10) NOT NULL,    -- machine architecture i.e. i386
+   pyvers varchar(10) NOT NULL,     -- python interpreter version
+   pycompiler varchar(10) NOT NULL, -- python interpreter compiler w/ version
+   pylibcvers varchar(10) NOT NULL, -- python interpreter libc version
+   pybits varchar(5) NOT NULL,      -- python interpreter bit architecture
+   pylinkage varchar(10) NOT NULL,  -- python interpreter linkage
+   region varchar(2) default '00',  -- regulatory domain
+   CONSTRAINT ch_sid CHECK (sid > 0),
+   FOREIGN KEY (sid) REFERENCES sensor(session_id)
+);
+
 -- gpsd table
 -- details of a gps device
 DROP TABLE IF EXISTS gpsd;
@@ -957,6 +981,7 @@ DELETE FROM sta;
 ALTER SEQUENCE sta_id_seq restart;
 DELETE FROM frame;
 ALTER SEQUENCE frame_id_seq RESTART;
+DELETE FROM platform;
 DELETE FROM using_gpsd;
 DELETE FROM geo;
 DELETE FROM gpsd;
@@ -991,6 +1016,7 @@ DROP TABLE action;
 DROP TABLE sta_activity;
 DROP TABLE sta;
 DROP TABLE frame;
+DROP TABLE platform;
 DROP TABLE using_gpsd;
 DROP TABLE geo;
 DROP TABLE gpsd;

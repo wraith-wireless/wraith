@@ -39,11 +39,12 @@ nidus 0.0.5
 
 nidus 0.0.6
  desc: continues from v 0.0.5
- includes: nidus 0.0.3, nmp 0.0.2, nidusdb 0.1.3 nidus.sql 0.0.10, simplepcap 0.0.1
+ includes: nidus 0.0.3, nmp 0.0.3, nidusdb 0.1.3 nidus.sql 0.0.10, simplepcap 0.0.1
   nidus.conf nidus.log.conf
  changes:
   - added extraction of all management frames (excluding timing adv)
   - added nidusd daemon file to start nidus server
+  - added support for platform table
 
 TODO:
 1) Should we return messages? i.e instead of just closing pipe for no running server etc

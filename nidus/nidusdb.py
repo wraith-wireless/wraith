@@ -175,6 +175,31 @@ class NidusDB(object):
         else:
             self._conn.commit()
 
+    def submitplatform(self,f):
+        """ submit platform details """
+        try:
+            # tokenize
+            ds = nmp.data2dict(nmp.tokenize(f),"PLATFORM")
+
+            sql = """
+                   insert into platform (sid,os,dist,version,name,kernel,machine,
+                                         pyvers,pycompiler,pylibcvers,pybits,
+                                         pylinkage,region)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                  """
+            self._curs.execute(sql,(self._sid,ds['os'],ds['dist'],ds['osv'],
+                                    ds['name'],ds['kernel'],ds['machine'],ds['pyv'],
+                                    ds['compiler'],ds['libcv'],ds['bits'],ds['link'],
+                                    ds['regdom']))
+        except nmp.NMPException as e:
+            raise NidusDBSubmitParseException(e)
+        except psql.Error as e:
+            # roll back
+            self._conn.rollback()
+            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+        else:
+            self._conn.commit()
+
     def submitdropped(self):
         """ sensor exited unexpectantly, close out open ended records """
         if not self._sid: return

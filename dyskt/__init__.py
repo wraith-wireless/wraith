@@ -24,7 +24,7 @@ dyskt 0.1.4
 dyskt 0.1.5
  desc: utilizes a new internal communication SOP to streamline and simplify
   interprocess communications
- includes: dyskt 0.0.10 internal 0.0.1 rto 0.0.10 (previously collator) rdoctl 0.0.5
+ includes: dyskt 0.0.10 internal 0.0.1 rto 0.0.11 (previously collator) rdoctl 0.0.5
   dyskt.conf dyskt.log.conf dysktd
  changes:
   - streamlined inter-process communication methods/objects
@@ -39,7 +39,9 @@ dyskt 0.1.5
  - removed signal handling as a means to pass commands
    o need to code command interface
  - added mac spoofing cability on start of each radio
+ - added platform/system details
  - added regulatory domain setting/resetting capability to sensor
+
 
 TODO:
      ** After testing remove set raw capability from python **
@@ -56,6 +58,7 @@ TODO:
      41) need to handle tuner thread failure in rdoctl
      42) consider sending multiple frames as a single compressed/encrypted
          packet for efficiency and security
+     43) send regulatory domain to nidus
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'
