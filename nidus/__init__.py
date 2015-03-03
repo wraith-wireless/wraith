@@ -47,7 +47,7 @@ nidus 0.0.6
   - added support for platform table
 
 TODO:
-1) Should we return messages? i.e instead of just closing pipe for no running server etc
+1) return messages instead of just closing pipe for no running server etc
 2) need constraints either through postgresql (preferred) or nidusdb - one example
    for each geo inserted verify first that the ts is within the period defined for
    the corresponding sensor

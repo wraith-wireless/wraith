@@ -89,14 +89,15 @@ class DySKT(object):
         try:
             # set the region? if so, we need to do it prior to starting the
             # RadioController
-            if self._conf['local']['region']:
-                logging.info("Setting regulatory domain to %s",
-                             self._conf['local']['region'])
+            rd = self._conf['local']['region']
+            if rd:
+                logging.info("Setting regulatory domain to %s",rd)
                 self._rd = iw.regget()
-                iw.regset(self._conf['local']['region'])
-                if iw.regget() != self._conf['local']['region']:
-                    logging.warn("Failed to set regulatory domain to %s",
-                                 self._conf['local']['region'])
+                iw.regset(rd)
+                if iw.regget() != rd:
+                    logging.warn("Regulatory domain may not have been set",rd)
+                else:
+                    logging.info("Regulatory domain set to %s",rd)
 
             # recon radio is mandatory
             logging.info("Starting Reconnaissance Radio")
@@ -116,8 +117,6 @@ class DySKT(object):
                     logging.warning("Collection Radio (%s), continuing without",e)
 
             # RTO
-            # For the RTO, we use the interal comms queue otherwise it will
-            # deadlock on waiting for reports from one of the radios
             logging.info("Starting RTO")
             (conn1,conn2) = mp.Pipe()
             self._pConns['rto'] = conn1

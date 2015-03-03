@@ -185,7 +185,7 @@ class NidusDB(object):
                    insert into platform (sid,os,dist,version,name,kernel,machine,
                                          pyvers,pycompiler,pylibcvers,pybits,
                                          pylinkage,region)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
                   """
             self._curs.execute(sql,(self._sid,ds['os'],ds['dist'],ds['osv'],
                                     ds['name'],ds['kernel'],ds['machine'],ds['pyv'],

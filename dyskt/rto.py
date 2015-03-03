@@ -25,6 +25,7 @@ import gps                                 # gps device access
 from Queue import Queue, Empty             # thread-safe queue
 import multiprocessing as mp               # multiprocessing
 from wraith.utils.timestamps import ts2iso # timestamp conversion
+from wraith.radio.iw import regget         # regulatory domain
 
 class GPSPoller(threading.Thread):
     """ periodically checks gps for current location """
@@ -141,7 +142,6 @@ class RTO(mp.Process):
         self._conn = conn                  # message queue to/from DySKT
         self._mgrs = None                  # lat/lon to mgrs conversion
         self._conf = conf['gps']           # configuration for gps/datastore
-        self._rd = conf['local']['region'] # regulatory domain
         self._nidus = None                 # nidus server
         self._flt = None                   # geo thread
         self._q = None                     # our queue to gps poller
@@ -317,24 +317,6 @@ class RTO(mp.Process):
         except Exception, ret:
             return ret
 
-    def _pfdetails(self):
-        """ get platform details as dict and return """
-        d = {'rd':self._rd,'dist':None,'osvers':None,'name':None}
-        d['os'] = platform.system().capitalize()
-        try:
-            d['dist'],d['osvers'],d['name'] = platform.linux_distribution()
-        except:
-            pass
-        d['kernel'] = platform.release()
-        d['arch'] = platform.machine()
-        d['pyvers'] = "%d.%d.%d" % (sys.version_info.major,
-                                    sys.version_info.minor,
-                                    sys.version_info.micro)
-        d['bits'],d['link'] = platform.architecture()
-        d['compiler'] = platform.python_compiler()
-        d['libcvers'] = " ".join(platform.libc_ver())
-        return d
-
     def _setgpsd(self):
         """ determines whether to use no gps, fixed gps or gps device """
         gpsid = None
@@ -376,6 +358,29 @@ class RTO(mp.Process):
         return gpsid
 
     @staticmethod
+    def _pfdetails():
+        """ get platform details as dict and return """
+        d = {'rd':None,'dist':None,'osvers':None,'name':None}
+        d['os'] = platform.system().capitalize()
+        try:
+            d['dist'],d['osvers'],d['name'] = platform.linux_distribution()
+        except:
+            pass
+        try:
+            d['rd'] = regget()
+        except:
+            pass
+        d['kernel'] = platform.release()
+        d['arch'] = platform.machine()
+        d['pyvers'] = "%d.%d.%d" % (sys.version_info.major,
+                                    sys.version_info.minor,
+                                    sys.version_info.micro)
+        d['bits'],d['link'] = platform.architecture()
+        d['compiler'] = platform.python_compiler()
+        d['libcvers'] = " ".join(platform.libc_ver())
+        return d
+
+    @staticmethod
     def _craftdevice(ts,d):
         """ create body of device message """
         return "%s %s \x1EFB\x1F%s\x1FFE\x1E %d" % (ts,d[0],d[1],d[2])
@@ -383,7 +388,7 @@ class RTO(mp.Process):
     @staticmethod
     def _craftplatform(d):
         """ create body of platform message """
-        return "%s \x1EFB\x1F%s\x1FFE\x1E %s \x1EFB\x1F%s\x1FFE\x1E %s %s %s %s %s %s %s %s" % \
+        return "%s \x1EFB\x1F%s\x1FFE\x1E %s \x1EFB\x1F%s\x1FFE\x1E %s %s %s %s %s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E" % \
                 (d['os'],d['dist'],d['osvers'],d['name'],d['kernel'],d['arch'],
                  d['pyvers'],d['bits'],d['link'],d['compiler'],d['libcvers'],d['rd'])
 

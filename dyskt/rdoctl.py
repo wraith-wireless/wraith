@@ -139,8 +139,8 @@ class RadioController(mp.Process):
             self._mac = ifaces[0]['addr']
         except (KeyError, IndexError):
             raise RuntimeError("%s:iw.dev:error getting interfaces" % self._role)
-        except iw.IWException:
-            raise RuntimeError("%s:iw.dev:failed to get phy" % self._role)
+        #except iw.IWException:
+        #    raise RuntimeError("%s:iw.dev:failed to get phy" % self._role)
 
         # get properties (the below will return None rather than throw exception)
         self._chs = iw.chget(self._phy)
