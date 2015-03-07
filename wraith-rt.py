@@ -164,6 +164,7 @@ class WraithPanel(gui.MasterPanel):
 
         # determine if postgresql is running
         if cmdline.runningprocess('postgres'):
+            self.logwrite('PostgreSQL is running',gui.LOG_NOTE)
             self._bSQL = True
 
             # update state
@@ -175,7 +176,7 @@ class WraithPanel(gui.MasterPanel):
                 self._conn = psql.connect(host=self._conf['store']['host'],
                                           dbname=self._conf['store']['db'],
                                           user=self._conf['store']['user'],
-                                          password=self._conf['store']['pwd'],)
+                                          password=self._conf['store']['pwd'])
 
                 # set to use UTC and enable CONN flag
                 curs = self._conn.cursor()
@@ -358,27 +359,77 @@ class WraithPanel(gui.MasterPanel):
 
     def connect(self):
         """ connects to postgresql """
-        pass
+        # NOTE: this should not be enabled unless psql is running and we are
+        # not connected, but check anyway
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if not flags['conn']: self._psqlconnect()
 
     def disconnect(self):
         """ connects to postgresql """
-        pass
+        # NOTE: should not be enabled if already disconnected but check anyway
+        # TODO: what to do once we have data being pulled?
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if flags['conn']: self._psqldisconnect()
 
     def psqlstart(self):
         """ starts postgresql """
-        pass
+        # NOTE: should not be enabled if postgresql is already running but check anyway
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if not flags['store']:
+            # do we have a password
+            if not self._pwd:
+                pwd = self._getpwd()
+                if pwd is None:
+                    self.logwrite("Password entry canceled. Cannot continue",
+                                  gui.LOG_WARN)
+                    return
+                self._pwd = pwd
+            self._startpsql()
 
     def psqlstop(self):
         """ starts postgresql """
-        pass
+        # should not be enabled if postgresql is not running, but check anyway
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if flags['store']:
+            # is nidus and/or DySKT running?
+            if flags['dyskt']:
+                ans = tkMB.askquestion('DySKT Running','Stop and lose queued data?',
+                                       parent=self)
+                if ans == 'no': return
+                self.logwrite("DySKT is running, all queued data will be lost",
+                              gui.LOG_WARN)
+
+            self._stoppsql()
 
     def psqlfix(self):
         """ fix any open-ended periods left over by errors """
-        pass
+        # should not be enabled unless postgres is running, we are connected
+        # and a sensor is not running, but check anyway
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if flags['store'] and flags['conn'] and not flags['dyskt']:
+            print 'fixing...'
 
     def psqldelall(self):
         """ delete all data in nidus database """
-        pass
+        # should not be enabled unless postgres is running, we are connected
+        # and a sensor is not running, but check anyway
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if flags['store'] and flags['conn'] and not flags['dyskt']:
+            curs = None
+            try:
+                # get a cursor and execute the delete_all procedure
+                self.logwrite("Deleting all records in database...",gui.LOG_NOTE)
+                curs = self._conn.cursor()
+                curs.callproc('delete_all')
+                self._conn.commit()
+                self.logwrite("Deleted all records")
+            except psql.Error as e:
+                self._conn.rollback()
+                self.logwrite("Failed to delete records <%s: %s>" % (e.pgcode,e.pgerror),
+                              gui.LOG_ERR)
+            finally:
+                if curs: curs.close()
+
 
     def nidusstart(self):
         """ starts nidus storage manager """
@@ -537,7 +588,7 @@ class WraithPanel(gui.MasterPanel):
         self.mnuNidusLog.entryconfig(1,state=Tix.DISABLED)     # nidus log clear
 
         if flags['store']:
-            # storage is running enable stop all, stop postgresql, and start nidus
+            # storage is running enable stop all, stop postgresql, start nidus
             self.mnuStorage.entryconfig(1,state=Tix.NORMAL)
             self.mnuStoragePSQL.entryconfig(1,state=Tix.NORMAL)
             self.mnuStorageNidus.entryconfig(0,state=Tix.NORMAL)
@@ -558,13 +609,17 @@ class WraithPanel(gui.MasterPanel):
             self.mnuNidusLog.entryconfig(1,state=Tix.NORMAL)
 
         if flags['conn']:
-            # connected to psql, enable stop all, disconnect
+            # connected to psql, enable stop all and disconnect
+            # if no DysKT is running, enable fix psql and delete all
             self.mnuStorage.entryconfig(1,state=Tix.NORMAL)
             self.mnuStorage.entryconfig(4,state=Tix.NORMAL)
+            if not flags['dyskt']:
+                self.mnuStoragePSQL.entryconfig(6,state=Tix.NORMAL)  # psql fix
+                self.mnuStoragePSQL.entryconfig(7,state=Tix.NORMAL)  # psql delete all
         else:
-            # disconnected, enable start all, connect
+            # disconnected, enable start all, enable connect if postgres is running
             self.mnuStorage.entryconfig(0,state=Tix.NORMAL)
-            self.mnuStorage.entryconfig(3,state=Tix.NORMAL)
+            if flags['store']: self.mnuStorage.entryconfig(3,state=Tix.NORMAL)
 
         # adjust dyskt menu
         if not flags['store'] and not flags['nidus']:
@@ -587,12 +642,11 @@ class WraithPanel(gui.MasterPanel):
                 self.mnuDySKT.entryconfig(0,state=Tix.NORMAL)    # start
                 self.mnuDySKT.entryconfig(1,state=Tix.DISABLED)  # stop
                 self.mnuDySKT.entryconfig(3,state=Tix.DISABLED)  # ctrl panel
-                #self.mnuDySKTLog.entryconfig(0,state=Tix.NORMAL) # view log
                 self.mnuDySKTLog.entryconfig(1,state=Tix.NORMAL) # clear log
                 self.mnuDySKT.entryconfig(7,state=Tix.NORMAL)    # configure
 
     def _startstorage(self):
-        """ start postgresql db and nidus storage manager """
+        """ start postgresql db and nidus storage manager & connect to db """
         # do we have a password
         if not self._pwd:
             pwd = self._getpwd()
@@ -601,44 +655,60 @@ class WraithPanel(gui.MasterPanel):
                 return
             self._pwd = pwd
 
-        # get our flags
-        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-
         # start necessary storage components
-        if not flags['store']:
-            self.logwrite("Starting PostgreSQL...",gui.LOG_NOTE)
-            try:
-                # try sudo /etc/init.d/postgresql start
-                cmdline.service('postgresql',self._pwd)
-                time.sleep(0.5)
-                if not cmdline.runningprocess('postgres'):
-                    raise RuntimeError('unknown')
-            except RuntimeError as e:
-                self.logwrite("Error starting PostgreSQL: %s" % e,gui.LOG_ERR)
-                return
-            else:
-                self.logwrite("PostgreSQL started")
-                self._setstate(_STATE_STORE_)
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if not flags['store']: self._startpsql()
 
         # start nidus
-        if not flags['nidus']:
-            self.logwrite("Starting Nidus...",gui.LOG_NOTE)
-            try:
-                cmdline.service('nidusd',self._pwd)
-                time.sleep(0.5)
-                if not cmdline.nidusrunning(NIDUSPID):
-                    raise RuntimeError('unknown')
-            except RuntimeError as e:
-                self.logwrite("Error starting Nidus: %s" % e,gui.LOG_ERR)
-            else:
-                self.logwrite("Nidus Started")
-                self._setstate(_STATE_NIDUS_)
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if not flags['nidus'] and flags['store']: self._startnidus()
 
         # connect to db
-        self.logwrite("Connecting to Nidus Datastore...",gui.LOG_NOTE)
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if not flags['conn'] and flags['store']: self._psqlconnect()
+
+    def _startpsql(self):
+        """
+         start postgresl server
+         NOTE: 1) no state checking done here
+               2) assumes sudo password is entered
+        """
+        # attempt to start psql
+        try:
+            self.logwrite("Starting PostgreSQL...",gui.LOG_NOTE)
+            cmdline.service('postgresql',self._pwd)
+            time.sleep(0.5)
+            if not cmdline.runningprocess('postgres'): raise RuntimeError('unknown')
+        except RuntimeError as e:
+            self.logwrite("Error starting PostgreSQL: %s" % e,gui.LOG_ERR)
+            return
+        else:
+            self.logwrite("PostgreSQL started")
+            self._setstate(_STATE_STORE_)
+
+    def _startnidus(self):
+        """
+         start nidus storage manager
+         NOTE: 1) no state checking done here
+               2) assumes sudo password is entered
+        """
+        # attempt to start nidus
+        try:
+            self.logwrite("Starting Nidus...",gui.LOG_NOTE)
+            cmdline.service('nidusd',self._pwd)
+            time.sleep(0.5)
+            if not cmdline.nidusrunning(NIDUSPID): raise RuntimeError('unknown')
+        except RuntimeError as e:
+            self.logwrite("Error starting Nidus: %s" % e,gui.LOG_ERR)
+        else:
+            self.logwrite("Nidus Started")
+            self._setstate(_STATE_NIDUS_)
+
+    def _psqlconnect(self):
+        """ connect to postgresql db: nidus """
         curs = None
         try:
-            # attempt to connect and set state accordingly
+            self.logwrite("Connecting to Nidus Datastore...",gui.LOG_NOTE)
             self._conn = psql.connect(host=self._conf['store']['host'],
                                       dbname=self._conf['store']['db'],
                                       user=self._conf['store']['user'],
@@ -664,67 +734,90 @@ class WraithPanel(gui.MasterPanel):
             if curs: curs.close()
 
     def _stopstorage(self):
-        """ stop posgresql db and nidus storage manager """
-        # get our flags
-        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-
+        """ stop posgresql db, nidus storage manager & disconnect """
         # if DySKT is running, prompt for clearance
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if flags['dyskt']:
-            ans = tkMB.askquestion('DySKT Running',
-                                   'Shutdown and lose queued data?',parent=self)
+            ans = tkMB.askquestion('DySKT Running','Quit and lose queued data?',parent=self)
             if ans == 'no': return
 
         # return if no storage component is running
         if not (flags['store'] or flags['conn'] or flags['nidus']): return
 
-        # do we have a password
-        if not self._pwd:
-            pwd = self._getpwd()
-            if pwd is None:
-                self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
-                return
-            self._pwd = pwd
-
         # disconnect from db
-        if self._conn:
-            self.logwrite("Disconnecting from Nidus datastore",gui.LOG_NOTE)
-            self._conn.close()
-            self._conn = None
-            self._setstate(_STATE_CONN_,False)
-            self.logwrite("Disconnected from Nidus datastore")
+        if flags['conn']: self._psqldisconnect()
 
         # before shutting down nidus & postgresql, confirm auto shutdown is enabled
         if not self._conf['policy']['shutdown']: return
 
         # shutdown nidus
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if flags['nidus']:
-            try:
-                self.logwrite("Shutting down Nidus",gui.LOG_NOTE)
-                cmdline.service('nidusd',self._pwd,False)
-                while cmdline.nidusrunning(NIDUSPID):
-                    self.logwrite("Nidus still processing data...",gui.LOG_NOTE)
-                    time.sleep(1.0)
-            except RuntimeError as e:
-                self.logwrite("Error shutting down Nidus: %s" % e,gui.LOG_ERR)
-            else:
-                self._setstate(_STATE_NIDUS_,False)
-                self.logwrite("Nidus shut down")
+            # do we have a password
+            if not self._pwd:
+                pwd = self._getpwd()
+                if pwd is None:
+                    self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
+                    return
+                self._pwd = pwd
+            self._stopnidus()
 
         # shutdown postgresql (check first if polite)
         if self._conf['policy']['polite'] and self._bSQL: return
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if flags['store']:
+            # do we have a password
+            if not self._pwd:
+                pwd = self._getpwd()
+                if pwd is None:
+                    self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
+                    return
+                self._pwd = pwd
+            self._stoppsql()
 
-        if cmdline.runningprocess('postgres'):
-            try:
-                self.logwrite("Shutting down PostgreSQL",gui.LOG_NOTE)
-                cmdline.service('postgresql',self._pwd,False)
-                while cmdline.runningprocess('postgres'):
-                    self.logwrite("PostgreSQL shutting down...",gui.LOG_NOTE)
-                    time.sleep(1.0)
-            except RuntimeError as e:
-                self.logwrite("Error shutting down PostgreSQL",gui.LOG_ERR)
-            else:
-                self._setstate(_STATE_STORE_,False)
-                self.logwrite("PostgreSQL shut down")
+    def _psqldisconnect(self):
+        """ disconnect from postgresl """
+        self.logwrite("Disconnecting from Nidus datastore...",gui.LOG_NOTE)
+        self._conn.close()
+        self._conn = None
+        self._setstate(_STATE_CONN_,False)
+        self.logwrite("Disconnected from Nidus datastore")
+
+    def _stopnidus(self):
+        """
+         stop nidus storage manager.
+          NOTE: 1) no state checking done here
+                2) assumes sudo password is entered
+        """
+        try:
+            self.logwrite("Shutting down Nidus",gui.LOG_NOTE)
+            cmdline.service('nidusd',self._pwd,False)
+            while cmdline.nidusrunning(NIDUSPID):
+                self.logwrite("Nidus still processing data...",gui.LOG_NOTE)
+                time.sleep(1.0)
+        except RuntimeError as e:
+            self.logwrite("Error shutting down Nidus: %s" % e,gui.LOG_ERR)
+        else:
+            self._setstate(_STATE_NIDUS_,False)
+            self.logwrite("Nidus shut down")
+
+    def _stoppsql(self):
+        """
+         shut down posgresql.
+         NOTE: 1) no state checking done here
+               2) assumes sudo password is entered
+        """
+        try:
+            self.logwrite("Shutting down PostgreSQL",gui.LOG_NOTE)
+            cmdline.service('postgresql',self._pwd,False)
+            while cmdline.runningprocess('postgres'):
+                self.logwrite("PostgreSQL shutting down...",gui.LOG_NOTE)
+                time.sleep(0.5)
+        except RuntimeError as e:
+            self.logwrite("Error shutting down PostgreSQL",gui.LOG_ERR)
+        else:
+            self._setstate(_STATE_STORE_,False)
+            self.logwrite("PostgreSQL shut down")
 
     def _startsensor(self):
         """ starts the DySKT sensor """

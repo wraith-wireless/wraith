@@ -207,9 +207,16 @@ class ConfigPanel(SlavePanel):
      Configuration file edit/view panel
     """
     def __init__(self,toplevel,chief,title):
+        """ initialize configuration panel """
         SlavePanel.__init__(self,toplevel,chief,"widgets/icons/config.png")
         self.master.title(title)
         self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
+
+        # set up the main frame, input frame and button frame
+        self.frmMain = Tix.Frame(self)
+        self.frmMain.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+
+
 
 class ListPanel(SlavePanel):
     """

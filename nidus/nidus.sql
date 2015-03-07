@@ -955,6 +955,51 @@ CREATE TABLE sta_info(
    FOREIGN KEY(staid) REFERENCES sta(id)
 );
 
+#### STORED PROCEDURES
+
+CREATE OR REPLACE FUNCTION delete_all()
+    RETURNS void as $$
+    BEGIN
+      DELETE FROM ampdu;
+      DELETE FROM ccmpcrypt;
+      DELETE FROM qosctrl;
+      DELETE FROM tkipcrypt;
+      DELETE FROM traffic;
+      DELETE FROM wepcrypt;
+      DELETE FROM signal;
+      DELETE FROM source;
+      DELETE FROM frame_path;
+      DELETE FROM assocreq;
+      DELETE FROM reassocreq;
+      DELETE FROM assocresp;
+      DELETE FROM probereq;
+      DELETE FROM proberesp;
+      DELETE FROM disassoc;
+      DELETE FROM deauth;
+      DELETE FROM beacon;
+      DELETE FROM auth;
+      DELETE FROM action;
+      DELETE FROM sta_activity;
+      DELETE FROM sta;
+      ALTER SEQUENCE sta_id_seq restart;
+      DELETE FROM frame;
+      ALTER SEQUENCE frame_id_seq RESTART;
+      DELETE FROM platform;
+      DELETE FROM using_gpsd;
+      DELETE FROM geo;
+      DELETE FROM gpsd;
+      ALTER SEQUENCE gpsd_id_seq RESTART;
+      DELETE FROM using_radio;
+      DELETE FROM radio_epoch;
+      DELETE FROM radio_event;
+      DELETE FROM radio_period;
+      DELETE FROM radio;
+      DELETE FROM sensor;
+      ALTER SEQUENCE sensor_session_id_seq RESTART;
+    END;
+    $$ LANGUAGE plpgsql;
+
+
 -- delete data from all tables
 -- TODO: look into truncate
 DELETE FROM ampdu;
