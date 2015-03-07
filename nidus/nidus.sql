@@ -957,6 +957,7 @@ CREATE TABLE sta_info(
 
 #### STORED PROCEDURES
 
+-- store procedure for deleting all content from all tables
 CREATE OR REPLACE FUNCTION delete_all()
     RETURNS void as $$
     BEGIN
@@ -999,6 +1000,14 @@ CREATE OR REPLACE FUNCTION delete_all()
     END;
     $$ LANGUAGE plpgsql;
 
+-- store procedure to fix any NULL-ended periods which can occur after
+-- error or a forced kill
+CREATE OR REPLACE FUNCTION fix_nullperiod()
+    RETURNS void as $$
+    BEGIN
+      
+    END;
+    $$ LANGUAGE plpgsql;
 
 -- delete data from all tables
 -- TODO: look into truncate

@@ -58,6 +58,8 @@ TODO:
      41) need to handle tuner thread failure in rdoctl
      42) consider sending multiple frames as a single compressed/encrypted
          packet for efficiency and security
+     43) why does iw.regget in dyskt.py not reflect the actual change to the
+         regulatory domain
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'

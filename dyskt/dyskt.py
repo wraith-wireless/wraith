@@ -95,7 +95,7 @@ class DySKT(object):
                 self._rd = iw.regget()
                 iw.regset(rd)
                 if iw.regget() != rd:
-                    logging.warn("Regulatory domain may not have been set",rd)
+                    logging.warn("Regulatory domain %s may not have been set",rd)
                 else:
                     logging.info("Regulatory domain set to %s",rd)
 

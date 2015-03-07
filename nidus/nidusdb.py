@@ -6,8 +6,7 @@ Provides a common interface and access methods from Nidus request handlers to th
 underlying storage system, serving a two-fold service:
  1) remove necessity for request handler to 'understand' underlying storage system
     protocols
- 2) allow for easier changes to storage system - NOTE: this file will have to be
-    modified to fit the storage system
+ 2) remove necessity for data provider to 'understand' underlying storage system
 """
 __name__ = 'nidusdb'
 __license__ = 'GPL v3.0'

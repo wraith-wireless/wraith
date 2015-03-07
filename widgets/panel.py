@@ -204,7 +204,10 @@ class SimplePanel(SlavePanel):
 
 class ConfigPanel(SlavePanel):
     """
-     Configuration file edit/view panel
+     Configuration file edit/view panel.
+     Derived classes must implement
+     _confs - add widgets to view/edit configuration file entries
+
     """
     def __init__(self,toplevel,chief,title):
         """ initialize configuration panel """
@@ -212,11 +215,25 @@ class ConfigPanel(SlavePanel):
         self.master.title(title)
         self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
 
-        # set up the main frame, input frame and button frame
-        self.frmMain = Tix.Frame(self)
-        self.frmMain.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        # set up the input widget frame
+        frmConfs = Tix.Frame(self)
+        self._confs(frmConfs)
+        frmConfs.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
 
+        # set up the button widget frame
+        frmBtns = Tix.Frame(self)
+        frmBtns.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
 
+        # four buttons, Ok, Apply, Reset and Cancel
+        Tix.Button(frmBtns,text='OK',command=self.ok).grid(row=0,column=0)
+        Tix.Button(frmBtns,text='Apply',command=self.apply).grid(row=0,column=1)
+        Tix.Button(frmBtns,text='Reset',command=self.reset).grid(row=0,column=2)
+        Tix.Button(frmBtns,text='Cancel',command=self.cancel).grid(row=0,column=3)
+    def _confs(self,frm): raise NotImplementedError("ConfigPanel::_confs")
+    def ok(self): pass
+    def apply(self): pass
+    def reset(self): pass
+    def cancel(self): self.close()
 
 class ListPanel(SlavePanel):
     """

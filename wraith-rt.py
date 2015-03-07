@@ -4,15 +4,12 @@
  TODO:
   1) make tkMessageBox,tkFileDialog and tkSimpleDialog derive match
     main color scheme
-  3) should we add a Database submenu for options like fix database?
   4) move display of log panel to after intializiation() so that
      wraith panel is 'first', leftmost panel - will have to figure out
      how to save messages from init to later
-  8) need to periodically check status of postgres,nidusd and dyskt
+  8) need to periodically recheck state -> status of postgres,nidusd and dyskt
   9) get log panel to scroll automatically
  10) add labels to frames
- 11) break down starting storage components seperately: 1) start postgresql, 2) start
-    nidus, 3) connect to postgress
 """
 
 __name__ = 'wraith-rt'
@@ -24,16 +21,18 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import time                        # sleeping
-import psycopg2 as psql            # postgresql api
-import Tix                         # Tix gui stuff
-import tkMessageBox as tkMB        # info dialogs
-from PIL import Image,ImageTk      # image input & support
-import ConfigParser                # config file parsing
-import wraith                      # helpful functions/version etc
-import wraith.widgets.panel as gui # graphics suite
-from wraith.utils import bits      # bitmask functions
-from wraith.utils import cmdline   # command line stuff
+import os                                  # file info etc
+import time                                # sleeping, timestamps
+import psycopg2 as psql                    # postgresql api
+import Tix                                 # Tix gui stuff
+import tkMessageBox as tkMB                # info dialogs
+from PIL import Image,ImageTk              # image input & support
+import ConfigParser                        # config file parsing
+import wraith                              # version info
+import wraith.widgets.panel as gui         # graphics suite
+from wraith.utils import bits              # bitmask functions
+from wraith.utils import cmdline           # command line stuff
+from wraith.utils.timestamps import ts2iso # ts conversion
 
 #### CONSTANTS
 
@@ -59,7 +58,6 @@ class DataBinPanel(gui.SimplePanel):
         frm.pack(side=Tix.TOP,expand=False)
 
         # add the bin buttons
-
         for b in _BINS_:
             try:
                 self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
@@ -89,23 +87,36 @@ class AboutPanel(gui.SimplePanel):
                   fg="white",
                   font=("Roman",8,'bold')).grid(row=2,column=0,sticky=Tix.N)
 
-#class WraithConfigPanel(SimplePanel):
-#    """ Display Wraith Configuration Panel """
-#    def __init__(self,toplevel,chief):
-#        SimplePanel.__init__(self,toplevel,chief,"Configure Wraith","widgets/icons/config.png")
-#
-#    def _body(self):
-#        """ make wigets for the body """
-#        # main frame
-#        frm = Tix.Frame(self)
-#        frm.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+class WraithConfigPanel(gui.ConfigPanel):
+    """ Display Wraith Configuration Panel """
+    def __init__(self,toplevel,chief):
+        gui.ConfigPanel.__init__(self,toplevel,chief,"Configure Wraith")
 
-        # Two subframes, Storage and Policy
-#        frmS = Tix.LabelFrame(frm)
-#        frmS.grid(row=0,column=0,sticky=Tix.N)
+    def _confs(self,frm):
+        """ set up entry widgets """
+        # two frames Storage and Policy
+        frmS = Tix.Frame(frm,borderwidth=1,relief='sunken')
+        frmS.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        Tix.Label(frmS,text='STORAGE').grid(row=0,column=0)
+        Tix.Label(frmS,text='Host: ').grid(row=1,column=0,sticky=Tix.W)
+        Tix.Label(frmS,text='DB: ').grid(row=2,column=0,sticky=Tix.W)
+        Tix.Label(frmS,text='User: ').grid(row=3,column=0,sticky=Tix.W)
+        Tix.Label(frmS,text='PWD: ').grid(row=4,column=0,sticky=Tix.W)
 
-#        frmP = Tix.LabelFrame(frm)
-#        frmP.grid(row=1,column=0,sticky=Tix.N)
+        frmP = Tix.Frame(frm,borderwidth=1,relief='sunken')
+        frmP.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        Tix.Label(frmP,text='POLICY').grid(row=0,column=0,sticky=Tix.W)
+        Tix.Label(frmP,text="Polite:").grid(row=1,column=0,sticky=Tix.W)
+        self.ptype = Tix.IntVar(self) # polite values
+        self.rdoPoliteOn = Tix.Radiobutton(frmP,text='On',variable=self.ptype,value=0)
+        self.rdoPoliteOn.grid(row=1,column=1,sticky=Tix.W)
+        self.rdoPoliteOff = Tix.Radiobutton(frmP,text='Off',variable=self.ptype,value=1)
+        self.rdoPoliteOff.grid(row=2,column=1,sticky=Tix.W)
+
+        #vtimecmd = self.register(self._validtime)
+        #txtSiteTU = Entry(frm,width=5,validate='key',\
+        #                  validatecommand=(vtimecmd,'%d','%S','%P'))
+        #txtSiteTU.grid(row=i+1,column=1,sticky=W)
 
 #### STATE DEFINITIONS
 _STATE_INIT_   = 0
@@ -295,7 +306,7 @@ class WraithPanel(gui.MasterPanel):
         self.mnuDySKTLog = Tix.Menu(self.mnuDySKT,tearoff=0)
         self.mnuDySKTLog.add_command(label='View',command=self.viewdysktlog)   # 0
         self.mnuDySKTLog.add_command(label='Clear',command=self.cleardysktlog) # 1
-        self.mnuDySKT.add_cascade(label='Log',menu=self.mnuNidusLog)       # 5
+        self.mnuDySKT.add_cascade(label='Log',menu=self.mnuDySKTLog)       # 5
         self.mnuDySKT.add_separator()                                      # 6
         self.mnuDySKT.add_command(label='Config',command=self.configdyskt) # 7
 
@@ -318,13 +329,13 @@ class WraithPanel(gui.MasterPanel):
     def configwraith(self):
         """ display config file preference editor """
         panel = self.getpanels("preferences",False)
-        #if not panel:
-        #    t = Tix.Toplevel()
-        #    pnl = WraithConfigPanel(t,self)
-        #    self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"preferences"))
-        #else:
-        #    panel[0].tk.deiconify()
-        #    panel[0].tk.lift()
+        if not panel:
+            t = Tix.Toplevel()
+            pnl = WraithConfigPanel(t,self)
+            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"preferences"))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
 
 #### View Menu
 
@@ -390,24 +401,46 @@ class WraithPanel(gui.MasterPanel):
         """ starts postgresql """
         # should not be enabled if postgresql is not running, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store']:
-            # is nidus and/or DySKT running?
-            if flags['dyskt']:
-                ans = tkMB.askquestion('DySKT Running','Stop and lose queued data?',
-                                       parent=self)
-                if ans == 'no': return
-                self.logwrite("DySKT is running, all queued data will be lost",
-                              gui.LOG_WARN)
-
+        if flags['store'] and not flags['dyskt']:
+            # do we have a password
+            if not self._pwd:
+                pwd = self._getpwd()
+                if pwd is None:
+                    self.logwrite("Password entry canceled. Cannot continue",
+                                  gui.LOG_WARN)
+                    return
+                self._pwd = pwd
             self._stoppsql()
 
     def psqlfix(self):
-        """ fix any open-ended periods left over by errors """
+        """
+         fix any open-ended periods left over by errors. An error or kill -9
+         may leave periods in certain tables as NULL-ended which will throw an
+         error during insert of new records
+        """
         # should not be enabled unless postgres is running, we are connected
         # and a sensor is not running, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if flags['store'] and flags['conn'] and not flags['dyskt']:
-            print 'fixing...'
+            curs = None
+            try:
+                ts = ts2iso(time.time())
+                curs = self._conn.cursor()
+                sqls = ["update sensor set period = tstzrange(lower(period),%s) where upper(period) is NULL;",
+                        "update radio_epoch set period = tstzrange(lower(period),%s) upper(period) is NULL;",
+                        "update radio_period set period = tstzrange(lower(period),%s) where upper(period) is NULL;",
+                        "update using_radio set period = tstzrange(lower(period),%s) where upper(period) is NULL;",
+                        "update using_gpsd set period = tstzrange(lower(period),%s) where upper(period) is NULL;"]
+                for sql in sqls: curs.execute(sql,(ts,))
+                self._conn.commit()
+            except psql.Error as e:
+                self._conn.rollback()
+                self.logwrite("Error fixing records <%s: %s>" % (e.pgcode,e.pgerror),
+                              gui.LOG_ERR)
+            else:
+                self.logwrite("Null-ended records fixed")
+            finally:
+                if curs: curs.close()
 
     def psqldelall(self):
         """ delete all data in nidus database """
@@ -427,25 +460,54 @@ class WraithPanel(gui.MasterPanel):
                 self._conn.rollback()
                 self.logwrite("Failed to delete records <%s: %s>" % (e.pgcode,e.pgerror),
                               gui.LOG_ERR)
+            else:
+                self.logwrite("All records deleted")
             finally:
                 if curs: curs.close()
 
-
     def nidusstart(self):
         """ starts nidus storage manager """
-        pass
+        # NOTE: should not be enabled if postgresql is not running but check anyway
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if flags['store'] and not flags['nidus']:
+            # do we have a password
+            if not self._pwd:
+                pwd = self._getpwd()
+                if pwd is None:
+                    self.logwrite("Password entry canceled. Cannot continue",
+                                  gui.LOG_WARN)
+                    return
+                self._pwd = pwd
+            self._startnidus()
 
     def nidusstop(self):
         """ stops nidus storage manager """
-        pass
+        # should not be enabled if nidus is not running, but check anyway
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if not flags['nidus']:
+            # do we have a password
+            if not self._pwd:
+                pwd = self._getpwd()
+                if pwd is None:
+                    self.logwrite("Password entry canceled. Cannot continue",
+                                  gui.LOG_WARN)
+                    return
+                self._pwd = pwd
+            self._stopnidus()
 
     def viewniduslog(self):
         """ display Nidus log """
-        self.unimplemented()
+        pass
 
     def clearniduslog(self):
         """ clear nidus log """
-        self.unimplemented()
+        # prompt first
+        finfo = os.stat(NIDUSLOG)
+        if finfo.st_size > 0:
+            ans = tkMB.askquestion('Clear Log','Clear contents of Nidus log?',
+                                   parent=self)
+            if ans == 'no': return
+            with open(NIDUSLOG,'w'): pass
 
     def confignidus(self):
         """ display nidus config file preference editor """
@@ -475,7 +537,13 @@ class WraithPanel(gui.MasterPanel):
 
     def cleardysktlog(self):
         """ clears the DySKT log """
-        self.unimplemented()
+        # prompt first
+        finfo = os.stat(DYSKTLOG)
+        if finfo.st_size > 0:
+            ans = tkMB.askquestion('Clear Log','Clear contents of DySKT log?',
+                                   parent=self)
+            if ans == 'no': return
+            with open(DYSKTLOG,'w'): pass
 
     def configdyskt(self):
         """ display dyskt config file preference editor """
@@ -588,9 +656,10 @@ class WraithPanel(gui.MasterPanel):
         self.mnuNidusLog.entryconfig(1,state=Tix.DISABLED)     # nidus log clear
 
         if flags['store']:
-            # storage is running enable stop all, stop postgresql, start nidus
+            # storage is running enable stop all, stop postgresql (if dyskt is
+            # not running), start nidus
             self.mnuStorage.entryconfig(1,state=Tix.NORMAL)
-            self.mnuStoragePSQL.entryconfig(1,state=Tix.NORMAL)
+            if not flags['dyskt']: self.mnuStoragePSQL.entryconfig(1,state=Tix.NORMAL)
             self.mnuStorageNidus.entryconfig(0,state=Tix.NORMAL)
         else:
             # storage is not running, enable start all, start postgresql
@@ -612,14 +681,14 @@ class WraithPanel(gui.MasterPanel):
             # connected to psql, enable stop all and disconnect
             # if no DysKT is running, enable fix psql and delete all
             self.mnuStorage.entryconfig(1,state=Tix.NORMAL)
-            self.mnuStorage.entryconfig(4,state=Tix.NORMAL)
+            self.mnuStoragePSQL.entryconfig(4,state=Tix.NORMAL)
             if not flags['dyskt']:
                 self.mnuStoragePSQL.entryconfig(6,state=Tix.NORMAL)  # psql fix
                 self.mnuStoragePSQL.entryconfig(7,state=Tix.NORMAL)  # psql delete all
         else:
             # disconnected, enable start all, enable connect if postgres is running
             self.mnuStorage.entryconfig(0,state=Tix.NORMAL)
-            if flags['store']: self.mnuStorage.entryconfig(3,state=Tix.NORMAL)
+            if flags['store']: self.mnuStoragePSQL.entryconfig(3,state=Tix.NORMAL)
 
         # adjust dyskt menu
         if not flags['store'] and not flags['nidus']:
@@ -790,7 +859,7 @@ class WraithPanel(gui.MasterPanel):
                 2) assumes sudo password is entered
         """
         try:
-            self.logwrite("Shutting down Nidus",gui.LOG_NOTE)
+            self.logwrite("Shutting down Nidus...",gui.LOG_NOTE)
             cmdline.service('nidusd',self._pwd,False)
             while cmdline.nidusrunning(NIDUSPID):
                 self.logwrite("Nidus still processing data...",gui.LOG_NOTE)
@@ -821,11 +890,51 @@ class WraithPanel(gui.MasterPanel):
 
     def _startsensor(self):
         """ starts the DySKT sensor """
-        pass
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if flags['store'] and flags['nidus'] and not flags['dyskt']:
+            # do we have a password
+            if not self._pwd:
+                pwd = self._getpwd()
+                if pwd is None:
+                    self.logwrite("Password entry canceled. Cannot continue",
+                                  gui.LOG_WARN)
+                    return
+                self._pwd = pwd
+
+            # start the sensor
+            try:
+                self.logwrite("Starting DySKT...",gui.LOG_NOTE)
+                cmdline.service('dysktd',self._pwd)
+                time.sleep(0.5)
+                if not cmdline.dysktrunning(DYSKTPID): raise RuntimeError('unknown')
+            except RuntimeError as e:
+                self.logwrite("Error starting DySKT: %s" % e,gui.LOG_ERR)
+            else:
+                self.logwrite("DySKT Started")
+                self._setstate(_STATE_DYSKT_)
 
     def _stopsensor(self):
         """ stops the DySKT sensor """
-        pass
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if flags['dyskt']:
+            # do we have a password
+            if not self._pwd:
+                pwd = self._getpwd()
+                if pwd is None:
+                    self.logwrite("Password entry canceled. Cannot continue",
+                                  gui.LOG_WARN)
+                    return
+                self._pwd = pwd
+
+            # stop the sensor
+            try:
+                self.logwrite("Shutting down DySKT...",gui.LOG_NOTE)
+                cmdline.service('dysktd',self._pwd,False)
+            except RuntimeError as e:
+                self.logwrite("Error shutting down DySKT: %s" % e,gui.LOG_ERR)
+            else:
+                self._setstate(_STATE_DYSKT_,False)
+                self.logwrite("DySKT shut down")
 
     def _getpwd(self):
         """ prompts for sudo password until correct or canceled"""
