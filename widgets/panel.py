@@ -190,6 +190,27 @@ class SlavePanel(Panel):
         """ an open "sub" panel is desiring to close """
         self.deletepanel(name)
 
+class SimplePanel(SlavePanel):
+    """
+     Defines a simple panel with body
+     Derived class must implement _body()
+    """
+    def __init__(self,toplevel,chief,title,iconpath=None):
+        SlavePanel.__init__(self,toplevel,chief,iconpath)
+        self.master.title(title)
+        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
+        self._body()
+    def _body(self): raise NotImplementedError("SimplePanel::_body")
+
+class ConfigPanel(SlavePanel):
+    """
+     Configuration file edit/view panel
+    """
+    def __init__(self,toplevel,chief,title):
+        SlavePanel.__init__(self,toplevel,chief,"widgets/icons/config.png")
+        self.master.title(title)
+        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
+
 class ListPanel(SlavePanel):
     """
      ListPanel - A simple SlavePanel with a ScrolledHList which displays

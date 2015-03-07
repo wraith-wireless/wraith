@@ -8,10 +8,11 @@
   4) move display of log panel to after intializiation() so that
      wraith panel is 'first', leftmost panel - will have to figure out
      how to save messages from init to later
-  6) why is clear dyskt log getting disabled
   8) need to periodically check status of postgres,nidusd and dyskt
   9) get log panel to scroll automatically
  10) add labels to frames
+ 11) break down starting storage components seperately: 1) start postgresql, 2) start
+    nidus, 3) connect to postgress
 """
 
 __name__ = 'wraith-rt'
@@ -44,22 +45,10 @@ DYSKTPID = '/var/run/dysktd.pid'       # path to dyskt pidfile
 
 ##### THE GUI(s)
 
-class SimplePanel(gui.SlavePanel):
-    """
-     Defines a simple panel with body
-     Derived class must implement _body()
-    """
-    def __init__(self,toplevel,chief,title,iconpath=None):
-        gui.SlavePanel.__init__(self,toplevel,chief,iconpath)
-        self.master.title(title)
-        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
-        self._body()
-    def _body(self): raise NotImplementedError("SimplePanel::_body")
-
-class DataBinPanel(SimplePanel):
+class DataBinPanel(gui.SimplePanel):
     """ DataBinPanel - displays a set of data bins for retrieved data storage """
     def __init__(self,toplevel,chief):
-        SimplePanel.__init__(self,toplevel,chief,"Databin","widgets/icons/databin.png")
+        gui.SimplePanel.__init__(self,toplevel,chief,"Databin","widgets/icons/databin.png")
 
     def donothing(self): pass
 
@@ -81,10 +70,10 @@ class DataBinPanel(SimplePanel):
                 self._bins[b]['btn'] = Tix.Button(frm,image=self._bins[b]['img'],command=self.donothing)
             self._bins[b]['btn'].grid(row=0,column=_BINS_.index(b),sticky=Tix.W)
 
-class AboutPanel(SimplePanel):
+class AboutPanel(gui.SimplePanel):
     """ AboutPanel - displays a simple About Panel """
     def __init__(self,toplevel,chief):
-        SimplePanel.__init__(self,toplevel,chief,"About Wraith","widgets/icons/about.png")
+        gui.SimplePanel.__init__(self,toplevel,chief,"About Wraith","widgets/icons/about.png")
 
     def _body(self):
         frm = Tix.Frame(self)
@@ -100,23 +89,23 @@ class AboutPanel(SimplePanel):
                   fg="white",
                   font=("Roman",8,'bold')).grid(row=2,column=0,sticky=Tix.N)
 
-class WraithConfigPanel(SimplePanel):
-    """ Display Wraith Configuration Panel """
-    def __init__(self,toplevel,chief):
-        SimplePanel.__init__(self,toplevel,chief,"Configure Wraith","widgets/icons/config.png")
-
-    def _body(self):
-        """ make wigets for the body """
-        # main frame
-        frm = Tix.Frame(self)
-        frm.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+#class WraithConfigPanel(SimplePanel):
+#    """ Display Wraith Configuration Panel """
+#    def __init__(self,toplevel,chief):
+#        SimplePanel.__init__(self,toplevel,chief,"Configure Wraith","widgets/icons/config.png")
+#
+#    def _body(self):
+#        """ make wigets for the body """
+#        # main frame
+#        frm = Tix.Frame(self)
+#        frm.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
 
         # Two subframes, Storage and Policy
-        frmS = Tix.LabelFrame(frm)
-        frmS.grid(row=0,column=0,sticky=Tix.N)
+#        frmS = Tix.LabelFrame(frm)
+#        frmS.grid(row=0,column=0,sticky=Tix.N)
 
-        frmP = Tix.LabelFrame(frm)
-        frmP.grid(row=1,column=0,sticky=Tix.N)
+#        frmP = Tix.LabelFrame(frm)
+#        frmP.grid(row=1,column=0,sticky=Tix.N)
 
 #### STATE DEFINITIONS
 _STATE_INIT_   = 0
@@ -163,7 +152,7 @@ class WraithPanel(gui.MasterPanel):
         # configure panel & write initial message
         # have to manually enter the desired size, as the menu does not expand
         # the visibile portion automatically
-        self.tk.wm_geometry("280x1+0+0")
+        self.tk.wm_geometry("300x1+0+0")
         self.tk.resizable(0,0)
         self.logwrite("Wraith v%s" % wraith.__version__)
 
@@ -268,17 +257,32 @@ class WraithPanel(gui.MasterPanel):
         self.mnuView.add_separator()
         self.mnuView.add_command(label='Data',command=self.viewdata)
 
-        # Nidus Menu
-        self.mnuNidus = Tix.Menu(self.menubar,tearoff=0)
-        self.mnuNidus.add_command(label='Start',command=self.nidusstart)     # 0
-        self.mnuNidus.add_command(label='Stop',command=self.nidusstop)       # 1
-        self.mnuNidus.add_separator()                                        # 2
-        self.mnuNidusLog = Tix.Menu(self.mnuNidus,tearoff=0)
-        self.mnuNidusLog.add_command(label='View',command=self.viewniduslog)   # 0
-        self.mnuNidusLog.add_command(label='Clear',command=self.clearniduslog) # 1
-        self.mnuNidus.add_cascade(label='Log',menu=self.mnuNidusLog)         # 3
-        self.mnuNidus.add_separator()
-        self.mnuNidus.add_command(label='Config',command=self.confignidus)   # 4
+        # Storage Menu
+        self.mnuStorage = Tix.Menu(self.menubar,tearoff=0)
+        self.mnuStorage.add_command(label="Start All",command=self.storagestart)  # 0
+        self.mnuStorage.add_command(label="Stop All",command=self.storagestop)    # 1
+        self.mnuStorage.add_separator()                                           # 2
+        self.mnuStoragePSQL = Tix.Menu(self.mnuStorage,tearoff=0)
+        self.mnuStoragePSQL.add_command(label='Start',command=self.psqlstart)       # 0
+        self.mnuStoragePSQL.add_command(label='Stop',command=self.psqlstop)         # 1
+        self.mnuStoragePSQL.add_separator()                                         # 2
+        self.mnuStoragePSQL.add_command(label='Connect',command=self.connect)       # 3
+        self.mnuStoragePSQL.add_command(label='Disconnect',command=self.disconnect) # 4      # 1
+        self.mnuStoragePSQL.add_separator()                                         # 5
+        self.mnuStoragePSQL.add_command(label='Fix',command=self.psqlfix)           # 6
+        self.mnuStoragePSQL.add_command(label='Delete All',command=self.psqldelall) # 7
+        self.mnuStorage.add_cascade(label='PostgreSQL',menu=self.mnuStoragePSQL)  # 3
+        self.mnuStorageNidus = Tix.Menu(self.mnuStorage,tearoff=0)
+        self.mnuStorageNidus.add_command(label='Start',command=self.nidusstart)     # 0
+        self.mnuStorageNidus.add_command(label='Stop',command=self.nidusstop)       # 1
+        self.mnuStorageNidus.add_separator()                                        # 2
+        self.mnuNidusLog = Tix.Menu(self.mnuStorageNidus,tearoff=0)
+        self.mnuNidusLog.add_command(label='View',command=self.viewniduslog)         # 0
+        self.mnuNidusLog.add_command(label='Clear',command=self.clearniduslog)       # 1
+        self.mnuStorageNidus.add_cascade(label='Log',menu=self.mnuNidusLog)         # 3
+        self.mnuStorageNidus.add_separator()                                        # 4
+        self.mnuStorageNidus.add_command(label='Config',command=self.confignidus)   # 5
+        self.mnuStorage.add_cascade(label='Nidus',menu=self.mnuStorageNidus)      # 4
 
         # DySKT Menu
         self.mnuDySKT = Tix.Menu(self.menubar,tearoff=0)
@@ -287,7 +291,7 @@ class WraithPanel(gui.MasterPanel):
         self.mnuDySKT.add_separator()                                      # 2
         self.mnuDySKT.add_command(label='Control',command=self.dysktctrl)  # 3            # 3
         self.mnuDySKT.add_separator()                                      # 4
-        self.mnuDySKTLog = Tix.Menu(self.mnuNidus,tearoff=0)
+        self.mnuDySKTLog = Tix.Menu(self.mnuDySKT,tearoff=0)
         self.mnuDySKTLog.add_command(label='View',command=self.viewdysktlog)   # 0
         self.mnuDySKTLog.add_command(label='Clear',command=self.cleardysktlog) # 1
         self.mnuDySKT.add_cascade(label='Log',menu=self.mnuNidusLog)       # 5
@@ -303,7 +307,7 @@ class WraithPanel(gui.MasterPanel):
         self.menubar.add_cascade(label='Wraith',menu=self.mnuWraith)
         self.menubar.add_cascade(label="Tools",menu=self.mnuTools)
         self.menubar.add_cascade(label='View',menu=self.mnuView)
-        self.menubar.add_cascade(label='Nidus',menu=self.mnuNidus)
+        self.menubar.add_cascade(label='Storage',menu=self.mnuStorage)
         self.menubar.add_cascade(label='DySKT',menu=self.mnuDySKT)
         self.menubar.add_cascade(label='Help',menu=self.mnuHelp)
 
@@ -313,13 +317,13 @@ class WraithPanel(gui.MasterPanel):
     def configwraith(self):
         """ display config file preference editor """
         panel = self.getpanels("preferences",False)
-        if not panel:
-            t = Tix.Toplevel()
-            pnl = WraithConfigPanel(t,self)
-            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"preferences"))
-        else:
-            panel[0].tk.deiconify()
-            panel[0].tk.lift()
+        #if not panel:
+        #    t = Tix.Toplevel()
+        #    pnl = WraithConfigPanel(t,self)
+        #    self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"preferences"))
+        #else:
+        #    panel[0].tk.deiconify()
+        #    panel[0].tk.lift()
 
 #### View Menu
 
@@ -338,19 +342,51 @@ class WraithPanel(gui.MasterPanel):
         """ display data panel """
         self.unimplemented()
 
-#### Nidus Menu
+#### Storage Menu
 
-    def nidusstart(self):
+    def storagestart(self):
         """ starts database and storage manager """
         self._startstorage()
         self._updatestate()
         self._menuenable()
 
-    def nidusstop(self):
+    def storagestop(self):
         """ stops database and storage manager """
         self._stopstorage()
         self._updatestate()
         self._menuenable()
+
+    def connect(self):
+        """ connects to postgresql """
+        pass
+
+    def disconnect(self):
+        """ connects to postgresql """
+        pass
+
+    def psqlstart(self):
+        """ starts postgresql """
+        pass
+
+    def psqlstop(self):
+        """ starts postgresql """
+        pass
+
+    def psqlfix(self):
+        """ fix any open-ended periods left over by errors """
+        pass
+
+    def psqldelall(self):
+        """ delete all data in nidus database """
+        pass
+
+    def nidusstart(self):
+        """ starts nidus storage manager """
+        pass
+
+    def nidusstop(self):
+        """ stops nidus storage manager """
+        pass
 
     def viewniduslog(self):
         """ display Nidus log """
@@ -485,25 +521,50 @@ class WraithPanel(gui.MasterPanel):
         # get all flags
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
 
-        # adjust nidus menu
-        if flags['store'] and flags['nidus']:
-            # all storage components are 'up'
-            self.mnuNidus.entryconfig(0,state=Tix.DISABLED)    # start
-            self.mnuNidus.entryconfig(1,state=Tix.NORMAL)      # stop
-            self.mnuNidusLog.entryconfig(1,state=Tix.DISABLED) # clear log
-        elif not flags['store'] and not flags['nidus']:
-            # no storage component is 'up'
-            self.mnuNidus.entryconfig(0,state=Tix.NORMAL)    # start
-            self.mnuNidus.entryconfig(1,state=Tix.DISABLED)  # stop
-            self.mnuNidusLog.entryconfig(1,state=Tix.NORMAL) # clear log
+        # adjust storage menu
+        # easiest for storage is to disable all and then only enable relevant
+        # always allow Nidus->config, Nidus->View Log
+        self.mnuStorage.entryconfig(0,state=Tix.DISABLED)      # all start
+        self.mnuStorage.entryconfig(1,state=Tix.DISABLED)      # all stop
+        self.mnuStoragePSQL.entryconfig(0,state=Tix.DISABLED)  # psql start
+        self.mnuStoragePSQL.entryconfig(1,state=Tix.DISABLED)  # psql stop
+        self.mnuStoragePSQL.entryconfig(3,state=Tix.DISABLED)  # connect 2 psql
+        self.mnuStoragePSQL.entryconfig(4,state=Tix.DISABLED)  # disconnect from psql
+        self.mnuStoragePSQL.entryconfig(6,state=Tix.DISABLED)  # psql fix
+        self.mnuStoragePSQL.entryconfig(7,state=Tix.DISABLED)  # psql delete all
+        self.mnuStorageNidus.entryconfig(0,state=Tix.DISABLED) # nidus start
+        self.mnuStorageNidus.entryconfig(1,state=Tix.DISABLED) # nidus stop
+        self.mnuNidusLog.entryconfig(1,state=Tix.DISABLED)     # nidus log clear
+
+        if flags['store']:
+            # storage is running enable stop all, stop postgresql, and start nidus
+            self.mnuStorage.entryconfig(1,state=Tix.NORMAL)
+            self.mnuStoragePSQL.entryconfig(1,state=Tix.NORMAL)
+            self.mnuStorageNidus.entryconfig(0,state=Tix.NORMAL)
         else:
-            # storage components are in a 'mixed' state
-            self.mnuNidus.entryconfig(0,state=Tix.NORMAL) # start
-            self.mnuNidus.entryconfig(1,state=Tix.NORMAL) # stop
-            if not flags['nidus']:
-                self.mnuNidusLog.entryconfig(1,state=Tix.NORMAL)   # clear log
-            else:
-                self.mnuNidusLog.entryconfig(1,state=Tix.DISABLED) # clear log
+            # storage is not running, enable start all, start postgresql
+            self.mnuStorage.entryconfig(0,state=Tix.NORMAL)
+            self.mnuStoragePSQL.entryconfig(0,state=Tix.NORMAL)
+
+        if flags['nidus']:
+            # nidus is running, enable stop all, stop nidus
+            self.mnuStorage.entryconfig(1,state=Tix.NORMAL)
+            self.mnuStorageNidus.entryconfig(1,state=Tix.NORMAL)
+        else:
+            # nidus is not running, enable start all & clear nidus log
+            # enable start nidus only if postgres is running
+            self.mnuStorage.entryconfig(0,state=Tix.NORMAL)
+            if flags['store']: self.mnuStorageNidus.entryconfig(0,state=Tix.NORMAL)
+            self.mnuNidusLog.entryconfig(1,state=Tix.NORMAL)
+
+        if flags['conn']:
+            # connected to psql, enable stop all, disconnect
+            self.mnuStorage.entryconfig(1,state=Tix.NORMAL)
+            self.mnuStorage.entryconfig(4,state=Tix.NORMAL)
+        else:
+            # disconnected, enable start all, connect
+            self.mnuStorage.entryconfig(0,state=Tix.NORMAL)
+            self.mnuStorage.entryconfig(3,state=Tix.NORMAL)
 
         # adjust dyskt menu
         if not flags['store'] and not flags['nidus']:
@@ -511,7 +572,6 @@ class WraithPanel(gui.MasterPanel):
             self.mnuDySKT.entryconfig(0,state=Tix.DISABLED)  # start
             self.mnuDySKT.entryconfig(1,state=Tix.DISABLED)  # stop
             self.mnuDySKT.entryconfig(3,state=Tix.DISABLED)  # ctrl panel
-            self.mnuDySKTLog.entryconfig(0,state=Tix.NORMAL) # view log
             self.mnuDySKTLog.entryconfig(1,state=Tix.NORMAL) # clear log
             self.mnuDySKT.entryconfig(7,state=Tix.NORMAL)    # configure
         else:
@@ -520,7 +580,6 @@ class WraithPanel(gui.MasterPanel):
                 self.mnuDySKT.entryconfig(0,state=Tix.DISABLED)    # start
                 self.mnuDySKT.entryconfig(1,state=Tix.NORMAL)      # stop
                 self.mnuDySKT.entryconfig(3,state=Tix.NORMAL)      # ctrl panel
-                self.mnuDySKTLog.entryconfig(0,state=Tix.NORMAL)   # view log
                 self.mnuDySKTLog.entryconfig(1,state=Tix.DISABLED) # clear log
                 self.mnuDySKT.entryconfig(7,state=Tix.NORMAL)      # configure
             else:
@@ -528,7 +587,7 @@ class WraithPanel(gui.MasterPanel):
                 self.mnuDySKT.entryconfig(0,state=Tix.NORMAL)    # start
                 self.mnuDySKT.entryconfig(1,state=Tix.DISABLED)  # stop
                 self.mnuDySKT.entryconfig(3,state=Tix.DISABLED)  # ctrl panel
-                self.mnuDySKTLog.entryconfig(0,state=Tix.NORMAL) # view log
+                #self.mnuDySKTLog.entryconfig(0,state=Tix.NORMAL) # view log
                 self.mnuDySKTLog.entryconfig(1,state=Tix.NORMAL) # clear log
                 self.mnuDySKT.entryconfig(7,state=Tix.NORMAL)    # configure
 

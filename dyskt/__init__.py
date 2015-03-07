@@ -58,7 +58,6 @@ TODO:
      41) need to handle tuner thread failure in rdoctl
      42) consider sending multiple frames as a single compressed/encrypted
          packet for efficiency and security
-     43) send regulatory domain to nidus
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'
