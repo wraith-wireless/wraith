@@ -204,10 +204,18 @@ class SimplePanel(SlavePanel):
 
 class ConfigPanel(SlavePanel):
     """
-     Configuration file edit/view panel.
+     Configuration file view/edit panel. Provides a frame for input widgets and
+     a button frame with
+      ok: writes new values to config file and exits
+      apply: writes new values to config file
+      reset: resets to original file
+      cancel: exits without writing to config file
+
      Derived classes must implement
      _confs - add widgets to view/edit configuration file entries
-
+     _initialize - initial entry of config file values into the widgets and reset()
+     _validate - validate entries before writing
+     _write - writes the values of the entries into the config file
     """
     def __init__(self,toplevel,chief,title):
         """ initialize configuration panel """
@@ -222,17 +230,28 @@ class ConfigPanel(SlavePanel):
 
         # set up the button widget frame
         frmBtns = Tix.Frame(self)
-        frmBtns.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        frmBtns.pack(side=Tix.TOP)
 
         # four buttons, Ok, Apply, Reset and Cancel
         Tix.Button(frmBtns,text='OK',command=self.ok).grid(row=0,column=0)
         Tix.Button(frmBtns,text='Apply',command=self.apply).grid(row=0,column=1)
         Tix.Button(frmBtns,text='Reset',command=self.reset).grid(row=0,column=2)
         Tix.Button(frmBtns,text='Cancel',command=self.cancel).grid(row=0,column=3)
+
+        # insert values from config file
+        self._initialize()
     def _confs(self,frm): raise NotImplementedError("ConfigPanel::_confs")
-    def ok(self): pass
-    def apply(self): pass
-    def reset(self): pass
+    def _initialize(self): raise NotImplementedError("ConfigPanel::_initialize")
+    def _validate(self): raise NotImplementedError("ConfigPanel::_validate")
+    def _write(self): raise NotImplementedError("ConfigPanel::_write")
+    def ok(self):
+        if self._validate():
+            self._write()
+            self.close()
+    def apply(self):
+        if self._validate():
+            self._write()
+    def reset(self): self._initialize()
     def cancel(self): self.close()
 
 class ListPanel(SlavePanel):
