@@ -458,19 +458,39 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
     def _confs(self,frm):
         """ set up entry widgets """
-        # SSE Configuration
+        # Recon Configuration
+        frmR = Tix.Frame(frm,borderwidth=2,relief='sunken')
+        frmR.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        Tix.Label(frmR,text="RECON").grid(row=0,column=0,columnspan=6,sticky=Tix.W)
+        Tix.Label(frmR,text="NIC: ").grid(row=1,column=0,sticky=Tix.W)
+        self.txtNic = Tix.Entry(frmR,width=5)
+        self.txtNic.grid(row=1,column=1,sticky=Tix.W)
+        Tix.Label(frmR,text="Spoof: ").grid(row=1,column=2,sticky=Tix.W)
+        self.txtSpoof = Tix.Entry(frmR,width=17)
+        self.txtSpoof.grid(row=1,column=3,sticky=Tix.W)
+        Tix.Label(frmR,text="Desc: ").grid(row=1,column=4,sticky=Tix.W)
+        self.txtDesc = Tix.Entry(frmR,width=15)
+        self.txtDesc.grid(row=1,column=5,sticky=Tix.W)
+        frmRA = Tix.Frame(frmR,borderwidth=2,relief='sunken')
+        frmRA.grid(row=2,column=0,columnspan=6,sticky=Tix.N)
+        Tix.Label(frmRA,text="Antenna").grid(row=0,column=0,sticky=Tix.W)
+
+
+        # Collection Configuration
+        frmC = Tix.Frame(frm,borderwidth=2,relief='sunken')
+        frmC.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+
+        # GPS Configuration
+        frmG = Tix.Frame(frm,borderwidth=2,relief='sunken')
+        frmG.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+
+        # Storage Configuration
         frmS = Tix.Frame(frm,borderwidth=2,relief='sunken')
         frmS.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
-        Tix.Label(frmS,text='SSE').grid(row=0,column=0,columnspan=2,sticky=Tix.W)
-        svar = Tix.IntVar()
 
-        # OUI Configuration
-        frmO = Tix.Frame(frm,borderwidth=2,relief='sunken')
-        frmO.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
-        Tix.Label(frmO,text='OUI').grid(row=0,column=0,sticky=Tix.W)
-        Tix.Label(frmS,text='Path: ').grid(row=1,column=0,sticky=Tix.W)
-        self.txtPath = Tix.Entry(frmO,width=50)
-        self.txtPath.grid(row=1,column=1,sticky=Tix.E)
+        # Local configuration
+        frmL = Tix.Frame(frm,borderwidth=2,relief='sunken')
+        frmL.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
 
     def _initialize(self):
         """ insert values from config file into entry boxes """
@@ -488,20 +508,6 @@ class DySKTConfigPanel(gui.ConfigPanel):
         fout = None
         try:
             conf = ConfigParser.ConfigParser()
-
-            # SSE section
-            #conf.add_section('SSE')
-            #conf.set('SSE','save','yes' if self.svar.get() else 'no')
-            #conf.set('SSE','save_private','yes' if self.pvar.get() else 'no')
-            #conf.set('SSE','save_path',self.txtPCAPPath.get())
-            #conf.set('SSE','save_maxsize',self.txtMaxSz.get())
-            #conf.set('SSE','save_maxfiles',self.txtMaxFiles.get())
-            #conf.set('SSE','store_threads',self.txtNumStore.get())
-            #conf.set('SSE','extract_threads',self.txtNumExtract.get())
-
-            # OUI section
-            #conf.add_section('OUI')
-            #conf.set('OUI','path',self.txtOUIPath.get())
 
             fout = open('dyskt/dyskt.conf','w')
             conf.write(fout)
@@ -959,7 +965,14 @@ class WraithPanel(gui.MasterPanel):
 
     def configdyskt(self):
         """ display dyskt config file preference editor """
-        self.unimplemented()
+        panel = self.getpanels("dysktprefs",False)
+        if not panel:
+            t = Tix.Toplevel()
+            pnl = DySKTConfigPanel(t,self)
+            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"dysktprefs"))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
 
 #### HELP MENU
 
