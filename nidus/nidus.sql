@@ -1,7 +1,7 @@
 -- timestamp for eternity = infinity
 -- using postgresql 9.3.4
 -- ensure postgresql service is running - sudo service postgresql start
--- version 0.0.10
+-- version 0.0.11
 
 -- create nidus user and nidus database  
 --postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
@@ -146,8 +146,33 @@ CREATE TABLE radio(
 );
 
 -- antenna type enumeration
-DROP TYPE IF EXISTS ANTENNA;
-CREATE TYPE ANTENNA AS ENUM ('none','omni','omni array','yagi','grid','panel','patch','sector');
+DROP TYPE IF EXISTS ANTENNA_TYPE;
+CREATE TYPE ANTENNA_TYPE AS ENUM ('none','omni','omni array','yagi','grid','panel',
+                                   'patch','sector');
+
+-- antenna table
+-- Each radio will have 1 or more antennas. Normally these would all be configured
+-- the same, however with 802.11n it is beneficial to have antennas polarized
+-- differently to increase throughput through spatial multiplexing
+DROP TABLE IF EXISTS antenna;
+CREATE TABLE antenna(
+  mac macaddr NOT NULL,            -- mac address of nic (fk)
+  ind smallint DEFAULT 0,          -- index of antenna, 0-based
+  ts TIMESTAMPTZ NOT NULL,         -- timestamp (considered valid until later one entered) 
+  gain REAL DEFAULT 2.14,          -- gain in dBi
+  loss REAL DEFAULT 0,             -- loss in dBi
+  x REAL DEFAULT 0,                -- rotation of antenna along x-axis
+  y REAL DEFAULT 0,                -- rotation of antenna along y-axis
+  z REAL DEFAULT 0,                -- rotation of antenna along y-axis
+  type ANTENNA_TYPE DEFAULT 'omni' -- type of antenna
+  CONSTRAINT ch_ind CHECK (ind >= 0),
+  CONSTRAINT ch_x CHECK(x >=0 and x < 360),
+  CONSTRAINT ch_y CHECK(y >=0 and y < 360),
+  CONSTRAINT ch_z CHECK(z >=0 and z < 360),
+  CONSTRAINT ch_gain CHECK(gain >= 0),
+  CONSTRAINT ch_loss CHECK(loss >= 0),
+  FOREIGN KEY (mac) REFERENCES radio(mac)
+);
 
 -- radio role type enumeration
 DROP TYPE IF EXISTS ROLE;
@@ -160,15 +185,8 @@ DROP TABLE IF EXISTS radio_epoch;
 CREATE TABLE radio_epoch(
    mac macaddr NOT NULL,            -- foreign key to radio mac addr
    role ROLE NOT NULL,              -- what role is radio playing now
-   ant_offset REAL DEFAULT 0,       -- offset of antenna front from gps device north
-   ant_gain REAL DEFAULT 2.14,      -- antenna gain in dBi
-   ant_loss REAL DEFAULT 0,         -- loss associated with system in dBi
-   ant_type ANTENNA DEFAULT 'omni', -- type of antenna 
    description VARCHAR(200),        -- brief description of radio
    period TSTZRANGE NOT NULL,       -- period during which record is true
-   CONSTRAINT ch_offset CHECK(ant_offset >=0 and ant_offset <= 360),
-   CONSTRAINT ch_gain CHECK(ant_gain >= 0),
-   CONSTRAINT ch_loss CHECK(ant_loss >= 0),
    FOREIGN KEY (mac) REFERENCES radio(mac),
    EXCLUDE USING gist (mac WITH =, period WITH &&)
 );
@@ -994,6 +1012,7 @@ CREATE OR REPLACE FUNCTION delete_all()
       DELETE FROM radio_epoch;
       DELETE FROM radio_event;
       DELETE FROM radio_period;
+      DELETE FROM antenna;
       DELETE FROM radio;
       DELETE FROM sensor;
       ALTER SEQUENCE sensor_session_id_seq RESTART;
@@ -1044,6 +1063,7 @@ DELETE FROM using_radio;
 DELETE FROM radio_epoch;
 DELETE FROM radio_event;
 DELETE FROM radio_period;
+DELETE FROM antenna;
 DELETE FROM radio;
 DELETE FROM sensor;
 ALTER SEQUENCE sensor_session_id_seq RESTART;
@@ -1078,6 +1098,7 @@ DROP TABLE using_radio;
 DROP TABLE radio_epoch;
 DROP TABLE radio_event;
 DROP TABLE radio_period;
+DROP TABLE antenna;
 DROP TABLE radio;
 DROP TABLE sensor;
 

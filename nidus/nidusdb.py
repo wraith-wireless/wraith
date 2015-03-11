@@ -310,12 +310,10 @@ class NidusDB(object):
 
             # insert epochal
             sql = """
-                   insert into radio_epoch
-                    (mac,role,ant_offset,ant_gain,ant_loss,ant_type,description,period)
-                   values (%s,%s,%s,%s,%s,%s,%s,tstzrange(%s,NULL,'[]'));
+                   insert into radio_epoch (mac,role,description,period)
+                   values (%s,%s,%s,tstzrange(%s,NULL,'[]'));
                   """
-            self._curs.execute(sql,(ds['mac'],ds['role'],ds['ant_offset'],ds['ant_gain'],
-                                    ds['ant_loss'],ds['ant_type'],ds['desc'],ds['ts']))
+            self._curs.execute(sql,(ds['mac'],ds['role'],ds['desc'],ds['ts']))
 
             # insert periodic
             sql = """

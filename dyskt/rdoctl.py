@@ -139,8 +139,8 @@ class RadioController(mp.Process):
             self._mac = ifaces[0]['addr']
         except (KeyError, IndexError):
             raise RuntimeError("%s:iw.dev:error getting interfaces" % self._role)
-        #except iw.IWException:
-        #    raise RuntimeError("%s:iw.dev:failed to get phy" % self._role)
+        except iw.IWException:
+            raise RuntimeError("%s:iw.dev:failed to get phy" % self._role)
 
         # get properties (the below will return None rather than throw exception)
         self._chs = iw.chget(self._phy)
@@ -206,11 +206,8 @@ class RadioController(mp.Process):
             self._s.bind((self._vnic,0x0003))
             uptime = time.time()
 
-            # read in antenna details
-            self._antenna['gain'] = conf['ant_gain']
-            self._antenna['loss'] = conf['ant_loss']
-            self._antenna['offset'] = conf['ant_offset']
-            self._antenna['type'] = conf['ant_type']
+            # read in antenna details and radio description
+
             self._desc = conf['desc']
 
             # compile initial scan pattern from config
@@ -407,8 +404,4 @@ class RadioController(mp.Process):
                 'standards':self._std,
                 'channels':self._chs,
                 'txpwr':self._txpwr,
-                'desc':self._desc,
-                'ant_type':self._antenna['type'],
-                'ant_gain':self._antenna['gain'],
-                'ant_loss':self._antenna['loss'],
-                'ant_offset':self._antenna['offset']}
+                'desc':self._desc}

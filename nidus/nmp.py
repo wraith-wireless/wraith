@@ -130,8 +130,7 @@ RADIO_FIELDS = ['ts','mac','role','spoofed','phy','nic','vnic','driver','chipset
                 'ant_loss','ant_offset']
 RADIO_WFIELDS = [('ts',str),('mac',str),('role',str),('spoofed',str),('phy',str),
                  ('nic',str),('vnic',str),('driver',str),('chipset',str),('standards',str),
-                 ('channels',str2ints),('txpwr',int),('desc',str),('ant_type',str),
-                 ('ant_gain',float),('ant_loss',float),('ant_offset',float)]
+                 ('channels',str2ints),('txpwr',int),('desc',str)]
 RADIO_TIMESTAMP  =  0 # ts of message
 RADIO_MAC        =  1 # physical mac address of radio
 RADIO_ROLE       =  2 # the role i.e. assault, recon
@@ -145,10 +144,6 @@ RADIO_STANDARDS  =  9 # 802.11 standards radio implements
 RADIO_CHANNELS   = 10 # channels supported
 RADIO_TXPWR      = 11 # transmit power in dB
 RADIO_DESC       = 12 # a short desc
-RADIO_ANT_TYPE   = 13 # type of antenna
-RADIO_ANT_GAIN   = 14 # gain in dBi
-RADIO_ANT_LOSS   = 15 # loss in dBi
-RADIO_ANT_OFFSET = 16 # offset of antenna 'front' from gps device 'front'
 
 RADIO_EVENT_FIELDS = ['ts','mac','event','params']
 RADIO_EVENT_WFIELDS = [('ts',str),('mac',str),('event',str),('params',str)]

@@ -468,13 +468,15 @@ class DySKTConfigPanel(gui.ConfigPanel):
         Tix.Label(frmR,text="Spoof: ").grid(row=1,column=2,sticky=Tix.W)
         self.txtSpoof = Tix.Entry(frmR,width=17)
         self.txtSpoof.grid(row=1,column=3,sticky=Tix.W)
-        Tix.Label(frmR,text="Desc: ").grid(row=1,column=4,sticky=Tix.W)
-        self.txtDesc = Tix.Entry(frmR,width=15)
-        self.txtDesc.grid(row=1,column=5,sticky=Tix.W)
+        Tix.Label(frmR,text="Desc: ").grid(row=2,column=0,sticky=Tix.W)
+        self.txtDesc = Tix.Text(frmR,width=32,height=3)
+        self.txtDesc.grid(row=2,column=1,columnspan=3,sticky=Tix.E)
         frmRA = Tix.Frame(frmR,borderwidth=2,relief='sunken')
-        frmRA.grid(row=2,column=0,columnspan=6,sticky=Tix.N)
-        Tix.Label(frmRA,text="Antenna").grid(row=0,column=0,sticky=Tix.W)
-
+        frmRA.grid(row=4,column=0,columnspan=4,sticky=Tix.N)
+        Tix.Label(frmRA,text="Antenna(s)").grid(row=0,column=0,sticky=Tix.W)
+        frmRS = Tix.Frame(frmR,borderwidth=2,relief='sunken')
+        frmRS.grid(row=5,column=0,columnspan=4,sticky=Tix.N)
+        Tix.Label(frmRS,text="Scan Pattern").grid(row=0,column=0,sticky=Tix.W)
 
         # Collection Configuration
         frmC = Tix.Frame(frm,borderwidth=2,relief='sunken')

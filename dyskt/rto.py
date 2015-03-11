@@ -395,11 +395,10 @@ class RTO(mp.Process):
     @staticmethod
     def _craftradio(ts,d):
         """ creates radio message body (d[0] is the radio and r its role """
-        return "%s %s %s %s %s %s %s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E %s %s %s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E %.2f %.2f %.2f" % \
+        return "%s %s %s %s %s %s %s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E %s %s %s \x1EFB\x1F%s\x1FFE\x1E"  % \
                (ts,d['mac'],d['role'],d['spoofed'],d['phy'],d['nic'],d['vnic'],
                 d['driver'],d['chipset'],d['standards'],','.join(d['channels']),
-                d['txpwr'],d['desc'],d['ant_type'],d['ant_gain'],d['ant_loss'],
-                d['ant_offset'])
+                d['txpwr'],d['desc'])
 
     @staticmethod
     def _craftradioevent(ts,d):
