@@ -149,7 +149,6 @@ CREATE TABLE radio(
 DROP TYPE IF EXISTS ANTENNA_TYPE;
 CREATE TYPE ANTENNA_TYPE AS ENUM ('none','omni','omni array','yagi','grid','panel',
                                    'patch','sector');
-
 -- antenna table
 -- Each radio will have 1 or more antennas. Normally these would all be configured
 -- the same, however with 802.11n it is beneficial to have antennas polarized
@@ -158,12 +157,12 @@ DROP TABLE IF EXISTS antenna;
 CREATE TABLE antenna(
   mac macaddr NOT NULL,            -- mac address of nic (fk)
   ind smallint DEFAULT 0,          -- index of antenna, 0-based
-  ts TIMESTAMPTZ NOT NULL,         -- timestamp (considered valid until later one entered) 
   gain REAL DEFAULT 2.14,          -- gain in dBi
   loss REAL DEFAULT 0,             -- loss in dBi
   x REAL DEFAULT 0,                -- rotation of antenna along x-axis
   y REAL DEFAULT 0,                -- rotation of antenna along y-axis
   z REAL DEFAULT 0,                -- rotation of antenna along y-axis
+  period TSTZRANGE NOT NULL,       -- timerange the radio is using this antenna
   type ANTENNA_TYPE DEFAULT 'omni' -- type of antenna
   CONSTRAINT ch_ind CHECK (ind >= 0),
   CONSTRAINT ch_x CHECK(x >=0 and x < 360),
@@ -171,7 +170,8 @@ CREATE TABLE antenna(
   CONSTRAINT ch_z CHECK(z >=0 and z < 360),
   CONSTRAINT ch_gain CHECK(gain >= 0),
   CONSTRAINT ch_loss CHECK(loss >= 0),
-  FOREIGN KEY (mac) REFERENCES radio(mac)
+  FOREIGN KEY (mac) REFERENCES radio(mac),
+  EXCLUDE USING gist (mac WITH =,period WITH &&)
 );
 
 -- radio role type enumeration
@@ -1024,7 +1024,13 @@ CREATE OR REPLACE FUNCTION delete_all()
 CREATE OR REPLACE FUNCTION fix_nullperiod()
     RETURNS void as $$
     BEGIN
-      
+      SET TIME ZONE 'UTC';
+      UPDATE sensor SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
+      UPDATE antenna SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
+      UPDATE radio_epoch SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
+      UPDATE radio_period SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
+      UPDATE using_radio SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
+      UPDATE using_gpsd SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
     END;
     $$ LANGUAGE plpgsql;
 

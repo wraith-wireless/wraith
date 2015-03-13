@@ -300,16 +300,35 @@ class DySKT(object):
         # get optional properties
         if conf.has_option(rtype,'spoof'):
             r['spoofed'] = conf.get(rtype,'spoof')
-        if conf.has_option(rtype,'antenna_gain'):
-            r['ant_gain'] = conf.getfloat(rtype,'antenna_gain')
-        if conf.has_option(rtype,'antenna_type'):
-            r['ant_type'] = conf.get(rtype,'antenna_type')
-        if conf.has_option(rtype,'antenna_loss'):
-            r['ant_loss'] = conf.getfloat(rtype,'antenna_loss')
-        if conf.has_option(rtype,'antenna_offset'):
-            r['ant_offset'] = conf.getfloat(rtype,'antenna_offset')
         if conf.has_option(rtype,'desc'):
             r['desc'] = conf.get(rtype,'desc')
+        try:
+            # for antennas, we process all or nothing
+            gain = []
+            atype = []
+            loss = []
+            xyz = []
+            if conf.has_option(rtype,'antenna_gain'):
+                gain = map(float,conf.get(rtype,'antenna_gain').split(','))
+            if conf.has_option(rtype,'antenna_type'):
+                atype = conf.get(rtype,'antenna_type').split(',')
+                if len(atype) != len(gain): raise RuntimeError('type')
+            if conf.has_option(rtype,'antenna_loss'):
+                loss = map(float,conf.get(rtype,'antenna_loss').split(','))
+                if len(loss) != len(gain): raise RuntimeError('loss')
+            if conf.has_option(rtype,'antenna_xyz'):
+                rs = conf.get(rtype,'antenna_xyz').split(',')
+                for t in rs: xyz.append(tuple(map(int,t.split(':'))))
+                if len(xyz) != len(gain): raise RuntimeError('xyz')
+        except ValueError as e:
+            logging.warn("Invalid type for %s antenna configuration - %s")
+        except RuntimeError as e:
+            logging.warn("Not all antenna configurations have the same length")
+        else:
+            r['antennas']['gain'] = gain
+            r['antennas']['type'] = atype
+            r['antennas']['loss'] = loss
+            r['antennas']['xyz'] = xyz
 
         # get scan pattern
         r['dwell'] = conf.getfloat(rtype,'dwell')

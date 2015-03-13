@@ -837,21 +837,15 @@ class WraithPanel(gui.MasterPanel):
         if flags['store'] and flags['conn'] and not flags['dyskt']:
             curs = None
             try:
-                ts = ts2iso(time.time())
+                self.logwrite("Fixing null-ended records in database...",gui.LOG_NOTE)
                 curs = self._conn.cursor()
-                sqls = ["update sensor set period = tstzrange(lower(period),%s) where upper(period) is NULL;",
-                        "update radio_epoch set period = tstzrange(lower(period),%s) upper(period) is NULL;",
-                        "update radio_period set period = tstzrange(lower(period),%s) where upper(period) is NULL;",
-                        "update using_radio set period = tstzrange(lower(period),%s) where upper(period) is NULL;",
-                        "update using_gpsd set period = tstzrange(lower(period),%s) where upper(period) is NULL;"]
-                for sql in sqls: curs.execute(sql,(ts,))
+                curs.callproc("fix_nullperiod")
                 self._conn.commit()
+                self.logwrite("Fixed all null-ended records")
             except psql.Error as e:
                 self._conn.rollback()
                 self.logwrite("Error fixing records <%s: %s>" % (e.pgcode,e.pgerror),
                               gui.LOG_ERR)
-            else:
-                self.logwrite("Null-ended records fixed")
             finally:
                 if curs: curs.close()
 
@@ -873,8 +867,6 @@ class WraithPanel(gui.MasterPanel):
                 self._conn.rollback()
                 self.logwrite("Failed to delete records <%s: %s>" % (e.pgcode,e.pgerror),
                               gui.LOG_ERR)
-            else:
-                self.logwrite("All records deleted")
             finally:
                 if curs: curs.close()
 
