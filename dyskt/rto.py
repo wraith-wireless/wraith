@@ -220,12 +220,26 @@ class RTO(mp.Process):
                 # break the blocking call and check the token
                 if cs == 'dyskt': continue
                 if ev == '!UP!': # should be the 1st message we get from radio(s)
-                    # NOTE: sending the radio, nidus will take care of setting
-                    # the radio device to up
+                    # NOTE: send the radio, nidus will take care of setting the
+                    # radio device to up. Send each antenna separately
                     rmap[cs] = msg['mac']
                     self._conn.send(('info','RTO','Radio',"%s initiated" % cs))
                     ret = self._send('RADIO',ts,msg)
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
+                    else:
+                        # send antennas
+                        for i in msg['nA']:
+                            ret = self._send('ANTENNA',ts,{'mac':msg['mac'],
+                                                           'index':i,
+                                                           'type':msg['type'][i],
+                                                           'gain':msg['gain'][i],
+                                                           'loss':msg['loss'][i],
+                                                           'x':msg['x'][i],
+                                                           'y':msg['y'][i],
+                                                           'z':msg['z'][i]})
+                            if ret:
+                                self._conn.send('err','RTO','Nidus',ret)
+                                break
                 #elif ev == '!DOWN!':
                 #    pass
                 elif ev == '!FAIL!':
@@ -251,6 +265,8 @@ class RTO(mp.Process):
                 else: # unidentified event type, notify leader
                     self._conn.send(('warn','RTO','Radio',
                                      "unidentified event %s" % ev))
+            except IndexError as e: # something wrong with antenna indexing
+                self._conn.send(('err','RTO',"Radio %s" % cs,"misconfigured antennas"))
             except KeyError as e: # a radio sent a message without initiating
                 self._conn.send(('warn','RTO','Radio %s' % e,
                                  "sent data %s of type %s w/o 'initiating'" % (ev,msg)))
@@ -305,6 +321,7 @@ class RTO(mp.Process):
             if t == 'DEVICE': send += self._craftdevice(ts,d)
             elif t == 'PLATFORM': send += self._craftplatform(d)
             elif t == 'RADIO': send += self._craftradio(ts,d)
+            elif t == 'ANTENNA': send += self._craftradio(ts,d)
             elif t == 'GPSD': send += self._craftgpsd(ts,d)
             elif t == 'FRAME': send += self._craftframe(ts,d)
             elif t == 'GPS': send += self._craftflt(ts,d,self._mgrs)
@@ -404,6 +421,13 @@ class RTO(mp.Process):
     def _craftradioevent(ts,d):
         """ create body of radio event message """
         return "%s %s %s \x1EFB\x1F%s\x1FFE\x1E" % (ts,d[0],d[1],d[2])
+
+    @staticmethod
+    def _craftantenna(ts,d):
+        """ create body of antenna message """
+        return "%s %s %d \x1EFB\x1F%s\x1FFE\x1E %.2f %.2f %d %d %d" %\
+               (ts,d['mac'],d['index'],d['type'],d['gain'],d['loss'],d['x'],
+                d['y'],d['z'])
 
     @staticmethod
     def _craftframe(ts,d):

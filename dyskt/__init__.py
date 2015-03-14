@@ -41,6 +41,7 @@ dyskt 0.1.5
  - added mac spoofing cability on start of each radio
  - added platform/system details
  - added regulatory domain setting/resetting capability to sensor
+ - modified antenna specification to support more than 1 antenna
 
 
 TODO:
