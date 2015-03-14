@@ -7,6 +7,7 @@ Defines the nidus message protocol. A simple definition of the nidus message pro
 Nidus expects six major message types Radio, GPSD, Frame, GPS, Status and Sensor
  DEVICE: state of given device has changed 
  RADIO: details about an wireless network interface card
+ ANTENNA: antenna details
  RADIO_EVENT: details of radio changing 'state'
  GPSD: details about a gps device
  FRAME: a raw 802.11 frame
@@ -151,6 +152,20 @@ RADIO_EVENT_TIMESTAMP = 0 # timestamp of event
 RADIO_EVENT_MAC       = 1 # mac address of radio
 RADIO_EVENT_EVENT     = 2 # the event one of {'scan','hold','listen','fail'}
 RADIO_EVENT_PARAMS    = 3 # free-form parameters of event
+
+#### ANTENNA ####
+ANTENNA_FIELDS = ['ts','mac','index','type','gain','loss','x','y','z']
+ANTENNA_WFIELDS = [('ts',str),('mac',str),('index',int),('type',str),('gain',float),
+                   ('loss',str2float),('x',int),('y',int),('z',int)]
+ANTENNA_TIMESTAMP = 0
+ANTENNA_MAC   = 1
+ANTENNA_INDEX = 2
+ANTENNA_TYPE  = 3
+ANTENNA_GAIN  = 4
+ANTENNA_LOSS  = 5
+ANTENNA_X     = 6
+ANTENNA_Y     = 7
+ANTENNA_Z     = 8
 
 #### GPSD ####
 GPSD_FIELDS = ['ts','id','vers','flags','driver','bps','path']

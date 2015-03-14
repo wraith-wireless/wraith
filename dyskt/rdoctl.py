@@ -97,26 +97,32 @@ class RadioController(mp.Process):
         self._q = None        # queue between tuner and us
         
         # _setup() sets the following
-        self._role = None     # role this radio plays one of {RECON|COLLECTION}
-        self._nic = None      # radio network interface controller name
-        self._mac = None      # real mac address
-        self._phy = None      # the phy of the device
-        self._vnic = None     # virtual monitor name
-        self._s = None        # the raw socket
-        self._std = None      # supported standards
-        self._chs = []        # supported channels
-        self._txpwr = 0       # current tx power
-        self._driver = None   # the driver
-        self._chipset = None  # the chipset
-        self._spoofed = ""    # spoofed mac address
-        self._desc = None     # optional description
-        self._scan = []       # the scan pattern: list of tuples (ch,chw)
-        self._ds = []         # dwell times (stay on scan[i] for time ds[i]
-        self._tuner = None    # tuner thread
-        self._antenna = {}    # antenna details {type,gain,loss,offset}
-        self._hop = None      # averaged hop time
-        self._interval = None # interval time for a complete scan
-        self._ev = None       # event queue for thread
+        self._role = None            # role this radio plays one of {RECON|COLLECTION}
+        self._nic = None              # radio network interface controller name
+        self._mac = None              # real mac address
+        self._phy = None              # the phy of the device
+        self._vnic = None             # virtual monitor name
+        self._s = None                # the raw socket
+        self._std = None              # supported standards
+        self._chs = []                # supported channels
+        self._txpwr = 0               # current tx power
+        self._driver = None           # the driver
+        self._chipset = None          # the chipset
+        self._spoofed = ""            # spoofed mac address
+        self._desc = None             # optional description
+        self._scan = []               # the scan pattern: list of tuples (ch,chw)
+        self._ds = []                 # dwell times (stay on scan[i] for time ds[i]
+        self._tuner = None            # tuner thread
+        self._antenna = {'num':0,     # antenna details
+                         'gain':None,
+                         'type':None,
+                         'loss':None,
+                         'x':None,
+                         'y':None,
+                         'z':None}
+        self._hop = None              # averaged hop time
+        self._interval = None         # interval time for a complete scan
+        self._ev = None               # event queue for thread
 
         # set up
         self._setup(conf)
@@ -207,7 +213,14 @@ class RadioController(mp.Process):
             uptime = time.time()
 
             # read in antenna details and radio description
-
+            if conf['antennas']['num'] > 0:
+                self._antenna['num'] = conf['antennas']['num']
+                self._antenna['type'] = conf['antennas']['type']
+                self._antenna['gain'] = conf['antennas']['gain']
+                self._antenna['loss'] = conf['antennas']['loss']
+                self._antenna['x'] = [v[0] for v in conf['antennas']['xyz']]
+                self._antenna['y'] = [v[1] for v in conf['antennas']['xyz']]
+                self._antenna['z'] = [v[2] for v in conf['antennas']['xyz']]
             self._desc = conf['desc']
 
             # compile initial scan pattern from config
@@ -404,4 +417,11 @@ class RadioController(mp.Process):
                 'standards':self._std,
                 'channels':self._chs,
                 'txpwr':self._txpwr,
-                'desc':self._desc}
+                'desc':self._desc,
+                'nA':self._antenna['num'],
+                'type':self._antenna['type'],
+                'gain':self._antenna['gain'],
+                'loss':self._antenna['loss'],
+                'x':self._antenna['x'],
+                'y':self._antenna['y'],
+                'z':self._antenna['z']}

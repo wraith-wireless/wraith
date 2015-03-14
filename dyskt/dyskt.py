@@ -302,33 +302,46 @@ class DySKT(object):
             r['spoofed'] = conf.get(rtype,'spoof')
         if conf.has_option(rtype,'desc'):
             r['desc'] = conf.get(rtype,'desc')
+
+        # process antennas - get the number first
         try:
-            # for antennas, we process all or nothing
-            gain = []
-            atype = []
-            loss = []
-            xyz = []
-            if conf.has_option(rtype,'antenna_gain'):
+            nA = conf.getint(rtype,'antennas') if conf.has_option(rtype,'antennas') else 0
+        except ValueError:
+            nA = 0
+
+        if nA:
+            # antennas has been specified, force correct/valid specifications
+            try:
                 gain = map(float,conf.get(rtype,'antenna_gain').split(','))
-            if conf.has_option(rtype,'antenna_type'):
+                if len(gain) != nA: raise RuntimeError('gain')
                 atype = conf.get(rtype,'antenna_type').split(',')
-                if len(atype) != len(gain): raise RuntimeError('type')
-            if conf.has_option(rtype,'antenna_loss'):
+                if len(atype) != nA: raise RuntimeError('type')
                 loss = map(float,conf.get(rtype,'antenna_loss').split(','))
-                if len(loss) != len(gain): raise RuntimeError('loss')
-            if conf.has_option(rtype,'antenna_xyz'):
+                if len(loss) != nA: raise RuntimeError('loss')
                 rs = conf.get(rtype,'antenna_xyz').split(',')
+                xyz = []
                 for t in rs: xyz.append(tuple(map(int,t.split(':'))))
-                if len(xyz) != len(gain): raise RuntimeError('xyz')
-        except ValueError as e:
-            logging.warn("Invalid type for %s antenna configuration - %s")
-        except RuntimeError as e:
-            logging.warn("Not all antenna configurations have the same length")
+                if len(xyz) != nA: raise RuntimeError('xyz')
+            except ConfigParser.NoOptionError as e:
+                logging.warn("Antenna %s not specified" % e)
+                #raise DySKTConfException("%s" % e)
+            except ValueError as e:
+                logging.warn("Invalid type for %s antenna configuration - %s")
+            except RuntimeError as e:
+                logging.warn("Antenna %s has invalid number of specifications" % e)
+            else:
+                r['antennas']['num'] = nA
+                r['antennas']['gain'] = gain
+                r['antennas']['type'] = atype
+                r['antennas']['loss'] = loss
+                r['antennas']['xyz'] = xyz
         else:
-            r['antennas']['gain'] = gain
-            r['antennas']['type'] = atype
-            r['antennas']['loss'] = loss
-            r['antennas']['xyz'] = xyz
+            # none, set all empty
+            r['antennas']['num'] = 0
+            r['antennas']['gain'] = []
+            r['antennas']['type'] = []
+            r['antennas']['loss'] = []
+            r['antennas']['xyz'] = []
 
         # get scan pattern
         r['dwell'] = conf.getfloat(rtype,'dwell')

@@ -155,15 +155,15 @@ CREATE TYPE ANTENNA_TYPE AS ENUM ('none','omni','omni array','yagi','grid','pane
 -- differently to increase throughput through spatial multiplexing
 DROP TABLE IF EXISTS antenna;
 CREATE TABLE antenna(
-  mac macaddr NOT NULL,            -- mac address of nic (fk)
-  ind smallint DEFAULT 0,          -- index of antenna, 0-based
-  gain REAL DEFAULT 2.14,          -- gain in dBi
-  loss REAL DEFAULT 0,             -- loss in dBi
-  x REAL DEFAULT 0,                -- rotation of antenna along x-axis
-  y REAL DEFAULT 0,                -- rotation of antenna along y-axis
-  z REAL DEFAULT 0,                -- rotation of antenna along y-axis
-  period TSTZRANGE NOT NULL,       -- timerange the radio is using this antenna
-  type ANTENNA_TYPE DEFAULT 'omni' -- type of antenna
+  mac macaddr NOT NULL,             -- mac address of nic (fk)
+  ind smallint NOT NULL,            -- index of antenna, 0-based
+  gain REAL,                        -- gain in dBi
+  loss REAL,                        -- loss in dBi
+  x REAL,                           -- rotation of antenna along x-axis
+  y REAL,                           -- rotation of antenna along y-axis
+  z REAL,                           -- rotation of antenna along y-axis
+  type ANTENNA_TYPE DEFAULT 'omni', -- type of antenna
+  period TSTZRANGE NOT NULL,        -- timerange the radio is using this antenna
   CONSTRAINT ch_ind CHECK (ind >= 0),
   CONSTRAINT ch_x CHECK(x >=0 and x < 360),
   CONSTRAINT ch_y CHECK(y >=0 and y < 360),
@@ -171,7 +171,7 @@ CREATE TABLE antenna(
   CONSTRAINT ch_gain CHECK(gain >= 0),
   CONSTRAINT ch_loss CHECK(loss >= 0),
   FOREIGN KEY (mac) REFERENCES radio(mac),
-  EXCLUDE USING gist (mac WITH =,period WITH &&)
+  EXCLUDE USING gist (mac WITH =,ind WITH =,period WITH &&)
 );
 
 -- radio role type enumeration

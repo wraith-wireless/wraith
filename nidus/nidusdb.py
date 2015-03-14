@@ -220,6 +220,12 @@ class NidusDB(object):
             for row in self._curs.fetchall():
                 mac = row[0]
 
+                # close out antenna
+                sql = """
+                       update antenna set period = tstzrange(lower(period),%s)
+                       where mac = %s and upper(period) is NULL;
+                      """
+
                 # close out radio_epoch
                 sql = """
                        update radio_epoch set period = tstzrange(lower(period),%s)
