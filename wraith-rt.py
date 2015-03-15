@@ -855,6 +855,9 @@ class WraithPanel(gui.MasterPanel):
         # and a sensor is not running, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if flags['store'] and flags['conn'] and not flags['dyskt']:
+            ans = tkMB.askquestion('Delete Records','Delete all DB records?',
+                                   parent=self)
+            if ans == 'no': return
             curs = None
             try:
                 # get a cursor and execute the delete_all procedure

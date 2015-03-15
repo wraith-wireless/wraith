@@ -47,8 +47,9 @@ class NidusRequestHandler(ss.BaseRequestHandler):
     
     def handle(self):
         """ process client communications """
-        logging.info("Sensor %s:%d connected...",self.client_address[0],
-                                                 self.client_address[1])
+        caddr = self.client_address[0]
+        cport = self.client_address[1]
+        logging.info("Sensor %s:%d connected...",caddr,cport)
         
         # get interface to databse
         connected = True
@@ -71,8 +72,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 data = self._recv()
                 if data: self._process(data,db)
                 else:
-                    logging.info("Sensor %s:%d exited...",self.client_address[0],
-                                                          self.client_address[1])
+                    logging.info("Sensor %s:%d exited...",caddr,cport)
                     connected = False
             except RuntimeError:
                 # nidus server shutdown, close out the db
@@ -81,9 +81,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
             except Exception as e:
                 # lost connection with sensor, minimize errors to database
                 db.submitdropped()
-                logging.error("Sensor %s:%d dropped - %s",self.client_address[0],
-                                                          self.client_address[1],
-                                                          e)
+                logging.error("Sensor %s:%d dropped - %s",caddr,cport,e)
                 connected = False
         
         # clean up
@@ -116,6 +114,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 if t == 'DEVICE': db.submitdevice(f,self.client_address[0])
                 elif t == 'PLATFORM': db.submitplatform(f)
                 elif t == 'RADIO': db.submitradio(f)
+                elif t == 'ANTENNA': db.submitantenna(f)
                 elif t == 'RADIO_EVENT': db.submitradioevent(f)
                 elif t == 'GPSD': db.submitgpsd(f)
                 elif t == 'FRAME': db.submitframe(f)

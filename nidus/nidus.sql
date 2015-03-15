@@ -976,7 +976,8 @@ CREATE TABLE sta_info(
 #### STORED PROCEDURES
 
 -- store procedure for deleting all content from all tables
-CREATE OR REPLACE FUNCTION delete_all()
+DROP FUNCTIOON IF EXISTS delete_all();
+CREATE FUNCTION delete_all()
     RETURNS void as $$
     BEGIN
       DELETE FROM ampdu;
@@ -1020,7 +1021,8 @@ CREATE OR REPLACE FUNCTION delete_all()
     $$ LANGUAGE plpgsql;
 
 -- store procedure to fix any NULL-ended periods which can occur after
--- error or a forced kill
+-- error or a forced kill Nidus (or a sensor)
+DROP FUNCTIOON IF EXISTS fix_nullperiod();
 CREATE OR REPLACE FUNCTION fix_nullperiod()
     RETURNS void as $$
     BEGIN

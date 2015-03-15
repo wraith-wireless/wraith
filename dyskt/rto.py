@@ -228,7 +228,7 @@ class RTO(mp.Process):
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                     else:
                         # send antennas
-                        for i in msg['nA']:
+                        for i in xrange(msg['nA']):
                             ret = self._send('ANTENNA',ts,{'mac':msg['mac'],
                                                            'index':i,
                                                            'type':msg['type'][i],
@@ -238,7 +238,7 @@ class RTO(mp.Process):
                                                            'y':msg['y'][i],
                                                            'z':msg['z'][i]})
                             if ret:
-                                self._conn.send('err','RTO','Nidus',ret)
+                                self._conn.send(('err','RTO','Nidus',ret))
                                 break
                 #elif ev == '!DOWN!':
                 #    pass
@@ -266,7 +266,7 @@ class RTO(mp.Process):
                     self._conn.send(('warn','RTO','Radio',
                                      "unidentified event %s" % ev))
             except IndexError as e: # something wrong with antenna indexing
-                self._conn.send(('err','RTO',"Radio %s" % cs,"misconfigured antennas"))
+                self._conn.send(('err','RTO',"Radio","misconfigured antennas"))
             except KeyError as e: # a radio sent a message without initiating
                 self._conn.send(('warn','RTO','Radio %s' % e,
                                  "sent data %s of type %s w/o 'initiating'" % (ev,msg)))
@@ -284,7 +284,7 @@ class RTO(mp.Process):
             try:
                 self._conn.send(('warn','RTO','Shutdown',"Incomplete shutdown"))
             except IOError:
-                # most likely DySKT closed their side of the pipe
+                # most likely DySKT(.py) closed their side of the pipe
                 pass
 
     def shutdown(self):
@@ -321,7 +321,7 @@ class RTO(mp.Process):
             if t == 'DEVICE': send += self._craftdevice(ts,d)
             elif t == 'PLATFORM': send += self._craftplatform(d)
             elif t == 'RADIO': send += self._craftradio(ts,d)
-            elif t == 'ANTENNA': send += self._craftradio(ts,d)
+            elif t == 'ANTENNA': send += self._craftantenna(ts,d)
             elif t == 'GPSD': send += self._craftgpsd(ts,d)
             elif t == 'FRAME': send += self._craftframe(ts,d)
             elif t == 'GPS': send += self._craftflt(ts,d,self._mgrs)

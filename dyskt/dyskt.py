@@ -295,7 +295,8 @@ class DySKT(object):
              'ant_type':0.0,
              'desc':"unknown",
              'scan_start':None,
-             'role':rtype.lower()}
+             'role':rtype.lower(),
+             'antennas':{}}
 
         # get optional properties
         if conf.has_option(rtype,'spoof'):

@@ -17,7 +17,7 @@ nidus 0.0.5
   - no longer attempts to store all packets in the data store
      o frames are saved to file
      o frames are parsed and portions are stored in the data store
-     o data is 'extracted' from frames and is also stored
+     o metadata is 'extracted' from frames and is also stored
   - SSE (Save Store Extract) is multithreaded which has helped alleviate delay
     from sensor exiting to nidus closing session records
       o 1 thread per radio for saving and number of threads for storing, extracting
@@ -45,6 +45,7 @@ nidus 0.0.6
   - added extraction of all management frames (excluding timing adv)
   - added nidusd daemon file to start nidus server
   - added support for platform table
+  - added support for antenna data storage
 
 TODO:
 1) return messages instead of just closing pipe for no running server etc

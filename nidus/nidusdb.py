@@ -358,13 +358,31 @@ class NidusDB(object):
         else:
             self._conn.commit()
 
+    def submitantenna(self,f):
+        """ submitantenna - submit the string fields to the database """
+        try:
+            # tokenize f and convert to dict and insert into db
+            ds = nmp.data2dict(nmp.tokenize(f),"ANTENNA")
+            sql = """
+                   insert into antenna (mac,ind,gain,loss,x,y,z,type,period)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,tstzrange(%s,NULL,'[]'));
+                  """
+            self._curs.execute(sql,(ds['mac'],ds['index'],ds['gain'],ds['loss'],
+                                    ds['x'],ds['y'],ds['z'],ds['type'],ds['ts']))
+        except nmp.NMPException as e:
+            raise NidusDBSubmitParseException(e)
+        except psql.Error as e:
+            self._conn.rollback()
+            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+        else:
+            self._conn.commit()
+
     def submitradioevent(self,f):
         """ submitradioevent - submit the string fields to the database """
         try:
-            # tokenize the string f and convert to dict
+            # tokenize the string f and convert to dict and insert into db
             ds = nmp.data2dict(nmp.tokenize(f),"RADIO_EVENT")
-
-            sql = "insert into radio_event values (%s,%s,%s,%s);"
+            sql = "insert into radio_event (mac,state,params,ts) values (%s,%s,%s,%s);"
             self._curs.execute(sql,(ds['mac'],ds['event'],ds['params'],ds['ts']))
         except nmp.NMPException as e:
             raise NidusDBSubmitParseException(e)
@@ -511,8 +529,16 @@ class NidusDB(object):
 
     def _setradio(self,ts,did,state):
         """ set the state of a radio """
+        # TODO: should we commit each statement?
         if not state:
-            # close out radio_epochal,
+            # close out antenna
+            sql = """
+                   update antenna set period = tstzrange(lower(period),%s)
+                   where mac = %s and upper(period) is NULL;
+                  """
+            self._curs.execute(sql,(ts,did))
+
+            # close out radio_epoch,
             sql = """
                    update radio_epoch set period = tstzrange(lower(period),%s)
                    where mac = %s and upper(period) is NULL;
@@ -1210,7 +1236,7 @@ class ExtractThread(SSEThread):
                                          cf_poll_req,privacy,short_pre,pbcc,
                                          ch_agility,spec_mgmt,qos,short_slot,
                                          apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
-                                         listen_int,ssid,sup_rates,ext_rates,vendors))
+                                         listen_int,ssid,sup_rates,ext_rates,vendors)
                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
                   """

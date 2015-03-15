@@ -156,7 +156,7 @@ RADIO_EVENT_PARAMS    = 3 # free-form parameters of event
 #### ANTENNA ####
 ANTENNA_FIELDS = ['ts','mac','index','type','gain','loss','x','y','z']
 ANTENNA_WFIELDS = [('ts',str),('mac',str),('index',int),('type',str),('gain',float),
-                   ('loss',str2float),('x',int),('y',int),('z',int)]
+                   ('loss',float),('x',int),('y',int),('z',int)]
 ANTENNA_TIMESTAMP = 0
 ANTENNA_MAC   = 1
 ANTENNA_INDEX = 2
