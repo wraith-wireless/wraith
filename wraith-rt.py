@@ -648,6 +648,9 @@ class WraithPanel(gui.MasterPanel):
         # set the state
         self._setstate(_STATE_EXIT_)
 
+        # close any open panels (allowing them to exit gracefully)
+        self.closepanels()
+
         # shutdown dyskt
         self._stopsensor()
 
