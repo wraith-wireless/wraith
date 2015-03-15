@@ -33,7 +33,7 @@ import wraith                              # version info
 import wraith.widgets.panel as gui         # graphics suite
 from wraith.utils import bits              # bitmask functions
 from wraith.utils import cmdline           # command line stuff
-from wraith.utils.timestamps import ts2iso # ts conversion
+#from wraith.utils.timestamps import ts2iso # ts conversion
 
 #### CONSTANTS
 
@@ -45,6 +45,7 @@ DYSKTPID = '/var/run/dysktd.pid'       # path to dyskt pidfile
 
 # Validation reg. exp.
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # reg exp for ip addr
+MACADDR = re.compile("^([0-9A-F]{2}:){5}([0-9A-F]{2})$")    # reg exp for mac addr (capital letters only)
 
 ################################################################################
 # CHILD PANELS
@@ -559,7 +560,7 @@ class WraithPanel(gui.MasterPanel):
 
         # set up super
         gui.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
-                                 [],True,"widgets/icons/wraith2.png")
+                                 [],True,"widgets/icons/wraith3.png")
 
 #### PROPS
 
@@ -786,14 +787,20 @@ class WraithPanel(gui.MasterPanel):
         # NOTE: this should not be enabled unless psql is running and we are
         # not connected, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if not flags['conn']: self._psqlconnect()
+        if not flags['conn']:
+            self._psqlconnect()
+            self._updatestate()
+            self._menuenable()
 
     def disconnect(self):
         """ connects to postgresql """
         # NOTE: should not be enabled if already disconnected but check anyway
         # TODO: what to do once we have data being pulled?
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['conn']: self._psqldisconnect()
+        if flags['conn']:
+            self._psqldisconnect()
+            self._updatestate()
+            self._menuenable()
 
     def psqlstart(self):
         """ starts postgresql """
@@ -809,6 +816,8 @@ class WraithPanel(gui.MasterPanel):
                     return
                 self._pwd = pwd
             self._startpsql()
+            self._updatestate()
+            self._menuenable()
 
     def psqlstop(self):
         """ starts postgresql """
@@ -824,6 +833,8 @@ class WraithPanel(gui.MasterPanel):
                     return
                 self._pwd = pwd
             self._stoppsql()
+            self._updatestate()
+            self._menuenable()
 
     def psqlfix(self):
         """
@@ -877,7 +888,7 @@ class WraithPanel(gui.MasterPanel):
         """ starts nidus storage manager """
         # NOTE: should not be enabled if postgresql is not running but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store'] and not flags['nidus']:
+        if not flags['nidus']:
             # do we have a password
             if not self._pwd:
                 pwd = self._getpwd()
@@ -887,6 +898,8 @@ class WraithPanel(gui.MasterPanel):
                     return
                 self._pwd = pwd
             self._startnidus()
+            self._updatestate()
+            self._menuenable()
 
     def nidusstop(self):
         """ stops nidus storage manager """
@@ -902,20 +915,31 @@ class WraithPanel(gui.MasterPanel):
                     return
                 self._pwd = pwd
             self._stopnidus()
+            self._updatestate()
+            self._menuenable()
 
     def viewniduslog(self):
         """ display Nidus log """
-        pass
+        panel = self.getpanels('niduslog',False)
+        if not panel:
+            t = Tix.Toplevel()
+            pnl = gui.TailLogPanel(t,self,"Nidus Log",0.2,NIDUSLOG)
+            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"niduslog"))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
 
     def clearniduslog(self):
         """ clear nidus log """
         # prompt first
         finfo = os.stat(NIDUSLOG)
         if finfo.st_size > 0:
-            ans = tkMB.askquestion('Clear Log','Clear contents of Nidus log?',
+            ans = tkMB.askquestion("Clear Log","Clear contents of Nidus log?",
                                    parent=self)
             if ans == 'no': return
             with open(NIDUSLOG,'w'): pass
+            lv = self.getpanels('niduslog')
+            if lv: lv.pnlreset()
 
     def confignidus(self):
         """ display nidus config file preference editor """
@@ -948,17 +972,26 @@ class WraithPanel(gui.MasterPanel):
 
     def viewdysktlog(self):
         """ display DySKT log """
-        self.unimplemented()
+        panel = self.getpanels('dysktlog',False)
+        if not panel:
+            t = Tix.Toplevel()
+            pnl = gui.TailLogPanel(t,self,"DySKT Log",0.2,DYSKTLOG)
+            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,'dysktlog'))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
 
     def cleardysktlog(self):
         """ clears the DySKT log """
         # prompt first
         finfo = os.stat(DYSKTLOG)
         if finfo.st_size > 0:
-            ans = tkMB.askquestion('Clear Log','Clear contents of DySKT log?',
+            ans = tkMB.askquestion("Clear Log","Clear contents of DySKT log?",
                                    parent=self)
             if ans == 'no': return
             with open(DYSKTLOG,'w'): pass
+            lv = self.getpanels('dysktlog')
+            if lv: lv.pnlreset()
 
     def configdyskt(self):
         """ display dyskt config file preference editor """
@@ -1079,10 +1112,9 @@ class WraithPanel(gui.MasterPanel):
 
         if flags['store']:
             # storage is running enable stop all, stop postgresql (if dyskt is
-            # not running), start nidus
+            # not running)
             self.mnuStorage.entryconfig(1,state=Tix.NORMAL)
             if not flags['dyskt']: self.mnuStoragePSQL.entryconfig(1,state=Tix.NORMAL)
-            self.mnuStorageNidus.entryconfig(0,state=Tix.NORMAL)
         else:
             # storage is not running, enable start all, start postgresql
             self.mnuStorage.entryconfig(0,state=Tix.NORMAL)
@@ -1096,7 +1128,7 @@ class WraithPanel(gui.MasterPanel):
             # nidus is not running, enable start all & clear nidus log
             # enable start nidus only if postgres is running
             self.mnuStorage.entryconfig(0,state=Tix.NORMAL)
-            if flags['store']: self.mnuStorageNidus.entryconfig(0,state=Tix.NORMAL)
+            self.mnuStorageNidus.entryconfig(0,state=Tix.NORMAL)
             self.mnuNidusLog.entryconfig(1,state=Tix.NORMAL)
 
         if flags['conn']:

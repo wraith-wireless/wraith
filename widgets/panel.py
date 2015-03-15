@@ -19,9 +19,10 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                        # files operations etc
+import os                         # files operations etc
 import time                       # dtg parsing etc
 import pickle                     # load and dump
+import threading                  # for threads
 #from operator import itemgetter  # iterators
 import Tix                        # Tix widgets
 #import Tkconstants as TKC         # tk constants
@@ -49,7 +50,6 @@ class PanelRecord(tuple):
     def pnl(self): return self[1]
     @property
     def desc(self): return self[2]
-
 
 #### helper dialogs
 
@@ -378,6 +378,118 @@ class LogPanel(ListPanel):
         self.n += 1
         self.list.yview('moveto',1.0)
 
+class TailLogger(threading.Thread):
+    """ periodically reads the specified logfile and returns any new 'lines' """
+    def __init__(self,cmd,cb,errcb,polltime,logfile):
+        """
+         initialize the thread
+          cmd - dict of commands {'STOP':True causes thread to exit}
+          cb - callback function for new lines
+          errcb - callback function to report any errors
+          polltime - time to sleep between polls
+          logfile - logfile to tail
+         NOTE: the parameter cmd must be initialized/set with all keys and starting
+          values beforing being passed to __init__, any key:value pairs set after
+          initialized will not be 'seen' by the thread
+        """
+        threading.Thread.__init__(self)
+        self._cmd = cmd          # command dict from caller
+        self._errcb = errcb      # error callback to report failures
+        self._pause = polltime   # time to sleep between file checks
+        self._lf = logfile       # path of file to monitor
+        self._cb = cb            # callback for new lines
+        self._ctime = None       # last time logfile was changed
+        self._offset = None      # offset of last file
+
+    def run(self):
+        """ polls until told to stop or internal error is encountered """
+        while not self._cmd['STOP']:
+            try:
+                if not self._ctime:
+                    self._ctime = os.stat(self._lf).st_ctime # get current change time
+                    fin = open(self._lf,'r')                 # open file
+                    lines = fin.readlines()                  # read all lines
+                    self._offset = fin.tell()                # get current offset
+                    fin.close()                              # close the file
+                    self._cb(lines)                          # forward the lines
+                else:
+                    ctime = os.stat(self._lf).st_ctime # latest change time
+                    if ctime != self._ctime:           # any changes?
+                        fin = open(self._lf,'r')       # open for reading
+                        fin.seek(self._offset-1)       # go to last read position
+                        lines = fin.readlines()        # read all new lines
+                        self._offset = fin.tell()      # get new position
+                        fin.close()                    # close the file
+                        self._ctime = ctime            # update change time
+                        self._cb(lines)                 # forward newly read lines
+            except Exception as e:
+            #except NotImplementedError as e:
+                self._errcb(e)
+                break
+            time.sleep(self._pause)
+
+class TailLogPanel(ListPanel):
+    """
+     Displays log data from a file - graphically similar to tail -f <file>
+    """
+    def __init__(self,toplevel,chief,ttl,polltime,logfile):
+        """ initializes TailLogPanel to read from the file specified logfile """
+        ListPanel.__init__(self,toplevel,chief,ttl,(60,8),1,[],"widgets/icons/log.png")
+        self._n=0
+        self._lf = logfile
+        if not os.path.exists(logfile) and not os.path.isfile(logfile):
+            self._chief.logwrite("Log File %s does not exist" % logfile,LOG_ERR)
+            return
+        self._polltime = polltime
+        self._logPoller = None
+        self._threadcmd = {'STOP':False}
+        self._startlogger()
+
+    def newlines(self,lines):
+        """ callback for polling thread to pass new data """
+        for line in lines:
+            entry = str(self._n)
+            self.list.add(entry,itemtype=Tix.TEXT,text=line.strip())
+            self._n += 1
+            self.list.yview('moveto',1.0)
+
+    def logerror(self,err):
+        """ received error callback for polling thread """
+        self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],err))
+
+    def close(self):
+        """ closes the panel """
+        # tell the logger to quit and wait for it to finish up, before notifyin
+        # parent we are closing
+        if self._logPoller:
+            self._threadcmd['STOP'] = True
+            self._logPoller.join()
+        self._chief.panelclose(self._name)
+
+    def pnlreset(self):
+        """ resets the log panel """
+        # stop the polling thread and join
+        self._threadcmd['STOP'] = True
+        self._logPoller.join()
+
+        # reset internal structures and clear the list
+        self._n = 0
+        self.list.delete_all()
+
+        # reset the log poller
+        self._startlogger()
+
+    def _startlogger(self):
+        self._logPoller = None
+        self._threadcmd = {'STOP':False}
+        try:
+            self._logPoller = TailLogger(self._threadcmd,self.newlines,
+                                         self.logerror,self._polltime,self._lf)
+            self._logPoller.start()
+        except Exception as e:
+            self._logPoller = None
+            self._chief.logwrite("Log for %s failed %s" % (self._lf,e))
+
 class MasterPanel(Panel):
     """
      the MasterPanel is the primary panel which controls the flow of the
@@ -528,7 +640,7 @@ class MasterPanel(Panel):
         log = self.getpanel("log",True)
         if log:
             log.logwrite(msg,mtype)
-        else:
+        elif mtype == LOG_ERR:
              tkMB.showerror('Error',msg,parent=self)
 
     def panelclose(self,panel):
