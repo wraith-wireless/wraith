@@ -34,6 +34,7 @@ import wraith.widgets.panel as gui         # graphics suite
 from wraith.utils import bits              # bitmask functions
 from wraith.utils import cmdline           # command line stuff
 #from wraith.utils.timestamps import ts2iso # ts conversion
+from wraith.radio.iwtools import wifaces   # check nic validity
 
 #### CONSTANTS
 
@@ -149,7 +150,7 @@ class WraithConfigPanel(gui.ConfigPanel):
     def _initialize(self):
         """ insert values from config file into entry boxes """
         conf = ConfigParser.RawConfigParser()
-        if not conf.read("wraith.conf"):
+        if not conf.read('wraith.conf'):
             tkMB.showerror("File Not Found","File wraith.conf was not found",
                            parent=self)
             return
@@ -462,22 +463,24 @@ class DySKTConfigPanel(gui.ConfigPanel):
         # Recon Configuration
         frmR = Tix.Frame(frm,borderwidth=2,relief='sunken')
         frmR.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
-        Tix.Label(frmR,text="RECON").grid(row=0,column=0,columnspan=6,sticky=Tix.W)
-        Tix.Label(frmR,text="NIC: ").grid(row=1,column=0,sticky=Tix.W)
+        Tix.Label(frmR,text='RECON').grid(row=0,column=0,columnspan=6,sticky=Tix.W)
+        Tix.Label(frmR,text='NIC: ').grid(row=1,column=0,sticky=Tix.W+Tix.N)
         self.txtNic = Tix.Entry(frmR,width=5)
-        self.txtNic.grid(row=1,column=1,sticky=Tix.W)
-        Tix.Label(frmR,text="Spoof: ").grid(row=1,column=2,sticky=Tix.W)
+        self.txtNic.grid(row=1,column=1,sticky=Tix.W+Tix.N)
+        rbtn = Tix.Button(frmR,text='Check',command=lambda:self.checknic(self.txtNic))
+        rbtn.grid(row=1,column=2,sticky=Tix.W)
+        Tix.Label(frmR,text='Spoof: ').grid(row=1,column=3,sticky=Tix.W+Tix.N)
         self.txtSpoof = Tix.Entry(frmR,width=17)
-        self.txtSpoof.grid(row=1,column=3,sticky=Tix.W)
-        Tix.Label(frmR,text="Desc: ").grid(row=2,column=0,sticky=Tix.W)
-        self.txtDesc = Tix.Text(frmR,width=32,height=3)
-        self.txtDesc.grid(row=2,column=1,columnspan=3,sticky=Tix.E)
+        self.txtSpoof.grid(row=1,column=4,sticky=Tix.W+Tix.N)
+        Tix.Label(frmR,text='Desc: ').grid(row=2,column=0,sticky=Tix.W+Tix.N)
+        self.txtDesc = Tix.Text(frmR,width=42,height=3)
+        self.txtDesc.grid(row=2,column=1,columnspan=4,sticky=Tix.E)
         frmRA = Tix.Frame(frmR,borderwidth=2,relief='sunken')
         frmRA.grid(row=4,column=0,columnspan=4,sticky=Tix.N)
-        Tix.Label(frmRA,text="Antenna(s)").grid(row=0,column=0,sticky=Tix.W)
+        Tix.Label(frmRA,text='ANTENNA(S)').grid(row=0,column=0,sticky=Tix.W)
         frmRS = Tix.Frame(frmR,borderwidth=2,relief='sunken')
         frmRS.grid(row=5,column=0,columnspan=4,sticky=Tix.N)
-        Tix.Label(frmRS,text="Scan Pattern").grid(row=0,column=0,sticky=Tix.W)
+        Tix.Label(frmRS,text="SCAN PATTERN").grid(row=0,column=0,sticky=Tix.W)
 
         # Collection Configuration
         frmC = Tix.Frame(frm,borderwidth=2,relief='sunken')
@@ -527,6 +530,15 @@ class DySKTConfigPanel(gui.ConfigPanel):
             tkMB.showinfo('Success',
                           "Restart for changes to take effect",
                           parent=self)
+
+    def checknic(self,txt):
+        """ validates nic is a wireless network interface """
+        nic = txt.get()
+        if not nic: return
+        if nic in wifaces():
+            tkMB.showinfo('Found',"%s is a valid wireless NIC" % nic,parent=self)
+        else:
+            tkMB.showinfo("Not Found","%s is not a valid wireless NIC" % nic,parent=self)
 
 ###############################################################################
 # WraithPanel - the main panel
@@ -908,7 +920,7 @@ class WraithPanel(gui.MasterPanel):
         """ stops nidus storage manager """
         # should not be enabled if nidus is not running, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if not flags['nidus']:
+        if flags['nidus']:
             # do we have a password
             if not self._pwd:
                 pwd = self._getpwd()
@@ -941,7 +953,7 @@ class WraithPanel(gui.MasterPanel):
                                    parent=self)
             if ans == 'no': return
             with open(NIDUSLOG,'w'): pass
-            lv = self.getpanels('niduslog')
+            lv = self.getpanel('niduslog')
             if lv: lv.pnlreset()
 
     def confignidus(self):
@@ -993,7 +1005,7 @@ class WraithPanel(gui.MasterPanel):
                                    parent=self)
             if ans == 'no': return
             with open(DYSKTLOG,'w'): pass
-            lv = self.getpanels('dysktlog')
+            lv = self.getpanel('dysktlog')
             if lv: lv.pnlreset()
 
     def configdyskt(self):

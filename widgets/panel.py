@@ -319,22 +319,6 @@ class ListPanel(SlavePanel):
     # noinspection PyUnusedLocal
     def bottomframe(self,frm): return None # override to add widgets to bottomframe
 
-class DescriptionPanel(SlavePanel):
-    """
-     Displays further description of an entry in the calling Panel - the caller
-     will implement descriptionbody to add widgets
-    """
-    def __init__(self,toplevel,chief,ttl):
-        SlavePanel.__init__(self,toplevel,chief,"widgets/icons/desc.png")
-        self.master.title(ttl)
-        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
-        frm1 = Tix.Frame(self,relief='sunken',border=2)
-        frm1.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
-        self._chief.descriptionbody(frm1)
-        frm2 = Tix.Frame(self,relief='sunken',border=2)
-        frm2.pack(side=Tix.TOP,fill=Tix.BOTH,expand=False)
-        Tix.Button(frm2,text='Close',command=self.close).pack()
-
 #### LOG MESSAGE TYPES ####
 LOG_NOERR = 0
 LOG_WARN  = 1
@@ -348,7 +332,8 @@ class LogPanel(ListPanel):
     """
     def __init__(self,toplevel,chief):
         ListPanel.__init__(self,toplevel,chief,"Log",(60,8),2,[],"widgets/icons/log.png")
-        self.n=0
+        self._l = threading.Lock()
+        self._n=0
         self.LC = [Tix.DisplayStyle(Tix.TEXT,
                                     refwindow=self.list,
                                     foreground='Green',
@@ -370,13 +355,19 @@ class LogPanel(ListPanel):
     def pnlreset(self): pass # don't care about reseting
     def logwrite(self,msg,mtype=LOG_NOERR):
         """ writes message msg of type mtype to the log """
-        entry = str(self.n)
-        self.list.add(entry,itemtype=Tix.TEXT,text=time.strftime('%H:%M:%S'))
-        self.list.item_create(entry,1,text=self.pre[mtype] + msg)
-        self.list.item_configure(entry,0,style=self.LC[mtype])
-        self.list.item_configure(entry,1,style=self.LC[mtype])
-        self.n += 1
-        self.list.yview('moveto',1.0)
+        self._l.acquire()
+        try:
+            entry = str(self._n)
+            self.list.add(entry,itemtype=Tix.TEXT,text=time.strftime('%H:%M:%S'))
+            self.list.item_create(entry,1,text=self.pre[mtype] + msg)
+            self.list.item_configure(entry,0,style=self.LC[mtype])
+            self.list.item_configure(entry,1,style=self.LC[mtype])
+            self._n += 1
+            self.list.yview('moveto',1.0)
+        except:
+            pass
+        finally:
+            self._l.release()
 
 class TailLogger(threading.Thread):
     """ periodically reads the specified logfile and returns any new 'lines' """
@@ -455,7 +446,8 @@ class TailLogPanel(ListPanel):
 
     def logerror(self,err):
         """ received error callback for polling thread """
-        self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],err))
+        self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],err),
+                             LOG_ERR)
 
     def close(self):
         """ closes the panel """
