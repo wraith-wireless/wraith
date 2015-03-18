@@ -952,9 +952,11 @@ class WraithPanel(gui.MasterPanel):
             ans = tkMB.askquestion("Clear Log","Clear contents of Nidus log?",
                                    parent=self)
             if ans == 'no': return
-            with open(NIDUSLOG,'w'): pass
             lv = self.getpanel('niduslog')
+            #if lv: lv.close()
+            with open(NIDUSLOG,'w'): os.utime(NIDUSLOG,None)
             if lv: lv.pnlreset()
+            #self.viewniduslog()
 
     def confignidus(self):
         """ display nidus config file preference editor """

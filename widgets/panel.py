@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 """ panel.py - defines a suite of graphical windows called panes
 
-Panels operate under the control of a master panel and execute tasks, display
-information independently of (or in conjuction with) this panel and other panels.
-Panels can be configured so that they can be opened, closed, "raised", minimized
-by the user or only by a calling panel
+Defines a graphic suite based on Tix where a set of non-modal panels operate under
+the control of a master panel and execute tasks, display information independently
+of (or in conjuction with) this panel and other panels. NOTE that one panel may
+be a master panel and a slave panel. Panels can be configured so that they can be
+opened, closed, "raised", minimized by the user or only by a calling panel.
 
  TODO:
    3) handle no icons or invalid icon paths
+   4) issues happen with the TailLogger after the corresponding logfile is deleted
 """
 
 __name__ = 'panel'
@@ -23,9 +25,8 @@ import os                         # files operations etc
 import time                       # dtg parsing etc
 import pickle                     # load and dump
 import threading                  # for threads
-#from operator import itemgetter  # iterators
+import Queue                      # for Queue class and Empty exception
 import Tix                        # Tix widgets
-#import Tkconstants as TKC         # tk constants
 import tkMessageBox as tkMB        # info dialogs
 import tkFileDialog as tkFD        # file gui dialogs
 import tkSimpleDialog as tkSD      # input dialogs
@@ -35,14 +36,14 @@ from PIL import Image,ImageTk     # image input & support
 class PanelException(Exception): pass            # TopLevel generic error
 
 class PanelRecord(tuple):
+    """
+     a record of a panel used as an item in a list of active "slave" panels
+      tk - toplevel
+      pnl - access this panel's methods
+      desc - string description of this panel
+    """
     # noinspection PyInitNewSignature
     def __new__(cls,tk,pnl,desc):
-        """
-         a record of a panel used as an item in a list of active "slave" panels
-          tk - toplevel
-          pnl - access this panel's methods
-          desc - string description of this panel
-        """
         return super(PanelRecord,cls).__new__(cls,tuple([tk,pnl,desc]))
     @property
     def tk(self): return self[0]
@@ -54,7 +55,7 @@ class PanelRecord(tuple):
 #### helper dialogs
 
 class PasswordDialog(tkSD.Dialog):
-    """ PasswordDialog - prompts user for password, hiding input """
+    """ PasswordDialog - (MKodal) prompts user for password, hiding input """
     def __init__(self,parent):
         tkSD.Dialog.__init__(self,parent)
         self.entPWD = None
@@ -84,11 +85,19 @@ class Panel(Tix.Frame):
         
      Derived classes must:
       implement close()
+
+     Derived classes can:
+      override delete (def delete(self): pass to dissallow user from closing
+
+     NOTE:
+      close is the polite way to get a panel to quit allowing it to execute any
+      necessary cleanup.
     """
     # noinspection PyProtectedMember
     def __init__(self,toplevel,iconPath=None):
         """
-         toplevel - controling window
+         toplevel - this is the Toplevel widget for this panel (managed directly
+          by the window manger)
          iconPath - path of icon (if one) to display the title bar
         """
         self.appicon=None
@@ -98,21 +107,28 @@ class Panel(Tix.Frame):
         self.master.protocol("WM_DELETE_WINDOW",self.delete)
         if self.appicon: self.tk.call('wm','iconphoto',self.master._w,self.appicon)
 
-    # panel exit trap function
+    # panel exit trap function passed to close
     def delete(self): self.close()
 
     # our exit function (must be defined in subclasses
     def close(self): raise NotImplementedError("Panel::close")
 
-    #### panel list functions
+    #### slave panel functions
 
     def addpanel(self,name,panel):
-        """ adds the panel object panel having key name to panels """
+        """ adds the panel object panel having key name to internal """
         self._panels[name] = panel
 
-    def deletepanel(self,name):
-        """ delete the panel with name and remove it from the list """
+    def killpanel(self,name):
+        """ force the panel to quit - the slave panel may not cleanup """
+        if not name in self._panels: return
         self._panels[name].tk.destroy()
+        del self._panels[name]
+
+    def deletepanel(self,name):
+        """ delete the panel with name and remove it from the internal dict """
+        if not name in self._panels: return
+        self._panels[name].pnl.close()
         del self._panels[name]
 
     def deletepanels(self,desc):
@@ -162,8 +178,10 @@ class SlavePanel(Panel):
      SlavePanel - defines a slave panel which has a controlling panel. i.e. it
      is opened dependant on another panel.
       defines:
-        pnlreset - notification that the current job is being cleared
-        setstates - should be overridden if subclass needs to set states based
+        pnlupdate: override if this panel if the Master needs it to update itself
+        pnlclose: an open slave panel is notifying this panel that it wants to
+        close
+        setstates: should be overridden if subclass needs to set states based
          on changes by controlling panel
         close - allows panel to close itself (and all children panels) notifying
         controlling panel as well
@@ -171,28 +189,20 @@ class SlavePanel(Panel):
       menu, main frame etc
     """
     def __init__(self,toplevel,chief,iconPath=None):
+        """ chief is the controlling (Master) panel """
         Panel.__init__(self,toplevel,iconPath)
         self._chief = chief
-
     def setstates(self,state): pass
-
-    def close(self): 
-        """ close any open panels - then notify master we are closing """
+    def close(self):
         self.closepanels()
         self._chief.panelclose(self._name)
-
     def pnlupdate(self): pass
-    def pnlreset(self): 
-        """ closes all open panels - override to change """
-        self.closepanels()
-
-    def panelclose(self,name):
-        """ an open "sub" panel is desiring to close """
-        self.deletepanel(name)
+    def panelclose(self,name): self.deletepanel(name)
 
 class SimplePanel(SlavePanel):
     """
-     Defines a simple panel with body
+     Defines a simple panel with body - this should be used for simple description
+     panels with minimal user interface
      Derived class must implement _body()
     """
     def __init__(self,toplevel,chief,title,iconpath=None):
@@ -327,8 +337,8 @@ LOG_NOTE  = 3
 
 class LogPanel(ListPanel):
     """
-     a LogPanel display information pertaining to the "program", cannot be closed
-     by the user only by the MasterPanel
+     a singular panel which display information pertaining to the "program",
+     cannot be closed by the user only by the MasterPanel
     """
     def __init__(self,toplevel,chief):
         ListPanel.__init__(self,toplevel,chief,"Log",(60,8),2,[],"widgets/icons/log.png")
@@ -371,10 +381,10 @@ class LogPanel(ListPanel):
 
 class TailLogger(threading.Thread):
     """ periodically reads the specified logfile and returns any new 'lines' """
-    def __init__(self,cmd,cb,errcb,polltime,logfile):
+    def __init__(self,q,cb,errcb,polltime,logfile):
         """
          initialize the thread
-          cmd - dict of commands {'STOP':True causes thread to exit}
+          q - event queue
           cb - callback function for new lines
           errcb - callback function to report any errors
           polltime - time to sleep between polls
@@ -384,7 +394,7 @@ class TailLogger(threading.Thread):
           initialized will not be 'seen' by the thread
         """
         threading.Thread.__init__(self)
-        self._cmd = cmd          # command dict from caller
+        self._q = q              # command queue from caller
         self._errcb = errcb      # error callback to report failures
         self._pause = polltime   # time to sleep between file checks
         self._lf = logfile       # path of file to monitor
@@ -394,16 +404,26 @@ class TailLogger(threading.Thread):
 
     def run(self):
         """ polls until told to stop or internal error is encountered """
-        while not self._cmd['STOP']:
+        # get intial file metadata and any intial lines
+        try:
+            self._ctime = os.stat(self._lf).st_ctime # get current change time
+            fin = open(self._lf,'r')                 # open file
+            lines = fin.readlines()                  # read all lines
+            self._offset = fin.tell()                # get current offset
+            fin.close()                              # close the file
+            self._cb(lines)                          # forward the lines
+        except Exception as e:
+            self._errcb(e)
+            return
+
+        while True:
             try:
-                if not self._ctime:
-                    self._ctime = os.stat(self._lf).st_ctime # get current change time
-                    fin = open(self._lf,'r')                 # open file
-                    lines = fin.readlines()                  # read all lines
-                    self._offset = fin.tell()                # get current offset
-                    fin.close()                              # close the file
-                    self._cb(lines)                          # forward the lines
-                else:
+                tkn = self._q.get(True,self._pause)
+                if tkn == '!STOP!': break
+                # no other commands expected ATT
+            except Queue.Empty:
+                # nothing on the queue, see if anything has changed
+                try:
                     ctime = os.stat(self._lf).st_ctime # latest change time
                     if ctime != self._ctime:           # any changes?
                         fin = open(self._lf,'r')       # open for reading
@@ -412,12 +432,10 @@ class TailLogger(threading.Thread):
                         self._offset = fin.tell()      # get new position
                         fin.close()                    # close the file
                         self._ctime = ctime            # update change time
-                        self._cb(lines)                 # forward newly read lines
-            except Exception as e:
-            #except NotImplementedError as e:
-                self._errcb(e)
-                break
-            time.sleep(self._pause)
+                        self._cb(lines)                # forward newly read lines
+                except Exception as e:
+                    self._errcb(e)
+                    break
 
 class TailLogPanel(ListPanel):
     """
@@ -433,7 +451,7 @@ class TailLogPanel(ListPanel):
             return
         self._polltime = polltime
         self._logPoller = None
-        self._threadcmd = {'STOP':False}
+        self._threadq = Queue.Queue()
         self._startlogger()
 
     def newlines(self,lines):
@@ -454,14 +472,14 @@ class TailLogPanel(ListPanel):
         # tell the logger to quit and wait for it to finish up, before notifyin
         # parent we are closing
         if self._logPoller:
-            self._threadcmd['STOP'] = True
+            self._threadq.put('!STOP!')
             self._logPoller.join()
         self._chief.panelclose(self._name)
 
     def pnlreset(self):
         """ resets the log panel """
         # stop the polling thread and join
-        self._threadcmd['STOP'] = True
+        self._threadq.put('!STOP!')
         self._logPoller.join()
 
         # reset internal structures and clear the list
@@ -472,11 +490,9 @@ class TailLogPanel(ListPanel):
         self._startlogger()
 
     def _startlogger(self):
-        self._logPoller = None
-        self._threadcmd = {'STOP':False}
         try:
-            self._logPoller = TailLogger(self._threadcmd,self.newlines,
-                                         self.logerror,self._polltime,self._lf)
+            self._logPoller = TailLogger(self._threadq,self.newlines,self.logerror,
+                                         self._polltime,self._lf)
             self._logPoller.start()
         except Exception as e:
             self._logPoller = None
