@@ -107,9 +107,11 @@ class Panel(Tix.Frame):
          panels
         
      Derived classes must implement
-      delete()
-      close()
-      requestclose() NOTE: may use pass if this derived class will not have slaves
+      delete - user exit trap
+      close - normal close
+
+     Derive classes should implement
+      notifyclose if the derived class needs to process closing slaves
     """
     # noinspection PyProtectedMember
     def __init__(self,toplevel,iconPath=None):
@@ -137,11 +139,12 @@ class Panel(Tix.Frame):
     def close(self):
         """ master panel initiated """
         raise NotImplementedError("Panel::close")
-    def requestclose(self,name):
-        """ slave panel known by name is requesting permission to close """
-        raise NotImplementedError("Panel::requestclose")
 
     #### slave panel storage functions
+
+    def notifyclose(self,name):
+        """ slave panel known by name is notifying of a pending close """
+        del self._panels[name]
 
     def addpanel(self,name,panelrec):
         """ adds the panel record panelrec having with unique name to internal """
@@ -222,7 +225,7 @@ class SlavePanel(Panel):
 
     Derived classes should override:
      delete if they want to dissallow user from closing the panel
-     requestclose if they need to further handle closing Slave panels
+     notifyclose if they need to further handle closing Slave panels
 
      NOTE: The SlavePanel itself has no methods to define gui widgets, i.e.
       menu, main frame etc
@@ -247,7 +250,8 @@ class SlavePanel(Panel):
     def delete(self):
         """user initiated - notify master of request to close """
         print self.name, " requesting close"
-        self._chief.requestclose(self.name)
+        self._chief.notifyclose(self.name)
+        self.close()
 
     def close(self):
         """
@@ -257,11 +261,8 @@ class SlavePanel(Panel):
         print self.name, " closing"
         self.closepanels()
         self._shutdown()
-        self.quit()
-
-    def requestclose(self,name):
-        """ the slave panel identified by name is requesting to close """
-        self.deletepanel(name)
+        self.master.destroy()
+        #self.quit()
 
 class SimplePanel(SlavePanel):
     """
@@ -671,16 +672,15 @@ class MasterPanel(Panel):
             self._shutdown()
             self.quit()
 
-    def requestclose(self,name):
+    def notifyclose(self,name):
         """
-         override requestclose, before allowing requesting panel to close,
+         override notifyclose, before allowing requesting panel to close,
          deregister it we need to remove all notification requests from
          the panel before deleting it
         """
         print self.name, "got ", name, "requesting close"
-        if name in self._panels:
-            self.audit_deregister(name)
-            self.deletepanel(name)
+        if name in self._panels: self.audit_deregister(name)
+        del self._panels[name]
 
     def _initialize(self): pass
     def _shutdown(self): pass
