@@ -100,7 +100,7 @@ class WraithConfigPanel(gui.ConfigPanel):
     def __init__(self,toplevel,chief):
         gui.ConfigPanel.__init__(self,toplevel,chief,"Configure Wraith")
 
-    def _confs(self,frm):
+    def _makegui(self,frm):
         """ set up entry widgets """
         # Storage Configuration
         frmS = Tix.Frame(frm,borderwidth=2,relief='sunken')
@@ -249,7 +249,7 @@ class NidusConfigPanel(gui.ConfigPanel):
     def __init__(self,toplevel,chief):
         gui.ConfigPanel.__init__(self,toplevel,chief,"Configure Nidus")
 
-    def _confs(self,frm):
+    def _makegui(self,frm):
         """ set up entry widgets """
         # SSE Configuration
         frmS = Tix.Frame(frm,borderwidth=2,relief='sunken')
@@ -458,26 +458,31 @@ class DySKTConfigPanel(gui.ConfigPanel):
     def __init__(self,toplevel,chief):
         gui.ConfigPanel.__init__(self,toplevel,chief,"Configure DySKT")
 
-    def _confs(self,frm):
+    def _makegui(self,frm):
         """ set up entry widgets """
         # Recon Configuration
         frmR = Tix.Frame(frm,borderwidth=2,relief='sunken')
         frmR.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
         Tix.Label(frmR,text='RECON').grid(row=0,column=0,columnspan=6,sticky=Tix.W)
         Tix.Label(frmR,text='NIC: ').grid(row=1,column=0,sticky=Tix.W+Tix.N)
-        self.txtNic = Tix.Entry(frmR,width=5)
-        self.txtNic.grid(row=1,column=1,sticky=Tix.W+Tix.N)
-        rbtn = Tix.Button(frmR,text='Check',command=lambda:self.checknic(self.txtNic))
+        self.txtReconNic = Tix.Entry(frmR,width=5)
+        self.txtReconNic.grid(row=1,column=1,sticky=Tix.W+Tix.N)
+        rbtn = Tix.Button(frmR,text='Check',command=lambda:self.checknic(self.txtReconNic))
         rbtn.grid(row=1,column=2,sticky=Tix.W)
         Tix.Label(frmR,text='Spoof: ').grid(row=1,column=3,sticky=Tix.W+Tix.N)
-        self.txtSpoof = Tix.Entry(frmR,width=17)
-        self.txtSpoof.grid(row=1,column=4,sticky=Tix.W+Tix.N)
+        self.txtReconSpoof = Tix.Entry(frmR,width=17)
+        self.txtReconSpoof.grid(row=1,column=4,sticky=Tix.W+Tix.N)
         Tix.Label(frmR,text='Desc: ').grid(row=2,column=0,sticky=Tix.W+Tix.N)
-        self.txtDesc = Tix.Text(frmR,width=42,height=3)
-        self.txtDesc.grid(row=2,column=1,columnspan=4,sticky=Tix.E)
+        self.txtReconDesc = Tix.Text(frmR,width=42,height=3)
+        self.txtReconDesc.grid(row=2,column=1,columnspan=4,sticky=Tix.E)
+        # ANTENNA SUB SECTION
         frmRA = Tix.Frame(frmR,borderwidth=2,relief='sunken')
         frmRA.grid(row=4,column=0,columnspan=4,sticky=Tix.N)
-        Tix.Label(frmRA,text='ANTENNA(S)').grid(row=0,column=0,sticky=Tix.W)
+        Tix.Label(frmRA,text='ANTENNA(S)').grid(row=0,column=0,columnspan=2,sticky=Tix.W)
+        Tix.Label(frmRA,text="Number: ").grid(row=1,column=0,sticky=Tix.W)
+        self.txtReconAntNum = Tix.Entry(frmRA,width=2)
+        self.txtReconAntNum.grid(row=1,column=1,sticky=Tix.W)
+        # SCAN PATTERN SUB SECTION
         frmRS = Tix.Frame(frmR,borderwidth=2,relief='sunken')
         frmRS.grid(row=5,column=0,columnspan=4,sticky=Tix.N)
         Tix.Label(frmRS,text="SCAN PATTERN").grid(row=0,column=0,sticky=Tix.W)
@@ -660,9 +665,6 @@ class WraithPanel(gui.MasterPanel):
         # set the state
         self._setstate(_STATE_EXIT_)
 
-        # close any open panels (allowing them to exit gracefully)
-        self.closepanels()
-
         # shutdown dyskt
         self._stopsensor()
 
@@ -683,7 +685,7 @@ class WraithPanel(gui.MasterPanel):
         self.mnuWraith.add_separator()
         self.mnuWraith.add_command(label='Configure',command=self.configwraith)
         self.mnuWraith.add_separator()
-        self.mnuWraith.add_command(label='Exit',command=self.panelquit)
+        self.mnuWraith.add_command(label='Exit',command=self.delete)
 
         # Tools Menu
         # all options will always be enabled
@@ -761,7 +763,7 @@ class WraithPanel(gui.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = WraithConfigPanel(t,self)
-            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"preferences"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"preferences"))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -774,7 +776,7 @@ class WraithPanel(gui.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = DataBinPanel(t,self)
-            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"databin"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"databin"))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -939,7 +941,7 @@ class WraithPanel(gui.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = gui.TailLogPanel(t,self,"Nidus Log",0.2,NIDUSLOG)
-            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"niduslog"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"niduslog"))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -964,7 +966,7 @@ class WraithPanel(gui.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = NidusConfigPanel(t,self)
-            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"nidusprefs"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"nidusprefs"))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -993,7 +995,7 @@ class WraithPanel(gui.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = gui.TailLogPanel(t,self,"DySKT Log",0.2,DYSKTLOG)
-            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,'dysktlog'))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'dysktlog'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -1016,7 +1018,7 @@ class WraithPanel(gui.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = DySKTConfigPanel(t,self)
-            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"dysktprefs"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"dysktprefs"))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -1029,7 +1031,7 @@ class WraithPanel(gui.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = AboutPanel(t,self)
-            self.addpanel(pnl._name,gui.PanelRecord(t,pnl,"about"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"about"))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()

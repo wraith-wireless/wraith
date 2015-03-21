@@ -3,19 +3,37 @@
 
 Defines a graphic suite based on Tix where a set of non-modal panels operate under
 the control of a master panel and execute tasks, display information independently
-of (or in conjuction with) this panel and other panels. NOTE that one panel may
-be a master panel and a slave panel. Panels can be configured so that they can be
-opened, closed, "raised", minimized by the user or only by a calling panel.
+of (or in conjuction with) this panel and other panels. (Think undocked windows)
+Panels can be configured so that they can be opened, closed, "raised", minimized
+by the user or only by a calling panel.
+NOTE:
+ a panel may be a master panel and a slave panel.
+ one and only panel will be "The Master" Panel
+
+This was actually written in 2009 but was forgotten after two deployments.
+Dragging it back out IOT to use a subset for the LOBster program, I noticed that
+there were a lot of small errors, irrelevant or redudant code and code that just
+did not make sense. So, I am starting basically from scratch and adding the code
+for subclasses as they becomes necessary.
 
  TODO:
    3) handle no icons or invalid icon paths
    4) issues happen with the TailLogger after the corresponding logfile is deleted
+   5) create a method in MasterPanel to handle creation of signular pattern i.e.
+     panel = self.getpanels(desc,False)
+     if not panel:
+        t = Tix.Toplevel()
+        pnl = PanelClase(t,self,argc)
+        self.addpanel(pnl.name,gui.PanelRecord(t,pnl,desc))
+      else:
+        panel[0].tk.deiconify()
+        panel[0].tk.lift()
 """
 
 __name__ = 'panel'
 __license__ = 'GPL v3.0'
-__version__ = '0.13.5'
-__date__ = 'February 2015'
+__version__ = '0.13.6'
+__date__ = 'March 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -27,13 +45,13 @@ import pickle                     # load and dump
 import threading                  # for threads
 import Queue                      # for Queue class and Empty exception
 import Tix                        # Tix widgets
-import tkMessageBox as tkMB        # info dialogs
-import tkFileDialog as tkFD        # file gui dialogs
-import tkSimpleDialog as tkSD      # input dialogs
+import tkMessageBox as tkMB       # info dialogs
+import tkFileDialog as tkFD       # file gui dialogs
+import tkSimpleDialog as tkSD     # input dialogs
 from PIL import Image,ImageTk     # image input & support
 
 #### PANEL EXCEPTIONS ####
-class PanelException(Exception): pass            # TopLevel generic error
+class PanelException(Exception): pass # TopLevel generic error
 
 class PanelRecord(tuple):
     """
@@ -55,7 +73,7 @@ class PanelRecord(tuple):
 #### helper dialogs
 
 class PasswordDialog(tkSD.Dialog):
-    """ PasswordDialog - (MKodal) prompts user for password, hiding input """
+    """ PasswordDialog - (Modal) prompts user for password, hiding input """
     def __init__(self,parent):
         tkSD.Dialog.__init__(self,parent)
         self.entPWD = None
@@ -76,22 +94,22 @@ class PasswordDialog(tkSD.Dialog):
 
 class Panel(Tix.Frame):
     """
-     Panel: Superclass from which all non-modal gui classes are derived
-      1) traps the exit from the title bar and passes it to derived close
+     Panel: This is the base class from which which all non-modal gui classes are
+      derived
+      1) traps the exit from the title bar and passes it to delete()
       2) maintains a dictionary of opened slave panels
-        self._panels["panelname"] => [panel1,panel2,...,paneln]
+        self._panels[panelname] => panelrecord where:
+         panelname is the unique name given by Toplevel._name
+         panelrec is a PanelRecord tuple
         NOTE: there may be multiple panels with the same desc but all panels
-        can be uniquely identified by the self._name
+        can be uniquely identified by the self.name
+      3) provides functionality to handle storage/retrieval/deletion of slave
+         panels
         
-     Derived classes must:
-      implement close()
-
-     Derived classes can:
-      override delete (def delete(self): pass to dissallow user from closing
-
-     NOTE:
-      close is the polite way to get a panel to quit allowing it to execute any
-      necessary cleanup.
+     Derived classes must implement
+      delete()
+      close()
+      requestclose() NOTE: may use pass if this derived class will not have slaves
     """
     # noinspection PyProtectedMember
     def __init__(self,toplevel,iconPath=None):
@@ -100,27 +118,37 @@ class Panel(Tix.Frame):
           by the window manger)
          iconPath - path of icon (if one) to display the title bar
         """
-        self.appicon=None
-        self._panels = {}
-        if iconPath: self.appicon = ImageTk.PhotoImage(Image.open(iconPath))
         Tix.Frame.__init__(self,toplevel)
-        self.master.protocol("WM_DELETE_WINDOW",self.delete)
+        self.appicon = ImageTk.PhotoImage(Image.open(iconPath)) if iconPath else None
         if self.appicon: self.tk.call('wm','iconphoto',self.master._w,self.appicon)
+        self.master.protocol("WM_DELETE_WINDOW",self.delete)
+        self._panels = {}
+        print self.name, " opened"
 
-    # panel exit trap function passed to close
-    def delete(self): self.close()
+    # properties/attributes
+    @property
+    def name(self): return self._name
 
-    # our exit function (must be defined in subclasses
-    def close(self): raise NotImplementedError("Panel::close")
+    # virtual methods
 
-    #### slave panel functions
+    def delete(self):
+        """ user initiated (from title bar) """
+        raise NotImplementedError("Panel::delete")
+    def close(self):
+        """ master panel initiated """
+        raise NotImplementedError("Panel::close")
+    def requestclose(self,name):
+        """ slave panel known by name is requesting permission to close """
+        raise NotImplementedError("Panel::requestclose")
 
-    def addpanel(self,name,panel):
-        """ adds the panel object panel having key name to internal """
-        self._panels[name] = panel
+    #### slave panel storage functions
+
+    def addpanel(self,name,panelrec):
+        """ adds the panel record panelrec having with unique name to internal """
+        self._panels[name] = panelrec
 
     def killpanel(self,name):
-        """ force the panel to quit - the slave panel may not cleanup """
+        """ force the panel identifed by name to quit - panel may not cleanup """
         if not name in self._panels: return
         self._panels[name].tk.destroy()
         del self._panels[name]
@@ -133,58 +161,69 @@ class Panel(Tix.Frame):
 
     def deletepanels(self,desc):
         """ deletes all panels with desc """
-        for panel in self.getpanels(desc,False): panel.pnl.close()
+        for panel in self.getpanels(desc,False):
+            panel.pnl.close()
+            del self._panels[panel.pnl.name]
 
     def getpanel(self,desc,pnlOnly=True):
-        """ returns the first panel with desc or None """
-        for panel in self._panels:
-            if self._panels[panel].desc == desc:
-                if pnlOnly:
-                    return self._panels[panel].pnl
-                else:
-                    return self._panels[panel]
+        """
+         returns the first panel with desc or None
+         if pnlOnly is True returns the panel object otherwise returns the
+         PanelRecord
+        """
+        for name in self._panels:
+            if self._panels[name].desc == desc:
+                if pnlOnly: return self._panels[name].pnl
+                else: return self._panels[name]
         return None
         
     def getpanels(self,desc,pnlOnly=True):
-        """ returns all panels with desc or [] if there are none open """
+        """
+         returns all panels with desc or [] if there are none open
+         if pnlOnly is True returns the panel object otherwise returns the
+         PanelRecord
+        """
         opened = []
-        for panel in self._panels:
-            if self._panels[panel].desc == desc:
+        for name in self._panels:
+            if self._panels[name].desc == desc:
                 if pnlOnly:
-                    opened.append(self._panels[panel].pnl)
+                    opened.append(self._panels[name].pnl)
                 else:
-                    opened.append(self._panels[panel])
+                    opened.append(self._panels[name])
         return opened
 
     def haspanel(self,desc):
         """ returns True if there is at least one panel with desc """
-        for panel in self._panels:
-            if self._panels[panel].desc == desc: return True
+        for name in self._panels:
+            if self._panels[name].desc == desc: return True
         return False
 
     def numpanels(self,desc):
         """ returns a count of all panels with desc """
         n = 0
-        for panel in self._panels:
-            if self._panels[panel].desc == desc: n +=1
+        for name in self._panels:
+            if self._panels[name].desc == desc: n +=1
         return n
 
     def closepanels(self):
         """ notifies all open panels to close """
-        for panel in self._panels.keys(): self._panels[panel].pnl.close()
+        for name in self._panels: self._panels[name].pnl.close()
 
 class SlavePanel(Panel):
     """
      SlavePanel - defines a slave panel which has a controlling panel. i.e. it
-     is opened dependant on another panel.
-      defines:
-        pnlupdate: override if this panel if the Master needs it to update itself
-        pnlclose: an open slave panel is notifying this panel that it wants to
-        close
-        setstates: should be overridden if subclass needs to set states based
-         on changes by controlling panel
-        close - allows panel to close itself (and all children panels) notifying
-        controlling panel as well
+     is opened dependant on and controlled by another panel. The name can be
+     a misnomer as this class can also control slave panels
+
+     Derived classes must implement:
+      _shutdown: perform necessary cleanup functionality
+      reset: Master panel is requesting the panel to reset itself
+      update: Master panel is requesting the panel to update itself
+
+    Derived classes should override:
+     delete if they want to dissallow user from closing the panel
+     requestclose if they need to further handle closing Slave panels
+
      NOTE: The SlavePanel itself has no methods to define gui widgets, i.e.
       menu, main frame etc
     """
@@ -192,18 +231,53 @@ class SlavePanel(Panel):
         """ chief is the controlling (Master) panel """
         Panel.__init__(self,toplevel,iconPath)
         self._chief = chief
-    def setstates(self,state): pass
+
+    def _shutdown(self):
+        """ cleanup functionality prior to quitting """
+        raise NotImplementedError("SlavePanel::_shutdown")
+
+    def reset(self):
+        """ reset to original/default setup """
+        raise NotImplementedError("SlavePanel::reset")
+
+    def update(self):
+        """ something has changed, update ourselve """
+        raise NotImplementedError("SlavePanel::update")
+
+    def delete(self):
+        """user initiated - notify master of request to close """
+        print self.name, " requesting close"
+        self._chief.requestclose(self.name)
+
     def close(self):
+        """
+         master panel is notifying us to close, notify any slave panels to close,
+         cleanup, then quit
+        """
+        print self.name, " closing"
         self.closepanels()
-        self._chief.panelclose(self._name)
-    def pnlupdate(self): pass
-    def panelclose(self,name): self.deletepanel(name)
+        self._shutdown()
+        self.quit()
+
+    def requestclose(self,name):
+        """ the slave panel identified by name is requesting to close """
+        self.deletepanel(name)
 
 class SimplePanel(SlavePanel):
     """
-     Defines a simple panel with body - this should be used for simple description
-     panels with minimal user interface
-     Derived class must implement _body()
+     Defines a simple panel with body. Should be used to define simple description
+     panels with minimal user interaction displaying static data. SimplePanels are
+     not expected to have any slave panels. Additionally, showing static data,
+     SimplePanels are not expected to display information that needs to be
+     updated or reset.
+
+     Derived class must implement:
+      _body: define gui widgets
+      in addition to SlavePanel::_shutdown, SlavePanel::reset, SlavePanel::update
+
+     Derived class should override:
+      reset,update if dynamic data is being displayed
+      _shutdown if any cleanup needs to be performed prior to closing
     """
     def __init__(self,toplevel,chief,title,iconpath=None):
         SlavePanel.__init__(self,toplevel,chief,iconpath)
@@ -211,6 +285,9 @@ class SimplePanel(SlavePanel):
         self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
         self._body()
     def _body(self): raise NotImplementedError("SimplePanel::_body")
+    def reset(self): pass
+    def update(self): pass
+    def _shutdown(self): pass
 
 class ConfigPanel(SlavePanel):
     """
@@ -218,14 +295,15 @@ class ConfigPanel(SlavePanel):
      a button frame with
       ok: writes new values to config file and exits
       apply: writes new values to config file
-      reset: resets to original file
+      widgetreset: resets to original file (not to be confused with SlavePanel::Reset)
       cancel: exits without writing to config file
 
      Derived classes must implement
-     _confs - add widgets to view/edit configuration file entries
-     _initialize - initial entry of config file values into the widgets and reset()
-     _validate - validate entries before writing
-     _write - writes the values of the entries into the config file
+      _makegui add widgets to view/edit configuration file entries
+      _initialize initial entry of config file values into the widgets. It is
+        also used by the reset to button
+      _validate validate entries before writing
+      _write writes the values of the entries into the config file
     """
     def __init__(self,toplevel,chief,title):
         """ initialize configuration panel """
@@ -235,7 +313,7 @@ class ConfigPanel(SlavePanel):
 
         # set up the input widget frame
         frmConfs = Tix.Frame(self)
-        self._confs(frmConfs)
+        self._makegui(frmConfs)
         frmConfs.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
 
         # set up the button widget frame
@@ -245,24 +323,39 @@ class ConfigPanel(SlavePanel):
         # four buttons, Ok, Apply, Reset and Cancel
         Tix.Button(frmBtns,text='OK',command=self.ok).grid(row=0,column=0)
         Tix.Button(frmBtns,text='Apply',command=self.apply).grid(row=0,column=1)
-        Tix.Button(frmBtns,text='Reset',command=self.reset).grid(row=0,column=2)
+        Tix.Button(frmBtns,text='Reset',command=self.widgetreset).grid(row=0,column=2)
         Tix.Button(frmBtns,text='Cancel',command=self.cancel).grid(row=0,column=3)
 
         # insert values from config file
         self._initialize()
-    def _confs(self,frm): raise NotImplementedError("ConfigPanel::_confs")
+
+    def _makegui(self,frm): raise NotImplementedError("ConfigPanel::_makegui")
     def _initialize(self): raise NotImplementedError("ConfigPanel::_initialize")
     def _validate(self): raise NotImplementedError("ConfigPanel::_validate")
     def _write(self): raise NotImplementedError("ConfigPanel::_write")
+
+    # Slave Panel abstract methods we do not need for this class
+    def reset(self): pass
+    def update(self): pass
+    def _shutdown(self): pass
+
     def ok(self):
+        """ validate entries and if good write to file then close """
         if self._validate():
             self._write()
-            self.close()
+            self.delete()
+
     def apply(self):
-        if self._validate():
-            self._write()
-    def reset(self): self._initialize()
-    def cancel(self): self.close()
+        """ validate entries and if good, write to file but leave open """
+        if self._validate(): self._write()
+
+    def widgetreset(self):
+        """ reset entries to orginal configuration file """
+        self._initialize()
+
+    def cancel(self):
+        """ make now changes and close """
+        self.delete()
 
 class ListPanel(SlavePanel):
     """
@@ -271,11 +364,12 @@ class ListPanel(SlavePanel):
      Derived classes can configure the ScrolledHList's number of columns, and
      whether or not to include headers for the columns.
 
-     Derived class must implement:
-      methods to add (modify, delete) entries as desired
-     Derived classes Should implement:
-      topframe - to add widgets to top frame
-      bottomframe - to add widgets to bottom frame
+     NOTE: this class does not define any methods to insert/remove/delete from
+      this list
+
+     Derived classes should implement:
+      topframe if any widgets need to be added to the top frame
+      bottomframe if any widgets need to be added to the bottom frame
     """
     def __init__(self,toplevel,chief,ttl,sz,cols=1,httl=None,iconPath=None):
         SlavePanel.__init__(self,toplevel,chief,iconPath)
@@ -295,7 +389,6 @@ class ListPanel(SlavePanel):
         self.frmMain.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
 
         # create the scrolled hlist
-
         # NOTE: if necessary, should be able to use Tree as below
         # self.slist = Tree(self.frmMain,options='hlist.columns %d hlist.header %d' % (cols,hdr))
         self.slist = Tix.ScrolledHList(self.frmMain,
@@ -342,9 +435,9 @@ class LogPanel(ListPanel):
     """
     def __init__(self,toplevel,chief):
         ListPanel.__init__(self,toplevel,chief,"Log",(60,8),2,[],"widgets/icons/log.png")
-        self._l = threading.Lock()
-        self._n=0
-        self.LC = [Tix.DisplayStyle(Tix.TEXT,
+        self._l = threading.Lock()                              # lock on writing
+        self._n = 0                                             # current number of entries
+        self._LC = [Tix.DisplayStyle(Tix.TEXT,                  # display styles
                                     refwindow=self.list,
                                     foreground='Green',
                                     selectforeground='Green'),
@@ -360,18 +453,21 @@ class LogPanel(ListPanel):
                                     refwindow=self.list,
                                     foreground='Blue',
                                     selectforeground='Blue')]
-        self.pre = ["[+] ","[?] ","[-] ","[!] "]
-    def delete(self): pass   # user can never close only the primary chief
-    def pnlreset(self): pass # don't care about reseting
+        self._symbol = ["[+] ","[?] ","[-] ","[!] "]           # type symbols
+        print "log is ", self.name
+    def delete(self): pass    # user can never close only the primary chief
+    def reset(self): pass     # nothing needs to be reset
+    def update(self): pass    # nothing needs to be updated
+    def _shutdown(self): pass # nothing needs to be cleaned up
     def logwrite(self,msg,mtype=LOG_NOERR):
         """ writes message msg of type mtype to the log """
         self._l.acquire()
         try:
             entry = str(self._n)
             self.list.add(entry,itemtype=Tix.TEXT,text=time.strftime('%H:%M:%S'))
-            self.list.item_create(entry,1,text=self.pre[mtype] + msg)
-            self.list.item_configure(entry,0,style=self.LC[mtype])
-            self.list.item_configure(entry,1,style=self.LC[mtype])
+            self.list.item_create(entry,1,text=self._symbol[mtype] + msg)
+            self.list.item_configure(entry,0,style=self._LC[mtype])
+            self.list.item_configure(entry,1,style=self._LC[mtype])
             self._n += 1
             self.list.yview('moveto',1.0)
         except:
@@ -438,13 +534,11 @@ class TailLogger(threading.Thread):
                     break
 
 class TailLogPanel(ListPanel):
-    """
-     Displays log data from a file - graphically similar to tail -f <file>
-    """
+    """ Displays log data from a file - graphically similar to tail -f <file> """
     def __init__(self,toplevel,chief,ttl,polltime,logfile):
         """ initializes TailLogPanel to read from the file specified logfile """
         ListPanel.__init__(self,toplevel,chief,ttl,(60,8),1,[],"widgets/icons/log.png")
-        self._n=0
+        self._n = 0
         self._lf = logfile
         if not os.path.exists(logfile) and not os.path.isfile(logfile):
             self._chief.logwrite("Log File %s does not exist" % logfile,LOG_ERR)
@@ -454,6 +548,7 @@ class TailLogPanel(ListPanel):
         self._threadq = Queue.Queue()
         self._startlogger()
 
+    # CALLBACKS
     def newlines(self,lines):
         """ callback for polling thread to pass new data """
         for line in lines:
@@ -464,23 +559,17 @@ class TailLogPanel(ListPanel):
 
     def logerror(self,err):
         """ received error callback for polling thread """
-        self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],err),
-                             LOG_ERR)
+        self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],
+                                                       err),LOG_ERR)
 
-    def close(self):
-        """ closes the panel """
-        # tell the logger to quit and wait for it to finish up, before notifyin
-        # parent we are closing
+    # VIRTUAL METHOD OVERRIDES
+
+    def reset(self):
+        """ resets the log panel """
+        # stop the polling thread and join
         if self._logPoller:
             self._threadq.put('!STOP!')
             self._logPoller.join()
-        self._chief.panelclose(self._name)
-
-    def pnlreset(self):
-        """ resets the log panel """
-        # stop the polling thread and join
-        self._threadq.put('!STOP!')
-        self._logPoller.join()
 
         # reset internal structures and clear the list
         self._n = 0
@@ -488,6 +577,15 @@ class TailLogPanel(ListPanel):
 
         # reset the log poller
         self._startlogger()
+
+    def update(self): pass # no need to implement
+
+    def _shutdown(self):
+        """ clean up our polling thread """
+        # stop polling thread and wait for it to finish
+        if self._logPoller:
+            self._threadq.put('!STOP!')
+            self._logPoller.join()
 
     def _startlogger(self):
         try:
@@ -500,9 +598,9 @@ class TailLogPanel(ListPanel):
 
 class MasterPanel(Panel):
     """
-     the MasterPanel is the primary panel which controls the flow of the
-     overall program. The MasterPanel defines a class meant to handle the primary
-     data, opening, closing children panels etc
+     the MasterPanel is the primary panel which controls the flow of the overall
+     program. The MasterPanel defines a class meant to handle the primary data,
+     opening, closing children panels etc.
      
      Derived classes should implement:
       _initialize -> if there is functionality that should be started
@@ -511,6 +609,7 @@ class MasterPanel(Panel):
       getstate -> if there is a State of the main panel that needs to be known
        by slave panels
       showpanel -> derive for use in toolsload (loads saved panel configs)
+      delete and close if the derived class must further handle shutting down
     """
     def __init__(self,toplevel,ttl,datatypes=None,logpanel=True,iconPath=None):
         """
@@ -529,7 +628,7 @@ class MasterPanel(Panel):
         self.hidden = {}           # keys of hidden data in bin
         self.selected = {}         # keys of selected data in bin
         for datatype in datatypes:
-            self.audit_registered[datatype]= []
+            self.audit_registered[datatype] = []
             self.bin[datatype] = {}
             self.hidden[datatype] = []
             self.selected[datatype] = []   
@@ -555,12 +654,42 @@ class MasterPanel(Panel):
         if os.path.exists('default.ts'): self.guiload('default.ts')
         self.update_idletasks()
 
+    # Panel overrides
+
+    def delete(self):
+        """ title bar exit trap """
+        self.close()
+
+    def close(self):
+        """ cleanly exits - shuts down as necessary """
+        ans = tkMB.askquestion('Quit?','Really Quit',parent=self)
+        if ans == 'no':
+            return
+        else:
+            self.logwrite('Quitting...')
+            #self.closepanels()
+            self._shutdown()
+            self.quit()
+
+    def requestclose(self,name):
+        """
+         override requestclose, before allowing requesting panel to close,
+         deregister it we need to remove all notification requests from
+         the panel before deleting it
+        """
+        print self.name, "got ", name, "requesting close"
+        if name in self._panels:
+            self.audit_deregister(name)
+            self.deletepanel(name)
+
     def _initialize(self): pass
     def _shutdown(self): pass
     def _makemenu(self): pass
     def showpanel(self,t): raise NotImplementedError("MasterPanel::showpanel")
+
     @property
     def getstate(self): return None
+
     def viewlog(self):
         """ displays the log panel """
         panel = self.getpanels("log",False)
@@ -574,12 +703,6 @@ class MasterPanel(Panel):
             panel[0].tk.deiconify()
             panel[0].tk.lift()
 
-#### CALLBACKS ####
-
-    def about(self): pass
-    def help(self): pass
-    def close(self): pass
-    
     def unimplemented(self):
         """ displays info dialog with not implmented message """
         tkMB.showinfo('Not Implemented',"This function not currently implemented",parent=self)
@@ -632,16 +755,6 @@ class MasterPanel(Panel):
                     for panel in self.getpanels(t,False):
                         panel.tk.wm_geometry(ts[t][i])
                         i += 1
-                    
-    def panelquit(self):
-        """ cleanly exits - shuts down as necessary """
-        ans = tkMB.askquestion('Quit?','Really Quit',parent=self)
-        if ans == 'no':
-            return
-        else:
-            self.logwrite('Quitting...')
-            self._shutdown()
-            self.quit()
 
     def logwrite(self,msg,mtype=LOG_NOERR):
         """ writes msg to log or shows in error message """
@@ -651,26 +764,19 @@ class MasterPanel(Panel):
         elif mtype == LOG_ERR:
              tkMB.showerror('Error',msg,parent=self)
 
-    def panelclose(self,panel):
-        """
-         override panelclose, we need to remove all notification requests from 
-         the panel before deleting it
-        """
-        if panel in self._panels:
-            self.audit_deregister(panel)
-            self.deletepanel(panel)
-        else:
-            self.logwrite('Invalid panel %s' % panel)
+    # Panel/date update functionality
 
-    def audit_register(self,dtype,panel):
+    def audit_register(self,dtype,name):
         """ register panel for dtype audits """
-        self.audit_registered[dtype].append(panel)
+        self.audit_registered[dtype].append(name)
 
-    def audit_deregister(self,panel):
-        """ deregister panel from all audits """
-        for key in self.audit_registered.keys():
-            if panel in self.audit_registered[key]:
-                self.audit_registered[key].remove(panel)
+    def audit_deregister(self,name):
+        """
+         deregister panel from all audits
+        """
+        for registered in self.audit_registered:
+            if name in self.audit_registered[registered]:
+                self.audit_registered[registered].remove(name)
 
     def hideentries(self,dtype,name,ids):
         """
@@ -706,8 +812,8 @@ class MasterPanel(Panel):
     def updatepanels(self):
         """ notify open panels something has changed """
         # use keys() to handle event where a panel may close itself
-        for panel in self._panels.keys(): self._panels[panel].pnl.pnlupdate()
+        for name in self._panels: self._panels[name].pnl.update()
 
     def resetpanels(self):
         """ notify open panels everything is reset """
-        for panel in self._panels: self._panels[panel].pnl.pnlreset()
+        for name in self._panels: self._panels[name].pnl.reset()
