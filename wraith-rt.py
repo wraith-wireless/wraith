@@ -477,16 +477,44 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self.txtReconDesc.grid(row=2,column=1,columnspan=4,sticky=Tix.E)
         # ANTENNA SUB SECTION
         frmRA = Tix.Frame(frmR,borderwidth=2,relief='sunken')
-        frmRA.grid(row=4,column=0,columnspan=4,sticky=Tix.N)
+        frmRA.grid(row=4,column=1,columnspan=4,sticky=Tix.N+Tix.W)
         Tix.Label(frmRA,text='ANTENNA(S)').grid(row=0,column=0,columnspan=2,sticky=Tix.W)
         Tix.Label(frmRA,text="Number: ").grid(row=1,column=0,sticky=Tix.W)
         self.txtReconAntNum = Tix.Entry(frmRA,width=2)
         self.txtReconAntNum.grid(row=1,column=1,sticky=Tix.W)
+        Tix.Label(frmRA,text='Gain: ').grid(row=2,column=0,sticky=Tix.W)
+        self.txtReconAntGain = Tix.Entry(frmRA,width=7)
+        self.txtReconAntGain.grid(row=2,column=1,sticky=Tix.W)
+        Tix.Label(frmRA,text=" ").grid(row=2,column=2)
+        Tix.Label(frmRA,text="Type: ").grid(row=2,column=3,sticky=Tix.E)
+        self.txtReconAntType = Tix.Entry(frmRA,width=15)
+        self.txtReconAntType.grid(row=2,column=4,sticky=Tix.E)
+        Tix.Label(frmRA,text='Loss: ').grid(row=3,column=0,sticky=Tix.W)
+        self.txtReconAntLoss = Tix.Entry(frmRA,width=7)
+        self.txtReconAntLoss.grid(row=3,column=1,sticky=Tix.W)
+        Tix.Label(frmRA,text=" ").grid(row=3,column=2)
+        Tix.Label(frmRA,text="XYZ: ").grid(row=3,column=3,sticky=Tix.E)
+        self.txtReconAntXYZ = Tix.Entry(frmRA,width=15)
+        self.txtReconAntXYZ.grid(row=3,column=4,sticky=Tix.E)
         # SCAN PATTERN SUB SECTION
         frmRS = Tix.Frame(frmR,borderwidth=2,relief='sunken')
-        frmRS.grid(row=5,column=0,columnspan=4,sticky=Tix.N)
-        Tix.Label(frmRS,text="SCAN PATTERN").grid(row=0,column=0,sticky=Tix.W)
+        frmRS.grid(row=5,column=1,columnspan=4,sticky=Tix.N+Tix.W)
+        Tix.Label(frmRS,text="SCAN PATTERN").grid(row=0,column=0,columnspan=5,sticky=Tix.W)
+        Tix.Label(frmRS,text="Dwell: ").grid(row=1,column=0,sticky=Tix.W)
+        self.txtReconScanDwell = Tix.Entry(frmRS,width=5)
+        self.txtReconScanDwell.grid(row=1,column=2,sticky=Tix.W)
+        Tix.Label(frmRS,text=" ").grid(row=1,column=3)
+        Tix.Label(frmRS,text="Start: ").grid(row=1,column=4,sticky=Tix.E)
+        self.txtReconScanStart = Tix.Entry(frmRS,width=3)
+        self.txtReconScanStart.grid(row=1,column=5,sticky=Tix.W)
 
+        Tix.Label(frmRS,text="Scan: ").grid(row=2,column=0,sticky=Tix.W)
+        self.txtReconScanScan = Tix.Entry(frmRS,width=12)
+        self.txtReconScanScan.grid(row=2,column=2,sticky=Tix.W)
+        Tix.Label(frmRS,text=" ").grid(row=2,column=3)
+        Tix.Label(frmRS,text="Pass: ").grid(row=2,column=4,sticky=Tix.W)
+        self.txtReconScanPass = Tix.Entry(frmRS,width=12)
+        self.txtReconScanPass.grid(row=2,column=5,sticky=Tix.E)
         # Collection Configuration
         frmC = Tix.Frame(frm,borderwidth=2,relief='sunken')
         frmC.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
@@ -543,7 +571,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
         if nic in wifaces():
             tkMB.showinfo('Found',"%s is a valid wireless NIC" % nic,parent=self)
         else:
-            tkMB.showinfo("Not Found","%s is not a valid wireless NIC" % nic,parent=self)
+            tkMB.showinfo("Not Found","%s is not present and/or a valid wireless NIC" % nic,parent=self)
 
 ###############################################################################
 # WraithPanel - the main panel
@@ -624,9 +652,8 @@ class WraithPanel(gui.MasterPanel):
                 curs = self._conn.cursor()
                 curs.execute("set time zone 'UTC';")
                 self._conn.commit()
-
-                self.logwrite("Connected to database")
                 self._setstate(_STATE_CONN_)
+                self.logwrite("Connected to database",gui.LOG_NOTE)
             except psql.OperationalError as e:
                 if e.__str__().find('connect') > 0:
                     self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
@@ -636,12 +663,14 @@ class WraithPanel(gui.MasterPanel):
                 else:
                     self.logwrite("Unspecified DB error occurred",gui.LOG_ERR)
                     self._conn.rollback()
+                self.logwrite("Not connected to database",gui.LOG_WARN)
             finally:
                 if curs: curs.close()
         else:
             self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
+            self.logwrite("Not connected to database",gui.LOG_WARN)
 
-                # nidus running?
+        # nidus running?
         if cmdline.nidusrunning(NIDUSPID):
             self.logwrite("Nidus is running")
             self._setstate(_STATE_NIDUS_)
@@ -957,7 +986,7 @@ class WraithPanel(gui.MasterPanel):
             lv = self.getpanel('niduslog')
             #if lv: lv.close()
             with open(NIDUSLOG,'w'): os.utime(NIDUSLOG,None)
-            if lv: lv.pnlreset()
+            if lv: lv.reset()
             #self.viewniduslog()
 
     def confignidus(self):

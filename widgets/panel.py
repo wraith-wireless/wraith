@@ -125,7 +125,6 @@ class Panel(Tix.Frame):
         if self.appicon: self.tk.call('wm','iconphoto',self.master._w,self.appicon)
         self.master.protocol("WM_DELETE_WINDOW",self.delete)
         self._panels = {}
-        print self.name, " opened"
 
     # properties/attributes
     @property
@@ -249,7 +248,6 @@ class SlavePanel(Panel):
 
     def delete(self):
         """user initiated - notify master of request to close """
-        print self.name, " requesting close"
         self._chief.notifyclose(self.name)
         self.close()
 
@@ -258,11 +256,9 @@ class SlavePanel(Panel):
          master panel is notifying us to close, notify any slave panels to close,
          cleanup, then quit
         """
-        print self.name, " closing"
         self.closepanels()
         self._shutdown()
         self.master.destroy()
-        #self.quit()
 
 class SimplePanel(SlavePanel):
     """
@@ -455,7 +451,6 @@ class LogPanel(ListPanel):
                                     foreground='Blue',
                                     selectforeground='Blue')]
         self._symbol = ["[+] ","[?] ","[-] ","[!] "]           # type symbols
-        print "log is ", self.name
     def delete(self): pass    # user can never close only the primary chief
     def reset(self): pass     # nothing needs to be reset
     def update(self): pass    # nothing needs to be updated
@@ -678,7 +673,6 @@ class MasterPanel(Panel):
          deregister it we need to remove all notification requests from
          the panel before deleting it
         """
-        print self.name, "got ", name, "requesting close"
         if name in self._panels: self.audit_deregister(name)
         del self._panels[name]
 
