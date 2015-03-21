@@ -34,3 +34,11 @@ __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
+
+#### CONSTANTS
+
+BINS = "ABCDEFG"                       # data bin ids
+NIDUSLOG = '/var/log/wraith/nidus.log' # path to nidus log
+DYSKTLOG = '/var/log/wraith/dyskt.log' # path to dyskt log
+NIDUSPID = '/var/run/nidusd.pid'       # path to nidus pidfile
+DYSKTPID = '/var/run/dysktd.pid'       # path to dyskt pidfile
