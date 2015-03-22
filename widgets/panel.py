@@ -541,7 +541,7 @@ class TailLogPanel(ListPanel):
             return
         self._polltime = polltime
         self._logPoller = None
-        self._threadq = Queue.Queue()
+        self._threadq = None
         self._startlogger()
 
     # CALLBACKS
@@ -563,13 +563,12 @@ class TailLogPanel(ListPanel):
     def reset(self):
         """ resets the log panel """
         # stop the polling thread and join
-        if self._logPoller:
-            self._threadq.put('!STOP!')
-            self._logPoller.join()
+        self._shutdown()
 
         # reset internal structures and clear the list
-        self._n = 0
-        self.list.delete_all()
+        if self._n:
+            self._n = 0
+            self.list.delete_all()
 
         # reset the log poller
         self._startlogger()
@@ -585,6 +584,7 @@ class TailLogPanel(ListPanel):
 
     def _startlogger(self):
         try:
+            self._threadq = Queue.Queue()
             self._logPoller = TailLogger(self._threadq,self.newlines,self.logerror,
                                          self._polltime,self._lf)
             self._logPoller.start()

@@ -29,7 +29,7 @@ wraith 0.0.2
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
 __version__ = '0.0.2'
-__date__ = 'February 2015'
+__date__ = 'March 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -37,8 +37,11 @@ __status__ = 'Development'
 
 #### CONSTANTS
 
-BINS = "ABCDEFG"                       # data bin ids
-NIDUSLOG = '/var/log/wraith/nidus.log' # path to nidus log
-DYSKTLOG = '/var/log/wraith/dyskt.log' # path to dyskt log
-NIDUSPID = '/var/run/nidusd.pid'       # path to nidus pidfile
-DYSKTPID = '/var/run/dysktd.pid'       # path to dyskt pidfile
+BINS = "ABCDEFG"                        # data bin ids
+NIDUSLOG   = '/var/log/wraith/nidus.log' # path to nidus log
+DYSKTLOG   = '/var/log/wraith/dyskt.log' # path to dyskt log
+NIDUSPID   = '/var/run/nidusd.pid'       # path to nidus pidfile
+DYSKTPID   = '/var/run/dysktd.pid'       # path to dyskt pidfile
+WRAITHCONF = 'wraith.conf'               # path to wraith config file
+NIDUSCONF  = 'nidus/nidus.conf'          # path to nidus config file
+DYSKTCONF  = 'dyskt/dyskt.conf'          # path to dyskt config file

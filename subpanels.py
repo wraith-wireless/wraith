@@ -24,10 +24,6 @@ from wraith.radio.iwtools import wifaces   # check nic validity
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # reg exp for ip addr
 MACADDR = re.compile("^([0-9A-F]{2}:){5}([0-9A-F]{2})$")    # reg exp for mac addr (capital letters only)
 
-################################################################################
-# CHILD PANELS
-################################################################################
-
 class DataBinPanel(gui.SimplePanel):
     """ DataBinPanel - displays a set of data bins for retrieved data storage """
     def __init__(self,toplevel,chief):
@@ -126,7 +122,7 @@ class WraithConfigPanel(gui.ConfigPanel):
     def _initialize(self):
         """ insert values from config file into entry boxes """
         conf = ConfigParser.RawConfigParser()
-        if not conf.read('wraith.conf'):
+        if not conf.read(wraith.WRAITHCONF):
             tkMB.showerror("File Not Found","File wraith.conf was not found",
                            parent=self)
             return
@@ -204,7 +200,7 @@ class WraithConfigPanel(gui.ConfigPanel):
             conf.set('Policy','polite','on' if self.ptype else 'off')
             conf.set('Policy','shutdown','auto' if self.stype else 'manual')
 
-            fout = open('wraith.conf','w')
+            fout = open(wraith.WRAITHCONF,'w')
             conf.write(fout)
             fout.close()
         except IOError as e:
@@ -276,7 +272,7 @@ class NidusConfigPanel(gui.ConfigPanel):
     def _initialize(self):
         """ insert values from config file into entry boxes """
         conf = ConfigParser.RawConfigParser()
-        if not conf.read("nidus/nidus.conf"):
+        if not conf.read(wraith.NIDUSCONF):
             tkMB.showerror("File Not Found",
                            "File nidus.conf was not found",
                            parent=self)
@@ -293,15 +289,12 @@ class NidusConfigPanel(gui.ConfigPanel):
         self.txtPCAPPath.delete(0,Tix.END)
         if conf.has_option('SSE','save_path'):
             self.txtPCAPPath.insert(0,conf.get('SSE','save_path'))
-        else: self.txtPCAPPath.insert(0,'')
         self.txtMaxSz.delete(0,Tix.END)
         if conf.has_option('SSE','save_maxsize'):
             self.txtMaxSz.insert(0,conf.get('SSE','save_maxsize'))
-        else: self.txtMaxSz.insert(0,'')
         self.txtMaxFiles.delete(0,Tix.END)
         if conf.has_option('SSE','save_maxfiles'):
             self.txtMaxFiles.insert(0,conf.get('SSE','save_maxfiles'))
-        else: self.txtMaxFiles.insert(0,'')
         self.txtNumStore.delete(0,Tix.END)
         if conf.has_option('SSE','store_threads'):
             self.txtNumStore.insert(0,conf.get('SSE','store_threads'))
@@ -413,7 +406,7 @@ class NidusConfigPanel(gui.ConfigPanel):
             conf.add_section('OUI')
             conf.set('OUI','path',self.txtOUIPath.get())
 
-            fout = open('nidus/nidus.conf','w')
+            fout = open(wraith.NIDUSCONF,'w')
             conf.write(fout)
             fout.close()
         except IOError as e:
@@ -451,9 +444,11 @@ class DySKTConfigPanel(gui.ConfigPanel):
         Tix.Label(frmR,text='Desc: ').grid(row=2,column=0,sticky=Tix.W+Tix.N)
         self.txtReconDesc = Tix.Text(frmR,width=42,height=3)
         self.txtReconDesc.grid(row=2,column=1,columnspan=4,sticky=Tix.E)
+
         # ANTENNA SUB SECTION
         frmRA = Tix.Frame(frmR,borderwidth=2,relief='sunken')
         frmRA.grid(row=4,column=1,columnspan=4,sticky=Tix.N+Tix.W)
+        # ANTENNA SUBSECTION
         Tix.Label(frmRA,text='ANTENNA(S)').grid(row=0,column=0,columnspan=2,sticky=Tix.W)
         Tix.Label(frmRA,text="Number: ").grid(row=1,column=0,sticky=Tix.W)
         self.txtReconAntNum = Tix.Entry(frmRA,width=2)
@@ -483,7 +478,6 @@ class DySKTConfigPanel(gui.ConfigPanel):
         Tix.Label(frmRS,text="Start: ").grid(row=1,column=4,sticky=Tix.E)
         self.txtReconScanStart = Tix.Entry(frmRS,width=3)
         self.txtReconScanStart.grid(row=1,column=5,sticky=Tix.W)
-
         Tix.Label(frmRS,text="Scan: ").grid(row=2,column=0,sticky=Tix.W)
         self.txtReconScanScan = Tix.Entry(frmRS,width=12)
         self.txtReconScanScan.grid(row=2,column=2,sticky=Tix.W)
@@ -491,6 +485,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
         Tix.Label(frmRS,text="Pass: ").grid(row=2,column=4,sticky=Tix.W)
         self.txtReconScanPass = Tix.Entry(frmRS,width=12)
         self.txtReconScanPass.grid(row=2,column=5,sticky=Tix.E)
+
         # Collection Configuration
         frmC = Tix.Frame(frm,borderwidth=2,relief='sunken')
         frmC.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
@@ -510,9 +505,25 @@ class DySKTConfigPanel(gui.ConfigPanel):
     def _initialize(self):
         """ insert values from config file into entry boxes """
         conf = ConfigParser.RawConfigParser()
-        if not conf.read("wraith.conf"):
-            tkMB.showerror("File Not Found","File wraith.conf was not found",parent=self)
+        if not conf.read(wraith.DYSKTCONF):
+            tkMB.showerror("File Not Found","File dyskt.conf was not found",parent=self)
             return
+
+        # start by reading the recon radio details
+        self.txtReconNic.delete(0,Tix.END)
+        if conf.has_option('Recon','nic'):
+            self.txtReconNic.insert(0,conf.get('Recon','nic'))
+        self.txtReconSpoof.delete(0,Tix.END)
+        if conf.has_option('Recon','spoof'):
+            self.txtReconSpoof.insert(0,conf.get('Recon','spoof'))
+        self.txtReconDesc.delete(1.0,Tix.END)
+        if conf.has_option('Recon','desc'):
+            self.txtReconDesc.insert(Tix.END,conf.get('Recon','desc'))
+        self.txtReconAntNum.delete(0,Tix.END)
+        if conf.has_option('Recon','antennas'):
+            self.txtReconAntNum.insert(0,conf.get('Recon','antennas'))
+        else: self.txtReconAntNum.insert(0,'1')
+
 
     def _validate(self):
         """ validate entries """
@@ -524,7 +535,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
         try:
             conf = ConfigParser.ConfigParser()
 
-            fout = open('dyskt/dyskt.conf','w')
+            fout = open(wraith.DYSKTCONF,'w')
             conf.write(fout)
             fout.close()
         except IOError as e:
