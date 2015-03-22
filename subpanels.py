@@ -422,6 +422,7 @@ class NidusConfigPanel(gui.ConfigPanel):
                           "Changes will take effect on next start",
                           parent=self)
 
+class DySKTConfigException(Exception): pass
 class DySKTConfigPanel(gui.ConfigPanel):
     """ Display Nidus Configuration Panel """
     def __init__(self,toplevel,chief):
@@ -549,43 +550,61 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
     def _validate(self):
         """ validate entries """
-        # start by reading the recon radio details
-        self.txtReconNic.delete(0,Tix.END)
-        if conf.has_option('Recon','nic'):
-            self.txtReconNic.insert(0,conf.get('Recon','nic'))
-        self.txtReconSpoof.delete(0,Tix.END)
-        if conf.has_option('Recon','spoof'):
-            self.txtReconSpoof.insert(0,conf.get('Recon','spoof'))
-        self.txtReconDesc.delete(1.0,Tix.END)
-        if conf.has_option('Recon','desc'):
-            self.txtReconDesc.insert(Tix.END,conf.get('Recon','desc'))
-        self.txtReconAntNum.delete(0,Tix.END)
-        if conf.has_option('Recon','antennas'):
-            self.txtReconAntNum.insert(0,conf.get('Recon','antennas'))
-        self.txtReconAntGain.delete(0,Tix.END)
-        if conf.has_option('Recon','antenna_gain'):
-            self.txtReconAntGain.insert(0,conf.get('Recon','antenna_gain'))
-        self.txtReconAntType.delete(0,Tix.END)
-        if conf.has_option('Recon','antenna_type'):
-            self.txtReconAntType.insert(0,conf.get('Recon','antenna_type'))
-        self.txtReconAntLoss.delete(0,Tix.END)
-        if conf.has_option('Recon','antenna_loss'):
-            self.txtReconAntLoss.insert(0,conf.get('Recon','antenna_loss'))
-        self.txtReconAntXYZ.delete(0,Tix.END)
-        if conf.has_option('Recon','antenna_xyz'):
-            self.txtReconAntXYZ.insert(0,conf.get('Recon','antenna_xyz'))
+        # start the recon radio details
+        #self.txtReconNic.get(0,Tix.END)
+        nic = self.txtReconNic.get()
+        if not nic:
+            tkMB.showerror("Invalid Input",
+                            "The Recon radio nic must be specified",
+                            parent=self)
+            return False
+        elif not nic in wifaces():
+            tkMB.showwarning("Not Found",
+                             "Recond radio %s may not be wireless" % nic)
+        spoof = self.txtReconSpoof.get()
+        if re.match(MACADDR,spoof) is None:
+            tkMB.showerror("Invalid Input",
+                           "Spoofed mac addr %s is not valid" % spoof,
+                           parent=self)
+            return False
+        #ignore self.txtReconDesc.delete(1.0,Tix.END)
+        if self.txtReconAntNum.get():
+            try:
+                nA = int(self.txtReconAntNum.get())
+                try:
+                    gain = map(float,self.txtReconAntGain.get().split(','))
+                    if len(gain) != nA: raise DySKTConfigException('Number of gain and number of antennas do not match')
+                except:
+                    raise DySKTConfigException('Gain must be float or list of floats')
+                atype = map(float,self.txtReconAntType.get().split(','))
+                if len(atype) != nA: raise DySKTConfigException('Number of types and number of antennas do not match')
+                try:
+                    gain = map(float,self.txtReconAntLoss.get().split(','))
+                    if len(gain) != nA: raise DySKTConfigException('Number of loss and number of antennas do not match')
+                except:
+                    raise DySKTConfigException('Loss must be float or list of floats')
+                try:
+                    xyzs = self.txtReconAntXYZ.get().split(',')
+                    if len(xyzs) != nA: raise DySKTConfigException('Number of xyz and number of antennas do not match')
+                    for xyz in xyzs:
+                        xyz = xyz.split(':')
+                        if len(xyz) != 3: raise DySKTConfigException('XYZ must be three integers')
+                        map(int,xyz)
+                except ValueError:
+                    raise DySKTConfigException('XYZ must be integer')
+            except ValueError:
+                tkMB.showerror("Invalid Input",
+                               "Number of antennas must be numeric",
+                               parent=self)
+                return False
+            except DySKTConfigException as e:
+                tkMB.showerror("Invalid Input",e,parent=self)
+                return False
+
         self.txtReconScanDwell.delete(0,Tix.END)
-        if conf.has_option('Recon','dwell'):
-            self.txtReconScanDwell.insert(0,conf.get('Recon','dwell'))
         self.txtReconScanStart.delete(0,Tix.END)
-        if conf.has_option('Recon','start'):
-            self.txtReconScanStart.insert(0,conf.get('Recon','start'))
         self.txtReconScanScan.delete(0,Tix.END)
-        if conf.has_option('Recon','scan'):
-            self.txtReconScanScan.insert(0,conf.get('Recon','scan'))
         self.txtReconScanPass.delete(0,Tix.END)
-        if conf.has_option('Recon','pass'):
-            self.txtReconScanPass.insert(0,conf.get('Recon','pass'))
         return True
 
     def _write(self):
