@@ -522,11 +522,70 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self.txtReconAntNum.delete(0,Tix.END)
         if conf.has_option('Recon','antennas'):
             self.txtReconAntNum.insert(0,conf.get('Recon','antennas'))
-        else: self.txtReconAntNum.insert(0,'1')
-
+        self.txtReconAntGain.delete(0,Tix.END)
+        if conf.has_option('Recon','antenna_gain'):
+            self.txtReconAntGain.insert(0,conf.get('Recon','antenna_gain'))
+        self.txtReconAntType.delete(0,Tix.END)
+        if conf.has_option('Recon','antenna_type'):
+            self.txtReconAntType.insert(0,conf.get('Recon','antenna_type'))
+        self.txtReconAntLoss.delete(0,Tix.END)
+        if conf.has_option('Recon','antenna_loss'):
+            self.txtReconAntLoss.insert(0,conf.get('Recon','antenna_loss'))
+        self.txtReconAntXYZ.delete(0,Tix.END)
+        if conf.has_option('Recon','antenna_xyz'):
+            self.txtReconAntXYZ.insert(0,conf.get('Recon','antenna_xyz'))
+        self.txtReconScanDwell.delete(0,Tix.END)
+        if conf.has_option('Recon','dwell'):
+            self.txtReconScanDwell.insert(0,conf.get('Recon','dwell'))
+        self.txtReconScanStart.delete(0,Tix.END)
+        if conf.has_option('Recon','start'):
+            self.txtReconScanStart.insert(0,conf.get('Recon','start'))
+        self.txtReconScanScan.delete(0,Tix.END)
+        if conf.has_option('Recon','scan'):
+            self.txtReconScanScan.insert(0,conf.get('Recon','scan'))
+        self.txtReconScanPass.delete(0,Tix.END)
+        if conf.has_option('Recon','pass'):
+            self.txtReconScanPass.insert(0,conf.get('Recon','pass'))
 
     def _validate(self):
         """ validate entries """
+        # start by reading the recon radio details
+        self.txtReconNic.delete(0,Tix.END)
+        if conf.has_option('Recon','nic'):
+            self.txtReconNic.insert(0,conf.get('Recon','nic'))
+        self.txtReconSpoof.delete(0,Tix.END)
+        if conf.has_option('Recon','spoof'):
+            self.txtReconSpoof.insert(0,conf.get('Recon','spoof'))
+        self.txtReconDesc.delete(1.0,Tix.END)
+        if conf.has_option('Recon','desc'):
+            self.txtReconDesc.insert(Tix.END,conf.get('Recon','desc'))
+        self.txtReconAntNum.delete(0,Tix.END)
+        if conf.has_option('Recon','antennas'):
+            self.txtReconAntNum.insert(0,conf.get('Recon','antennas'))
+        self.txtReconAntGain.delete(0,Tix.END)
+        if conf.has_option('Recon','antenna_gain'):
+            self.txtReconAntGain.insert(0,conf.get('Recon','antenna_gain'))
+        self.txtReconAntType.delete(0,Tix.END)
+        if conf.has_option('Recon','antenna_type'):
+            self.txtReconAntType.insert(0,conf.get('Recon','antenna_type'))
+        self.txtReconAntLoss.delete(0,Tix.END)
+        if conf.has_option('Recon','antenna_loss'):
+            self.txtReconAntLoss.insert(0,conf.get('Recon','antenna_loss'))
+        self.txtReconAntXYZ.delete(0,Tix.END)
+        if conf.has_option('Recon','antenna_xyz'):
+            self.txtReconAntXYZ.insert(0,conf.get('Recon','antenna_xyz'))
+        self.txtReconScanDwell.delete(0,Tix.END)
+        if conf.has_option('Recon','dwell'):
+            self.txtReconScanDwell.insert(0,conf.get('Recon','dwell'))
+        self.txtReconScanStart.delete(0,Tix.END)
+        if conf.has_option('Recon','start'):
+            self.txtReconScanStart.insert(0,conf.get('Recon','start'))
+        self.txtReconScanScan.delete(0,Tix.END)
+        if conf.has_option('Recon','scan'):
+            self.txtReconScanScan.insert(0,conf.get('Recon','scan'))
+        self.txtReconScanPass.delete(0,Tix.END)
+        if conf.has_option('Recon','pass'):
+            self.txtReconScanPass.insert(0,conf.get('Recon','pass'))
         return True
 
     def _write(self):
