@@ -19,6 +19,7 @@ import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
 from wraith.radio.iwtools import wifaces   # check nic validity
+from wraith.dyskt.dyskt import parsechlist
 
 # Validation reg. exp.
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # reg exp for ip addr
@@ -539,8 +540,8 @@ class DySKTConfigPanel(gui.ConfigPanel):
         if conf.has_option('Recon','dwell'):
             self.txtReconScanDwell.insert(0,conf.get('Recon','dwell'))
         self.txtReconScanStart.delete(0,Tix.END)
-        if conf.has_option('Recon','start'):
-            self.txtReconScanStart.insert(0,conf.get('Recon','start'))
+        if conf.has_option('Recon','scan_start'):
+            self.txtReconScanStart.insert(0,conf.get('Recon','scan_start'))
         self.txtReconScanScan.delete(0,Tix.END)
         if conf.has_option('Recon','scan'):
             self.txtReconScanScan.insert(0,conf.get('Recon','scan'))
@@ -550,8 +551,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
     def _validate(self):
         """ validate entries """
-        # start the recon radio details
-        #self.txtReconNic.get(0,Tix.END)
+        # start with the recon radio details
         nic = self.txtReconNic.get()
         if not nic:
             tkMB.showerror("Invalid Input",
@@ -560,38 +560,48 @@ class DySKTConfigPanel(gui.ConfigPanel):
             return False
         elif not nic in wifaces():
             tkMB.showwarning("Not Found",
-                             "Recond radio %s may not be wireless" % nic)
-        spoof = self.txtReconSpoof.get()
+                             "Recond radio %s may not be wireless" % nic,
+                             parent=self)
+        spoof = self.txtReconSpoof.get().upper()
         if re.match(MACADDR,spoof) is None:
             tkMB.showerror("Invalid Input",
                            "Spoofed mac addr %s is not valid" % spoof,
                            parent=self)
             return False
-        #ignore self.txtReconDesc.delete(1.0,Tix.END)
+        #ignore the description -> self.txtReconDesc.delete(1.0,Tix.END)
+
+        # process the antennas - if antenna number is > 0 then force validation of
+        # all antenna widgets
         if self.txtReconAntNum.get():
             try:
                 nA = int(self.txtReconAntNum.get())
-                try:
-                    gain = map(float,self.txtReconAntGain.get().split(','))
-                    if len(gain) != nA: raise DySKTConfigException('Number of gain and number of antennas do not match')
-                except:
-                    raise DySKTConfigException('Gain must be float or list of floats')
-                atype = map(float,self.txtReconAntType.get().split(','))
-                if len(atype) != nA: raise DySKTConfigException('Number of types and number of antennas do not match')
-                try:
-                    gain = map(float,self.txtReconAntLoss.get().split(','))
-                    if len(gain) != nA: raise DySKTConfigException('Number of loss and number of antennas do not match')
-                except:
-                    raise DySKTConfigException('Loss must be float or list of floats')
-                try:
-                    xyzs = self.txtReconAntXYZ.get().split(',')
-                    if len(xyzs) != nA: raise DySKTConfigException('Number of xyz and number of antennas do not match')
-                    for xyz in xyzs:
-                        xyz = xyz.split(':')
-                        if len(xyz) != 3: raise DySKTConfigException('XYZ must be three integers')
-                        map(int,xyz)
-                except ValueError:
-                    raise DySKTConfigException('XYZ must be integer')
+                if nA:
+                    try:
+                        gain = map(float,self.txtReconAntGain.get().split(','))
+                        if len(gain) != nA:
+                            raise DySKTConfigException('Number of gain and number of antennas do not match')
+                    except:
+                        raise DySKTConfigException('Gain must be float or list of floats')
+                    atype = map(float,self.txtReconAntType.get().split(','))
+                    if len(atype) != nA:
+                        raise DySKTConfigException('Number of types and number of antennas do not match')
+                    try:
+                        gain = map(float,self.txtReconAntLoss.get().split(','))
+                        if len(gain) != nA:
+                            raise DySKTConfigException('Number of loss and number of antennas do not match')
+                    except:
+                        raise DySKTConfigException('Loss must be float or list of floats')
+                    try:
+                        xyzs = self.txtReconAntXYZ.get().split(',')
+                        if len(xyzs) != nA:
+                            raise DySKTConfigException('Number of xyz and number of antennas do not match')
+                        for xyz in xyzs:
+                            xyz = xyz.split(':')
+                            if len(xyz) != 3:
+                                raise DySKTConfigException('XYZ must be three integers')
+                            map(int,xyz)
+                    except ValueError:
+                        raise DySKTConfigException('XYZ must be integer')
             except ValueError:
                 tkMB.showerror("Invalid Input",
                                "Number of antennas must be numeric",
@@ -601,10 +611,26 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 tkMB.showerror("Invalid Input",e,parent=self)
                 return False
 
-        self.txtReconScanDwell.delete(0,Tix.END)
-        self.txtReconScanStart.delete(0,Tix.END)
-        self.txtReconScanScan.delete(0,Tix.END)
-        self.txtReconScanPass.delete(0,Tix.END)
+        # process scan patterns
+        dwell = self.txtReconScanDwell.get()
+        try:
+            float(dwell)
+        except:
+            tkMB.showerror("Invalid Input", "Scan dwell must be integer",parent=self)
+            return False
+        start = self.txtReconScanStart.get()
+        try:
+            if start: int(start)
+        except:
+            tkMB.showerror("Invalid Input", "Scan start must be integer",parent=self)
+            return False
+        try:
+            parsechlist(self.txtReconScanScan.get(),'scan')
+            parsechlist(self.txtReconScanPass.get(),'pass')
+        except ValueError as e:
+            tkMB.showerror("Invalid Input",e,parent=self)
+            return False
+
         return True
 
     def _write(self):

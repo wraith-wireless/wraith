@@ -42,6 +42,7 @@ dyskt 0.1.5
  - added platform/system details
  - added regulatory domain setting/resetting capability to sensor
  - modified antenna specification to support more than 1 antenna
+ - remove internal.py and the Report class, using just a simple Tuple instead
 
 
 TODO:

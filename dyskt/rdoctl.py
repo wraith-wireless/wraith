@@ -19,7 +19,6 @@ import socket                          # reading frames
 import threading                       # for the tuner thread
 from Queue import Queue, Empty         # thread-safe queue
 import multiprocessing as mp           # for Process
-from internal import Report            # internal communications
 from wraith.radio import iw            # iw command line interface
 import wraith.radio.iwtools as iwt     # nic command line interaces
 from wraith.radio.mpdu import MAX_MPDU # maximum size of frame
@@ -271,7 +270,7 @@ class RadioController(mp.Process):
             self._tuner = Tuner(self._q,self._conn,self._vnic,self._scan,self._ds,ch_i)
 
             # notify RTO we are good
-            self._comms.put(Report(self._vnic,uptime,'!UP!',self.radio))
+            self._comms.put((self._vnic,uptime,'!UP!',self.radio))
         except socket.error as e:
             try:
                 iw.devdel(self._vnic)
@@ -319,7 +318,7 @@ class RadioController(mp.Process):
 
         # start tuner thread
         self._tuner.start()
-        self._comms.put(Report(self._vnic,time.time(),'!SCAN!',self._scan))
+        self._comms.put((self._vnic,time.time(),'!SCAN!',self._scan))
 
         # execute sniffing loop
         while True:
@@ -331,30 +330,30 @@ class RadioController(mp.Process):
                 try:
                     # pull the frame off and pass it on
                     frame = self._s.recv(MAX_MPDU)
-                    self._comms.put(Report(self._vnic,time.time(),'!FRAME!',frame))
+                    self._comms.put((self._vnic,time.time(),'!FRAME!',frame))
                 except socket.error as e:
-                    self._comms.put(Report(self._vnic,time.time(),'!FAIL!',e))
+                    self._comms.put((self._vnic,time.time(),'!FAIL!',e))
                     self._conn.send(('err',"%s" % self._role,'Socket',e))
                     break
                 except Exception as e:
                     # blanket 'don't know what happend' exception
-                    self._comms.put(Report(self._vnic,time.time(),'!FAIL!',e))
+                    self._comms.put((self._vnic,time.time(),'!FAIL!',e))
                     self._conn.send(('err',"%s" % self._role,'Unknown',e))
                     break
             else:
                 # process the notification
                 if event == '!FAIL!':
-                    self._comms.put(Report(self._vnic,ts,'!FAIL!',msg))
+                    self._comms.put((self._vnic,ts,'!FAIL!',msg))
                 elif event == '!HOLD!':
-                    #self._comms.put(Report(ts,self._vnic,'!HOLD!',' '))
+                    #self._comms.put((self._vnic,ts,'!HOLD!',' '))
                     pass
                 elif event == '!RESUME!':
-                    self._comms.put(Report(self._vnic,time.time(),'!SCAN!',self._scan))
+                    self._comms.put((self._vnic,time.time(),'!SCAN!',self._scan))
                 elif event == '!LISTEN':
-                    #self._comms.put(Report(self._vnic,time.time(),'!LISTEN!',' '))
+                    #self._comms.put((self._vnic,time.time(),'!LISTEN!',' '))
                     pass
                 elif event == '!PAUSE!':
-                    #self._comms.put(Report(self._vnic,time.time(),'!SCAN!',' '))
+                    #self._comms.put((self._vnic,time.time(),'!SCAN!',' '))
                     pass
                 elif event == '!STOP!':
                     break

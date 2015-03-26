@@ -15,21 +15,20 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                           # for path validations
-import signal                       # signal processing
-import time                         # for sleep, timestamps
-import logging                      # log
-import logging.config               # log configuration
-import logging.handlers             # handlers for log
-import multiprocessing as mp        # multiprocessing process, events etc
-import argparse as ap               # reading command line arguments
-import ConfigParser                 # reading configuration files
-from wraith import dyskt            # for rev number, author
-from internal import Report         # message report template
-from rto import RTO                 # the rto
-from rdoctl import RadioController  # Radio object etc
-from wraith.radio import channels   # channel specifications
-from wraith.radio import iw         # channel widths and region set/get
+import os                                       # for path validations
+import signal                                   # signal processing
+import time                                     # for sleep, timestamps
+import logging                                  # log
+import logging.config                           # log configuration
+import logging.handlers                         # handlers for log
+import multiprocessing as mp                    # multiprocessing process, events etc
+import argparse as ap                           # reading command line arguments
+import ConfigParser                             # reading configuration files
+from wraith import dyskt                        # for rev number, author
+from wraith.dyskt.rto import RTO                # the rto
+from wraith.dyskt.rdoctl import RadioController # Radio object etc
+from wraith.radio import channels               # channel specifications
+from wraith.radio import iw                     # channel widths and region set/get
 
 #### set up log
 # have to configure absolute path
@@ -53,6 +52,53 @@ DYSKT_PAUSED_COLL     =  3 # dyskt collection radio is paused
 DYSKT_PAUSED_BOTH     =  4 # both radios are paused
 DYSKT_EXITING         =  5 # dyskt has finished execution loop
 DYSKT_DESTROYED       =  6 # dyskt is destroyed
+
+def parsechlist(pattern,ptype):
+    """
+      parse channel list pattern of type ptype = oneof {'scan','pass'} and return
+      a list of tuples (ch,chwidth)
+    """
+    if not pattern: chs,ws = ([],[])
+    else:
+        # split the pattern by ch,width separator
+        chs,ws = pattern.split(':')
+
+        # parse channel portion
+        if not chs: chs = []
+        else:
+            if chs.lower().startswith('b'): # band specification
+                band = chs[1:]
+                if band == '2.4':
+                    chs = sorted(channels.ISM_24_C2F.keys())
+                elif band == '5':
+                    chs = sorted(channels.UNII_5_C2F.keys())
+                else:
+                    raise ValueError("Band specification %s for %s not supported" % (chs,ptype))
+            elif '-' in chs: # range specification
+                [l,u] = chs.split('-')
+                chs = [c for c in xrange(int(l),int(u)+1) if c in channels.channels()]
+            else: # list or single specification
+                try:
+                    chs = [int(c) for c in chs.split(',')]
+                except ValueError:
+                    raise ValueError("Invalid channel list specification %s for %s" % (chs,ptype))
+
+            # parse width portion
+            if not ws or ws.lower() == 'all': ws = []
+            else:
+                if ws.lower() == "noht": ws = [None,'HT20']
+                elif ws.lower() == "ht": ws = ['HT40+','HT40-']
+                else: raise ValueError("Invalid specification for width %s for %s" % (ws,ptype))
+
+    # compile all possible combinations
+    if (chs,ws) == ([],[]):
+        if ptype == 'scan': return [(ch,chw) for chw in iw.IW_CHWS for ch in channels.channels()]
+    elif not chs: return [(ch,chw) for chw in ws for ch in channels.channels()]
+    elif not ws: return [(ch,chw) for chw in iw.IW_CHWS for ch in chs]
+    else:
+        return [(ch,chw) for chw in ws for ch in chs]
+
+    return [],[]
 
 class DySKT(object):
     """ DySKT - primary process of the Wraith sensor """
@@ -156,7 +202,7 @@ class DySKT(object):
         # any holding for data block
         logging.info("Stopping Sub-processes")
         self._halt.set()
-        self._ic.put(Report('dyskt',time.time(),'!CHECK!',[]))
+        self._ic.put(('dyskt',time.time(),'!CHECK!',[]))
         for key in self._pConns.keys():
             try:
                 self._pConns[key].send('!STOP!')
@@ -347,8 +393,8 @@ class DySKT(object):
         # get scan pattern
         r['dwell'] = conf.getfloat(rtype,'dwell')
         if r['dwell'] <= 0: raise ValueError("dwell must be > 0")
-        r['scan'] = self._parsechlist(conf.get(rtype,'scan'),'scan')
-        r['pass'] = self._parsechlist(conf.get(rtype,'pass'),'pass')
+        r['scan'] = parsechlist(conf.get(rtype,'scan'),'scan')
+        r['pass'] = parsechlist(conf.get(rtype,'pass'),'pass')
         if conf.has_option(rtype,'scan_start'):
             try:
                 (ch,chw) = conf.get(rtype,'scan_start').split(':')
@@ -362,57 +408,6 @@ class DySKT(object):
             r['scan_start'] = r['scan'][0]
 
         return r
-
-    @staticmethod
-    def _parsechlist(pattern,ptype):
-        """
-         parse channel list pattern of type ptype = oneof {'scan','pass'} and return
-         a list of tuples (ch,chwidth)
-        """
-        if not pattern:
-            chs,ws = ([],[])
-        else:
-            # split the pattern by ch,width separator
-            chs,ws = pattern.split(':')
-
-            # parse channel portion
-            if not chs: chs = []
-            else:
-                if chs.lower().startswith('b'): # band specification
-                    band = chs[1:]
-                    if band == '2.4':
-                        chs = sorted(channels.ISM_24_C2F.keys())
-                    elif band == '5':
-                        chs = sorted(channels.UNII_5_C2F.keys())
-                    else:
-                        raise ValueError("Band specification %s not supported" % chs)
-                elif '-' in chs: # range specification
-                    [l,u] = chs.split('-')
-                    chs = [c for c in xrange(int(l),int(u)+1) if c in channels.channels()]
-                else: # list or single specification
-                    try:
-                        chs = [int(c) for c in chs.split(',')]
-                    except ValueError:
-                        raise ValueError("Invalid channel list specification %s" % chs)
-
-            # parse width portion
-            if not ws or ws.lower() == 'all': ws = []
-            else:
-                if ws.lower() == "noht": ws = [None,'HT20']
-                elif ws.lower() == "ht": ws = ['HT40+','HT40-']
-                else: raise ValueError("Invalid specification for width: %s" % ws)
-
-        # compile all possible combinations
-        if (chs,ws) == ([],[]):
-            if ptype == 'scan': return [(ch,chw) for chw in iw.IW_CHWS for ch in channels.channels()]
-        elif not chs:
-            return [(ch,chw) for chw in ws for ch in channels.channels()]
-        elif not ws:
-            return [(ch,chw) for chw in iw.IW_CHWS for ch in chs]
-        else:
-            return [(ch,chw) for chw in ws for ch in chs]
-
-        return [],[]
 
 if __name__ == 'dyskt':
     try:

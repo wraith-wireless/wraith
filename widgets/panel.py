@@ -299,7 +299,9 @@ class ConfigPanel(SlavePanel):
       _makegui add widgets to view/edit configuration file entries
       _initialize initial entry of config file values into the widgets. It is
         also used by the reset to button
-      _validate validate entries before writing
+      _validate validate entries before writing (derived class must handle
+       displaying error messages to user) returns True if all widget entries
+       are valid, False otherwise
       _write writes the values of the entries into the config file
     """
     def __init__(self,toplevel,chief,title):

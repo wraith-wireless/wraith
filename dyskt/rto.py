@@ -134,6 +134,8 @@ class RTO(mp.Process):
         """
          initializes RTO
          comms - internal communication
+          NOTE: all messages sent on internal comms must be a tuple T where
+           T = (sender callsign,timestamp of event,event message,additional params)
          conn - connection to/from DySKT
          conf - necessary config details
         """
@@ -214,7 +216,7 @@ class RTO(mp.Process):
             ev = msg = None
             try:
                 rpt = self._comms.get() # blocking call
-                (cs,ts,ev,msg,_) = rpt.report
+                (cs,ts,ev,msg,_) = rpt[0],rpt[1],rpt[2],rpt[3],rpt[4]
 
                 # DySKT pushes a token onto the internal comms allowing us to
                 # break the blocking call and check the token
