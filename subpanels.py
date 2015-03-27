@@ -431,6 +431,13 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
     def _makegui(self,frm):
         """ set up entry widgets """
+        nb = Tix.NoteBook(frm)
+        nb.add('recon',label='Recon',underline=0)
+        nb.add('coll',label='Collection',underline=0)
+        nb.add('gps',label='GPS',underline=0)
+        nb.add('misc',label='Misc.',underline=0)
+        nb.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
+
         # Recon Configuration
         frmR = Tix.Frame(frm,borderwidth=2,relief='sunken')
         frmR.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
@@ -506,6 +513,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
     def _initialize(self):
         """ insert values from config file into entry boxes """
+        return
         conf = ConfigParser.RawConfigParser()
         if not conf.read(wraith.DYSKTCONF):
             tkMB.showerror("File Not Found","File dyskt.conf was not found",parent=self)
@@ -582,7 +590,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                             raise DySKTConfigException('Number of gain and number of antennas do not match')
                     except:
                         raise DySKTConfigException('Gain must be float or list of floats')
-                    atype = map(float,self.txtReconAntType.get().split(','))
+                    atype = self.txtReconAntType.get().split(',')
                     if len(atype) != nA:
                         raise DySKTConfigException('Number of types and number of antennas do not match')
                     try:
@@ -635,7 +643,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
     def _write(self):
         """ write entry inputs to config file """
-        fout = None
+        return
         try:
             conf = ConfigParser.ConfigParser()
 

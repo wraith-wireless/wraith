@@ -44,7 +44,6 @@ dyskt 0.1.5
  - modified antenna specification to support more than 1 antenna
  - remove internal.py and the Report class, using just a simple Tuple instead
 
-
 TODO:
      ** After testing remove set raw capability from python **
       3) implement adaptive scan pattern
