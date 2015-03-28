@@ -18,8 +18,9 @@ from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
+from wraith.radio.iw import IW_CHWS        # channel width list
 from wraith.radio.iwtools import wifaces   # check nic validity
-from wraith.dyskt.dyskt import parsechlist
+from wraith.dyskt.dyskt import parsechlist # channelist validity check
 
 # Validation reg. exp.
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # reg exp for ip addr
@@ -433,29 +434,29 @@ class DySKTConfigPanel(gui.ConfigPanel):
         """ set up entry widgets """
         nb = Tix.NoteBook(frm)
         nb.add('recon',label='Recon',underline=0)
-        nb.add('coll',label='Collection',underline=0)
+        nb.add('collection',label='Collection',underline=0)
         nb.add('gps',label='GPS',underline=0)
         nb.add('misc',label='Misc.',underline=0)
         nb.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
 
-        # Recon Configuration
-        frmR = Tix.Frame(frm,borderwidth=2,relief='sunken')
+        # Recon Tab Configuration
+        frmR = Tix.Frame(nb.recon)
         frmR.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
-        Tix.Label(frmR,text='RECON').grid(row=0,column=0,columnspan=6,sticky=Tix.W)
-        Tix.Label(frmR,text='NIC: ').grid(row=1,column=0,sticky=Tix.W+Tix.N)
+        #Tix.Label(frmR,text='RECON').grid(row=0,column=0,columnspan=6,sticky=Tix.W)
+        Tix.Label(frmR,text='NIC: ').grid(row=0,column=0,sticky=Tix.W+Tix.N)
         self.txtReconNic = Tix.Entry(frmR,width=5)
-        self.txtReconNic.grid(row=1,column=1,sticky=Tix.W+Tix.N)
-        Tix.Label(frmR,text=' ').grid(row=1,column=2,sticky=Tix.W)
-        Tix.Label(frmR,text='Spoof: ').grid(row=1,column=3,sticky=Tix.W+Tix.N)
+        self.txtReconNic.grid(row=0,column=1,sticky=Tix.W+Tix.N)
+        Tix.Label(frmR,text=' ').grid(row=0,column=2,sticky=Tix.W)
+        Tix.Label(frmR,text='Spoof: ').grid(row=0,column=3,sticky=Tix.W+Tix.N)
         self.txtReconSpoof = Tix.Entry(frmR,width=17)
-        self.txtReconSpoof.grid(row=1,column=4,sticky=Tix.W+Tix.N)
-        Tix.Label(frmR,text='Desc: ').grid(row=2,column=0,sticky=Tix.W+Tix.N)
+        self.txtReconSpoof.grid(row=0,column=4,sticky=Tix.W+Tix.N)
+        Tix.Label(frmR,text='Desc: ').grid(row=1,column=0,sticky=Tix.W+Tix.N)
         self.txtReconDesc = Tix.Text(frmR,width=42,height=3)
-        self.txtReconDesc.grid(row=2,column=1,columnspan=4,sticky=Tix.E)
+        self.txtReconDesc.grid(row=1,column=1,columnspan=4,sticky=Tix.E)
 
         # ANTENNA SUB SECTION
         frmRA = Tix.Frame(frmR,borderwidth=2,relief='sunken')
-        frmRA.grid(row=4,column=1,columnspan=4,sticky=Tix.N+Tix.W)
+        frmRA.grid(row=2,column=1,columnspan=4,sticky=Tix.N+Tix.W)
         # ANTENNA SUBSECTION
         Tix.Label(frmRA,text='ANTENNA(S)').grid(row=0,column=0,columnspan=2,sticky=Tix.W)
         Tix.Label(frmRA,text="Number: ").grid(row=1,column=0,sticky=Tix.W)
@@ -477,7 +478,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self.txtReconAntXYZ.grid(row=3,column=4,sticky=Tix.E)
         # SCAN PATTERN SUB SECTION
         frmRS = Tix.Frame(frmR,borderwidth=2,relief='sunken')
-        frmRS.grid(row=5,column=1,columnspan=4,sticky=Tix.N+Tix.W)
+        frmRS.grid(row=3,column=1,columnspan=4,sticky=Tix.N+Tix.W)
         Tix.Label(frmRS,text="SCAN PATTERN").grid(row=0,column=0,columnspan=5,sticky=Tix.W)
         Tix.Label(frmRS,text="Dwell: ").grid(row=1,column=0,sticky=Tix.W)
         self.txtReconScanDwell = Tix.Entry(frmRS,width=5)
@@ -494,6 +495,60 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self.txtReconScanPass = Tix.Entry(frmRS,width=12)
         self.txtReconScanPass.grid(row=2,column=5,sticky=Tix.E)
 
+        # Collection Tab Configuration
+        frmC = Tix.Frame(nb.collection)
+        frmC.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        Tix.Label(frmC,text='NIC: ').grid(row=0,column=0,sticky=Tix.W+Tix.N)
+        self.txtCollectionNic = Tix.Entry(frmC,width=5)
+        self.txtCollectionNic.grid(row=0,column=1,sticky=Tix.W+Tix.N)
+        Tix.Label(frmC,text=' ').grid(row=0,column=2,sticky=Tix.W)
+        Tix.Label(frmC,text='Spoof: ').grid(row=0,column=3,sticky=Tix.W+Tix.N)
+        self.txtCollectionSpoof = Tix.Entry(frmC,width=17)
+        self.txtCollectionSpoof.grid(row=0,column=4,sticky=Tix.W+Tix.N)
+        Tix.Label(frmC,text='Desc: ').grid(row=1,column=0,sticky=Tix.W+Tix.N)
+        self.txtCollectionDesc = Tix.Text(frmC,width=42,height=3)
+        self.txtCollectionDesc.grid(row=1,column=1,columnspan=4,sticky=Tix.E)
+
+        # ANTENNA SUB SECTION
+        frmCA = Tix.Frame(frmC,borderwidth=2,relief='sunken')
+        frmCA.grid(row=2,column=1,columnspan=4,sticky=Tix.N+Tix.W)
+        # ANTENNA SUBSECTION
+        Tix.Label(frmCA,text='ANTENNA(S)').grid(row=0,column=0,columnspan=2,sticky=Tix.W)
+        Tix.Label(frmCA,text="Number: ").grid(row=1,column=0,sticky=Tix.W)
+        self.txtCollectionAntNum = Tix.Entry(frmCA,width=2)
+        self.txtCollectionAntNum.grid(row=1,column=1,sticky=Tix.W)
+        Tix.Label(frmCA,text='Gain: ').grid(row=2,column=0,sticky=Tix.W)
+        self.txtCollectionAntGain = Tix.Entry(frmCA,width=7)
+        self.txtCollectionAntGain.grid(row=2,column=1,sticky=Tix.W)
+        Tix.Label(frmCA,text=" ").grid(row=2,column=2)
+        Tix.Label(frmCA,text="Type: ").grid(row=2,column=3,sticky=Tix.E)
+        self.txtCollectionAntType = Tix.Entry(frmCA,width=15)
+        self.txtCollectionAntType.grid(row=2,column=4,sticky=Tix.E)
+        Tix.Label(frmCA,text='Loss: ').grid(row=3,column=0,sticky=Tix.W)
+        self.txtCollectionAntLoss = Tix.Entry(frmCA,width=7)
+        self.txtCollectionAntLoss.grid(row=3,column=1,sticky=Tix.W)
+        Tix.Label(frmCA,text=" ").grid(row=3,column=2)
+        Tix.Label(frmCA,text="XYZ: ").grid(row=3,column=3,sticky=Tix.E)
+        self.txtCollectionAntXYZ = Tix.Entry(frmCA,width=15)
+        self.txtCollectionAntXYZ.grid(row=3,column=4,sticky=Tix.E)
+        # SCAN PATTERN SUB SECTION
+        frmCS = Tix.Frame(frmC,borderwidth=2,relief='sunken')
+        frmCS.grid(row=3,column=1,columnspan=4,sticky=Tix.N+Tix.W)
+        Tix.Label(frmCS,text="SCAN PATTERN").grid(row=0,column=0,columnspan=5,sticky=Tix.W)
+        Tix.Label(frmCS,text="Dwell: ").grid(row=1,column=0,sticky=Tix.W)
+        self.txtCollectionScanDwell = Tix.Entry(frmCS,width=5)
+        self.txtCollectionScanDwell.grid(row=1,column=2,sticky=Tix.W)
+        Tix.Label(frmCS,text=" ").grid(row=1,column=3)
+        Tix.Label(frmCS,text="Start: ").grid(row=1,column=4,sticky=Tix.E)
+        self.txtCollectionScanStart = Tix.Entry(frmCS,width=3)
+        self.txtCollectionScanStart.grid(row=1,column=5,sticky=Tix.W)
+        Tix.Label(frmCS,text="Scan: ").grid(row=2,column=0,sticky=Tix.W)
+        self.txtCollectionScanScan = Tix.Entry(frmCS,width=12)
+        self.txtCollectionScanScan.grid(row=2,column=2,sticky=Tix.W)
+        Tix.Label(frmCS,text=" ").grid(row=2,column=3)
+        Tix.Label(frmCS,text="Pass: ").grid(row=2,column=4,sticky=Tix.W)
+        self.txtCollectionScanPass = Tix.Entry(frmCS,width=12)
+        self.txtCollectionScanPass.grid(row=2,column=5,sticky=Tix.E)
 
     def _initialize(self):
         """ insert values from config file into entry boxes """
@@ -540,6 +595,44 @@ class DySKTConfigPanel(gui.ConfigPanel):
         if cp.has_option('Recon','pass'):
             self.txtReconScanPass.insert(0,cp.get('Recon','pass'))
 
+        # then the collection radio details
+        self.txtCollectionNic.delete(0,Tix.END)
+        if cp.has_option('Collection','nic'):
+            self.txtCollectionNic.insert(0,cp.get('Collection','nic'))
+        self.txtCollectionSpoof.delete(0,Tix.END)
+        if cp.has_option('Collection','spoof'):
+            self.txtCollectionSpoof.insert(0,cp.get('Collection','spoof'))
+        self.txtCollectionDesc.delete(1.0,Tix.END)
+        if cp.has_option('Collection','desc'):
+            self.txtCollectionDesc.insert(Tix.END,cp.get('Collection','desc'))
+        self.txtCollectionAntNum.delete(0,Tix.END)
+        if cp.has_option('Collection','antennas'):
+            self.txtCollectionAntNum.insert(0,cp.get('Collection','antennas'))
+        self.txtCollectionAntGain.delete(0,Tix.END)
+        if cp.has_option('Collection','antenna_gain'):
+            self.txtCollectionAntGain.insert(0,cp.get('Collection','antenna_gain'))
+        self.txtCollectionAntType.delete(0,Tix.END)
+        if cp.has_option('Collection','antenna_type'):
+            self.txtCollectionAntType.insert(0,cp.get('Collection','antenna_type'))
+        self.txtCollectionAntLoss.delete(0,Tix.END)
+        if cp.has_option('Collection','antenna_loss'):
+            self.txtCollectionAntLoss.insert(0,cp.get('Collection','antenna_loss'))
+        self.txtCollectionAntXYZ.delete(0,Tix.END)
+        if cp.has_option('Collection','antenna_xyz'):
+            self.txtCollectionAntXYZ.insert(0,cp.get('Collection','antenna_xyz'))
+        self.txtCollectionScanDwell.delete(0,Tix.END)
+        if cp.has_option('Collection','dwell'):
+            self.txtCollectionScanDwell.insert(0,cp.get('Collection','dwell'))
+        self.txtCollectionScanStart.delete(0,Tix.END)
+        if cp.has_option('Collection','scan_start'):
+            self.txtCollectionScanStart.insert(0,cp.get('Collection','scan_start'))
+        self.txtCollectionScanScan.delete(0,Tix.END)
+        if cp.has_option('Collection','scan'):
+            self.txtCollectionScanScan.insert(0,cp.get('Collection','scan'))
+        self.txtCollectionScanPass.delete(0,Tix.END)
+        if cp.has_option('Collection','pass'):
+            self.txtCollectionScanPass.insert(0,cp.get('Collection','pass'))
+
     def _validate(self):
         """ validate entries """
         # start with the recon radio details
@@ -551,15 +644,14 @@ class DySKTConfigPanel(gui.ConfigPanel):
             return False
         elif not nic in wifaces():
             tkMB.showwarning("Not Found",
-                             "Recond radio %s may not be wireless" % nic,
+                             "Recon radio %s may not be wireless" % nic,
                              parent=self)
         spoof = self.txtReconSpoof.get().upper()
-        if re.match(MACADDR,spoof) is None:
-            tkMB.showerror("Invalid Input",
+        if spoof and re.match(MACADDR,spoof) is None:
+            tkMB.showerror("Invalid Recon Input",
                            "Spoofed mac addr %s is not valid" % spoof,
                            parent=self)
             return False
-        #ignore the description -> self.txtReconDesc.delete(1.0,Tix.END)
 
         # process the antennas - if antenna number is > 0 then force validation of
         # all antenna widgets
@@ -571,7 +663,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                         gain = map(float,self.txtReconAntGain.get().split(','))
                         if len(gain) != nA:
                             raise DySKTConfigException('Number of gain and number of antennas do not match')
-                    except:
+                    except ValueError:
                         raise DySKTConfigException('Gain must be float or list of floats')
                     atype = self.txtReconAntType.get().split(',')
                     if len(atype) != nA:
@@ -594,12 +686,12 @@ class DySKTConfigPanel(gui.ConfigPanel):
                     except ValueError:
                         raise DySKTConfigException('XYZ must be integer')
             except ValueError:
-                tkMB.showerror("Invalid Input",
+                tkMB.showerror("Invalid Recon Input",
                                "Number of antennas must be numeric",
                                parent=self)
                 return False
             except DySKTConfigException as e:
-                tkMB.showerror("Invalid Input",e,parent=self)
+                tkMB.showerror("Invalid Recon Input",e,parent=self)
                 return False
 
         # process scan patterns
@@ -607,19 +699,118 @@ class DySKTConfigPanel(gui.ConfigPanel):
         try:
             float(dwell)
         except:
-            tkMB.showerror("Invalid Input", "Scan dwell must be integer",parent=self)
+            tkMB.showerror("Invalid Recon Input", "Scan dwell must be float",parent=self)
             return False
         start = self.txtReconScanStart.get()
         try:
-            if start: int(start)
-        except:
-            tkMB.showerror("Invalid Input", "Scan start must be integer",parent=self)
+            if start:
+                if ':' in start: ch,chw = start.split(':')
+                else:
+                    ch = start
+                    chw = None
+                ch = int(ch)
+                if chw and not chw in IW_CHWS:
+                    raise RuntimeError("Specified channel width %s is not valid" % chw)
+        except ValueError:
+            tkMB.showerror("Invalid Recon Input", "Scan start must be integer",parent=self)
+            return False
+        except Exception as e:
+            tkMB.showerror("Invalid Recon Input",e,parent=self)
             return False
         try:
             parsechlist(self.txtReconScanScan.get(),'scan')
             parsechlist(self.txtReconScanPass.get(),'pass')
         except ValueError as e:
-            tkMB.showerror("Invalid Input",e,parent=self)
+            tkMB.showerror("Invalid Recon Input",e,parent=self)
+            return False
+
+        # then collection radio details
+        nic = self.txtCollectionNic.get()
+        if not nic:
+            tkMB.showerror("Invalid Input",
+                            "The Collection radio nic must be specified",
+                            parent=self)
+            return False
+        elif not nic in wifaces():
+            tkMB.showwarning("Not Found",
+                             "Collectiond radio %s may not be wireless" % nic,
+                             parent=self)
+        spoof = self.txtCollectionSpoof.get().upper()
+        if spoof and re.match(MACADDR,spoof) is None:
+            tkMB.showerror("Invalid Colleciton Input",
+                           "Spoofed mac addr %s is not valid" % spoof,
+                           parent=self)
+            return False
+
+        # process the antennas - if antenna number is > 0 then force validation of
+        # all antenna widgets
+        if self.txtCollectionAntNum.get():
+            try:
+                nA = int(self.txtCollectionAntNum.get())
+                if nA:
+                    try:
+                        gain = map(float,self.txtCollectionAntGain.get().split(','))
+                        if len(gain) != nA:
+                            raise DySKTConfigException('Number of gain and number of antennas do not match')
+                    except ValueError:
+                        raise DySKTConfigException('Gain must be float or list of floats')
+                    atype = self.txtCollectionAntType.get().split(',')
+                    if len(atype) != nA:
+                        raise DySKTConfigException('Number of types and number of antennas do not match')
+                    try:
+                        gain = map(float,self.txtCollectionAntLoss.get().split(','))
+                        if len(gain) != nA:
+                            raise DySKTConfigException('Number of loss and number of antennas do not match')
+                    except:
+                        raise DySKTConfigException('Loss must be float or list of floats')
+                    try:
+                        xyzs = self.txtCollectionAntXYZ.get().split(',')
+                        if len(xyzs) != nA:
+                            raise DySKTConfigException('Number of xyz and number of antennas do not match')
+                        for xyz in xyzs:
+                            xyz = xyz.split(':')
+                            if len(xyz) != 3:
+                                raise DySKTConfigException('XYZ must be three integers')
+                            map(int,xyz)
+                    except ValueError:
+                        raise DySKTConfigException('XYZ must be integer')
+            except ValueError:
+                tkMB.showerror("Invalid Collection Input",
+                               "Number of antennas must be numeric",
+                               parent=self)
+                return False
+            except DySKTConfigException as e:
+                tkMB.showerror("Invalid Collection Input",e,parent=self)
+                return False
+
+        # process scan patterns
+        dwell = self.txtCollectionScanDwell.get()
+        try:
+            float(dwell)
+        except:
+            tkMB.showerror("Invalid Collection Input", "Scan dwell must be float",parent=self)
+            return False
+        start = self.txtCollectionScanStart.get()
+        try:
+            if start:
+                if ':' in start: ch,chw = start.split(':')
+                else:
+                    ch = start
+                    chw = None
+                ch = int(ch)
+                if chw and not chw in IW_CHWS:
+                    raise RuntimeError("Specified channel width %s is not valid" % chw)
+        except ValueError:
+            tkMB.showerror("Invalid Collection Input", "Scan start must be integer",parent=self)
+            return False
+        except Exception as e:
+            tkMB.showerror("Invalid Collection Input",e,parent=self)
+            return False
+        try:
+            parsechlist(self.txtCollectionScanScan.get(),'scan')
+            parsechlist(self.txtCollectionScanPass.get(),'pass')
+        except ValueError as e:
+            tkMB.showerror("Invalid Collection Input",e,parent=self)
             return False
 
         return True

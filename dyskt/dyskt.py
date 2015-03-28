@@ -48,7 +48,7 @@ def parsechlist(pattern,ptype):
       parse channel list pattern of type ptype = oneof {'scan','pass'} and return
       a list of tuples (ch,chwidth)
     """
-    if not pattern: chs,ws = ([],[])
+    if not pattern: chs,ws = [],[]
     else:
         # split the pattern by ch,width separator
         chs,ws = pattern.split(':')
@@ -237,7 +237,7 @@ class DySKT(object):
         # execution loop
         while not self._halt.is_set():
             # get message a tuple: (level,originator,type,message)
-            for key in self._pConns.keys():
+            for key in self._pConns:
                 try:
                     if self._pConns[key].poll():
                         (l,o,t,m) = self._pConns[key].recv()
@@ -288,7 +288,8 @@ class DySKT(object):
                 else:
                     self._conf['collection'] = None
                     logging.info("No collection radio specified")
-            except (ConfigParser.NoSectionError,ConfigParser.NoOptionError,RuntimeError,ValueError):
+            except (ConfigParser.NoSectionError,ConfigParser.NoOptionError,
+                    RuntimeError,ValueError):
                 logging.warning("Invalid collection specification. Continuing without...")
 
             # GPS section
@@ -331,7 +332,7 @@ class DySKT(object):
         """ read in the rtype radio configuration from conf and return parsed dict """
         # don't bother if specified radio is not present
         if not conf.get(rtype,'nic') in wifaces():
-            raise RuntimeError("Radio %s not present/or not wireless" % conf.get(rtype,'nic'))
+            raise RuntimeError("Radio %s not present/not wireless" % conf.get(rtype,'nic'))
 
         # get nic and set role setting default antenna config
         r = {'nic':conf.get(rtype,'nic'),
@@ -346,10 +347,8 @@ class DySKT(object):
              'antennas':{}}
 
         # get optional properties
-        if conf.has_option(rtype,'spoof'):
-            r['spoofed'] = conf.get(rtype,'spoof')
-        if conf.has_option(rtype,'desc'):
-            r['desc'] = conf.get(rtype,'desc')
+        if conf.has_option(rtype,'spoof'): r['spoofed'] = conf.get(rtype,'spoof')
+        if conf.has_option(rtype,'desc'):  r['desc'] = conf.get(rtype,'desc')
 
         # process antennas - get the number first
         try:
@@ -398,7 +397,12 @@ class DySKT(object):
         r['pass'] = parsechlist(conf.get(rtype,'pass'),'pass')
         if conf.has_option(rtype,'scan_start'):
             try:
-                (ch,chw) = conf.get(rtype,'scan_start').split(':')
+                scanspec = conf.get(rtype,'scan_start')
+                if ':' in scanspec:
+                    (ch,chw) = scanspec.split(':')
+                else:
+                    ch = scanspec
+                    chw = None
                 ch = int(ch) if ch else r['scan'][0][0]
                 if not chw in iw.IW_CHWS: chw = r['scan'][0][1]
                 r['scan_start'] = (ch,chw) if (ch,chw) in r['scan'] else r['scan'][0]

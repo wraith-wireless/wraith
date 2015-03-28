@@ -244,11 +244,11 @@ class WraithPanel(gui.MasterPanel):
 #### Wraith Menu
     def configwraith(self):
         """ display config file preference editor """
-        panel = self.getpanels("preferences",False)
+        panel = self.getpanels('preferences',False)
         if not panel:
             t = Tix.Toplevel()
             pnl = subgui.WraithConfigPanel(t,self)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"preferences"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'preferences'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -257,11 +257,11 @@ class WraithPanel(gui.MasterPanel):
 
     def viewdatabins(self):
         """ display the data bins panel """
-        panel = self.getpanels("databin",False)
+        panel = self.getpanels('databin',False)
         if not panel:
             t = Tix.Toplevel()
             pnl = subgui.DataBinPanel(t,self)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"databin"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'databin'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -426,7 +426,7 @@ class WraithPanel(gui.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = gui.TailLogPanel(t,self,"Nidus Log",0.2,wraith.NIDUSLOG)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"niduslog"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'niduslog'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -447,11 +447,11 @@ class WraithPanel(gui.MasterPanel):
 
     def confignidus(self):
         """ display nidus config file preference editor """
-        panel = self.getpanels("nidusprefs",False)
+        panel = self.getpanels('nidusprefs',False)
         if not panel:
             t = Tix.Toplevel()
             pnl = subgui.NidusConfigPanel(t,self)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"nidusprefs"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'nidusprefs'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -499,11 +499,11 @@ class WraithPanel(gui.MasterPanel):
 
     def configdyskt(self):
         """ display dyskt config file preference editor """
-        panel = self.getpanels("dysktprefs",False)
+        panel = self.getpanels('dysktprefs',False)
         if not panel:
             t = Tix.Toplevel()
             pnl = subgui.DySKTConfigPanel(t,self)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"dysktprefs"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'dysktprefs'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -512,11 +512,11 @@ class WraithPanel(gui.MasterPanel):
 
     def about(self):
         """ display the about panel """
-        panel = self.getpanels("about",False)
+        panel = self.getpanels('about',False)
         if not panel:
             t = Tix.Toplevel()
             pnl = subgui.AboutPanel(t,self)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"about"))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'about'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -531,6 +531,12 @@ class WraithPanel(gui.MasterPanel):
         """ opens a panel of type desc """
         if desc == 'log': self.viewlog()
         elif desc == 'databin': self.viewdatabins()
+        elif desc == 'preferences': self.configwraith()
+        elif desc == 'niduslog': self.viewniduslog()
+        elif desc == 'nidusprefs': self.confignidus()
+        elif desc == 'dysktlog': self.viewdysktlog()
+        elif desc == 'dysktprefs': self.configdyskt()
+        elif desc == 'about': self.about()
         else: raise RuntimeError, "WTF Cannot open %s" % desc
 
 #### HELPER FUNCTIONS

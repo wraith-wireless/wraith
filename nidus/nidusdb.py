@@ -1021,9 +1021,9 @@ class ExtractThread(SSEThread):
                 addrs[l2[a]]['loc'].append(i+1)
             else:
                 addrs[l2[a]] = {'loc':[i+1],'id':None}
+        # TODO: cannot remember what the below does
         saddrs = set(addrs.keys())
-        if len(saddrs) != len(addrs.keys()):
-            print 'consume', addrs
+        if len(saddrs) != len(addrs): print 'consume', addrs
 
         # each _insert function will reraise psql related errors after
         # setting the internal err tuple
