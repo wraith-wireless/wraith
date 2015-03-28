@@ -43,6 +43,10 @@ dyskt 0.1.5
  - added regulatory domain setting/resetting capability to sensor
  - modified antenna specification to support more than 1 antenna
  - remove internal.py and the Report class, using just a simple Tuple instead
+ - modified gps poller to send front line trace even in cases of static gps
+   configuration - have to determine if:
+    a) this will slow down RTO
+    b) if it will result in unneccessary db storage
 
 TODO:
      ** After testing remove set raw capability from python **

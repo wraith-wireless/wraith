@@ -333,7 +333,7 @@ class RadioController(mp.Process):
                     self._comms.put((self._vnic,time.time(),'!FRAME!',frame))
                 except socket.error as e:
                     self._comms.put((self._vnic,time.time(),'!FAIL!',e))
-                    self._conn.send(('err',"%s" % self._role,'Socket',e))
+                    self._conn.send(('err',"%s" % self._role,'Socket',e,))
                     break
                 except Exception as e:
                     # blanket 'don't know what happend' exception
