@@ -29,6 +29,7 @@ from wraith.dyskt.rto import RTO                # the rto
 from wraith.dyskt.rdoctl import RadioController # Radio object etc
 from wraith.radio import channels               # channel specifications
 from wraith.radio import iw                     # channel widths and region set/get
+from wraith.radio.iwtools import wifaces        # check for interface presents
 
 #### set up log
 # have to configure absolute path
@@ -41,17 +42,6 @@ class DySKTException(Exception): pass
 class DySKTConfException(DySKTException): pass
 class DySKTParamException(DySKTException): pass
 class DySKTRuntimeException(DySKTException): pass
-
-#### CONSTANTS
-# WASP STATES
-DYSKT_INVALID         = -1 # dyskt is unuseable
-DYSKT_CREATED         =  0 # dyskt is created but not yet started
-DYSKT_RUNNING         =  1 # dyskt is currently executing
-DYSKT_PAUSED_RECON    =  2 # dyskt recon radio is paused
-DYSKT_PAUSED_COLL     =  3 # dyskt collection radio is paused
-DYSKT_PAUSED_BOTH     =  4 # both radios are paused
-DYSKT_EXITING         =  5 # dyskt has finished execution loop
-DYSKT_DESTROYED       =  6 # dyskt is destroyed
 
 def parsechlist(pattern,ptype):
     """
@@ -100,6 +90,16 @@ def parsechlist(pattern,ptype):
 
     return [],[]
 
+# WASP STATES
+DYSKT_INVALID         = -1 # dyskt is unuseable
+DYSKT_CREATED         =  0 # dyskt is created but not yet started
+DYSKT_RUNNING         =  1 # dyskt is currently executing
+DYSKT_PAUSED_RECON    =  2 # dyskt recon radio is paused
+DYSKT_PAUSED_COLL     =  3 # dyskt collection radio is paused
+DYSKT_PAUSED_BOTH     =  4 # both radios are paused
+DYSKT_EXITING         =  5 # dyskt has finished execution loop
+DYSKT_DESTROYED       =  6 # dyskt is destroyed
+
 class DySKT(object):
     """ DySKT - primary process of the Wraith sensor """
     def __init__(self,conf=None):
@@ -133,8 +133,13 @@ class DySKT(object):
         # a RuntimeError failure
         logging.info("Initializing subprocess...")
         try:
-            # set the region? if so, we need to do it prior to starting the
-            # RadioController
+            # start RTO first
+            logging.info("Starting RTO")
+            (conn1,conn2) = mp.Pipe()
+            self._pConns['rto'] = conn1
+            self._rto = RTO(self._ic,conn2,self._conf)
+
+            # set the region? if so, do it prior to starting the RadioController
             rd = self._conf['local']['region']
             if rd:
                 logging.info("Setting regulatory domain to %s",rd)
@@ -161,12 +166,6 @@ class DySKT(object):
                 except RuntimeError as e:
                     # continue without collector, but log it
                     logging.warning("Collection Radio (%s), continuing without",e)
-
-            # RTO
-            logging.info("Starting RTO")
-            (conn1,conn2) = mp.Pipe()
-            self._pConns['rto'] = conn1
-            self._rto = RTO(self._ic,conn2,self._conf)
         except RuntimeError as e:
             # e should have the form "Major:Minor:Description"
             ms = e.message.split(':')
@@ -189,9 +188,9 @@ class DySKT(object):
         self._state = DYSKT_EXITING
 
         # reset regulatory domain if necessary
-        logging.info("Resetting regulatory domain")
         if self._rd:
             try:
+                logging.info("Resetting regulatory domain")
                 iw.regset(self._rd)
                 if iw.regget() != self._rd: raise RuntimeError
             except:
@@ -203,7 +202,7 @@ class DySKT(object):
         logging.info("Stopping Sub-processes")
         self._halt.set()
         self._ic.put(('dyskt',time.time(),'!CHECK!',[]))
-        for key in self._pConns.keys():
+        for key in self._pConns:
             try:
                 self._pConns[key].send('!STOP!')
             except IOError:
@@ -289,7 +288,7 @@ class DySKT(object):
                 else:
                     self._conf['collection'] = None
                     logging.info("No collection radio specified")
-            except (ConfigParser.NoSectionError,ConfigParser.NoOptionError,ValueError):
+            except (ConfigParser.NoSectionError,ConfigParser.NoOptionError,RuntimeError,ValueError):
                 logging.warning("Invalid collection specification. Continuing without...")
 
             # GPS section
@@ -323,15 +322,17 @@ class DySKT(object):
                     logging.warn("Regulatory domain %s is invalid" % reg)
                 else:
                     self._conf['local']['region'] = conf.get('Local','region')
-        except ConfigParser.NoSectionError as e:
+        except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
             raise DySKTConfException("%s" % e)
-        except ConfigParser.NoOptionError as e:
-            raise DySKTConfException("%s" % e)
-        except ValueError as e:
+        except (RuntimeError,ValueError) as e:
             raise DySKTConfException("%s" % e)
 
     def _readradio(self,conf,rtype='Recon'):
         """ read in the rtype radio configuration from conf and return parsed dict """
+        # don't bother if specified radio is not present
+        if not conf.get(rtype,'nic') in wifaces():
+            raise RuntimeError("Radio %s not present/or not wireless" % conf.get(rtype,'nic'))
+
         # get nic and set role setting default antenna config
         r = {'nic':conf.get(rtype,'nic'),
              'spoofed':None,

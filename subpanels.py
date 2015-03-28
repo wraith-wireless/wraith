@@ -445,8 +445,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
         Tix.Label(frmR,text='NIC: ').grid(row=1,column=0,sticky=Tix.W+Tix.N)
         self.txtReconNic = Tix.Entry(frmR,width=5)
         self.txtReconNic.grid(row=1,column=1,sticky=Tix.W+Tix.N)
-        rbtn = Tix.Button(frmR,text='Check',command=lambda:self.checknic(self.txtReconNic))
-        rbtn.grid(row=1,column=2,sticky=Tix.W)
+        Tix.Label(frmR,text=' ').grid(row=1,column=2,sticky=Tix.W)
         Tix.Label(frmR,text='Spoof: ').grid(row=1,column=3,sticky=Tix.W+Tix.N)
         self.txtReconSpoof = Tix.Entry(frmR,width=17)
         self.txtReconSpoof.grid(row=1,column=4,sticky=Tix.W+Tix.N)
@@ -495,67 +494,51 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self.txtReconScanPass = Tix.Entry(frmRS,width=12)
         self.txtReconScanPass.grid(row=2,column=5,sticky=Tix.E)
 
-        # Collection Configuration
-        frmC = Tix.Frame(frm,borderwidth=2,relief='sunken')
-        frmC.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
-
-        # GPS Configuration
-        frmG = Tix.Frame(frm,borderwidth=2,relief='sunken')
-        frmG.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
-
-        # Storage Configuration
-        frmS = Tix.Frame(frm,borderwidth=2,relief='sunken')
-        frmS.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
-
-        # Local configuration
-        frmL = Tix.Frame(frm,borderwidth=2,relief='sunken')
-        frmL.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
 
     def _initialize(self):
         """ insert values from config file into entry boxes """
-        return
-        conf = ConfigParser.RawConfigParser()
-        if not conf.read(wraith.DYSKTCONF):
+        cp = ConfigParser.RawConfigParser()
+        if not cp.read(wraith.DYSKTCONF):
             tkMB.showerror("File Not Found","File dyskt.conf was not found",parent=self)
             return
 
         # start by reading the recon radio details
         self.txtReconNic.delete(0,Tix.END)
-        if conf.has_option('Recon','nic'):
-            self.txtReconNic.insert(0,conf.get('Recon','nic'))
+        if cp.has_option('Recon','nic'):
+            self.txtReconNic.insert(0,cp.get('Recon','nic'))
         self.txtReconSpoof.delete(0,Tix.END)
-        if conf.has_option('Recon','spoof'):
-            self.txtReconSpoof.insert(0,conf.get('Recon','spoof'))
+        if cp.has_option('Recon','spoof'):
+            self.txtReconSpoof.insert(0,cp.get('Recon','spoof'))
         self.txtReconDesc.delete(1.0,Tix.END)
-        if conf.has_option('Recon','desc'):
-            self.txtReconDesc.insert(Tix.END,conf.get('Recon','desc'))
+        if cp.has_option('Recon','desc'):
+            self.txtReconDesc.insert(Tix.END,cp.get('Recon','desc'))
         self.txtReconAntNum.delete(0,Tix.END)
-        if conf.has_option('Recon','antennas'):
-            self.txtReconAntNum.insert(0,conf.get('Recon','antennas'))
+        if cp.has_option('Recon','antennas'):
+            self.txtReconAntNum.insert(0,cp.get('Recon','antennas'))
         self.txtReconAntGain.delete(0,Tix.END)
-        if conf.has_option('Recon','antenna_gain'):
-            self.txtReconAntGain.insert(0,conf.get('Recon','antenna_gain'))
+        if cp.has_option('Recon','antenna_gain'):
+            self.txtReconAntGain.insert(0,cp.get('Recon','antenna_gain'))
         self.txtReconAntType.delete(0,Tix.END)
-        if conf.has_option('Recon','antenna_type'):
-            self.txtReconAntType.insert(0,conf.get('Recon','antenna_type'))
+        if cp.has_option('Recon','antenna_type'):
+            self.txtReconAntType.insert(0,cp.get('Recon','antenna_type'))
         self.txtReconAntLoss.delete(0,Tix.END)
-        if conf.has_option('Recon','antenna_loss'):
-            self.txtReconAntLoss.insert(0,conf.get('Recon','antenna_loss'))
+        if cp.has_option('Recon','antenna_loss'):
+            self.txtReconAntLoss.insert(0,cp.get('Recon','antenna_loss'))
         self.txtReconAntXYZ.delete(0,Tix.END)
-        if conf.has_option('Recon','antenna_xyz'):
-            self.txtReconAntXYZ.insert(0,conf.get('Recon','antenna_xyz'))
+        if cp.has_option('Recon','antenna_xyz'):
+            self.txtReconAntXYZ.insert(0,cp.get('Recon','antenna_xyz'))
         self.txtReconScanDwell.delete(0,Tix.END)
-        if conf.has_option('Recon','dwell'):
-            self.txtReconScanDwell.insert(0,conf.get('Recon','dwell'))
+        if cp.has_option('Recon','dwell'):
+            self.txtReconScanDwell.insert(0,cp.get('Recon','dwell'))
         self.txtReconScanStart.delete(0,Tix.END)
-        if conf.has_option('Recon','scan_start'):
-            self.txtReconScanStart.insert(0,conf.get('Recon','scan_start'))
+        if cp.has_option('Recon','scan_start'):
+            self.txtReconScanStart.insert(0,cp.get('Recon','scan_start'))
         self.txtReconScanScan.delete(0,Tix.END)
-        if conf.has_option('Recon','scan'):
-            self.txtReconScanScan.insert(0,conf.get('Recon','scan'))
+        if cp.has_option('Recon','scan'):
+            self.txtReconScanScan.insert(0,cp.get('Recon','scan'))
         self.txtReconScanPass.delete(0,Tix.END)
-        if conf.has_option('Recon','pass'):
-            self.txtReconScanPass.insert(0,conf.get('Recon','pass'))
+        if cp.has_option('Recon','pass'):
+            self.txtReconScanPass.insert(0,cp.get('Recon','pass'))
 
     def _validate(self):
         """ validate entries """
@@ -662,12 +645,3 @@ class DySKTConfigPanel(gui.ConfigPanel):
             tkMB.showinfo('Success',
                           "Restart for changes to take effect",
                           parent=self)
-
-    def checknic(self,txt):
-        """ validates nic is a wireless network interface """
-        nic = txt.get()
-        if not nic: return
-        if nic in wifaces():
-            tkMB.showinfo('Found',"%s is a valid wireless NIC" % nic,parent=self)
-        else:
-            tkMB.showinfo("Not Found","%s is not present and/or a valid wireless NIC" % nic,parent=self)

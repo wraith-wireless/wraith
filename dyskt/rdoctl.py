@@ -326,7 +326,7 @@ class RadioController(mp.Process):
                 # check for any notifications from tuner thread
                 (event,ts,msg) = self._q.get_nowait()
             except Empty:
-                # no notices from tuner thread, pull of the next frame
+                # no notices from tuner thread, pull off the next frame
                 try:
                     # pull the frame off and pass it on
                     frame = self._s.recv(MAX_MPDU)
@@ -341,6 +341,7 @@ class RadioController(mp.Process):
                     self._conn.send(('err',"%s" % self._role,'Unknown',e))
                     break
             else:
+                print "got token ", event
                 # process the notification
                 if event == '!FAIL!':
                     self._comms.put((self._vnic,ts,'!FAIL!',msg))
@@ -385,6 +386,7 @@ class RadioController(mp.Process):
                 self._tuner = None
 
             # reset the device
+            print "resetting device"
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
@@ -392,7 +394,9 @@ class RadioController(mp.Process):
                     iwt.ifconfig(self._nic,'down')
                     iwt.resethwaddr(self._nic)
                 iwt.ifconfig(self._nic,'up')
+                print "device reset"
             except iw.IWException:
+                print "device reset failed"
                 clean = False
 
             # close socket and connection
