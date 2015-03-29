@@ -1310,11 +1310,11 @@ class ExtractThread(SSEThread):
 
             sql = """
                    insert into reassocreq (fid,client,ap,ess,ibss,cf_pollable,
-                                          cf_poll_req,privacy,short_pre,pbcc,
-                                          ch_agility,spec_mgmt,qos,short_slot,
-                                          apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
-                                          listen_int,cur_ap,ssid,sup_rates,ext_rates,
-                                          vendors))
+                                           cf_poll_req,privacy,short_pre,pbcc,
+                                           ch_agility,spec_mgmt,qos,short_slot,
+                                           apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
+                                           listen_int,cur_ap,ssid,sup_rates,ext_rates,
+                                           vendors)
                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
                   """
