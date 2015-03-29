@@ -1,15 +1,5 @@
 #!/usr/bin/env python
 """ wraith-rt.py - defines the Master(main) Panel of the wraith gui
-
- TODO:
-  1) make tkMessageBox,tkFileDialog and tkSimpleDialog derive match
-    main color scheme
-  4) move display of log panel to after intializiation() so that
-     wraith panel is 'first', leftmost panel - will have to figure out
-     how to save messages from init to later
-  8) need to periodically recheck state -> status of postgres,nidusd and dyskt
-  9) get log panel to scroll automatically
- 10) add labels to frames
 """
 
 #__name__ = 'wraith-rt'
