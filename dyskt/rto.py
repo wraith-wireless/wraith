@@ -44,7 +44,7 @@ class GPSPoller(threading.Thread):
         """ attempt to connect to device if fixed is off """
         if self._conf['fixed']: return # static, do nothing
         try:
-            self._gpsd = gps.gps(self._conf['host'],self._conf['port'])
+            self._gpsd = gps.gps('127.0.0.1',self._conf['port'])
             self._gpsd.stream(gps.WATCH_ENABLE)
         except socket.error as e:
             raise RuntimeError(e)

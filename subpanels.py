@@ -13,7 +13,6 @@ __status__ = 'Development'
 import os                                  # file info etc
 import re                                  # reg. exp.
 import Tix                                 # Tix gui stuff
-import tkMessageBox as tkMB                # info dialogs
 from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
@@ -23,8 +22,9 @@ from wraith.radio.iwtools import wifaces   # check nic validity
 from wraith.dyskt.dyskt import parsechlist # channelist validity check
 
 # Validation reg. exp.
-IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # reg exp for ip addr
-MACADDR = re.compile("^([0-9A-F]{2}:){5}([0-9A-F]{2})$")    # reg exp for mac addr (capital letters only)
+IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr
+MACADDR = re.compile("^([0-9A-F]{2}:){5}([0-9A-F]{2})$")    # re for mac addr (capital letters only)
+GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device id (capital letss only)
 
 class DataBinPanel(gui.SimplePanel):
     """ DataBinPanel - displays a set of data bins for retrieved data storage """
@@ -125,8 +125,7 @@ class WraithConfigPanel(gui.ConfigPanel):
         """ insert values from config file into entry boxes """
         conf = ConfigParser.RawConfigParser()
         if not conf.read(wraith.WRAITHCONF):
-            tkMB.showerror("File Not Found","File wraith.conf was not found",
-                           parent=self)
+            self.err("File Not Found","File wraith.conf was not found")
             return
 
         # in case the conf file is invalid, set to empty if not present
@@ -164,24 +163,16 @@ class WraithConfigPanel(gui.ConfigPanel):
         """ validate entries """
         host = self.txtHost.get()
         if re.match(IPADDR,host) is None and host != 'localhost':
-            tkMB.showerror("Invalid Input",
-                           "Host %s is not valid" % host,
-                           parent=self)
+            self.err("Invalid Input","Host %s is not valid" % host)
             return False
         if len(self.txtDB.get()) < 1 or len(self.txtDB.get()) > 15:
-            tkMB.showerror("Invalid Input",
-                           "DB name must be between 1 and 15 characters",
-                           parent=self)
+            self.err("Invalid Input","DB name must be between 1 and 15 characters")
             return False
         if len(self.txtUser.get()) < 1 or len(self.txtUser.get()) > 15:
-            tkMB.showerror("Invalid Input",
-                           "User name must be between 1 and 15 characters",
-                           parent=self)
+            self.err("Invalid Input","User name must be between 1 and 15 characters")
             return False
         if len(self.txtPWD.get()) < 1 or len(self.txtPWD.get()) > 15:
-            tkMB.showerror("Invalid Input",
-                           "Password must be between 1 and 15 characters",
-                           parent=self)
+            self.err("Invalid Input","Password must be between 1 and 15 characters")
             return False
         return True
 
@@ -206,17 +197,11 @@ class WraithConfigPanel(gui.ConfigPanel):
             conf.write(fout)
             fout.close()
         except IOError as e:
-            tkMB.showerror("File Error",
-                           "Error <%s> writing to config file" % e,
-                           parent=self)
+            self.err("File Error","Error <%s> writing to config file" % e)
         except ConfigParser.Error as e:
-            tkMB.showerror("Configuration Error",
-                           "Error <%s> writing to config file" % e,
-                           parent=self)
+            self.err("Configuration Error","Error <%s> writing to config file" % e)
         else:
-            tkMB.showinfo('Success',
-                          "Restart for changes to take effect",
-                          parent=self)
+            self.info('Success',"Restart for changes to take effect")
 
 class NidusConfigPanel(gui.ConfigPanel):
     """ Display Nidus Configuration Panel """
@@ -275,9 +260,7 @@ class NidusConfigPanel(gui.ConfigPanel):
         """ insert values from config file into entry boxes """
         conf = ConfigParser.RawConfigParser()
         if not conf.read(wraith.NIDUSCONF):
-            tkMB.showerror("File Not Found",
-                           "File nidus.conf was not found",
-                           parent=self)
+            self.err("File Not Found","nidus.conf was not found")
             return
 
         # in case the conf file is invalid, set to empty if not present
@@ -287,7 +270,7 @@ class NidusConfigPanel(gui.ConfigPanel):
             private = int(conf.getboolean('SSE','save_private'))
         except:
             save = 0
-            private  =0
+            private = 0
         self.txtPCAPPath.delete(0,Tix.END)
         if conf.has_option('SSE','save_path'):
             self.txtPCAPPath.insert(0,conf.get('SSE','save_path'))
@@ -329,62 +312,40 @@ class NidusConfigPanel(gui.ConfigPanel):
             if not os.path.isabs(pPCAP):
                 pPCAP = os.path.abspath(os.path.join('nidus',pPCAP))
             if not os.path.exists(pPCAP):
-                tkMB.showerror("Invalid Input",
-                               "PCAP directory %s does not exist" % pPCAP,
-                               parent=self)
+                self.err("Invalid Input","PCAP directory %s does not exist" % pPCAP)
                 return False
             try:
-                sz = int(self.txtMaxSz.get())
-                if sz < 1:
-                    tkMB.showerror("Invalid Input",
-                                   "Max Size must be >= 1",
-                                   parent=self)
+                if int(self.txtMaxSz.get()) < 1:
+                    self.err("Invalid Input","Max Size must be >= 1")
                     return False
             except ValueError:
-                tkMB.showerror("Invalid Input",
-                               "Max Size must be an integer",
-                               parent=self)
+                self.err("Invalid Input","Max Size must be an integer")
                 return False
             try:
-                sz = int(self.txtMaxFiles.get())
-                if sz < 1:
-                    tkMB.showerror("Invalid Input",
-                                   "Max Files must be >= 1",
-                                   parent=self)
+                if int(self.txtMaxFiles.get()) < 1:
+                    self.err("Invalid Input","Max Files must be >= 1")
                     return False
             except ValueError:
-                tkMB.showerror("Invalid Input",
-                               "Max files must be an integer",
-                               parent=self)
+                self.err("Invalid Input","Max files must be an integer")
                 return False
         try:
             st = int(self.txtNumStore.get())
             if st < 1 or st > 10:
-                tkMB.showerror("Invalid Input",
-                               "Number of store threads must be between 1 and 10",
-                               parent=self)
+                self.err("Invalid Input","Number of store threads must be between 1 and 10")
                 return False
         except ValueError:
-            tkMB.showerror("Invalid Input",
-                           "Number of store threads must be an integer",
-                           parent=self)
+            self.err("Invalid Input","Number of store threads must be an integer")
             return False
         try:
             et = int(self.txtNumExtract.get())
             if et < 1 or et > 10:
-                tkMB.showerror("Invalid Input",
-                               "Number of extract threads must be between 1 and 10",
-                               parent=self)
+                self.err("Invalid Input","Number of extract threads must be between 1 and 10")
                 return False
         except ValueError:
-            tkMB.showerror("Invalid Input",
-                           "Number of extract threads must be an integer",
-                           parent=self)
+            self.err("Invalid Input","Number of extract threads must be an integer")
             return False
         if not os.path.isfile(self.txtOUIPath.get()):
-            tkMB.showerror("Invalid Input",
-                           "OUI file %s is not valid" % self.txtOUIPath.get(),
-                           parent=self)
+            self.err("Invalid Input","OUI file %s is not valid" % self.txtOUIPath.get())
             return False
         return True
 
@@ -412,17 +373,11 @@ class NidusConfigPanel(gui.ConfigPanel):
             conf.write(fout)
             fout.close()
         except IOError as e:
-            tkMB.showerror("File Error",
-                           "Error <%s> writing to config file" % e,
-                           parent=self)
+            self.err("File Error","Error <%s> writing to config file" % e)
         except ConfigParser.Error as e:
-            tkMB.showerror("Configuration Error",
-                           "Error <%s> writing to config file" % e,
-                           parent=self)
+            self.err("Configuration Error","Error <%s> writing to config file" % e)
         else:
-            tkMB.showinfo('Success',
-                          "Changes will take effect on next start",
-                          parent=self)
+            self.info('Success',"Changes will take effect on next start")
 
 class DySKTConfigException(Exception): pass
 class DySKTConfigPanel(gui.ConfigPanel):
@@ -433,16 +388,15 @@ class DySKTConfigPanel(gui.ConfigPanel):
     def _makegui(self,frm):
         """ set up entry widgets """
         nb = Tix.NoteBook(frm)
-        nb.add('recon',label='Recon',underline=0)
-        nb.add('collection',label='Collection',underline=0)
-        nb.add('gps',label='GPS',underline=0)
-        nb.add('misc',label='Misc.',underline=0)
+        nb.add('recon',label='Recon')
+        nb.add('collection',label='Collection')
+        nb.add('gps',label='GPS')
+        nb.add('misc',label='Misc.')
         nb.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
 
         # Recon Tab Configuration
         frmR = Tix.Frame(nb.recon)
         frmR.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
-        #Tix.Label(frmR,text='RECON').grid(row=0,column=0,columnspan=6,sticky=Tix.W)
         Tix.Label(frmR,text='NIC: ').grid(row=0,column=0,sticky=Tix.W+Tix.N)
         self.txtReconNic = Tix.Entry(frmR,width=5)
         self.txtReconNic.grid(row=0,column=1,sticky=Tix.W+Tix.N)
@@ -550,11 +504,57 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self.txtCollectionScanPass = Tix.Entry(frmCS,width=12)
         self.txtCollectionScanPass.grid(row=2,column=5,sticky=Tix.E)
 
+        # GPS Tab Configuration
+        # use a checkbutton & two subframes to differentiate betw/ fixed & dyanmic
+        frmG = Tix.Frame(nb.gps)
+        frmG.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        self.gvar = Tix.IntVar()
+        self.chkFixed = Tix.Checkbutton(frmG,text="Fixed",border=0,
+                                        variable=self.gvar,
+                                        command=self.gpscb)
+        self.chkFixed.grid(row=0,column=0,sticky=Tix.W)
+
+        # separate dynamic and fixed
+        frmGF = Tix.Frame(frmG,borderwidth=1,relief='sunken')
+        frmGF.grid(row=1,column=0,sticky=Tix.W+Tix.N)
+        Tix.Label(frmGF,text="FIXED").grid(row=0,column=0,sticky=Tix.W)
+        Tix.Label(frmGF,text="Lat: ").grid(row=1,column=0,sticky=Tix.W)
+        self.txtLat = Tix.Entry(frmGF,width=10)
+        self.txtLat.grid(row=1,column=1,sticky=Tix.W)
+        Tix.Label(frmGF,text="Lon: ").grid(row=2,column=0,sticky=Tix.W)
+        self.txtLon = Tix.Entry(frmGF,width=10)
+        self.txtLon.grid(row=2,column=1,sticky=Tix.W)
+        Tix.Label(frmGF,text="Alt: ").grid(row=3,column=0,sticky=Tix.W)
+        self.txtAlt = Tix.Entry(frmGF,width=10)
+        self.txtAlt.grid(row=3,column=1,sticky=Tix.W)
+        Tix.Label(frmGF,text="Heading: ").grid(row=4,column=0,sticky=Tix.W)
+        self.txtHeading = Tix.Entry(frmGF,width=3)
+        self.txtHeading.grid(row=4,column=1,sticky=Tix.W)
+        Tix.Label(frmG,text=' ').grid(row=0,column=1) # separate the frames
+        frmGD = Tix.Frame(frmG,borderwidth=1,relief='sunken')
+        frmGD.grid(row=1,column=2,sticky=Tix.E+Tix.N)
+        Tix.Label(frmGD,text="DYNAMIC").grid(row=0,column=0,sticky=Tix.W)
+        Tix.Label(frmGD,text="Port: ").grid(row=1,column=0,sticky=Tix.W)
+        self.txtPort = Tix.Entry(frmGD,width=5)
+        self.txtPort.grid(row=1,column=1,sticky=Tix.W)
+        Tix.Label(frmGD,text="Dev ID: ").grid(row=2,column=0,sticky=Tix.W)
+        self.txtDevID = Tix.Entry(frmGD,width=9)
+        self.txtDevID.grid(row=2,column=1,sticky=Tix.W)
+        Tix.Label(frmGD,text="Poll: ").grid(row=3,column=0,sticky=Tix.W)
+        self.txtPoll = Tix.Entry(frmGD,width=5)
+        self.txtPoll.grid(row=3,column=1,sticky=Tix.W)
+        Tix.Label(frmGD,text="EPX: ").grid(row=4,column=0,sticky=Tix.W)
+        self.txtEPX = Tix.Entry(frmGD,width=5)
+        self.txtEPX.grid(row=4,column=1,sticky=Tix.W)
+        Tix.Label(frmGD,text="EPY: ").grid(row=5,column=0,sticky=Tix.W)
+        self.txtEPY = Tix.Entry(frmGD,width=5)
+        self.txtEPY.grid(row=5,column=1,sticky=Tix.W)
+
     def _initialize(self):
         """ insert values from config file into entry boxes """
         cp = ConfigParser.RawConfigParser()
         if not cp.read(wraith.DYSKTCONF):
-            tkMB.showerror("File Not Found","File dyskt.conf was not found",parent=self)
+            self.err("File Not Found","File dyskt.conf was not found")
             return
 
         # start by reading the recon radio details
@@ -633,24 +633,44 @@ class DySKTConfigPanel(gui.ConfigPanel):
         if cp.has_option('Collection','pass'):
             self.txtCollectionScanPass.insert(0,cp.get('Collection','pass'))
 
+        # gps entries
+        try:
+            fixed = int(cp.getboolean('GPS','fixed'))
+        except:
+            fixed = 0
+        self.gvar.set(fixed)
+        self.txtLat.delete(0,Tix.END)
+        if cp.has_option('GPS','lat'): self.txtLat.insert(0,cp.get('GPS','lat'))
+        self.txtLon.delete(0,Tix.END)
+        if cp.has_option('GPS','lon'): self.txtLon.insert(0,cp.get('GPS','lon'))
+        self.txtAlt.delete(0,Tix.END)
+        if cp.has_option('GPS','alt'): self.txtAlt.insert(0,cp.get('GPS','alt'))
+        self.txtHeading.delete(0,Tix.END)
+        if cp.has_option('GPS','heading'): self.txtHeading.insert(0,cp.get('GPS','heading'))
+        self.txtPort.delete(0,Tix.END)
+        if cp.has_option('GPS','port'): self.txtPort.insert(0,cp.get('GPS','port'))
+        self.txtDevID.delete(0,Tix.END)
+        if cp.has_option('GPS','devid'): self.txtDevID.insert(0,cp.get('GPS','devid'))
+        self.txtPoll.delete(0,Tix.END)
+        if cp.has_option('GPS','poll'): self.txtPoll.insert(0,cp.get('GPS','poll'))
+        self.txtEPX.delete(0,Tix.END)
+        if cp.has_option('GPS','epx'): self.txtEPX.insert(0,cp.get('GPS','epx'))
+        self.txtEPY.delete(0,Tix.END)
+        if cp.has_option('GPS','epy'): self.txtEPY.insert(0,cp.get('GPS','epy'))
+        self.gpscb() # enable/disable entries
+
     def _validate(self):
         """ validate entries """
         # start with the recon radio details
         nic = self.txtReconNic.get()
         if not nic:
-            tkMB.showerror("Invalid Input",
-                            "The Recon radio nic must be specified",
-                            parent=self)
+            self.err("Invalid Recon Input","Radio nic must be specified")
             return False
         elif not nic in wifaces():
-            tkMB.showwarning("Not Found",
-                             "Recon radio %s may not be wireless" % nic,
-                             parent=self)
+            self.warn("Not Found","Recon radio may not be wireless")
         spoof = self.txtReconSpoof.get().upper()
         if spoof and re.match(MACADDR,spoof) is None:
-            tkMB.showerror("Invalid Recon Input",
-                           "Spoofed mac addr %s is not valid" % spoof,
-                           parent=self)
+            self.err("Invalid Recon Input","Spoofed MAC addr %s is not valid")
             return False
 
         # process the antennas - if antenna number is > 0 then force validation of
@@ -660,46 +680,40 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 nA = int(self.txtReconAntNum.get())
                 if nA:
                     try:
-                        gain = map(float,self.txtReconAntGain.get().split(','))
-                        if len(gain) != nA:
-                            raise DySKTConfigException('Number of gain and number of antennas do not match')
+                        if len(map(float,self.txtReconAntGain.get().split(','))) != nA:
+                            raise DySKTConfigException("Number of gain is invalid")
                     except ValueError:
-                        raise DySKTConfigException('Gain must be float or list of floats')
-                    atype = self.txtReconAntType.get().split(',')
-                    if len(atype) != nA:
-                        raise DySKTConfigException('Number of types and number of antennas do not match')
+                        raise DySKTConfigException("Gain must be float or list of floats")
+                    if len(self.txtReconAntType.get().split(',')) != nA:
+                        raise DySKTConfigException("Number of types is invalid")
                     try:
-                        gain = map(float,self.txtReconAntLoss.get().split(','))
-                        if len(gain) != nA:
-                            raise DySKTConfigException('Number of loss and number of antennas do not match')
+                        if len(map(float,self.txtReconAntLoss.get().split(','))) != nA:
+                            raise DySKTConfigException("Number of loss is invalid")
                     except:
-                        raise DySKTConfigException('Loss must be float or list of floats')
+                        raise DySKTConfigException("Loss must be float or list of floats")
                     try:
                         xyzs = self.txtReconAntXYZ.get().split(',')
                         if len(xyzs) != nA:
-                            raise DySKTConfigException('Number of xyz and number of antennas do not match')
+                            raise DySKTConfigException("Number of xyz is invalid")
                         for xyz in xyzs:
                             xyz = xyz.split(':')
                             if len(xyz) != 3:
-                                raise DySKTConfigException('XYZ must be three integers')
+                                raise DySKTConfigException("XYZ must be three integers")
                             map(int,xyz)
                     except ValueError:
                         raise DySKTConfigException('XYZ must be integer')
             except ValueError:
-                tkMB.showerror("Invalid Recon Input",
-                               "Number of antennas must be numeric",
-                               parent=self)
+                self.err("Invalid Recon Input","Number of antennas must be numeric")
                 return False
             except DySKTConfigException as e:
-                tkMB.showerror("Invalid Recon Input",e,parent=self)
+                self.err("Invalid Recon Input",e)
                 return False
 
         # process scan patterns
-        dwell = self.txtReconScanDwell.get()
         try:
-            float(dwell)
+            float(self.txtReconScanDwell.get())
         except:
-            tkMB.showerror("Invalid Recon Input", "Scan dwell must be float",parent=self)
+            self.err("Invalid Recon Input","Scan dwell must be float")
             return False
         start = self.txtReconScanStart.get()
         try:
@@ -710,36 +724,30 @@ class DySKTConfigPanel(gui.ConfigPanel):
                     chw = None
                 ch = int(ch)
                 if chw and not chw in IW_CHWS:
-                    raise RuntimeError("Specified channel width %s is not valid" % chw)
+                    raise RuntimeError("Specified channel width is not valid")
         except ValueError:
-            tkMB.showerror("Invalid Recon Input", "Scan start must be integer",parent=self)
+            self.err("Invalid Recon Input","Scan start must be integer")
             return False
         except Exception as e:
-            tkMB.showerror("Invalid Recon Input",e,parent=self)
+            self.err("Invalid Recon Input",e)
             return False
         try:
             parsechlist(self.txtReconScanScan.get(),'scan')
             parsechlist(self.txtReconScanPass.get(),'pass')
         except ValueError as e:
-            tkMB.showerror("Invalid Recon Input",e,parent=self)
+            self.err("Invalid Recon Input",e)
             return False
 
         # then collection radio details
         nic = self.txtCollectionNic.get()
         if not nic:
-            tkMB.showerror("Invalid Input",
-                            "The Collection radio nic must be specified",
-                            parent=self)
+            self.err("Invalid Collection Input","The Collection radio nic must be specified")
             return False
         elif not nic in wifaces():
-            tkMB.showwarning("Not Found",
-                             "Collectiond radio %s may not be wireless" % nic,
-                             parent=self)
+            self.warn("Not Found","Radio may not be wireless")
         spoof = self.txtCollectionSpoof.get().upper()
         if spoof and re.match(MACADDR,spoof) is None:
-            tkMB.showerror("Invalid Colleciton Input",
-                           "Spoofed mac addr %s is not valid" % spoof,
-                           parent=self)
+            self.err("Invalid Colleciton Input","Spoofed MAC address is not valid")
             return False
 
         # process the antennas - if antenna number is > 0 then force validation of
@@ -749,46 +757,40 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 nA = int(self.txtCollectionAntNum.get())
                 if nA:
                     try:
-                        gain = map(float,self.txtCollectionAntGain.get().split(','))
-                        if len(gain) != nA:
-                            raise DySKTConfigException('Number of gain and number of antennas do not match')
+                        if len(map(float,self.txtCollectionAntGain.get().split(','))) != nA:
+                            raise DySKTConfigException("Number of gain is invalid")
                     except ValueError:
-                        raise DySKTConfigException('Gain must be float or list of floats')
-                    atype = self.txtCollectionAntType.get().split(',')
-                    if len(atype) != nA:
-                        raise DySKTConfigException('Number of types and number of antennas do not match')
+                        raise DySKTConfigException("Gain must be float or list of floats")
+                    if len(self.txtCollectionAntType.get().split(',')) != nA:
+                        raise DySKTConfigException("Number of types is invalid")
                     try:
-                        gain = map(float,self.txtCollectionAntLoss.get().split(','))
-                        if len(gain) != nA:
-                            raise DySKTConfigException('Number of loss and number of antennas do not match')
+                        if len(map(float,self.txtCollectionAntLoss.get().split(','))) != nA:
+                            raise DySKTConfigException("Number of loss is invalid")
                     except:
-                        raise DySKTConfigException('Loss must be float or list of floats')
+                        raise DySKTConfigException("Loss must be float or list of floats")
                     try:
                         xyzs = self.txtCollectionAntXYZ.get().split(',')
                         if len(xyzs) != nA:
-                            raise DySKTConfigException('Number of xyz and number of antennas do not match')
+                            raise DySKTConfigException("Number of xyz is invalid")
                         for xyz in xyzs:
                             xyz = xyz.split(':')
                             if len(xyz) != 3:
-                                raise DySKTConfigException('XYZ must be three integers')
+                                raise DySKTConfigException("XYZ must be three integers")
                             map(int,xyz)
                     except ValueError:
-                        raise DySKTConfigException('XYZ must be integer')
+                        raise DySKTConfigException("XYZ must be integer")
             except ValueError:
-                tkMB.showerror("Invalid Collection Input",
-                               "Number of antennas must be numeric",
-                               parent=self)
+                self.err("Invalid Collection Input","Number of antennas must be numeric")
                 return False
             except DySKTConfigException as e:
-                tkMB.showerror("Invalid Collection Input",e,parent=self)
+                self.err("Invalid Collection Input",e)
                 return False
 
         # process scan patterns
-        dwell = self.txtCollectionScanDwell.get()
         try:
-            float(dwell)
+            float(self.txtCollectionScanDwell.get())
         except:
-            tkMB.showerror("Invalid Collection Input", "Scan dwell must be float",parent=self)
+            self.err("Invalid Collection Input", "Scan dwell must be float")
             return False
         start = self.txtCollectionScanStart.get()
         try:
@@ -799,19 +801,70 @@ class DySKTConfigPanel(gui.ConfigPanel):
                     chw = None
                 ch = int(ch)
                 if chw and not chw in IW_CHWS:
-                    raise RuntimeError("Specified channel width %s is not valid" % chw)
+                    raise RuntimeError("Specified channel width is not valid")
         except ValueError:
-            tkMB.showerror("Invalid Collection Input", "Scan start must be integer",parent=self)
+            self.err("Invalid Collection Input", "Scan start must be integer")
             return False
         except Exception as e:
-            tkMB.showerror("Invalid Collection Input",e,parent=self)
+            self.err("Invalid Collection Input",e)
             return False
         try:
             parsechlist(self.txtCollectionScanScan.get(),'scan')
             parsechlist(self.txtCollectionScanPass.get(),'pass')
         except ValueError as e:
-            tkMB.showerror("Invalid Collection Input",e,parent=self)
+            self.err("Invalid Collection Input",e)
             return False
+
+        # gps - only process enabled widgets
+        if self.gvar.get():
+            # fixed is set
+            try:
+                float(self.txtLat.get())
+                float(self.txtLon.get())
+            except:
+                self.err("Invalid GPS Input","Lat/Lon must be floats")
+                return False
+            try:
+                float(self.txtAlt.get())
+            except:
+                self.err("Invalid GPS Input","Altitude must be a float")
+                return False
+            hdg = self.txtHeading.get()
+            try:
+                hdg = int(hdg)
+                if hdg < 0 or hdg > 360: raise RuntimeError("")
+            except ValueError as e:
+                self.err("Invalid GPS Input","Heading must be an integer")
+                return False
+            except:
+                self.err("Invalid GPS Input","Heading must be between 0 and 360")
+                return False
+        else:
+            # dynamic is set
+            port = self.txtPort.get()
+            try:
+                port = int(port)
+                if port < 1024 or port > 65535: raise RuntimeError("")
+            except ValueError:
+                self.err("Invalid GPS Input","Device port must be an integer")
+                return False
+            except:
+                self.err("Invalid GPS Input","Port must be between 1024 and 65535")
+                return False
+            if re.match(GPSDID,self.txtDevID.get().upper()) is None:
+                self.err("Invalid GPS Input","GPS Dev ID is invalid")
+                return False
+            try:
+                if float(self.txtPoll.get()) < 0: raise RuntimeError("")
+            except:
+                self.err("Invalid GPS Input","Poll must be numeric and greater than 0")
+                return False
+            try:
+                float(self.txtEPX.get())
+                float(self.txtEPY.get())
+            except:
+                self.err("Invalid GPS Input","EPX/EPY must be numeric or 'inf'")
+                return False
 
         return True
 
@@ -825,14 +878,33 @@ class DySKTConfigPanel(gui.ConfigPanel):
             conf.write(fout)
             fout.close()
         except IOError as e:
-            tkMB.showerror("File Error",
-                           "Error <%s> writing to config file" % e,
-                           parent=self)
+            self.err("File Error","Error <%s> writing to config file" % e)
         except ConfigParser.Error as e:
-            tkMB.showerror("Configuration Error",
-                           "Error <%s> writing to config file" % e,
-                           parent=self)
+            self.err("Configuration Error","Error <%s> writing to config file" % e)
         else:
-            tkMB.showinfo('Success',
-                          "Restart for changes to take effect",
-                          parent=self)
+            self.info('Success',"Restart for changes to take effect")
+
+    def gpscb(self):
+        """ enable/disable gps entries as necessary """
+        if self.gvar.get():
+            # fixed is on enable only fixed entries
+            self.txtLat.configure(state=Tix.NORMAL)
+            self.txtLon.configure(state=Tix.NORMAL)
+            self.txtAlt.configure(state=Tix.NORMAL)
+            self.txtHeading.configure(state=Tix.NORMAL)
+            self.txtPort.configure(state=Tix.DISABLED)
+            self.txtDevID.configure(state=Tix.DISABLED)
+            self.txtPoll.configure(state=Tix.DISABLED)
+            self.txtEPX.configure(state=Tix.DISABLED)
+            self.txtEPY.configure(state=Tix.DISABLED)
+        else:
+            # fixed is off enable only dynamic entries
+            self.txtLat.configure(state=Tix.DISABLED)
+            self.txtLon.configure(state=Tix.DISABLED)
+            self.txtAlt.configure(state=Tix.DISABLED)
+            self.txtHeading.configure(state=Tix.DISABLED)
+            self.txtPort.configure(state=Tix.NORMAL)
+            self.txtDevID.configure(state=Tix.NORMAL)
+            self.txtPoll.configure(state=Tix.NORMAL)
+            self.txtEPX.configure(state=Tix.NORMAL)
+            self.txtEPY.configure(state=Tix.NORMAL)

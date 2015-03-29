@@ -25,7 +25,6 @@ import os                                  # file info etc
 import time                                # sleeping, timestamps
 import psycopg2 as psql                    # postgresql api
 import Tix                                 # Tix gui stuff
-import tkMessageBox as tkMB                # info dialogs
 import ConfigParser                        # config file parsing
 import wraith                              # version info
 import wraith.widgets.panel as gui         # graphics suite
@@ -368,8 +367,7 @@ class WraithPanel(gui.MasterPanel):
         # and a sensor is not running, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if flags['store'] and flags['conn'] and not flags['dyskt']:
-            ans = tkMB.askquestion('Delete Records','Delete all DB records?',
-                                   parent=self)
+            ans = self.ask('Delete Records','Delete all DB records?')
             if ans == 'no': return
             curs = None
             try:
@@ -381,8 +379,7 @@ class WraithPanel(gui.MasterPanel):
                 self.logwrite("Deleted all records")
             except psql.Error as e:
                 self._conn.rollback()
-                self.logwrite("Failed to delete records <%s: %s>" % (e.pgcode,e.pgerror),
-                              gui.LOG_ERR)
+                self.logwrite("Delete Failed<%s: %s>" % (e.pgcode,e.pgerror),gui.LOG_ERR)
             finally:
                 if curs: curs.close()
 
@@ -436,8 +433,7 @@ class WraithPanel(gui.MasterPanel):
         # prompt first
         finfo = os.stat(wraith.NIDUSLOG)
         if finfo.st_size > 0:
-            ans = tkMB.askquestion("Clear Log","Clear contents of Nidus log?",
-                                   parent=self)
+            ans = self.ask("Clear Log","Clear contents of Nidus log?")
             if ans == 'no': return
             lv = self.getpanel('niduslog')
             #if lv: lv.close()
@@ -490,8 +486,7 @@ class WraithPanel(gui.MasterPanel):
         # prompt first
         finfo = os.stat(wraith.DYSKTLOG)
         if finfo.st_size > 0:
-            ans = tkMB.askquestion("Clear Log","Clear contents of DySKT log?",
-                                   parent=self)
+            ans = self.ask("Clear Log","Clear contents of DySKT log?")
             if ans == 'no': return
             with open(wraith.DYSKTLOG,'w'): pass
             lv = self.getpanel('dysktlog')
@@ -771,7 +766,7 @@ class WraithPanel(gui.MasterPanel):
         # if DySKT is running, prompt for clearance
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if flags['dyskt']:
-            ans = tkMB.askquestion('DySKT Running','Quit and lose queued data?',parent=self)
+            ans = self.ask('DySKT Running','Quit and lose queued data?')
             if ans == 'no': return
 
         # return if no storage component is running
@@ -919,6 +914,6 @@ if __name__ == 'wraith-rt':
     t.option_add('*activeBackground','black')         # bg on mouseover
     t.option_add('*activeForeground','blue')          # fg on mouseover
     t.option_add('*disabledForeground','gray')        # fg on disabled widget
-    t.option_add('*disabledBackground','black')       # bg on disabled widget
+    t.option_add('*disabledBackground','gray')       # bg on disabled widget
     t.option_add('*troughColor','black')              # trough on scales/scrollbars
     WraithPanel(t).mainloop()

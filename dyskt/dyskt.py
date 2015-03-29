@@ -294,20 +294,18 @@ class DySKT(object):
 
             # GPS section
             self._conf['gps'] = {}
-            if conf.has_section('GPS'):
-                self._conf['gps']['fixed'] = conf.getboolean('GPS','fixed')
-                if self._conf['gps']['fixed']:
-                    self._conf['gps']['lat'] = conf.getfloat('GPS','lat')
-                    self._conf['gps']['lon'] = conf.getfloat('GPS','lon')
-                    self._conf['gps']['alt'] = conf.getfloat('GPS','alt')
-                    self._conf['gps']['dir'] = conf.getfloat('GPS','heading')
-                else:
-                    self._conf['gps']['host'] = conf.get('GPS','host')
-                    self._conf['gps']['port'] = conf.getint('GPS','port')
-                    self._conf['gps']['id'] = conf.get('GPS','devid')
-                    self._conf['gps']['poll'] = conf.getfloat('GPS','poll')
-                    self._conf['gps']['epx'] = conf.getfloat('GPS','epx')
-                    self._conf['gps']['epy'] = conf.getfloat('GPS','epy')
+            self._conf['gps']['fixed'] = conf.getboolean('GPS','fixed')
+            if self._conf['gps']['fixed']:
+                self._conf['gps']['lat'] = conf.getfloat('GPS','lat')
+                self._conf['gps']['lon'] = conf.getfloat('GPS','lon')
+                self._conf['gps']['alt'] = conf.getfloat('GPS','alt')
+                self._conf['gps']['dir'] = conf.getfloat('GPS','heading')
+            else:
+                self._conf['gps']['port'] = conf.getint('GPS','port')
+                self._conf['gps']['id'] = conf.get('GPS','devid')
+                self._conf['gps']['poll'] = conf.getfloat('GPS','poll')
+                self._conf['gps']['epx'] = conf.getfloat('GPS','epx')
+                self._conf['gps']['epy'] = conf.getfloat('GPS','epy')
 
             # Storage section
             self._conf['store'] = {'host':conf.get('Storage','host'),
