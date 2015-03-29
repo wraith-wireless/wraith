@@ -550,6 +550,32 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self.txtEPY = Tix.Entry(frmGD,width=5)
         self.txtEPY.grid(row=5,column=1,sticky=Tix.W)
 
+        # misc tab
+        frmM = Tix.Frame(nb.misc)
+        frmM.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        frmMS = Tix.Frame(frmM,border=1,relief='sunken')
+        frmMS.grid(row=0,column=0,sticky=Tix.W)
+        Tix.Label(frmMS,text='STORAGE').grid(row=0,column=0,sticky=Tix.W)
+        self.cvar = Tix.IntVar()
+        self.chkCollated = Tix.Checkbutton(frmMS,text='Collated',border=0,variable=self.cvar)
+        self.chkCollated.grid(row=1,column=0,sticky=Tix.W)
+        Tix.Label(frmMS,text=' Host: ').grid(row=1,column=1)
+        self.txtStoreHost = Tix.Entry(frmMS,width=15)
+        self.txtStoreHost.grid(row=1,column=2)
+        Tix.Label(frmMS,text=' Port: ').grid(row=1,column=3)
+        self.txtStorePort = Tix.Entry(frmMS,width=5)
+        self.txtStorePort.grid(row=1,column=4)
+        frmML = Tix.Frame(frmM,border=1,relief='sunken')
+        frmML.grid(row=1,column=0,sticky=Tix.W)
+        Tix.Label(frmML,text="LOCAL").grid(row=0,column=0,sticky=Tix.W)
+        Tix.Label(frmML,text="Region: ").grid(row=1,column=0,sticky=Tix.W)
+        self.txtRegion = Tix.Entry(frmML,width=2)
+        self.txtRegion.grid(row=1,column=1)
+        Tix.Label(frmML,text=" C2C: ").grid(row=1,column=2,sticky=Tix.W)
+        self.txtC2CPort = Tix.Entry(frmML,width=5)
+        self.txtC2CPort.grid(row=1,column=3)
+
+
     def _initialize(self):
         """ insert values from config file into entry boxes """
         cp = ConfigParser.RawConfigParser()
@@ -659,6 +685,21 @@ class DySKTConfigPanel(gui.ConfigPanel):
         if cp.has_option('GPS','epy'): self.txtEPY.insert(0,cp.get('GPS','epy'))
         self.gpscb() # enable/disable entries
 
+        # misc entries
+        try:
+            collated = int(cp.getboolean('Storage','collated'))
+        except:
+            collated = 0
+        self.cvar.set(collated)
+        self.txtStoreHost.delete(0,Tix.END)
+        if cp.has_option('Storage','host'): self.txtStoreHost.insert(0,cp.get('Storage','host'))
+        self.txtStorePort.delete(0,Tix.END)
+        if cp.has_option('Storage','port'): self.txtStorePort.insert(0,cp.get('Storage','port'))
+        self.txtRegion.delete(0,Tix.END)
+        if cp.has_option('Local','region'): self.txtRegion.insert(0,cp.get('Local','region'))
+        self.txtC2CPort.delete(0,Tix.END)
+        if cp.has_option('Local','C2C'): self.txtC2CPort.insert(0,cp.get('Local','C2C'))
+
     def _validate(self):
         """ validate entries """
         # start with the recon radio details
@@ -673,8 +714,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
             self.err("Invalid Recon Input","Spoofed MAC addr %s is not valid")
             return False
 
-        # process the antennas - if antenna number is > 0 then force validation of
-        # all antenna widgets
+        # process antennas, if # > 0 then force validation of all antenna widgets
         if self.txtReconAntNum.get():
             try:
                 nA = int(self.txtReconAntNum.get())
@@ -833,11 +873,8 @@ class DySKTConfigPanel(gui.ConfigPanel):
             try:
                 hdg = int(hdg)
                 if hdg < 0 or hdg > 360: raise RuntimeError("")
-            except ValueError as e:
-                self.err("Invalid GPS Input","Heading must be an integer")
-                return False
             except:
-                self.err("Invalid GPS Input","Heading must be between 0 and 360")
+                self.err("Invalid GPS Input","Heading must be an integer between 0 and 360")
                 return False
         else:
             # dynamic is set
@@ -846,10 +883,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 port = int(port)
                 if port < 1024 or port > 65535: raise RuntimeError("")
             except ValueError:
-                self.err("Invalid GPS Input","Device port must be an integer")
-                return False
-            except:
-                self.err("Invalid GPS Input","Port must be between 1024 and 65535")
+                self.err("Invalid GPS Input","Device port must be a number between 1024 and 65535")
                 return False
             if re.match(GPSDID,self.txtDevID.get().upper()) is None:
                 self.err("Invalid GPS Input","GPS Dev ID is invalid")
@@ -865,6 +899,29 @@ class DySKTConfigPanel(gui.ConfigPanel):
             except:
                 self.err("Invalid GPS Input","EPX/EPY must be numeric or 'inf'")
                 return False
+
+        # misc entries
+        host = self.txtStoreHost.get()
+        if re.match(IPADDR,host) is None and host != 'localhost':
+            self.err("Invalid Storage Input","Host is not a valid address")
+        port = self.txtStorePort.get()
+        try:
+            port = int(port)
+            if port < 1024 or port > 65535: raise RuntimeError("")
+        except ValueError:
+            self.err("Invalid Storage Input","Host Port must be a number between 1024 and 65535")
+            return False
+        region = self.txtRegion.get()
+        if region and len(region) != 2:
+            self.err("Invalid Local Input","Region must be 2 characters")
+            return False
+        port = self.txtC2CPort.get()
+        try:
+            port = int(port)
+            if port < 1024 or port > 65535: raise RuntimeError("")
+        except:
+            self.err("Invalid Local Input","C2C Port must be a number between 1024 and 65535")
+            return False
 
         return True
 
