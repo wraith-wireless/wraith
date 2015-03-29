@@ -178,23 +178,19 @@ class WraithConfigPanel(gui.ConfigPanel):
 
     def _write(self):
         """ write entry inputs to config file """
+        fout = None
         try:
-            conf = ConfigParser.ConfigParser()
-
-            # storage section
-            conf.add_section('Storage')
-            conf.set('Storage','host',self.txtHost.get())
-            conf.set('Storage','db',self.txtDB.get())
-            conf.set('Storage','user',self.txtUser.get())
-            conf.set('Storage','pwd',self.txtUser.get())
-
-            # policy section
-            conf.add_section('Policy')
-            conf.set('Policy','polite','on' if self.ptype else 'off')
-            conf.set('Policy','shutdown','auto' if self.stype else 'manual')
-
+            cp = ConfigParser.ConfigParser()
+            cp.add_section('Storage')
+            cp.set('Storage','host',self.txtHost.get())
+            cp.set('Storage','db',self.txtDB.get())
+            cp.set('Storage','user',self.txtUser.get())
+            cp.set('Storage','pwd',self.txtUser.get())
+            cp.add_section('Policy')
+            cp.set('Policy','polite','on' if self.ptype else 'off')
+            cp.set('Policy','shutdown','auto' if self.stype else 'manual')
             fout = open(wraith.WRAITHCONF,'w')
-            conf.write(fout)
+            cp.write(fout)
             fout.close()
         except IOError as e:
             self.err("File Error","Error <%s> writing to config file" % e)
@@ -202,6 +198,8 @@ class WraithConfigPanel(gui.ConfigPanel):
             self.err("Configuration Error","Error <%s> writing to config file" % e)
         else:
             self.info('Success',"Restart for changes to take effect")
+        finally:
+            if fout: fout.close()
 
 class NidusConfigPanel(gui.ConfigPanel):
     """ Display Nidus Configuration Panel """
@@ -353,24 +351,19 @@ class NidusConfigPanel(gui.ConfigPanel):
         """ write entry inputs to config file """
         fout = None
         try:
-            conf = ConfigParser.ConfigParser()
-
-            # SSE section
-            conf.add_section('SSE')
-            conf.set('SSE','save','yes' if self.svar.get() else 'no')
-            conf.set('SSE','save_private','yes' if self.pvar.get() else 'no')
-            conf.set('SSE','save_path',self.txtPCAPPath.get())
-            conf.set('SSE','save_maxsize',self.txtMaxSz.get())
-            conf.set('SSE','save_maxfiles',self.txtMaxFiles.get())
-            conf.set('SSE','store_threads',self.txtNumStore.get())
-            conf.set('SSE','extract_threads',self.txtNumExtract.get())
-
-            # OUI section
-            conf.add_section('OUI')
-            conf.set('OUI','path',self.txtOUIPath.get())
-
+            cp = ConfigParser.ConfigParser()
+            cp.add_section('SSE')
+            cp.set('SSE','save','yes' if self.svar.get() else 'no')
+            cp.set('SSE','save_private','yes' if self.pvar.get() else 'no')
+            cp.set('SSE','save_path',self.txtPCAPPath.get())
+            cp.set('SSE','save_maxsize',self.txtMaxSz.get())
+            cp.set('SSE','save_maxfiles',self.txtMaxFiles.get())
+            cp.set('SSE','store_threads',self.txtNumStore.get())
+            cp.set('SSE','extract_threads',self.txtNumExtract.get())
+            cp.add_section('OUI')
+            cp.set('OUI','path',self.txtOUIPath.get())
             fout = open(wraith.NIDUSCONF,'w')
-            conf.write(fout)
+            cp.write(fout)
             fout.close()
         except IOError as e:
             self.err("File Error","Error <%s> writing to config file" % e)
@@ -378,6 +371,8 @@ class NidusConfigPanel(gui.ConfigPanel):
             self.err("Configuration Error","Error <%s> writing to config file" % e)
         else:
             self.info('Success',"Changes will take effect on next start")
+        finally:
+            if fout: fout.close()
 
 class DySKTConfigException(Exception): pass
 class DySKTConfigPanel(gui.ConfigPanel):
@@ -535,8 +530,8 @@ class DySKTConfigPanel(gui.ConfigPanel):
         frmGD.grid(row=1,column=2,sticky=Tix.E+Tix.N)
         Tix.Label(frmGD,text="DYNAMIC").grid(row=0,column=0,sticky=Tix.W)
         Tix.Label(frmGD,text="Port: ").grid(row=1,column=0,sticky=Tix.W)
-        self.txtPort = Tix.Entry(frmGD,width=5)
-        self.txtPort.grid(row=1,column=1,sticky=Tix.W)
+        self.txtGPSPort = Tix.Entry(frmGD,width=5)
+        self.txtGPSPort.grid(row=1,column=1,sticky=Tix.W)
         Tix.Label(frmGD,text="Dev ID: ").grid(row=2,column=0,sticky=Tix.W)
         self.txtDevID = Tix.Entry(frmGD,width=9)
         self.txtDevID.grid(row=2,column=1,sticky=Tix.W)
@@ -673,8 +668,8 @@ class DySKTConfigPanel(gui.ConfigPanel):
         if cp.has_option('GPS','alt'): self.txtAlt.insert(0,cp.get('GPS','alt'))
         self.txtHeading.delete(0,Tix.END)
         if cp.has_option('GPS','heading'): self.txtHeading.insert(0,cp.get('GPS','heading'))
-        self.txtPort.delete(0,Tix.END)
-        if cp.has_option('GPS','port'): self.txtPort.insert(0,cp.get('GPS','port'))
+        self.txtGPSPort.delete(0,Tix.END)
+        if cp.has_option('GPS','port'): self.txtGPSPort.insert(0,cp.get('GPS','port'))
         self.txtDevID.delete(0,Tix.END)
         if cp.has_option('GPS','devid'): self.txtDevID.insert(0,cp.get('GPS','devid'))
         self.txtPoll.delete(0,Tix.END)
@@ -780,80 +775,77 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
         # then collection radio details
         nic = self.txtCollectionNic.get()
-        if not nic:
-            self.err("Invalid Collection Input","The Collection radio nic must be specified")
-            return False
-        elif not nic in wifaces():
-            self.warn("Not Found","Radio may not be wireless")
-        spoof = self.txtCollectionSpoof.get().upper()
-        if spoof and re.match(MACADDR,spoof) is None:
-            self.err("Invalid Colleciton Input","Spoofed MAC address is not valid")
-            return False
-
-        # process the antennas - if antenna number is > 0 then force validation of
-        # all antenna widgets
-        if self.txtCollectionAntNum.get():
-            try:
-                nA = int(self.txtCollectionAntNum.get())
-                if nA:
-                    try:
-                        if len(map(float,self.txtCollectionAntGain.get().split(','))) != nA:
-                            raise DySKTConfigException("Number of gain is invalid")
-                    except ValueError:
-                        raise DySKTConfigException("Gain must be float or list of floats")
-                    if len(self.txtCollectionAntType.get().split(',')) != nA:
-                        raise DySKTConfigException("Number of types is invalid")
-                    try:
-                        if len(map(float,self.txtCollectionAntLoss.get().split(','))) != nA:
-                            raise DySKTConfigException("Number of loss is invalid")
-                    except:
-                        raise DySKTConfigException("Loss must be float or list of floats")
-                    try:
-                        xyzs = self.txtCollectionAntXYZ.get().split(',')
-                        if len(xyzs) != nA:
-                            raise DySKTConfigException("Number of xyz is invalid")
-                        for xyz in xyzs:
-                            xyz = xyz.split(':')
-                            if len(xyz) != 3:
-                                raise DySKTConfigException("XYZ must be three integers")
-                            map(int,xyz)
-                    except ValueError:
-                        raise DySKTConfigException("XYZ must be integer")
-            except ValueError:
-                self.err("Invalid Collection Input","Number of antennas must be numeric")
+        if nic:
+            if not nic in wifaces(): self.warn("Not Found","Radio may not be wireless")
+            spoof = self.txtCollectionSpoof.get().upper()
+            if spoof and re.match(MACADDR,spoof) is None:
+                self.err("Invalid Colleciton Input","Spoofed MAC address is not valid")
                 return False
-            except DySKTConfigException as e:
+
+            # process the antennas - if antenna number is > 0 then force validation of
+            # all antenna widgets
+            if self.txtCollectionAntNum.get():
+                try:
+                    nA = int(self.txtCollectionAntNum.get())
+                    if nA:
+                        try:
+                            if len(map(float,self.txtCollectionAntGain.get().split(','))) != nA:
+                                raise DySKTConfigException("Number of gain is invalid")
+                        except ValueError:
+                            raise DySKTConfigException("Gain must be float or list of floats")
+                        if len(self.txtCollectionAntType.get().split(',')) != nA:
+                            raise DySKTConfigException("Number of types is invalid")
+                        try:
+                            if len(map(float,self.txtCollectionAntLoss.get().split(','))) != nA:
+                                raise DySKTConfigException("Number of loss is invalid")
+                        except:
+                            raise DySKTConfigException("Loss must be float or list of floats")
+                        try:
+                            xyzs = self.txtCollectionAntXYZ.get().split(',')
+                            if len(xyzs) != nA:
+                                raise DySKTConfigException("Number of xyz is invalid")
+                            for xyz in xyzs:
+                                xyz = xyz.split(':')
+                                if len(xyz) != 3:
+                                    raise DySKTConfigException("XYZ must be three integers")
+                                map(int,xyz)
+                        except ValueError:
+                            raise DySKTConfigException("XYZ must be integer")
+                except ValueError:
+                    self.err("Invalid Collection Input","Number of antennas must be numeric")
+                    return False
+                except DySKTConfigException as e:
+                    self.err("Invalid Collection Input",e)
+                    return False
+
+            # process scan patterns
+            try:
+                float(self.txtCollectionScanDwell.get())
+            except:
+                self.err("Invalid Collection Input", "Scan dwell must be float")
+                return False
+            start = self.txtCollectionScanStart.get()
+            try:
+                if start:
+                    if ':' in start: ch,chw = start.split(':')
+                    else:
+                        ch = start
+                        chw = None
+                    ch = int(ch)
+                    if chw and not chw in IW_CHWS:
+                        raise RuntimeError("Specified channel width is not valid")
+            except ValueError:
+                self.err("Invalid Collection Input", "Scan start must be integer")
+                return False
+            except Exception as e:
                 self.err("Invalid Collection Input",e)
                 return False
-
-        # process scan patterns
-        try:
-            float(self.txtCollectionScanDwell.get())
-        except:
-            self.err("Invalid Collection Input", "Scan dwell must be float")
-            return False
-        start = self.txtCollectionScanStart.get()
-        try:
-            if start:
-                if ':' in start: ch,chw = start.split(':')
-                else:
-                    ch = start
-                    chw = None
-                ch = int(ch)
-                if chw and not chw in IW_CHWS:
-                    raise RuntimeError("Specified channel width is not valid")
-        except ValueError:
-            self.err("Invalid Collection Input", "Scan start must be integer")
-            return False
-        except Exception as e:
-            self.err("Invalid Collection Input",e)
-            return False
-        try:
-            parsechlist(self.txtCollectionScanScan.get(),'scan')
-            parsechlist(self.txtCollectionScanPass.get(),'pass')
-        except ValueError as e:
-            self.err("Invalid Collection Input",e)
-            return False
+            try:
+                parsechlist(self.txtCollectionScanScan.get(),'scan')
+                parsechlist(self.txtCollectionScanPass.get(),'pass')
+            except ValueError as e:
+                self.err("Invalid Collection Input",e)
+                return False
 
         # gps - only process enabled widgets
         if self.gvar.get():
@@ -878,7 +870,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 return False
         else:
             # dynamic is set
-            port = self.txtPort.get()
+            port = self.txtGPSPort.get()
             try:
                 port = int(port)
                 if port < 1024 or port > 65535: raise RuntimeError("")
@@ -927,12 +919,69 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
     def _write(self):
         """ write entry inputs to config file """
-        return
+        fout = None
         try:
-            conf = ConfigParser.ConfigParser()
-
+            cp = ConfigParser.ConfigParser()
+            cp.add_section('Recon')
+            cp.set('Recon','nic',self.txtReconNic.get())
+            if self.txtReconSpoof.get(): cp.set('Recon','spoof',self.txtReconSpoof.get())
+            nA = self.txtReconAntNum.get()
+            if nA:
+                cp.set('Recon','antennas',self.txtReconAntNum.get())
+                cp.set('Recon','antenna_gain',self.txtReconAntGain.get())
+                cp.set('Recon','antenna_loss',self.txtReconAntLoss.get())
+                cp.set('Recon','antenna_type',self.txtReconAntType.get())
+                cp.set('Recon','antenna_xyz',self.txtReconAntXYZ.get())
+            desc = self.txtReconDesc.get(1.0,Tix.END).strip()
+            if desc: cp.set('Recon','desc',desc)
+            cp.set('Recon','dwell',self.txtReconScanDwell.get())
+            cp.set('Recon','scan',self.txtReconScanScan.get())
+            cp.set('Recon','pass',self.txtReconScanPass.get())
+            cp.set('Recon','scan_start',self.txtReconScanStart.get())
+            if self.txtCollectionNic.get():
+                cp.add_section('Collection')
+                cp.set('Collection','nic',self.txtCollectionNic.get())
+                if self.txtCollectionSpoof.get():
+                    cp.set('Collection','spoof',self.txtCollectionSpoof.get())
+                nA = self.txtCollectionAntNum.get()
+                if nA:
+                    cp.set('Collection','antennas',self.txtCollectionAntNum.get())
+                    cp.set('Collection','antenna_gain',self.txtCollectionAntGain.get())
+                    cp.set('Collection','antenna_loss',self.txtCollectionAntLoss.get())
+                    cp.set('Collection','antenna_type',self.txtCollectionAntType.get())
+                    cp.set('Collection','antenna_xyz',self.txtCollectionAntXYZ.get())
+                desc = self.txtCollectionDesc.get(1.0,Tix.END).strip()
+                if desc: cp.set('Collection','desc',desc)
+                cp.set('Collection','dwell',self.txtCollectionScanDwell.get())
+                cp.set('Collection','scan',self.txtCollectionScanScan.get())
+                cp.set('Collection','pass',self.txtCollectionScanPass.get())
+                cp.set('Collection','scan_start',self.txtCollectionScanStart.get())
+            cp.add_section('GPS')
+            fixed = self.gvar.get()
+            cp.set('GPS','fixed','yes' if fixed else 'no')
+            if fixed:
+                cp.set('GPS','lat',self.txtLat.get())
+                cp.set('GPS','lon',self.txtLon.get())
+                cp.set('GPS','alt',self.txtAlt.get())
+                cp.set('GPS','heading',self.txtHeading.get())
+            else:
+                cp.set('GPS','port',self.txtGPSPort.get())
+                cp.set('GPS','devid',self.txtDevID.get())
+                cp.set('GPS','poll',self.txtPoll.get())
+                cp.set('GPS','epx',self.txtEPX.get())
+                cp.set('GPS','epy',self.txtEPY.get())
+            cp.add_section('Storage')
+            cp.set('Storage','collated','yes' if self.cvar.get() else 'no')
+            cp.set('Storage','host',self.txtStoreHost.get())
+            cp.set('Storage','port',self.txtStorePort.get())
+            region = self.txtRegion.get()
+            c2cport = self.txtC2CPort.get()
+            if region or c2cport:
+                cp.add_section('Local')
+                if region: cp.set('Local','region',region)
+                if c2cport: cp.set('Local','C2C',c2cport)
             fout = open(wraith.DYSKTCONF,'w')
-            conf.write(fout)
+            cp.write(fout)
             fout.close()
         except IOError as e:
             self.err("File Error","Error <%s> writing to config file" % e)
@@ -940,6 +989,8 @@ class DySKTConfigPanel(gui.ConfigPanel):
             self.err("Configuration Error","Error <%s> writing to config file" % e)
         else:
             self.info('Success',"Restart for changes to take effect")
+        finally:
+            if fout: fout.close()
 
     def gpscb(self):
         """ enable/disable gps entries as necessary """
@@ -949,7 +1000,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
             self.txtLon.configure(state=Tix.NORMAL)
             self.txtAlt.configure(state=Tix.NORMAL)
             self.txtHeading.configure(state=Tix.NORMAL)
-            self.txtPort.configure(state=Tix.DISABLED)
+            self.txtGPSPort.configure(state=Tix.DISABLED)
             self.txtDevID.configure(state=Tix.DISABLED)
             self.txtPoll.configure(state=Tix.DISABLED)
             self.txtEPX.configure(state=Tix.DISABLED)
@@ -960,7 +1011,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
             self.txtLon.configure(state=Tix.DISABLED)
             self.txtAlt.configure(state=Tix.DISABLED)
             self.txtHeading.configure(state=Tix.DISABLED)
-            self.txtPort.configure(state=Tix.NORMAL)
+            self.txtGPSPort.configure(state=Tix.NORMAL)
             self.txtDevID.configure(state=Tix.NORMAL)
             self.txtPoll.configure(state=Tix.NORMAL)
             self.txtEPX.configure(state=Tix.NORMAL)

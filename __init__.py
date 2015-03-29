@@ -15,16 +15,17 @@ Requires:
 
 wraith 0.0.2
  desc: dyskt,nidus are developmentally sound, begin work on gui
- includes: wraith-rt.py and wraith.conf (also all subdirectories etc)
+ includes: wraith-rt. py,subpanels.py and wraith.conf (also all subdirectories etc)
  changes:
-  - added extraction of all management frames (excluding timing adv)
-  - added nidusd daemon file to start nidus server
+  - added multiple panels for non-data related functionality
 
  TODO:
   1) tried --remove-pid/--remove-pidfile to remove pids of dysktd and nidusd
      from /var/run but does not work. Have to use --make-pid to force creation
      of pid file but then, the pidfile is not removed (ubuntu does not have
      --remove-pid flag
+  2) viewniduslog and viewdysktlog hang whenever respective logs are cleared
+  3) need to further test config panels primarily DySKTConfigPanel
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

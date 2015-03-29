@@ -12,7 +12,7 @@
  10) add labels to frames
 """
 
-__name__ = 'wraith-rt'
+#__name__ = 'wraith-rt'
 __license__ = 'GPL v3.0'
 __version__ = '0.0.3'
 __revdate__ = 'February 2015'
@@ -907,7 +907,7 @@ class WraithPanel(gui.MasterPanel):
         except AttributeError:
             return None # canceled
 
-if __name__ == 'wraith-rt':
+if __name__ == '__main__':
     t = Tix.Tk()
     t.option_add('*foreground','blue')                # normal fg color
     t.option_add('*background','black')               # normal bg color
