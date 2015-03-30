@@ -196,10 +196,10 @@ class ConvertPanel(gui.SimplePanel):
         self.txtmW = Tix.Entry(frmPwr,width=8)
         self.txtmW.grid(row=0,column=5)
         Tix.Button(frmPwr,text='Convert',command=self.convertpwr).grid(row=0,column=6)
-        frmButtons = Tix.Frame(frm,borderwidth=0)
-        frmButtons.grid(row=2,column=0,sticky=Tix.N)
-        Tix.Button(frmButtons,text='OK',command=self.delete).grid(row=0,column=0)
-        Tix.Button(frmButtons,text='Clear',command=self.clear).grid(row=0,column=1)
+        frmBtns = Tix.Frame(frm,borderwidth=0)
+        frmBtns.grid(row=2,column=0,sticky=Tix.N)
+        Tix.Button(frmBtns,text='OK',command=self.delete).grid(row=0,column=0)
+        Tix.Button(frmBtns,text='Clear',command=self.clear).grid(row=0,column=1)
 
     def convertgeo(self):
         """convert geo from lat/lon to mgrs or vice versa """
@@ -260,6 +260,74 @@ class ConvertPanel(gui.SimplePanel):
         self.txtdBm.delete(0,Tix.END)
         self.txtmBm.delete(0,Tix.END)
         self.txtmW.delete(0,Tix.END)
+
+# Tools->Calculate(all)
+class CalculatePanel(gui.SimplePanel):
+    """ Base calculator panel """
+    def __init__(self,toplevel,chief,ttl,inputs,result):
+        """
+          inputs is a list of tuples of the form t = (label,width,type) where:
+           label is the text to display in the entry's label
+           width is the width (# of characters) for the entry
+           type is the conversion to use on the text from the entry (as a string)
+          result is a tuple t = (formula,measurement) such that
+           formula is a string representing the mathematical formula to evaluate
+           where each placeholder $i is substituted with the value in entry i
+           i.e. "$0 * $1" results in the multiplication of the value in entry 0
+           and entry 1
+           and measurement is the answer's measurement (string)
+        """
+        self._entries = []
+        self._inputs = inputs
+        self._ans = Tix.StringVar()
+        self._ans.set("")
+        self._formula = result[0]
+        self._meas = result[1]
+        gui.SimplePanel.__init__(self,toplevel,chief,ttl,"widgets/icons/calculator.png")
+
+    def _body(self,frm):
+        """ creates the body """
+        frmEnt = Tix.Frame(frm,borderwidth=0)
+        frmEnt.grid(row=0,column=0,sticky=Tix.W)
+        for i in xrange(len(self._inputs)):
+            Tix.Label(frmEnt,text=" %s: " % self._inputs[i][0]).grid(row=0,column=(i*2))
+            self._entries.append(Tix.Entry(frmEnt,width=self._inputs[i][1]))
+            self._entries[i].grid(row=0,column=(i*2)+1)
+        frmAns = Tix.Frame(frm,borderwidth=0)
+        frmAns.grid(row=1,column=0,sticky=Tix.N)
+        Tix.Label(frmAns,text="Answer: ").grid(row=0,column=0)
+        Tix.Label(frmAns,width=25,textvariable=self._ans).grid(row=0,column=1)
+        Tix.Label(frmAns,text=" %s" % self._meas).grid(row=0,column=2)
+        frmBtns = Tix.Frame(frm,borderwidth=0)
+        frmBtns.grid(row=2,column=0,sticky=Tix.N)
+        Tix.Button(frmBtns,text="Calculate",command=self.calc).grid(row=0,column=0)
+        Tix.Button(frmBtns,text="Reset",command=self.clear).grid(row=0,column=1)
+        Tix.Button(frmBtns,text="Close",command=self.delete).grid(row=0,column=2)
+
+    def calc(self):
+        """ apply formula with entries """
+        formula = self._formula
+        # make sure no entries are empty substituting the value of the entry as
+        # we go
+        for i in xrange(len(self._entries)):
+            if self._entries[i].get():
+                formula = formula.replace('$%d' % i,"%s('%s')" % (self._inputs[i][2],self._entries[i].get()))
+            else:
+                self.err('Error',"All entries must be filled in")
+                return
+
+        # attempt to calculate
+        try:
+            self._ans.set(str(eval(formula)))
+        except ValueError as e:
+            self.err("Invalid Input","%s is not a valid input" % e.message.split(':')[1].strip())
+        except Exception as e:
+            self.err('Error',e)
+
+    def clear(self):
+        """ clear all entries """
+        for entry in self._entries: entry.delete(0,Tix.END)
+        self._ans.set('')
 
 # View->DataBin
 class DataBinPanel(gui.SimplePanel):
