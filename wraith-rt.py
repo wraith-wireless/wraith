@@ -41,7 +41,12 @@ _STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
 _CALCS_ = {'EIRP':{'inputs':[('Pwr (mW)',5,'float'),('Gain (dBi)',5,'float')],
                    'answer':("10*math.log10($0) + $1",'dB')},
            'FSPL':{'inputs':[('Distance (m)',7,'float'),('RF (MHz)',5,'float')],
-                   'answer':("20*math.log10($0/1000) + 20*math.log10($1) + 32.44",'dB')}}
+                   'answer':("20*math.log10($0/1000) + 20*math.log10($1) + 32.44",'dB')},
+           'Link Budget':{'inputs':[('Tx Pwr (mW)',5,'float'),('Tx Gain (dBi)',5,'float'),
+                                    ('Tx Loss (dB)',5,'float'),('Rx Gain (dBi)',5,'float'),
+                                    ('Rx Loss (dB)',5,'float'),('Distance (kM)',3,'float'),
+                                    ('RF (MHz)',5,'float')],
+                          'answer':("10*math.log10($0)+$1-$2+$3-$4-(20*math.log10($5) + 20*math.log10($6) + 32.44)",'dB')}}
 
 class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
@@ -170,11 +175,12 @@ class WraithPanel(gui.MasterPanel):
         # Tools Menu
         # all options will always be enabled
         self.mnuTools = Tix.Menu(self.menubar,tearoff=0)
-        self.mnuTools.add_command(label="Convert",command=self.viewconvert)
+        self.mnuTools.add_command(label='Convert',command=self.viewconvert)
         self.mnuToolsCalcs = Tix.Menu(self.mnuTools,tearoff=0)
-        self.mnuToolsCalcs.add_command(label="EIRP",command=lambda:self.calc('EIRP'))
-        self.mnuToolsCalcs.add_command(label="FSPL",command=lambda:self.calc('FSPL'))
-        self.mnuTools.add_cascade(label="Calcuators",menu=self.mnuToolsCalcs)
+        self.mnuToolsCalcs.add_command(label='EIRP',command=lambda:self.calc('EIRP'))
+        self.mnuToolsCalcs.add_command(label='FSPL',command=lambda:self.calc('FSPL'))
+        self.mnuToolsCalcs.add_command(label='Link Budget',command=lambda:self.calc('Link Budget'))
+        self.mnuTools.add_cascade(label='Calcuators',menu=self.mnuToolsCalcs)
 
         # View Menu
         # all options will always be enabled
