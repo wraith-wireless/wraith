@@ -14,6 +14,7 @@ import os                                  # file info etc
 import re                                  # reg. exp.
 import Tix                                 # Tix gui stuff
 import mgrs                                # for mgrs2latlon conversions etc
+import math                                # for conversions, calculations
 from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
@@ -183,9 +184,17 @@ class ConvertPanel(gui.SimplePanel):
         self.txtMGRS = Tix.Entry(frmGeo,width=15)
         self.txtMGRS.grid(row=0,column=3,sticky=Tix.W)
         Tix.Button(frmGeo,text='Convert',command=self.convertgeo).grid(row=0,column=4)
-
+        frmPwr = Tix.Frame(frm,borderwidth=0)
+        frmPwr.grid(row=1,column=0,sticky=Tix.E)
+        Tix.Label(frmPwr,text="dBm: ").grid(row=0,column=0)
+        self.txtdBm = Tix.Entry(frmPwr,width=7)
+        self.txtdBm.grid(row=0,column=1)
+        Tix.Label(frmPwr,text=" mW: ").grid(row=0,column=2)
+        self.txtmW = Tix.Entry(frmPwr,width=7)
+        self.txtmW.grid(row=0,column=3)
+        Tix.Button(frmPwr,text='Convert',command=self.convertpwr).grid(row=0,column=4)
         frmButtons = Tix.Frame(frm,borderwidth=0)
-        frmButtons.grid(row=1,column=0,sticky=Tix.N)
+        frmButtons.grid(row=2,column=0,sticky=Tix.N)
         Tix.Button(frmButtons,text='OK',command=self.delete).grid(row=0,column=0)
         Tix.Button(frmButtons,text='Clear',command=self.clear).grid(row=0,column=1)
 
@@ -210,10 +219,31 @@ class ConvertPanel(gui.SimplePanel):
                 except:
                     self.err("Error","Lat/Lon is not valid")
 
+    def convertpwr(self):
+        """ convert dBm to mW or vice versa """
+        d = self.txtdBm.get()
+        w = self.txtmW.get()
+        if d and w: self.err("Error","One field must be empty")
+        else:
+            if d:
+                try:
+                    w = math.pow(10,(float(d)/10.0))
+                    self.txtmW.insert(0,"%.3f" % w)
+                except:
+                    self.err("Error","dBm is not valid")
+            elif w:
+                try:
+                    d = 10*math.log10(float(w))
+                    self.txtdBm.insert(0,"%.3f" % d)
+                except:
+                    self.err("Error","dBm is not valid")
+
     def clear(self):
         """ clear all entries """
         self.txtLatLon.delete(0,Tix.END)
         self.txtMGRS.delete(0,Tix.END)
+        self.txtdBm.delete(0,Tix.END)
+        self.txtmW.delete(0,Tix.END)
 
 # View->DataBin
 class DataBinPanel(gui.SimplePanel):
