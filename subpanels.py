@@ -187,12 +187,15 @@ class ConvertPanel(gui.SimplePanel):
         frmPwr = Tix.Frame(frm,borderwidth=0)
         frmPwr.grid(row=1,column=0,sticky=Tix.E)
         Tix.Label(frmPwr,text="dBm: ").grid(row=0,column=0)
-        self.txtdBm = Tix.Entry(frmPwr,width=7)
+        self.txtdBm = Tix.Entry(frmPwr,width=8)
         self.txtdBm.grid(row=0,column=1)
-        Tix.Label(frmPwr,text=" mW: ").grid(row=0,column=2)
-        self.txtmW = Tix.Entry(frmPwr,width=7)
-        self.txtmW.grid(row=0,column=3)
-        Tix.Button(frmPwr,text='Convert',command=self.convertpwr).grid(row=0,column=4)
+        Tix.Label(frmPwr,text=" mBm: ").grid(row=0,column=2)
+        self.txtmBm = Tix.Entry(frmPwr,width=8)
+        self.txtmBm.grid(row=0,column=3)
+        Tix.Label(frmPwr,text=" mW: ").grid(row=0,column=4)
+        self.txtmW = Tix.Entry(frmPwr,width=8)
+        self.txtmW.grid(row=0,column=5)
+        Tix.Button(frmPwr,text='Convert',command=self.convertpwr).grid(row=0,column=6)
         frmButtons = Tix.Frame(frm,borderwidth=0)
         frmButtons.grid(row=2,column=0,sticky=Tix.N)
         Tix.Button(frmButtons,text='OK',command=self.delete).grid(row=0,column=0)
@@ -203,46 +206,59 @@ class ConvertPanel(gui.SimplePanel):
         # copied from LOBster
         m = self.txtMGRS.get()
         ll = self.txtLatLon.get()
-        if m and ll: self.err("Error","One field must be empty")
+        if m and ll: self.err('Error',"One field must be empty")
         else:
             if m:
                 try:
                     ll = self._mgrs.toLatLon(m)
                     self.txtLatLon.insert(0,"%.3f %.3f" % (ll[0],ll[1]))
                 except:
-                    self.err("Error","MGRS is not valid")
+                    self.err('Error',"MGRS is not valid")
             elif ll:
                 try:
                     ll = ll.split()
                     m = self._mgrs.toMGRS(ll[0],ll[1])
                     self.txtMGRS.insert(0,m)
                 except:
-                    self.err("Error","Lat/Lon is not valid")
+                    self.err('Error',"Lat/Lon is not valid")
 
     def convertpwr(self):
         """ convert dBm to mW or vice versa """
         d = self.txtdBm.get()
         w = self.txtmW.get()
-        if d and w: self.err("Error","One field must be empty")
-        else:
-            if d:
-                try:
-                    w = math.pow(10,(float(d)/10.0))
-                    self.txtmW.insert(0,"%.3f" % w)
-                except:
-                    self.err("Error","dBm is not valid")
-            elif w:
-                try:
-                    d = 10*math.log10(float(w))
-                    self.txtdBm.insert(0,"%.3f" % d)
-                except:
-                    self.err("Error","dBm is not valid")
+        m = self.txtmBm.get()
+        if d and not (m or w):
+            try:
+                w = math.pow(10,(float(d)/10.0))
+                m = 100 * float(d)
+                self.txtmW.insert(0,'%.3f' % w)
+                self.txtmBm.insert(0,'%.3f' % m)
+            except:
+                self.err('Error',"dBm is not valid")
+        elif w and not (m or d):
+            try:
+                d = 10*math.log10(float(w))
+                m = 100 * d
+                self.txtdBm.insert(0,'%.3f' % d)
+                self.txtmBm.insert(0,'%.3f' % m)
+            except:
+                self.err('Error',"dBm is not valid")
+        elif m and not (d or m):
+            try:
+                d = float(m) / 100
+                w = math.pow(10,(float(d)/10.0))
+                self.txtdBm.insert(0,'%.3f' % d)
+                self.txtmW.insert(0,'%.3f' % w)
+            except:
+                self.err('Error',"mBm is not valid")
+        else: self.err('Error',"Two fields must be empty")
 
     def clear(self):
         """ clear all entries """
         self.txtLatLon.delete(0,Tix.END)
         self.txtMGRS.delete(0,Tix.END)
         self.txtdBm.delete(0,Tix.END)
+        self.txtmBm.delete(0,Tix.END)
         self.txtmW.delete(0,Tix.END)
 
 # View->DataBin
