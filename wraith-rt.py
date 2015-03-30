@@ -39,14 +39,17 @@ _STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
 
 #### CALCULATIONS - dict of calculation options for CalculatePanel
 _CALCS_ = {'EIRP':{'inputs':[('Pwr (mW)',5,'float'),('Gain (dBi)',5,'float')],
-                   'answer':("10*math.log10($0) + $1",'dB')},
+                   'answer':("10*math.log10($0) + $1",'dB'),
+                   'rc':[2]},
            'FSPL':{'inputs':[('Distance (m)',7,'float'),('RF (MHz)',5,'float')],
-                   'answer':("20*math.log10($0/1000) + 20*math.log10($1) + 32.44",'dB')},
-           'Link Budget':{'inputs':[('Tx Pwr (mW)',5,'float'),('Tx Gain (dBi)',5,'float'),
-                                    ('Tx Loss (dB)',5,'float'),('Rx Gain (dBi)',5,'float'),
-                                    ('Rx Loss (dB)',5,'float'),('Distance (kM)',3,'float'),
-                                    ('RF (MHz)',5,'float')],
-                          'answer':("10*math.log10($0)+$1-$2+$3-$4-(20*math.log10($5) + 20*math.log10($6) + 32.44)",'dB')}}
+                   'answer':("20*math.log10($0/1000) + 20*math.log10($1) + 32.44",'dB'),
+                   'rc':[2]},
+           'Link Budget':{'inputs':[('Tx Pwr (mW)',5,'float'),('Tx Gain (dBi)',3,'float'),
+                                    ('Tx Loss (dB)',3,'float'),('Rx Gain (dBi)',3,'float'),
+                                    ('Rx Loss (dB)',3,'float'),('Distance (kM)',3,'float'),
+                                    ('RF (MHz)',4,'float')],
+                          'answer':("10*math.log10($0)+$1-$2+$3-$4-(20*math.log10($5) + 20*math.log10($6) + 32.44)",'dB'),
+                          'rc':[3,2,2]}}
 
 class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
@@ -277,7 +280,8 @@ class WraithPanel(gui.MasterPanel):
         if not panel:
             t = Tix.Toplevel()
             pnl = subgui.CalculatePanel(t,self,key,_CALCS_[key]['inputs'],
-                                                   _CALCS_[key]['answer'])
+                                                   _CALCS_[key]['answer'],
+                                                   _CALCS_[key]['rc'])
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'%scalc' % key))
         else:
             panel[0].tk.deiconify()
