@@ -263,7 +263,10 @@ class ConvertPanel(gui.SimplePanel):
 
 # Tools->Calculate(all)
 class CalculatePanel(gui.SimplePanel):
-    """ Base calculator panel """
+    """
+     Base calculator panel - a simple panel that displays specified entries and
+     calculates a specified formula
+    """
     def __init__(self,toplevel,chief,ttl,inputs,result):
         """
           inputs is a list of tuples of the form t = (label,width,type) where:

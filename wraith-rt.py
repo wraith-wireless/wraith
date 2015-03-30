@@ -37,6 +37,10 @@ _STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
                  'dyskt':(1 << 4),  # at least one sensor is collecting data
                  'exit':(1 << 5)}   # exiting/shutting down
 
+#### CALCULATIONS - dict of calculation options for CalculatePanel
+_CALCS_ = {'EIRP':{'inputs':[('Pwr (mW)',5,'float'),('Gain (dBi)',5,'float')],
+                   'answer':("10*math.log10($0) + $1","dB")}}
+
 class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
     def __init__(self,toplevel):
@@ -166,6 +170,7 @@ class WraithPanel(gui.MasterPanel):
         self.mnuTools = Tix.Menu(self.menubar,tearoff=0)
         self.mnuTools.add_command(label="Convert",command=self.viewconvert)
         self.mnuToolsCalcs = Tix.Menu(self.mnuTools,tearoff=0)
+        self.mnuToolsCalcs.add_command(label="EIRP",command=lambda:self.calc('EIRP'))
         self.mnuTools.add_cascade(label="Calcuators",menu=self.mnuToolsCalcs)
 
         # View Menu
@@ -253,6 +258,18 @@ class WraithPanel(gui.MasterPanel):
             t = Tix.Toplevel()
             pnl = subgui.ConvertPanel(t,self)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'convert'))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
+
+    def calc(self,key):
+        """ calculate the function defined by key in the _CALCS_ dict"""
+        panel = self.getpanels('%scalc' % key)
+        if not panel:
+            t = Tix.Toplevel()
+            pnl = subgui.CalculatePanel(t,self,key,_CALCS_[key]['inputs'],
+                                                   _CALCS_[key]['answer'])
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'%scalc' % key))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
