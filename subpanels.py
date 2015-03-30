@@ -13,6 +13,7 @@ __status__ = 'Development'
 import os                                  # file info etc
 import re                                  # reg. exp.
 import Tix                                 # Tix gui stuff
+import mgrs                                # for mgrs2latlon conversions etc
 from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
@@ -168,6 +169,7 @@ class WraithConfigPanel(gui.ConfigPanel):
 class ConvertPanel(gui.SimplePanel):
     """ several conversion utilities """
     def __init__(self,toplevel,chief):
+        self._mgrs = mgrs.MGRS()
         gui.SimplePanel.__init__(self,toplevel,chief,"Conversions","widgets/icons/convert.png")
 
     def _body(self,frm):
@@ -187,8 +189,31 @@ class ConvertPanel(gui.SimplePanel):
         Tix.Button(frmButtons,text='OK',command=self.delete).grid(row=0,column=0)
         Tix.Button(frmButtons,text='Clear',command=self.clear).grid(row=0,column=1)
 
-    def convertgeo(self): pass
-    def clear(self): pass
+    def convertgeo(self):
+        """convert geo from lat/lon to mgrs or vice versa """
+        # copied from LOBster
+        m = self.txtMGRS.get()
+        ll = self.txtLatLon.get()
+        if m and ll: self.err("Error","One field must be empty")
+        else:
+            if m:
+                try:
+                    ll = self._mgrs.toLatLon(m)
+                    self.txtLatLon.insert(0,"%.3f %.3f" % (ll[0],ll[1]))
+                except:
+                    self.err("Error","MGRS is not valid")
+            elif ll:
+                try:
+                    ll = ll.split()
+                    m = self._mgrs.toMGRS(ll[0],ll[1])
+                    self.txtMGRS.insert(0,m)
+                except:
+                    self.err("Error","Lat/Lon is not valid")
+
+    def clear(self):
+        """ clear all entries """
+        self.txtLatLon.delete(0,Tix.END)
+        self.txtMGRS.delete(0,Tix.END)
 
 # View->DataBin
 class DataBinPanel(gui.SimplePanel):
