@@ -26,49 +26,12 @@ IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr
 MACADDR = re.compile("^([0-9A-F]{2}:){5}([0-9A-F]{2})$")    # re for mac addr (capital letters only)
 GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device id (capital letss only)
 
-class DataBinPanel(gui.SimplePanel):
-    """ DataBinPanel - displays a set of data bins for retrieved data storage """
-    def __init__(self,toplevel,chief):
-        gui.SimplePanel.__init__(self,toplevel,chief,"Databin","widgets/icons/databin.png")
+# Some constants
+COPY = u"\N{COPYRIGHT SIGN}"
 
-    def donothing(self): pass
+#### MENU PANELS
 
-    def _body(self):
-        """ creates the body """
-        self._bins = {}
-        frm = Tix.Frame(self)
-        frm.pack(side=Tix.TOP,expand=False)
-
-        # add the bin buttons
-        for b in wraith.BINS:
-            try:
-                self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
-            except:
-                self._bins[b] = {'img':None}
-                self._bins[b]['btn'] = Tix.Button(frm,text=b,command=self.donothing)
-            else:
-                self._bins[b]['btn'] = Tix.Button(frm,image=self._bins[b]['img'],command=self.donothing)
-            self._bins[b]['btn'].grid(row=0,column=wraith.BINS.index(b),sticky=Tix.W)
-
-class AboutPanel(gui.SimplePanel):
-    """ AboutPanel - displays a simple About Panel """
-    def __init__(self,toplevel,chief):
-        gui.SimplePanel.__init__(self,toplevel,chief,"About Wraith","widgets/icons/about.png")
-
-    def _body(self):
-        frm = Tix.Frame(self)
-        frm.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
-        self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/wraith-banner.png"))
-        Tix.Label(frm,bg="white",image=self.logo).grid(row=0,column=0,sticky=Tix.N)
-        Tix.Label(frm,
-                  text="wraith-rt %s" % wraith.__version__,
-                  fg="white",
-                  font=("Roman",16,'bold')).grid(row=1,column=0,sticky=Tix.N)
-        Tix.Label(frm,
-                  text="Wireless assault, reconnaissance, collection and exploitation toolkit",
-                  fg="white",
-                  font=("Roman",8,'bold')).grid(row=2,column=0,sticky=Tix.N)
-
+# Wraith->Configure
 class WraithConfigPanel(gui.ConfigPanel):
     """ Display Wraith Configuration Panel """
     def __init__(self,toplevel,chief):
@@ -201,6 +164,55 @@ class WraithConfigPanel(gui.ConfigPanel):
         finally:
             if fout: fout.close()
 
+# Tools->Convert
+class ConvertPanel(gui.SimplePanel):
+    """ several conversion utilities """
+    def __init__(self,toplevel,chief):
+        gui.SimplePanel.__init__(self,toplevel,chief,"Conversions","widgets/icons/convert.png")
+
+    def _body(self,frm):
+        """ creates the body """
+        frmGeo = Tix.Frame(frm,borderwidth=0)
+        frmGeo.grid(row=0,column=0,sticky=Tix.W)
+        Tix.Label(frmGeo,text='Lat/Lon: ').grid(row=0,column=0,sticky=Tix.W)
+        self.txtLatLon = Tix.Entry(frmGeo,width=15)
+        self.txtLatLon.grid(row=0,column=1,sticky=Tix.W)
+        Tix.Label(frmGeo,text=' MGRS: ').grid(row=0,column=2,sticky=Tix.W)
+        self.txtMGRS = Tix.Entry(frmGeo,width=15)
+        self.txtMGRS.grid(row=0,column=3,sticky=Tix.W)
+        Tix.Button(frmGeo,text='Convert',command=self.convertgeo).grid(row=0,column=4)
+
+        frmButtons = Tix.Frame(frm,borderwidth=0)
+        frmButtons.grid(row=1,column=0,sticky=Tix.N)
+        Tix.Button(frmButtons,text='OK',command=self.delete).grid(row=0,column=0)
+        Tix.Button(frmButtons,text='Clear',command=self.clear).grid(row=0,column=1)
+
+    def convertgeo(self): pass
+    def clear(self): pass
+
+# View->DataBin
+class DataBinPanel(gui.SimplePanel):
+    """ DataBinPanel - displays a set of data bins for retrieved data storage """
+    def __init__(self,toplevel,chief):
+        self._bins = {}
+        gui.SimplePanel.__init__(self,toplevel,chief,"Databin","widgets/icons/databin.png")
+
+    def donothing(self): pass
+
+    def _body(self,frm):
+        """ creates the body """
+        # add the bin buttons
+        for b in wraith.BINS:
+            try:
+                self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
+            except:
+                self._bins[b] = {'img':None}
+                self._bins[b]['btn'] = Tix.Button(frm,text=b,command=self.donothing)
+            else:
+                self._bins[b]['btn'] = Tix.Button(frm,image=self._bins[b]['img'],command=self.donothing)
+            self._bins[b]['btn'].grid(row=0,column=wraith.BINS.index(b),sticky=Tix.W)
+
+# Storage->Nidus-->Config
 class NidusConfigPanel(gui.ConfigPanel):
     """ Display Nidus Configuration Panel """
     def __init__(self,toplevel,chief):
@@ -374,6 +386,7 @@ class NidusConfigPanel(gui.ConfigPanel):
         finally:
             if fout: fout.close()
 
+# DySKT->Config
 class DySKTConfigException(Exception): pass
 class DySKTConfigPanel(gui.ConfigPanel):
     """ Display Nidus Configuration Panel """
@@ -1016,3 +1029,21 @@ class DySKTConfigPanel(gui.ConfigPanel):
             self.txtPoll.configure(state=Tix.NORMAL)
             self.txtEPX.configure(state=Tix.NORMAL)
             self.txtEPY.configure(state=Tix.NORMAL)
+
+# Help-->About
+class AboutPanel(gui.SimplePanel):
+    """ AboutPanel - displays a simple About Panel """
+    def __init__(self,toplevel,chief):
+        gui.SimplePanel.__init__(self,toplevel,chief,"About Wraith","widgets/icons/about.png")
+
+    def _body(self,frm):
+        self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/wraith-banner.png"))
+        Tix.Label(frm,bg='white',image=self.logo).grid(row=0,column=0,sticky=Tix.N)
+        Tix.Label(frm,text="wraith-rt %s" % wraith.__version__,
+                  fg='white',font=("Roman",16,'bold')).grid(row=1,column=0,sticky=Tix.N)
+        Tix.Label(frm,text="Wireless reconnaissance, collection, assault and exploitation toolkit",
+                  fg='white',font=("Roman",8,'bold')).grid(row=2,column=0,sticky=Tix.N)
+        Tix.Label(frm,text="Copyright %s %s %s" % (COPY,
+                                                   wraith.__date__.split(' ')[1],
+                                                   wraith.__email__),
+                  fg='white',font=('Roman',8,'bold')).grid(row=3,column=0,sticky=Tix.N)

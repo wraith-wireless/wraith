@@ -149,7 +149,7 @@ class WraithPanel(gui.MasterPanel):
         """ make the menu """
         self.menubar = Tix.Menu(self)
 
-        # File Menu
+        # Wraith Menu
         # all options will always be enabled
         self.mnuWraith = Tix.Menu(self.menubar,tearoff=0)
         self.mnuWraithGui = Tix.Menu(self.mnuWraith,tearoff=0)
@@ -164,6 +164,7 @@ class WraithPanel(gui.MasterPanel):
         # Tools Menu
         # all options will always be enabled
         self.mnuTools = Tix.Menu(self.menubar,tearoff=0)
+        self.mnuTools.add_command(label="Convert",command=self.viewconvert)
         self.mnuToolsCalcs = Tix.Menu(self.mnuTools,tearoff=0)
         self.mnuTools.add_cascade(label="Calcuators",menu=self.mnuToolsCalcs)
 
@@ -231,6 +232,7 @@ class WraithPanel(gui.MasterPanel):
 #### MENU CALLBACKS
 
 #### Wraith Menu
+
     def configwraith(self):
         """ display config file preference editor """
         panel = self.getpanels('preferences',False)
@@ -238,6 +240,19 @@ class WraithPanel(gui.MasterPanel):
             t = Tix.Toplevel()
             pnl = subgui.WraithConfigPanel(t,self)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'preferences'))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
+
+#### Tools Menu
+
+    def viewconvert(self):
+        """ display conversion panel """
+        panel = self.getpanels('convert',False)
+        if not panel:
+            t = Tix.Toplevel()
+            pnl = subgui.ConvertPanel(t,self)
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'convert'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()

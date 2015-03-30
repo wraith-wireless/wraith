@@ -35,6 +35,7 @@ wraith 0.0.2
      throws an error
  13) viewniduslog and viewdysktlog hang whenever respective logs are cleared
  14) need to further test config panels primarily DySKTConfigPanel
+ 15) see 11, need to convert all pack to grid (or vice versa)
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

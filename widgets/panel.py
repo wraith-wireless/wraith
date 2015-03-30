@@ -290,8 +290,10 @@ class SimplePanel(SlavePanel):
         SlavePanel.__init__(self,toplevel,chief,iconpath)
         self.master.title(title)
         self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
-        self._body()
-    def _body(self): raise NotImplementedError("SimplePanel::_body")
+        frm = Tix.Frame(self)
+        frm.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        self._body(frm)
+    def _body(self,frm): raise NotImplementedError("SimplePanel::_body")
     def reset(self): pass
     def update(self): pass
     def _shutdown(self): pass
