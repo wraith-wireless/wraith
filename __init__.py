@@ -18,6 +18,7 @@ wraith 0.0.2
  includes: wraith-rt. py,subpanels.py and wraith.conf (also all subdirectories etc)
  changes:
   - added multiple panels for non-data related functionality
+  - began adding calculation panels
 
  TODO:
   1) tried --remove-pid/--remove-pidfile to remove pids of dysktd and nidusd

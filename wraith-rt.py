@@ -39,7 +39,9 @@ _STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
 
 #### CALCULATIONS - dict of calculation options for CalculatePanel
 _CALCS_ = {'EIRP':{'inputs':[('Pwr (mW)',5,'float'),('Gain (dBi)',5,'float')],
-                   'answer':("10*math.log10($0) + $1","dB")}}
+                   'answer':("10*math.log10($0) + $1",'dB')},
+           'FSPL':{'inputs':[('Distance (m)',7,'float'),('RF (MHz)',5,'float')],
+                   'answer':("20*math.log10($0/1000) + 20*math.log10($1) + 32.44",'dB')}}
 
 class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
@@ -171,6 +173,7 @@ class WraithPanel(gui.MasterPanel):
         self.mnuTools.add_command(label="Convert",command=self.viewconvert)
         self.mnuToolsCalcs = Tix.Menu(self.mnuTools,tearoff=0)
         self.mnuToolsCalcs.add_command(label="EIRP",command=lambda:self.calc('EIRP'))
+        self.mnuToolsCalcs.add_command(label="FSPL",command=lambda:self.calc('FSPL'))
         self.mnuTools.add_cascade(label="Calcuators",menu=self.mnuToolsCalcs)
 
         # View Menu
