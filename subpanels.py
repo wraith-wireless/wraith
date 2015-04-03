@@ -22,6 +22,7 @@ import wraith.widgets.panel as gui         # graphics suite
 from wraith.radio.iw import IW_CHWS        # channel width list
 from wraith.radio.iwtools import wifaces   # check nic validity
 from wraith.dyskt.dyskt import parsechlist # channelist validity check
+from wraith.utils import landnav           # lang nav utilities
 
 # Validation reg. exp.
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr
@@ -261,6 +262,35 @@ class ConvertPanel(gui.SimplePanel):
         self.txtmBm.delete(0,Tix.END)
         self.txtmW.delete(0,Tix.END)
 
+#### CALCULATIONS - dict of calculation options for CalculatePanel
+CALCS = {'EIRP':{'inputs':[('Pwr (mW)',5,'float'),('Gain (dBi)',5,'float')],
+                 'answer':("10*math.log10($0) + $1",'dB'),'rc':[2]},
+         'FSPL':{'inputs':[('Distance (m)',7,'float'),('RF (MHz)',5,'float')],
+                  'answer':("20*math.log10($0/1000) + 20*math.log10($1) + 32.44",'dB'),
+                  'rc':[2]},
+         'Link Budget':{'inputs':[('Tx Pwr (mW)',5,'float'),('Tx Gain (dBi)',3,'float'),
+                                  ('Tx Loss (dB)',3,'float'),('Rx Gain (dBi)',3,'float'),
+                                  ('Rx Loss (dB)',3,'float'),('Distance (kM)',3,'float'),
+                                  ('RF (MHz)',4,'float')],
+                        'answer':("10*math.log10($0)+$1-$2+$3-$4-(20*math.log10($5) + 20*math.log10($6) + 32.44)",'dB'),
+                        'rc':[3,2,2]},
+         'Fresnel Zone':{'inputs':[('Dist. 1 (kM)',5,'float'),
+                                   ('Dist. 2 (kM)',5,'float'),
+                                   ('RF (MHz)',4,'float')],
+                         'answer':("17.3*(math.sqrt(($0*$1)/($2/1000)*($0+$1)))",'m'),
+                         'rc':[3]},
+         'Distance':{'inputs':[("Start (mgrs)",15,'str'),("End (mgrs)",15,'str')],
+                     'answer':("landnav.dist($0,$1)[0]",'m'),
+                     'rc':[1,1]},
+         'Terminus':{'inputs':[("Point (mgrs)",15,'str'),("LOB (TN)",4,'float'),
+                               ("Dist (m)",5,'float')],
+                     'answer':("landnav.terminus($0,$1,$2)[2]",'mgrs'),
+                     'rc':[1,2]},
+         'Cut':{'inputs':[("Pt 1 (mgrs)",15,'str'),("LOB 1 (TN)",4,'float'),
+                          ("Pt 2 (mgrs)",15,'str'),("LOB 2 (TN)",4,'float')],
+                'answer':("landnav.findcut($0,$1,$2,$3)",'mgrs'),
+                'rc':[2,2]}}
+
 # Tools->Calculate(all)
 class CalculatePanel(gui.SimplePanel):
     """
@@ -273,6 +303,7 @@ class CalculatePanel(gui.SimplePanel):
            label is the text to display in the entry's label
            width is the width (# of characters) for the entry
            type is the conversion to use on the text from the entry (as a string)
+           see above
           result is a tuple t = (formula,measurement) such that
            formula is a string representing the mathematical formula to evaluate
            where each placeholder $i is substituted with the value in entry i
@@ -308,23 +339,17 @@ class CalculatePanel(gui.SimplePanel):
         i = 0
         for input in inputs:
             for c in xrange(len(input)):
-                Tix.Label(frmEnt,text=" %s: " % input[c][0]).grid(row=r,column=(c*2))
+                Tix.Label(frmEnt,text=" %s: " % input[c][0]).grid(row=r,column=c*2,sticky=Tix.W)
                 self._entries.append(Tix.Entry(frmEnt,width=input[c][1]))
-                self._entries[i].grid(row=r,column=(c*2)+1)
+                self._entries[i].grid(row=r,column=c*2+1,sticky=Tix.W)
                 i += 1
             r += 1
-
-        #for i in xrange(len(self._inputs)):
-        #    Tix.Label(frmEnt,text=" %s: " % self._inputs[i][0]).grid(row=0,column=(i*2))
-        #    self._entries.append(Tix.Entry(frmEnt,width=self._inputs[i][1]))
-        #    self._entries[i].grid(row=0,column=(i*2)+1)
 
         # answer frame, then button frames
         frmAns = Tix.Frame(frm,borderwidth=0)
         frmAns.grid(row=1,column=0,sticky=Tix.N)
         Tix.Label(frmAns,text="Answer: ").grid(row=0,column=0)
         Tix.Label(frmAns,width=20,textvariable=self._ans).grid(row=0,column=1)
-        Tix.Label(frmAns,text=" %s" % self._meas).grid(row=0,column=2)
         frmBtns = Tix.Frame(frm,borderwidth=0)
         frmBtns.grid(row=2,column=0,sticky=Tix.N)
         Tix.Button(frmBtns,text="Calculate",command=self.calc).grid(row=0,column=0)
@@ -345,7 +370,7 @@ class CalculatePanel(gui.SimplePanel):
 
         # attempt to calculate
         try:
-            self._ans.set(str(eval(formula)))
+            self._ans.set("%s %s" % (str(eval(formula)),self._meas))
         except ValueError as e:
             self.err("Invalid Input","%s is not a valid input" % e.message.split(':')[1].strip())
         except Exception as e:
