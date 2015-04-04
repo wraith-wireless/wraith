@@ -320,7 +320,6 @@ class ConfigPanel(SlavePanel):
         """ initialize configuration panel """
         SlavePanel.__init__(self,toplevel,chief,"widgets/icons/config.png")
         self.master.title(title)
-        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
 
         # set up the input widget frame
         frmConfs = Tix.Frame(self)
@@ -385,7 +384,6 @@ class ListPanel(SlavePanel):
     def __init__(self,toplevel,chief,ttl,sz,cols=1,httl=None,iconPath=None):
         SlavePanel.__init__(self,toplevel,chief,iconPath)
         self.master.title(ttl)
-        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
 
         # create and allow derived classes to setup top frame
         frmTop = Tix.Frame(self)

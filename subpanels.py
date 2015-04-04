@@ -1241,17 +1241,39 @@ class AboutPanel(gui.SimplePanel):
 
 # Help->Help
 class HelpPanel(gui.SimplePanel):
-    """ HelpPanel - displays a simple Help Panel """
+    """
+     HelpPanel - displays a simple Help Panel
+      For now, this a simplistic help panel with a Tree on the left hand side
+      with entries corresponding to simple text files on the left. Would like
+      to extend this to allow for images, links in the right-hand side as
+      well as search functionality
+    """
     def __init__(self,toplevel,chief,hpath):
         self._path = hpath
         gui.SimplePanel.__init__(self,toplevel,chief,"Help","widgets/icons/help.png")
 
+    #def _body(self,frm):
+    #    self.txtSHelp = Tix.ScrolledText(frm)
+    #    self.txtHelp = self.txtSHelp.text
+    #    self.txtHelp.config(width=80)
+    #    self.txtHelp.config(height=20)
+    #    self.txtHelp.config(wrap=Tix.WORD)
+    #    self.txtSHelp.grid(row=0,column=0,sticky=Tix.W+Tix.N+Tix.E+Tix.S)
+    #    with open(self._path,'r') as fin: self.txtHelp.insert("1.0",fin.read())
     def _body(self,frm):
+        # split frm into two
+        frmI = Tix.Frame(frm)
+        frmI.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+
+        frmD = Tix.Frame(frm)
+        frmD.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
         self.txtSHelp = Tix.ScrolledText(frm)
         self.txtHelp = self.txtSHelp.text
         self.txtHelp.config(width=80)
         self.txtHelp.config(height=20)
         self.txtHelp.config(wrap=Tix.WORD)
         self.txtSHelp.grid(row=0,column=0,sticky=Tix.W+Tix.N+Tix.E+Tix.S)
-        with open(self._path,'r') as fin: self.txtHelp.insert("1.0",fin.read())
+        #with open(self._path,'r') as fin: self.txtHelp.insert("1.0",fin.read())
+
+        #self.slist = Tix.Tree(frm)
 
