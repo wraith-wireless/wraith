@@ -544,7 +544,14 @@ class WraithPanel(gui.MasterPanel):
 
     def help(self):
         """ display the help panel """
-        self.unimplemented()
+        panel = self.getpanels('help',False)
+        if not panel:
+            t = Tix.Toplevel()
+            pnl = subgui.HelpPanel(t,self,'README.md')
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'help'))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
 
 #### MINION METHODS
 
@@ -940,6 +947,6 @@ if __name__ == '__main__':
     t.option_add('*activeBackground','black')         # bg on mouseover
     t.option_add('*activeForeground','blue')          # fg on mouseover
     t.option_add('*disabledForeground','gray')        # fg on disabled widget
-    t.option_add('*disabledBackground','gray')       # bg on disabled widget
+    t.option_add('*disabledBackground','gray')        # bg on disabled widget
     t.option_add('*troughColor','black')              # trough on scales/scrollbars
     WraithPanel(t).mainloop()

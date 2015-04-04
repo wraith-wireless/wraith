@@ -1238,3 +1238,20 @@ class AboutPanel(gui.SimplePanel):
                                                    wraith.__date__.split(' ')[1],
                                                    wraith.__email__),
                   fg='white',font=('Roman',8,'bold')).grid(row=3,column=0,sticky=Tix.N)
+
+# Help->Help
+class HelpPanel(gui.SimplePanel):
+    """ HelpPanel - displays a simple Help Panel """
+    def __init__(self,toplevel,chief,hpath):
+        self._path = hpath
+        gui.SimplePanel.__init__(self,toplevel,chief,"Help","widgets/icons/help.png")
+
+    def _body(self,frm):
+        self.txtSHelp = Tix.ScrolledText(frm)
+        self.txtHelp = self.txtSHelp.text
+        self.txtHelp.config(width=80)
+        self.txtHelp.config(height=20)
+        self.txtHelp.config(wrap=Tix.WORD)
+        self.txtSHelp.grid(row=0,column=0,sticky=Tix.W+Tix.N+Tix.E+Tix.S)
+        with open(self._path,'r') as fin: self.txtHelp.insert("1.0",fin.read())
+

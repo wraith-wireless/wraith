@@ -18,7 +18,9 @@ wraith 0.0.2
  includes: wraith-rt. py,subpanels.py and wraith.conf (also all subdirectories etc)
  changes:
   - added multiple panels for non-data related functionality
-  - added conversion/calculation panels
+    o start/stop services
+    o log viewing
+    o conversion/calculation panels
 
  TODO:
   1) tried --remove-pid/--remove-pidfile to remove pids of dysktd and nidusd
@@ -38,6 +40,9 @@ wraith 0.0.2
  14) need to further test config panels primarily DySKTConfigPanel
  15) see 11, need to convert all pack to grid (or vice versa)
  16) fresnel zone calculation - is it correct?
+ 17) Help Panel
+     - code a two-paned window for an indexed help
+     - write help documentation
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
@@ -50,7 +55,7 @@ __status__ = 'Development'
 
 #### CONSTANTS
 
-BINS = "ABCDEFG"                        # data bin ids
+BINS = "ABCDEFG"                         # data bin ids
 NIDUSLOG   = '/var/log/wraith/nidus.log' # path to nidus log
 DYSKTLOG   = '/var/log/wraith/dyskt.log' # path to dyskt log
 NIDUSPID   = '/var/run/nidusd.pid'       # path to nidus pidfile
