@@ -38,7 +38,6 @@ wraith 0.0.2
      throws an error
  13) viewniduslog and viewdysktlog hang whenever respective logs are cleared
  14) need to further test config panels primarily DySKTConfigPanel
- 15) see 11, need to convert all pack to grid (or vice versa)
  16) fresnel zone calculation - is it correct?
  17) Help Panel
      - code a two-paned window for an indexed help

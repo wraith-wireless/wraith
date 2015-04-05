@@ -544,14 +544,7 @@ class WraithPanel(gui.MasterPanel):
 
     def help(self):
         """ display the help panel """
-        panel = self.getpanels('help',False)
-        if not panel:
-            t = Tix.Toplevel()
-            pnl = subgui.HelpPanel(t,self,'README.md')
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'help'))
-        else:
-            panel[0].tk.deiconify()
-            panel[0].tk.lift()
+        self.unimplemented()
 
 #### MINION METHODS
 
