@@ -28,8 +28,6 @@ for subclasses as they becomes necessary.
       else:
         panel[0].tk.deiconify()
         panel[0].tk.lift()
-   6) convert all pack to grid
-     o when doing so, need correpsonding expand, fill functionality
    7) disable/enable resize as necessary and if enabled ensure widgets resize
       as necessary -> self.master.resizable(0,0)
 """
@@ -109,6 +107,7 @@ class Panel(Tix.Frame):
         can be uniquely identified by the self.name
       3) provides functionality to handle storage/retrieval/deletion of slave
          panels
+      4) allows for the setting/display of an icon
         
      Derived classes must implement
       delete - user exit trap
@@ -118,30 +117,28 @@ class Panel(Tix.Frame):
       notifyclose if the derived class needs to process closing slaves
     """
     # noinspection PyProtectedMember
-    def __init__(self,toplevel,iconPath=None):
+    def __init__(self,toplevel,iconPath=None,resize=False):
         """
          toplevel - this is the Toplevel widget for this panel (managed directly
           by the window manger)
          iconPath - path of icon (if one) to display the title bar
+         resize - allow resize of Panel ornot
         """
         Tix.Frame.__init__(self,toplevel)
         self.appicon = ImageTk.PhotoImage(Image.open(iconPath)) if iconPath else None
         if self.appicon: self.tk.call('wm','iconphoto',self.master._w,self.appicon)
         self.master.protocol("WM_DELETE_WINDOW",self.delete)
         self._panels = {}
+        self.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
+        if not resize: self.master.resizable(0,0)
 
     # properties/attributes
     @property
     def name(self): return self._name
 
     # virtual methods
-
-    def delete(self):
-        """ user initiated (from title bar) """
-        raise NotImplementedError("Panel::delete")
-    def close(self):
-        """ master panel initiated """
-        raise NotImplementedError("Panel::close")
+    def delete(self): raise NotImplementedError("Panel::delete") # user initiated
+    def close(self): raise NotImplementedError("Panel::close") # self/master initiated
 
     #### slave panel storage functions
 
@@ -243,9 +240,9 @@ class SlavePanel(Panel):
      NOTE: The SlavePanel itself has no methods to define gui widgets, i.e.
       menu, main frame etc
     """
-    def __init__(self,toplevel,chief,iconPath=None):
+    def __init__(self,toplevel,chief,iconPath=None,resize=False):
         """ chief is the controlling (Master) panel """
-        Panel.__init__(self,toplevel,iconPath)
+        Panel.__init__(self,toplevel,iconPath,resize)
         self._chief = chief
 
     def _shutdown(self):
@@ -290,12 +287,11 @@ class SimplePanel(SlavePanel):
       reset,update if dynamic data is being displayed
       _shutdown if any cleanup needs to be performed prior to closing
     """
-    def __init__(self,toplevel,chief,title,iconpath=None):
-        SlavePanel.__init__(self,toplevel,chief,iconpath)
+    def __init__(self,toplevel,chief,title,iconpath=None,resize=False):
+        SlavePanel.__init__(self,toplevel,chief,iconpath,resize)
         self.master.title(title)
-        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
         frm = Tix.Frame(self)
-        frm.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        frm.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
         self._body(frm)
     def _body(self,frm): raise NotImplementedError("SimplePanel::_body")
     def reset(self): pass
@@ -320,20 +316,19 @@ class ConfigPanel(SlavePanel):
        are valid, False otherwise
       _write writes the values of the entries into the config file
     """
-    def __init__(self,toplevel,chief,title):
+    def __init__(self,toplevel,chief,title,resize=False):
         """ initialize configuration panel """
-        SlavePanel.__init__(self,toplevel,chief,"widgets/icons/config.png")
+        SlavePanel.__init__(self,toplevel,chief,"widgets/icons/config.png",resize)
         self.master.title(title)
-        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
 
         # set up the input widget frame
         frmConfs = Tix.Frame(self)
         self._makegui(frmConfs)
-        frmConfs.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        frmConfs.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
 
         # set up the button widget frame
         frmBtns = Tix.Frame(self)
-        frmBtns.pack(side=Tix.TOP)
+        frmBtns.grid(row=1,column=0,sticky=Tix.N+Tix.S)
 
         # four buttons, Ok, Apply, Reset and Cancel
         Tix.Button(frmBtns,text='OK',command=self.ok).grid(row=0,column=0)
@@ -386,14 +381,16 @@ class ListPanel(SlavePanel):
       topframe if any widgets need to be added to the top frame
       bottomframe if any widgets need to be added to the bottom frame
     """
-    def __init__(self,toplevel,chief,ttl,sz,cols=1,httl=None,iconPath=None):
-        SlavePanel.__init__(self,toplevel,chief,iconPath)
+    def __init__(self,toplevel,chief,ttl,sz,cols=1,httl=None,iconPath=None,resize=False):
+        SlavePanel.__init__(self,toplevel,chief,iconPath,resize)
         self.master.title(ttl)
-        self.pack(expand=True,fill=Tix.BOTH,side=Tix.TOP)
 
         # create and allow derived classes to setup top frame
+        curRow = 0
         frmTop = Tix.Frame(self)
-        if self.topframe(frmTop): frmTop.pack(side=Tix.TOP,expand=False)
+        if self.topframe(frmTop):
+            frmTop.grid(row=curRow,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
+            curRow += 1
 
         # need hdr value for HList init
         hdr = True
@@ -401,7 +398,8 @@ class ListPanel(SlavePanel):
 
         # setup the hlist
         self.frmMain = Tix.Frame(self)
-        self.frmMain.pack(side=Tix.TOP,fill=Tix.BOTH,expand=True)
+        self.frmMain.grid(row=curRow,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
+        curRow += 1
 
         # create the scrolled hlist
         # NOTE: if necessary, should be able to use Tree as below
@@ -425,14 +423,15 @@ class ListPanel(SlavePanel):
                                       style=style['header'])
 
         # and pack the scrolled list
-        self.slist.pack(expand=True,fill=Tix.BOTH,side=Tix.LEFT)
+        self.slist.grid(row=curRow,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
+        curRow += 1
 
         # allow a bottom frame
         frmBottom = Tix.Frame(self)
         if self.bottomframe(frmBottom):
-            frmBottom.pack(side=Tix.TOP,expand=False)
+            frmBottom.grid(row=curRow,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
 
-    # noinspection prPyUnusedLocal
+    # noinspection PyUnusedLocal
     def topframe(self,frm): return None # override to add widgets to topframe
     # noinspection PyUnusedLocal
     def bottomframe(self,frm): return None # override to add widgets to bottomframe
@@ -551,7 +550,7 @@ class TailLogPanel(ListPanel):
     """ Displays log data from a file - graphically similar to tail -f <file> """
     def __init__(self,toplevel,chief,ttl,polltime,logfile):
         """ initializes TailLogPanel to read from the file specified logfile """
-        ListPanel.__init__(self,toplevel,chief,ttl,(60,8),1,[],"widgets/icons/log.png")
+        ListPanel.__init__(self,toplevel,chief,ttl,(60,8),1,[],"widgets/icons/log.png",False)
         self._n = 0
         self._lf = logfile
         if not os.path.exists(logfile) and not os.path.isfile(logfile):
@@ -625,14 +624,14 @@ class MasterPanel(Panel):
       showpanel -> derive for use in toolsload (loads saved panel configs)
       delete and close if the derived class must further handle shutting down
     """
-    def __init__(self,toplevel,ttl,datatypes=None,logpanel=True,iconPath=None):
+    def __init__(self,toplevel,ttl,datatypes=None,logpanel=True,iconPath=None,resize=False):
         """
          ttl - title of the window/panel
          datatypes - list of strings for data bins, etc
          logpanel - if True, will initiate a logpanel
          iconPath - path of image to show as icon for this panel
         """
-        Panel.__init__(self,toplevel,iconPath)
+        Panel.__init__(self,toplevel,iconPath,resize)
         self.tk = toplevel
         self.menubar = None
         

@@ -9,6 +9,7 @@ widgets 0.0.2
  includes: icons folder, panel.py
  changes:
   - scrubbed and removed circular, redundant, confusing code
+  - stopped using pack and grid geometry managers
 """
 __name__ = 'utils'
 __license__ = 'GPL v3.0'

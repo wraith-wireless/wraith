@@ -50,7 +50,7 @@ class WraithPanel(gui.MasterPanel):
 
         # set up super
         gui.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
-                                 [],True,"widgets/icons/wraith3.png")
+                                 [],True,"widgets/icons/wraith3.png",False)
 
 #### PROPS
 
@@ -68,7 +68,6 @@ class WraithPanel(gui.MasterPanel):
         # have to manually enter the desired size, as the menu does not expand
         # the visibile portion automatically
         self.tk.wm_geometry("300x1+0+0")
-        self.tk.resizable(0,0)
         self.logwrite("Wraith v%s" % wraith.__version__)
 
         # read in conf file, exit on error
@@ -935,11 +934,11 @@ class WraithPanel(gui.MasterPanel):
 
 if __name__ == '__main__':
     t = Tix.Tk()
-    t.option_add('*foreground','blue')                # normal fg color
+    """t.option_add('*foreground','blue')                # normal fg color
     t.option_add('*background','black')               # normal bg color
     t.option_add('*activeBackground','black')         # bg on mouseover
     t.option_add('*activeForeground','blue')          # fg on mouseover
     t.option_add('*disabledForeground','gray')        # fg on disabled widget
     t.option_add('*disabledBackground','gray')        # bg on disabled widget
-    t.option_add('*troughColor','black')              # trough on scales/scrollbars
+    t.option_add('*troughColor','black')              # trough on scales/scrollbars"""
     WraithPanel(t).mainloop()

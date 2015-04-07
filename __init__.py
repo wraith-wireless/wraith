@@ -17,10 +17,11 @@ wraith 0.0.2
  desc: dyskt,nidus are developmentally sound, begin work on gui
  includes: wraith-rt. py,subpanels.py and wraith.conf (also all subdirectories etc)
  changes:
-  - added multiple panels for non-data related functionality
-    o start/stop services
-    o log viewing
-    o conversion/calculation panels
+  GUI:
+   - added multiple panels for non-data related functionality
+     o start/stop services
+     o log viewing
+     o conversion/calculation panels
 
  TODO:
   1) tried --remove-pid/--remove-pidfile to remove pids of dysktd and nidusd
@@ -34,14 +35,13 @@ wraith 0.0.2
      to send 'batch' messages after the fact
   6) need to periodically recheck state -> status of postgres,nidusd and dyskt
  10) get log panel to scroll automatically
- 11) add labels to frames. Have to use grid or pack not both otherwise, LabelFrame
-     throws an error
  13) viewniduslog and viewdysktlog hang whenever respective logs are cleared
  14) need to further test config panels primarily DySKTConfigPanel
  16) fresnel zone calculation - is it correct?
  17) Help Panel
      - code a two-paned window for an indexed help
-     - write help documentation
+     - write help documentation\
+ 18) port/move to ttk?
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
