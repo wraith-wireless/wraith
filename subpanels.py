@@ -12,7 +12,8 @@ __status__ = 'Development'
 
 import os                                  # file info etc
 import re                                  # reg. exp.
-import Tix                                 # Tix gui stuff
+import Tkinter as tk                       # gui constructs
+import ttk                                 # ttk widgets
 import mgrs                                # for mgrs2latlon conversions etc
 import math                                # for conversions, calculations
 from PIL import Image,ImageTk              # image input & support
@@ -43,49 +44,43 @@ class WraithConfigPanel(gui.ConfigPanel):
     def _makegui(self,frm):
         """ set up entry widgets """
         # Storage Configuration
-        lfrmS = Tix.LabelFrame(frm,label='Storage')
-        lfrmS.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-        frmS = lfrmS.subwidget_list['frame']
-        Tix.Label(frmS,text='Host: ').grid(row=0,column=0,sticky=Tix.W)
-        self.txtHost = Tix.Entry(frmS,width=15)
-        self.txtHost.grid(row=0,column=1,sticky=Tix.E)
-        Tix.Label(frmS,text='DB: ').grid(row=1,column=0,sticky=Tix.W)
-        self.txtDB = Tix.Entry(frmS,width=15)
-        self.txtDB.grid(row=1,column=1,sticky=Tix.E)
-        Tix.Label(frmS,text='User: ').grid(row=2,column=0,sticky=Tix.W)
-        self.txtUser = Tix.Entry(frmS,width=15)
-        self.txtUser.grid(row=2,column=1,sticky=Tix.E)
-        Tix.Label(frmS,text='PWD: ').grid(row=3,column=0,sticky=Tix.W)
-        self.txtPWD = Tix.Entry(frmS,width=15)
-        self.txtPWD.grid(row=3,column=1,sticky=Tix.E)
+        frmS = ttk.LabelFrame(frm,text='Storage')
+        frmS.grid(row=0,column=0,sticky='nwse')
+        ttk.Label(frmS,text='Host: ').grid(row=0,column=0,sticky='w')
+        self.txtHost = ttk.Entry(frmS,width=15)
+        self.txtHost.grid(row=0,column=1,sticky='e')
+        ttk.Label(frmS,text='DB: ').grid(row=1,column=0,sticky='w')
+        self.txtDB = ttk.Entry(frmS,width=15)
+        self.txtDB.grid(row=1,column=1,sticky='e')
+        ttk.Label(frmS,text='User: ').grid(row=2,column=0,sticky='w')
+        self.txtUser = ttk.Entry(frmS,width=15)
+        self.txtUser.grid(row=2,column=1,sticky='e')
+        ttk.Label(frmS,text='PWD: ').grid(row=3,column=0,sticky='w')
+        self.txtPWD = ttk.Entry(frmS,width=15)
+        self.txtPWD.grid(row=3,column=1,sticky='e')
 
         # Policy Configuration
-        lfrmP = Tix.LabelFrame(frm,label='Policy')
-        lfrmP.grid(row=1,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-        frmP = lfrmP.subwidget_list['frame']
+        frmP = ttk.LabelFrame(frm,text='Policy')
+        frmP.grid(row=1,column=0,sticky='nswe')
 
         # polite
-        Tix.Label(frmP,text="Polite:").grid(row=0,column=0,sticky=Tix.W)
-        self.ptype = Tix.IntVar(self)
-        self.rdoPoliteOn = Tix.Radiobutton(frmP,text='On',
-                                           variable=self.ptype,value=1)
-        self.rdoPoliteOn.grid(row=0,column=1,sticky=Tix.W)
-        self.rdoPoliteOff = Tix.Radiobutton(frmP,text='Off',
-                                            variable=self.ptype,value=0)
-        self.rdoPoliteOff.grid(row=1,column=1,sticky=Tix.W)
+        ttk.Label(frmP,text="Polite:").grid(row=0,column=0,sticky='w')
+        self.ptype = tk.IntVar(self)
+        self.rdoPoliteOn = ttk.Radiobutton(frmP,text='On',variable=self.ptype,value=1)
+        self.rdoPoliteOn.grid(row=0,column=1,sticky='w')
+        self.rdoPoliteOff = ttk.Radiobutton(frmP,text='Off',variable=self.ptype,value=0)
+        self.rdoPoliteOff.grid(row=1,column=1,sticky='w')
 
         # separator label
-        Tix.Label(frmP,text=" ").grid(row=0,column=2)
+        ttk.Label(frmP,text=" ").grid(row=0,column=2)
 
         # shutdown
-        Tix.Label(frmP,text="Shutdown:").grid(row=0,column=3,sticky=Tix.W)
-        self.stype = Tix.IntVar(self)
-        self.rdoShutdownAuto = Tix.Radiobutton(frmP,text='Auto',
-                                               variable=self.stype,value=1)
-        self.rdoShutdownAuto.grid(row=0,column=4,sticky=Tix.W)
-        self.rdoShutdownManual = Tix.Radiobutton(frmP,text='Manual',
-                                                 variable=self.ptype,value=0)
-        self.rdoShutdownManual.grid(row=1,column=4,sticky=Tix.W)
+        ttk.Label(frmP,text="Shutdown:").grid(row=0,column=3,sticky='w')
+        self.stype = tk.IntVar(self)
+        self.rdoShutdownAuto = ttk.Radiobutton(frmP,text='Auto',variable=self.stype,value=1)
+        self.rdoShutdownAuto.grid(row=0,column=4,sticky='w')
+        self.rdoShutdownManual = ttk.Radiobutton(frmP,text='Manual',variable=self.ptype,value=0)
+        self.rdoShutdownManual.grid(row=1,column=4,sticky='w')
 
     def _initialize(self):
         """ insert values from config file into entry boxes """
@@ -95,22 +90,22 @@ class WraithConfigPanel(gui.ConfigPanel):
             return
 
         # in case the conf file is invalid, set to empty if not present
-        self.txtHost.delete(0,Tix.END)
+        self.txtHost.delete(0,tk.END)
         if conf.has_option('Storage','host'):
             self.txtHost.insert(0,conf.get('Storage','host'))
         else: self.txtHost.insert(0,'')
 
-        self.txtDB.delete(0,Tix.END)
+        self.txtDB.delete(0,tk.END)
         if conf.has_option('Storage','db'):
             self.txtDB.insert(0,conf.get('Storage','db'))
         else: self.txtDB.insert(0,'')
 
-        self.txtUser.delete(0,Tix.END)
+        self.txtUser.delete(0,tk.END)
         if conf.has_option('Storage','user'):
             self.txtUser.insert(0,conf.get('Storage','user'))
         else: self.txtUser.insert(0,'')
 
-        self.txtPWD.delete(0,Tix.END)
+        self.txtPWD.delete(0,tk.END)
         if conf.has_option('Storage','pwd'):
             self.txtPWD.insert(0,conf.get('Storage','pwd'))
         else: self.txtPWD.insert(0,'')
@@ -177,36 +172,34 @@ class ConvertPanel(gui.SimplePanel):
     def _body(self,frm):
         """ creates the body """
         # create the location frame
-        lfrmGeo = Tix.LabelFrame(frm,label='Location')
-        lfrmGeo.grid(row=0,column=0,sticky=Tix.W)
-        frmGeo = lfrmGeo.subwidget_list['frame'] # pack widgets into this
+        frmGeo = ttk.LabelFrame(frm,text='Location')
+        frmGeo.grid(row=0,column=0,sticky='w')
         # add widgets to the location frame
-        Tix.Label(frmGeo,text='Lat/Lon: ').grid(row=0,column=0,sticky=Tix.W)
-        self.txtLatLon = Tix.Entry(frmGeo,width=15)
-        self.txtLatLon.grid(row=0,column=1,sticky=Tix.W)
-        Tix.Label(frmGeo,text=' MGRS: ').grid(row=0,column=2,sticky=Tix.W)
-        self.txtMGRS = Tix.Entry(frmGeo,width=15)
-        self.txtMGRS.grid(row=0,column=3,sticky=Tix.W)
-        Tix.Button(frmGeo,text='Convert',command=self.convertgeo).grid(row=0,column=4)
+        ttk.Label(frmGeo,text='Lat/Lon: ').grid(row=0,column=0,sticky='w')
+        self.txtLatLon = ttk.Entry(frmGeo,width=15)
+        self.txtLatLon.grid(row=0,column=1,sticky='w')
+        ttk.Label(frmGeo,text=' MGRS: ').grid(row=0,column=2,sticky='w')
+        self.txtMGRS = ttk.Entry(frmGeo,width=15)
+        self.txtMGRS.grid(row=0,column=3,sticky='w')
+        ttk.Button(frmGeo,text='Convert',command=self.convertgeo).grid(row=0,column=4)
         # create the power frame
-        lfrmPwr = Tix.LabelFrame(frm,label='Power')
-        lfrmPwr.grid(row=1,column=0,sticky=Tix.N)
-        frmPwr = lfrmPwr.subwidget_list['frame']
+        frmPwr = ttk.LabelFrame(frm,text='Power')
+        frmPwr.grid(row=1,column=0,sticky='n')
         # add widgets to the power frame
-        Tix.Label(frmPwr,text="dBm: ").grid(row=0,column=0)
-        self.txtdBm = Tix.Entry(frmPwr,width=8)
+        ttk.Label(frmPwr,text="dBm: ").grid(row=0,column=0)
+        self.txtdBm = ttk.Entry(frmPwr,width=8)
         self.txtdBm.grid(row=0,column=1)
-        Tix.Label(frmPwr,text=" mBm: ").grid(row=0,column=2)
-        self.txtmBm = Tix.Entry(frmPwr,width=8)
+        ttk.Label(frmPwr,text=" mBm: ").grid(row=0,column=2)
+        self.txtmBm = ttk.Entry(frmPwr,width=8)
         self.txtmBm.grid(row=0,column=3)
-        Tix.Label(frmPwr,text=" mW: ").grid(row=0,column=4)
-        self.txtmW = Tix.Entry(frmPwr,width=8)
+        ttk.Label(frmPwr,text=" mW: ").grid(row=0,column=4)
+        self.txtmW = ttk.Entry(frmPwr,width=8)
         self.txtmW.grid(row=0,column=5)
-        Tix.Button(frmPwr,text='Convert',command=self.convertpwr).grid(row=0,column=6)
-        frmBtns = Tix.Frame(frm,borderwidth=0)
-        frmBtns.grid(row=2,column=0,sticky=Tix.N)
-        Tix.Button(frmBtns,text='OK',command=self.delete).grid(row=0,column=0)
-        Tix.Button(frmBtns,text='Clear',command=self.clear).grid(row=0,column=1)
+        ttk.Button(frmPwr,text='Convert',command=self.convertpwr).grid(row=0,column=6)
+        frmBtns = ttk.Frame(frm,borderwidth=0)
+        frmBtns.grid(row=2,column=0,sticky='n')
+        ttk.Button(frmBtns,text='OK',command=self.delete).grid(row=0,column=0)
+        ttk.Button(frmBtns,text='Clear',command=self.clear).grid(row=0,column=1)
 
     def convertgeo(self):
         """convert geo from lat/lon to mgrs or vice versa """
@@ -262,11 +255,11 @@ class ConvertPanel(gui.SimplePanel):
 
     def clear(self):
         """ clear all entries """
-        self.txtLatLon.delete(0,Tix.END)
-        self.txtMGRS.delete(0,Tix.END)
-        self.txtdBm.delete(0,Tix.END)
-        self.txtmBm.delete(0,Tix.END)
-        self.txtmW.delete(0,Tix.END)
+        self.txtLatLon.delete(0,tk.END)
+        self.txtMGRS.delete(0,tk.END)
+        self.txtdBm.delete(0,tk.END)
+        self.txtmBm.delete(0,tk.END)
+        self.txtmW.delete(0,tk.END)
 
 #### CALCULATIONS - dict of calculation options for CalculatePanel
 CALCS = {'EIRP':{'inputs':[('Pwr (mW)',5,'float'),('Gain (dBi)',5,'float')],
@@ -322,7 +315,7 @@ class CalculatePanel(gui.SimplePanel):
         # initiate variables prior to call SimplePanel::init
         self._entries = []
         self._inputs = inputs
-        self._ans = Tix.StringVar()
+        self._ans = tk.StringVar()
         self._ans.set("")
         self._formula = result[0]
         self._meas = result[1]
@@ -332,8 +325,8 @@ class CalculatePanel(gui.SimplePanel):
     def _body(self,frm):
         """ creates the body """
         # entries frame
-        frmEnt = Tix.Frame(frm,borderwidth=0)
-        frmEnt.grid(row=0,column=0,sticky=Tix.W)
+        frmEnt = ttk.Frame(frm,borderwidth=0)
+        frmEnt.grid(row=0,column=0,sticky='w')
 
         # create the widgets
         inputs = []
@@ -346,22 +339,22 @@ class CalculatePanel(gui.SimplePanel):
         i = 0
         for input in inputs:
             for c in xrange(len(input)):
-                Tix.Label(frmEnt,text=" %s: " % input[c][0]).grid(row=r,column=c*2,sticky=Tix.W)
-                self._entries.append(Tix.Entry(frmEnt,width=input[c][1]))
-                self._entries[i].grid(row=r,column=c*2+1,sticky=Tix.W)
+                ttk.Label(frmEnt,text=" %s: " % input[c][0]).grid(row=r,column=c*2,sticky='w')
+                self._entries.append(ttk.Entry(frmEnt,width=input[c][1]))
+                self._entries[i].grid(row=r,column=c*2+1,sticky='w')
                 i += 1
             r += 1
 
         # answer frame, then button frames
-        frmAns = Tix.Frame(frm,borderwidth=0)
-        frmAns.grid(row=1,column=0,sticky=Tix.N)
-        Tix.Label(frmAns,text="Answer: ").grid(row=0,column=0)
-        Tix.Label(frmAns,width=20,textvariable=self._ans).grid(row=0,column=1)
-        frmBtns = Tix.Frame(frm,borderwidth=0)
-        frmBtns.grid(row=2,column=0,sticky=Tix.N+Tix.S)
-        Tix.Button(frmBtns,text="Calculate",command=self.calc).grid(row=0,column=0)
-        Tix.Button(frmBtns,text="Reset",command=self.clear).grid(row=0,column=1)
-        Tix.Button(frmBtns,text="Close",command=self.delete).grid(row=0,column=2)
+        frmAns = ttk.Frame(frm,borderwidth=0)
+        frmAns.grid(row=1,column=0,sticky='n')
+        ttk.Label(frmAns,text="Answer: ").grid(row=0,column=0)
+        ttk.Label(frmAns,width=20,textvariable=self._ans).grid(row=0,column=1)
+        frmBtns = ttk.Frame(frm,borderwidth=0)
+        frmBtns.grid(row=2,column=0,sticky='ns')
+        ttk.Button(frmBtns,text="Calculate",command=self.calc).grid(row=0,column=0)
+        ttk.Button(frmBtns,text="Reset",command=self.clear).grid(row=0,column=1)
+        ttk.Button(frmBtns,text="Close",command=self.delete).grid(row=0,column=2)
 
     def calc(self):
         """ apply formula with entries """
@@ -385,7 +378,7 @@ class CalculatePanel(gui.SimplePanel):
 
     def clear(self):
         """ clear all entries """
-        for entry in self._entries: entry.delete(0,Tix.END)
+        for entry in self._entries: entry.delete(0,tk.END)
         self._ans.set('')
 
 # View->DataBin
@@ -405,10 +398,10 @@ class DataBinPanel(gui.SimplePanel):
                 self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
             except:
                 self._bins[b] = {'img':None}
-                self._bins[b]['btn'] = Tix.Button(frm,text=b,command=self.donothing)
+                self._bins[b]['btn'] = ttk.Button(frm,text=b,command=self.donothing)
             else:
-                self._bins[b]['btn'] = Tix.Button(frm,image=self._bins[b]['img'],command=self.donothing)
-            self._bins[b]['btn'].grid(row=0,column=wraith.BINS.index(b),sticky=Tix.W)
+                self._bins[b]['btn'] = ttk.Button(frm,image=self._bins[b]['img'],command=self.donothing)
+            self._bins[b]['btn'].grid(row=0,column=wraith.BINS.index(b),sticky='w')
 
 # Storage->Nidus-->Config
 class NidusConfigPanel(gui.ConfigPanel):
@@ -419,46 +412,43 @@ class NidusConfigPanel(gui.ConfigPanel):
     def _makegui(self,frm):
         """ set up entry widgets """
         # SSE Configuration
-        lfrmS = Tix.LabelFrame(frm,label='SSE')
-        lfrmS.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-        frmS = lfrmS.subwidget_list['frame']
-        Tix.Label(frmS,text='Packets: ').grid(row=0,column=0,sticky=Tix.W)
-        self.svar = Tix.IntVar()
-        self.chkSave = Tix.Checkbutton(frmS,text="Save",border=0,
-                                       variable=self.svar,command=self.cb)
-        self.chkSave.grid(row=0,column=1,sticky=Tix.W)
-        self.pvar = Tix.IntVar()
-        self.chkPrivate = Tix.Checkbutton(frmS,text="Private",border=0,
-                                          variable=self.pvar)
-        self.chkPrivate.grid(row=0,column=2,sticky=Tix.E)
-        Tix.Label(frmS,text='Path: ').grid(row=0,column=3,sticky=Tix.W)
-        self.txtPCAPPath = Tix.Entry(frmS,width=25)
+        frmS = ttk.LabelFrame(frm,text='SSE')
+        frmS.grid(row=0,column=0,sticky='nwse')
+        ttk.Label(frmS,text='Packets: ').grid(row=0,column=0,sticky='w')
+        self.svar = tk.IntVar()
+        self.chkSave = ttk.Checkbutton(frmS,text="Save",border=0,variable=self.svar,command=self.cb)
+        self.chkSave.grid(row=0,column=1,sticky='w')
+        self.pvar = tk.IntVar()
+        self.chkPrivate = ttk.Checkbutton(frmS,text="Private",border=0,variable=self.pvar)
+        self.chkPrivate.grid(row=0,column=2,sticky='e')
+        ttk.Label(frmS,text='Path: ').grid(row=0,column=3,sticky='w')
+        self.txtPCAPPath = ttk.Entry(frmS,width=25)
         self.txtPCAPPath.grid(row=0,column=4)
-        Tix.Label(frmS,text="Max Size: ").grid(row=1,column=1,sticky=Tix.W)
-        self.txtMaxSz = Tix.Entry(frmS,width=4)
-        self.txtMaxSz.grid(row=1,column=2,sticky=Tix.W)
-        Tix.Label(frmS,text="Max Files: ").grid(row=1,column=3,sticky=Tix.W)
-        self.txtMaxFiles = Tix.Entry(frmS,width=4)
-        self.txtMaxFiles.grid(row=1,column=4,columnspan=2,sticky=Tix.W)
-        Tix.Label(frmS,text='Threads: ').grid(row=2,column=0,sticky=Tix.W)
-        Tix.Label(frmS,text='Store: ').grid(row=2,column=1,sticky=Tix.W)
-        self.txtNumStore = Tix.Entry(frmS,width=2)
-        self.txtNumStore.grid(row=2,column=2,sticky=Tix.W)
-        Tix.Label(frmS,text='Extract: ').grid(row=2,column=3,sticky=Tix.W)
-        self.txtNumExtract = Tix.Entry(frmS,width=2)
-        self.txtNumExtract.grid(row=2,column=4,sticky=Tix.W)
+        ttk.Label(frmS,text="Max Size: ").grid(row=1,column=1,sticky='w')
+        self.txtMaxSz = ttk.Entry(frmS,width=4)
+        self.txtMaxSz.grid(row=1,column=2,sticky='w')
+        ttk.Label(frmS,text="Max Files: ").grid(row=1,column=3,sticky='w')
+        self.txtMaxFiles = ttk.Entry(frmS,width=4)
+        self.txtMaxFiles.grid(row=1,column=4,columnspan=2,sticky='w')
+        ttk.Label(frmS,text='Threads: ').grid(row=2,column=0,sticky='w')
+        ttk.Label(frmS,text='Store: ').grid(row=2,column=1,sticky='w')
+        self.txtNumStore = ttk.Entry(frmS,width=2)
+        self.txtNumStore.grid(row=2,column=2,sticky='w')
+        ttk.Label(frmS,text='Extract: ').grid(row=2,column=3,sticky='w')
+        self.txtNumExtract = ttk.Entry(frmS,width=2)
+        self.txtNumExtract.grid(row=2,column=4,sticky='w')
 
         # OUI Configuration
-        frmO = Tix.Frame(frm)
-        frmO.grid(row=1,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-        Tix.Label(frmO,text='OUI Path: ').grid(row=0,column=0,sticky=Tix.W)
-        self.txtOUIPath = Tix.Entry(frmO,width=50)
-        self.txtOUIPath.grid(row=0,column=1,sticky=Tix.E)
+        frmO = ttk.Frame(frm)
+        frmO.grid(row=1,column=0,sticky='nwse')
+        ttk.Label(frmO,text='OUI Path: ').grid(row=0,column=0,sticky='w')
+        self.txtOUIPath = ttk.Entry(frmO,width=50)
+        self.txtOUIPath.grid(row=0,column=1,sticky='e')
 
     def cb(self):
         """ Save Checkbutton callback: disable/enable Save options as necessary """
-        if self.svar.get(): state = Tix.NORMAL
-        else: state = Tix.DISABLED
+        if self.svar.get(): state = tk.NORMAL
+        else: state = tk.DISABLED
         self.chkPrivate.configure(state=state)
         self.txtPCAPPath.configure(state=state)
         self.txtMaxSz.configure(state=state)
@@ -479,34 +469,34 @@ class NidusConfigPanel(gui.ConfigPanel):
         except:
             save = 0
             private = 0
-        self.txtPCAPPath.delete(0,Tix.END)
+        self.txtPCAPPath.delete(0,tk.END)
         if conf.has_option('SSE','save_path'):
             self.txtPCAPPath.insert(0,conf.get('SSE','save_path'))
-        self.txtMaxSz.delete(0,Tix.END)
+        self.txtMaxSz.delete(0,tk.END)
         if conf.has_option('SSE','save_maxsize'):
             self.txtMaxSz.insert(0,conf.get('SSE','save_maxsize'))
-        self.txtMaxFiles.delete(0,Tix.END)
+        self.txtMaxFiles.delete(0,tk.END)
         if conf.has_option('SSE','save_maxfiles'):
             self.txtMaxFiles.insert(0,conf.get('SSE','save_maxfiles'))
-        self.txtNumStore.delete(0,Tix.END)
+        self.txtNumStore.delete(0,tk.END)
         if conf.has_option('SSE','store_threads'):
             self.txtNumStore.insert(0,conf.get('SSE','store_threads'))
         else: self.txtNumStore.insert(0,'2')
-        self.txtNumExtract.delete(0,Tix.END)
+        self.txtNumExtract.delete(0,tk.END)
         if conf.has_option('SSE','extract_threads'):
             self.txtNumExtract.insert(0,conf.get('SSE','extract_threads'))
         else: self.txtNumExtract.insert(0,'2')
 
         # disable/enable as needed
-        if save: state = Tix.NORMAL
-        else: state = Tix.DISABLED
+        if save: state = tk.NORMAL
+        else: state = tk.DISABLED
         self.chkPrivate.configure(state=state)
         self.txtPCAPPath.configure(state=state)
         self.txtMaxSz.configure(state=state)
         self.txtMaxFiles.configure(state=state)
 
         # OUI section
-        self.txtOUIPath.delete(0,Tix.END)
+        self.txtOUIPath.delete(0,tk.END)
         if conf.has_option('OUI','path'):
             self.txtOUIPath.insert(0,conf.get('OUI','Path'))
         else: self.txtOUIPath.insert(0,'/etc/aircrack-ng/airodump-ng-oui.txt')
@@ -593,191 +583,183 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
     def _makegui(self,frm):
         """ set up entry widgets """
-        nb = Tix.NoteBook(frm)
+        nb = ttk.NoteBook(frm)
         nb.add('recon',label='Recon')
         nb.add('collection',label='Collection')
         nb.add('gps',label='GPS')
         nb.add('misc',label='Misc.')
-        nb.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
+        nb.grid(row=0,column=0,sticky='nwse')
 
         # Recon Tab Configuration
-        frmR = Tix.Frame(nb.recon)
-        frmR.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-        Tix.Label(frmR,text='NIC: ').grid(row=0,column=0,sticky=Tix.W+Tix.N)
-        self.txtReconNic = Tix.Entry(frmR,width=5)
-        self.txtReconNic.grid(row=0,column=1,sticky=Tix.W+Tix.N)
-        Tix.Label(frmR,text=' ').grid(row=0,column=2,sticky=Tix.W)
-        Tix.Label(frmR,text='Spoof: ').grid(row=0,column=3,sticky=Tix.W+Tix.N)
-        self.txtReconSpoof = Tix.Entry(frmR,width=17)
-        self.txtReconSpoof.grid(row=0,column=4,sticky=Tix.W+Tix.N)
-        Tix.Label(frmR,text='Desc: ').grid(row=1,column=0,sticky=Tix.W+Tix.N)
-        self.txtReconDesc = Tix.Text(frmR,width=42,height=3)
-        self.txtReconDesc.grid(row=1,column=1,columnspan=4,sticky=Tix.E)
+        frmR = ttk.Frame(nb.recon)
+        frmR.grid(row=0,column=0,sticky='nwse')
+        ttk.Label(frmR,text='NIC: ').grid(row=0,column=0,sticky='nw')
+        self.txtReconNic = ttk.Entry(frmR,width=5)
+        self.txtReconNic.grid(row=0,column=1,sticky='nw')
+        ttk.Label(frmR,text=' ').grid(row=0,column=2,sticky='w')
+        ttk.Label(frmR,text='Spoof: ').grid(row=0,column=3,sticky='nw')
+        self.txtReconSpoof = ttk.Entry(frmR,width=17)
+        self.txtReconSpoof.grid(row=0,column=4,sticky='nw')
+        ttk.Label(frmR,text='Desc: ').grid(row=1,column=0,sticky='nw')
+        self.txtReconDesc = tk.Text(frmR,width=42,height=3)
+        self.txtReconDesc.grid(row=1,column=1,columnspan=4,sticky='e')
 
         # ANTENNA SUB SECTION
-        lfrmRA = Tix.LabelFrame(frmR,label='Antennas')
-        lfrmRA.grid(row=2,column=0,columnspan=5,sticky=Tix.N+Tix.S+Tix.W+Tix.E)
-        frmRA = lfrmRA.subwidget_list['frame']
+        frmRA = ttk.LabelFrame(frmR,text='Antennas')
+        frmRA.grid(row=2,column=0,columnspan=5,sticky='nwse')
         # ANTENNA SUBSECTION
-        Tix.Label(frmRA,text="Number: ").grid(row=0,column=0,sticky=Tix.W)
-        self.txtReconAntNum = Tix.Entry(frmRA,width=2)
-        self.txtReconAntNum.grid(row=0,column=1,sticky=Tix.W)
-        Tix.Label(frmRA,text='Gain: ').grid(row=1,column=0,sticky=Tix.W)
-        self.txtReconAntGain = Tix.Entry(frmRA,width=7)
-        self.txtReconAntGain.grid(row=1,column=1,sticky=Tix.W)
-        Tix.Label(frmRA,text=" ").grid(row=1,column=2)
-        Tix.Label(frmRA,text="Type: ").grid(row=1,column=3,sticky=Tix.E)
-        self.txtReconAntType = Tix.Entry(frmRA,width=15)
-        self.txtReconAntType.grid(row=1,column=4,sticky=Tix.E)
-        Tix.Label(frmRA,text='Loss: ').grid(row=2,column=0,sticky=Tix.W)
-        self.txtReconAntLoss = Tix.Entry(frmRA,width=7)
-        self.txtReconAntLoss.grid(row=2,column=1,sticky=Tix.W)
-        Tix.Label(frmRA,text=" ").grid(row=2,column=2)
-        Tix.Label(frmRA,text="XYZ: ").grid(row=2,column=3,sticky=Tix.E)
-        self.txtReconAntXYZ = Tix.Entry(frmRA,width=15)
-        self.txtReconAntXYZ.grid(row=2,column=4,sticky=Tix.E)
+        ttk.Label(frmRA,text="Number: ").grid(row=0,column=0,sticky='w')
+        self.txtReconAntNum = ttk.Entry(frmRA,width=2)
+        self.txtReconAntNum.grid(row=0,column=1,sticky='w')
+        ttk.Label(frmRA,text='Gain: ').grid(row=1,column=0,sticky='w')
+        self.txtReconAntGain = ttk.Entry(frmRA,width=7)
+        self.txtReconAntGain.grid(row=1,column=1,sticky='w')
+        ttk.Label(frmRA,text=" ").grid(row=1,column=2)
+        ttk.Label(frmRA,text="Type: ").grid(row=1,column=3,sticky='e')
+        self.txtReconAntType = ttk.Entry(frmRA,width=15)
+        self.txtReconAntType.grid(row=1,column=4,sticky='e')
+        ttk.Label(frmRA,text='Loss: ').grid(row=2,column=0,sticky='w')
+        self.txtReconAntLoss = ttk.Entry(frmRA,width=7)
+        self.txtReconAntLoss.grid(row=2,column=1,sticky='w')
+        ttk.Label(frmRA,text=" ").grid(row=2,column=2)
+        ttk.Label(frmRA,text="XYZ: ").grid(row=2,column=3,sticky='e')
+        self.txtReconAntXYZ = ttk.Entry(frmRA,width=15)
+        self.txtReconAntXYZ.grid(row=2,column=4,sticky='e')
         # SCAN PATTERN SUB SECTION
-        lfrmRS = Tix.LabelFrame(frmR,label='Scan Pattern')
-        lfrmRS.grid(row=3,column=0,columnspan=5,sticky=Tix.N+Tix.S+Tix.W+Tix.E)
-        frmRS = lfrmRS.subwidget_list['frame']
-        Tix.Label(frmRS,text="Dwell: ").grid(row=0,column=0,sticky=Tix.W)
-        self.txtReconScanDwell = Tix.Entry(frmRS,width=5)
-        self.txtReconScanDwell.grid(row=0,column=2,sticky=Tix.W)
-        Tix.Label(frmRS,text=" ").grid(row=0,column=3)
-        Tix.Label(frmRS,text="Start: ").grid(row=0,column=4,sticky=Tix.E)
-        self.txtReconScanStart = Tix.Entry(frmRS,width=3)
-        self.txtReconScanStart.grid(row=0,column=5,sticky=Tix.W)
-        Tix.Label(frmRS,text="Scan: ").grid(row=1,column=0,sticky=Tix.W)
-        self.txtReconScanScan = Tix.Entry(frmRS,width=12)
-        self.txtReconScanScan.grid(row=1,column=2,sticky=Tix.W)
-        Tix.Label(frmRS,text=" ").grid(row=1,column=3)
-        Tix.Label(frmRS,text="Pass: ").grid(row=1,column=4,sticky=Tix.W)
-        self.txtReconScanPass = Tix.Entry(frmRS,width=12)
-        self.txtReconScanPass.grid(row=1,column=5,sticky=Tix.E)
+        frmRS = ttk.LabelFrame(frmR,text='Scan Pattern')
+        frmRS.grid(row=3,column=0,columnspan=5,sticky='nwse')
+        ttk.Label(frmRS,text="Dwell: ").grid(row=0,column=0,sticky='w')
+        self.txtReconScanDwell = ttk.Entry(frmRS,width=5)
+        self.txtReconScanDwell.grid(row=0,column=2,sticky='w')
+        ttk.Label(frmRS,text=" ").grid(row=0,column=3)
+        ttk.Label(frmRS,text="Start: ").grid(row=0,column=4,sticky='e')
+        self.txtReconScanStart = ttk.Entry(frmRS,width=3)
+        self.txtReconScanStart.grid(row=0,column=5,sticky='w')
+        ttk.Label(frmRS,text="Scan: ").grid(row=1,column=0,sticky='w')
+        self.txtReconScanScan = ttk.Entry(frmRS,width=12)
+        self.txtReconScanScan.grid(row=1,column=2,sticky='w')
+        ttk.Label(frmRS,text=" ").grid(row=1,column=3)
+        ttk.Label(frmRS,text="Pass: ").grid(row=1,column=4,sticky='w')
+        self.txtReconScanPass = ttk.Entry(frmRS,width=12)
+        self.txtReconScanPass.grid(row=1,column=5,sticky='e')
 
         # Collection Tab Configuration
-        frmC = Tix.Frame(nb.collection)
-        frmC.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-        Tix.Label(frmC,text='NIC: ').grid(row=0,column=0,sticky=Tix.W+Tix.N)
-        self.txtCollectionNic = Tix.Entry(frmC,width=5)
-        self.txtCollectionNic.grid(row=0,column=1,sticky=Tix.W+Tix.N)
-        Tix.Label(frmC,text=' ').grid(row=0,column=2,sticky=Tix.W)
-        Tix.Label(frmC,text='Spoof: ').grid(row=0,column=3,sticky=Tix.W+Tix.N)
-        self.txtCollectionSpoof = Tix.Entry(frmC,width=17)
-        self.txtCollectionSpoof.grid(row=0,column=4,sticky=Tix.W+Tix.N)
-        Tix.Label(frmC,text='Desc: ').grid(row=1,column=0,sticky=Tix.W+Tix.N)
-        self.txtCollectionDesc = Tix.Text(frmC,width=42,height=3)
-        self.txtCollectionDesc.grid(row=1,column=1,columnspan=4,sticky=Tix.E)
+        frmC = ttk.Frame(nb.collection)
+        frmC.grid(row=0,column=0,sticky='nwse')
+        ttk.Label(frmC,text='NIC: ').grid(row=0,column=0,sticky='nw')
+        self.txtCollectionNic = ttk.Entry(frmC,width=5)
+        self.txtCollectionNic.grid(row=0,column=1,sticky='nw')
+        ttk.Label(frmC,text=' ').grid(row=0,column=2,sticky='w')
+        ttk.Label(frmC,text='Spoof: ').grid(row=0,column=3,sticky='wn')
+        self.txtCollectionSpoof = ttk.Entry(frmC,width=17)
+        self.txtCollectionSpoof.grid(row=0,column=4,sticky='nw')
+        ttk.Label(frmC,text='Desc: ').grid(row=1,column=0,sticky='nw')
+        self.txtCollectionDesc = tk.Text(frmC,width=42,height=3)
+        self.txtCollectionDesc.grid(row=1,column=1,columnspan=4,sticky='e')
 
         # ANTENNA SUB SECTION
-        lfrmCA = Tix.LabelFrame(frmC,label='Antennas')
-        lfrmCA.grid(row=2,column=0,columnspan=5,sticky=Tix.N+Tix.S+Tix.W+Tix.E)
-        frmCA = lfrmCA.subwidget_list['frame']
+        frmCA = ttk.LabelFrame(frmC,text='Antennas')
+        frmCA.grid(row=2,column=0,columnspan=5,sticky='nwse')
         # ANTENNA SUBSECTION
-        Tix.Label(frmCA,text="Number: ").grid(row=0,column=0,sticky=Tix.W)
-        self.txtCollectionAntNum = Tix.Entry(frmCA,width=2)
-        self.txtCollectionAntNum.grid(row=0,column=1,sticky=Tix.W)
-        Tix.Label(frmCA,text='Gain: ').grid(row=1,column=0,sticky=Tix.W)
-        self.txtCollectionAntGain = Tix.Entry(frmCA,width=7)
-        self.txtCollectionAntGain.grid(row=1,column=1,sticky=Tix.W)
-        Tix.Label(frmCA,text=" ").grid(row=1,column=2)
-        Tix.Label(frmCA,text="Type: ").grid(row=1,column=3,sticky=Tix.E)
-        self.txtCollectionAntType = Tix.Entry(frmCA,width=15)
-        self.txtCollectionAntType.grid(row=1,column=4,sticky=Tix.E)
-        Tix.Label(frmCA,text='Loss: ').grid(row=2,column=0,sticky=Tix.W)
-        self.txtCollectionAntLoss = Tix.Entry(frmCA,width=7)
-        self.txtCollectionAntLoss.grid(row=2,column=1,sticky=Tix.W)
-        Tix.Label(frmCA,text=" ").grid(row=2,column=2)
-        Tix.Label(frmCA,text="XYZ: ").grid(row=2,column=3,sticky=Tix.E)
-        self.txtCollectionAntXYZ = Tix.Entry(frmCA,width=15)
-        self.txtCollectionAntXYZ.grid(row=2,column=4,sticky=Tix.E)
+        ttk.Label(frmCA,text="Number: ").grid(row=0,column=0,sticky='w')
+        self.txtCollectionAntNum = ttk.Entry(frmCA,width=2)
+        self.txtCollectionAntNum.grid(row=0,column=1,sticky='w')
+        ttk.Label(frmCA,text='Gain: ').grid(row=1,column=0,sticky='w')
+        self.txtCollectionAntGain = ttk.Entry(frmCA,width=7)
+        self.txtCollectionAntGain.grid(row=1,column=1,sticky='w')
+        ttk.Label(frmCA,text=" ").grid(row=1,column=2)
+        ttk.Label(frmCA,text="Type: ").grid(row=1,column=3,sticky='e')
+        self.txtCollectionAntType = ttk.Entry(frmCA,width=15)
+        self.txtCollectionAntType.grid(row=1,column=4,sticky='e')
+        ttk.Label(frmCA,text='Loss: ').grid(row=2,column=0,sticky='w')
+        self.txtCollectionAntLoss = ttk.Entry(frmCA,width=7)
+        self.txtCollectionAntLoss.grid(row=2,column=1,sticky='w')
+        ttk.Label(frmCA,text=" ").grid(row=2,column=2)
+        ttk.Label(frmCA,text="XYZ: ").grid(row=2,column=3,sticky='e')
+        self.txtCollectionAntXYZ = ttk.Entry(frmCA,width=15)
+        self.txtCollectionAntXYZ.grid(row=2,column=4,sticky='e')
         # SCAN PATTERN SUB SECTION
-        lfrmCS = Tix.LabelFrame(frmC,label='Scan Pattern')
-        lfrmCS.grid(row=3,column=0,columnspan=5,sticky=Tix.N+Tix.S+Tix.W+Tix.E)
-        frmCS = lfrmCS.subwidget_list['frame']
-        Tix.Label(frmCS,text="Dwell: ").grid(row=0,column=0,sticky=Tix.W)
-        self.txtCollectionScanDwell = Tix.Entry(frmCS,width=5)
-        self.txtCollectionScanDwell.grid(row=0,column=2,sticky=Tix.W)
-        Tix.Label(frmCS,text=" ").grid(row=0,column=3)
-        Tix.Label(frmCS,text="Start: ").grid(row=0,column=4,sticky=Tix.E)
-        self.txtCollectionScanStart = Tix.Entry(frmCS,width=3)
-        self.txtCollectionScanStart.grid(row=0,column=5,sticky=Tix.W)
-        Tix.Label(frmCS,text="Scan: ").grid(row=1,column=0,sticky=Tix.W)
-        self.txtCollectionScanScan = Tix.Entry(frmCS,width=12)
-        self.txtCollectionScanScan.grid(row=1,column=2,sticky=Tix.W)
-        Tix.Label(frmCS,text=" ").grid(row=1,column=3)
-        Tix.Label(frmCS,text="Pass: ").grid(row=1,column=4,sticky=Tix.W)
-        self.txtCollectionScanPass = Tix.Entry(frmCS,width=12)
-        self.txtCollectionScanPass.grid(row=1,column=5,sticky=Tix.E)
+        frmCS = ttk.LabelFrame(frmC,text='Scan Pattern')
+        frmCS.grid(row=3,column=0,columnspan=5,sticky='nwse')
+        ttk.Label(frmCS,text="Dwell: ").grid(row=0,column=0,sticky='w')
+        self.txtCollectionScanDwell = ttk.Entry(frmCS,width=5)
+        self.txtCollectionScanDwell.grid(row=0,column=2,sticky='w')
+        ttk.Label(frmCS,text=" ").grid(row=0,column=3)
+        ttk.Label(frmCS,text="Start: ").grid(row=0,column=4,sticky='e')
+        self.txtCollectionScanStart = ttk.Entry(frmCS,width=3)
+        self.txtCollectionScanStart.grid(row=0,column=5,sticky='w')
+        ttk.Label(frmCS,text="Scan: ").grid(row=1,column=0,sticky='w')
+        self.txtCollectionScanScan = ttk.Entry(frmCS,width=12)
+        self.txtCollectionScanScan.grid(row=1,column=2,sticky='w')
+        ttk.Label(frmCS,text=" ").grid(row=1,column=3)
+        ttk.Label(frmCS,text="Pass: ").grid(row=1,column=4,sticky='w')
+        self.txtCollectionScanPass = ttk.Entry(frmCS,width=12)
+        self.txtCollectionScanPass.grid(row=1,column=5,sticky='e')
 
         # GPS Tab Configuration
         # use a checkbutton & two subframes to differentiate betw/ fixed & dyanmic
-        frmG = Tix.Frame(nb.gps)
-        frmG.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-        self.gvar = Tix.IntVar()
-        self.chkFixed = Tix.Checkbutton(frmG,text="Fixed",border=0,
+        frmG = ttk.Frame(nb.gps)
+        frmG.grid(row=0,column=0,sticky='nwse')
+        self.gvar = tk.IntVar()
+        self.chkFixed = ttk.Checkbutton(frmG,text="Fixed",border=0,
                                         variable=self.gvar,
                                         command=self.gpscb)
-        self.chkFixed.grid(row=0,column=0,sticky=Tix.W)
+        self.chkFixed.grid(row=0,column=0,sticky='w')
 
         # separate dynamic and fixed
-        lfrmGF = Tix.LabelFrame(frmG,label='Fixed')
-        lfrmGF.grid(row=1,column=0,sticky=Tix.W+Tix.N)
-        frmGF =lfrmGF.subwidget_list['frame']
-        Tix.Label(frmGF,text="Lat: ").grid(row=0,column=0,sticky=Tix.W)
-        self.txtLat = Tix.Entry(frmGF,width=10)
-        self.txtLat.grid(row=0,column=1,sticky=Tix.W)
-        Tix.Label(frmGF,text="Lon: ").grid(row=1,column=0,sticky=Tix.W)
-        self.txtLon = Tix.Entry(frmGF,width=10)
-        self.txtLon.grid(row=1,column=1,sticky=Tix.W)
-        Tix.Label(frmGF,text="Alt: ").grid(row=2,column=0,sticky=Tix.W)
-        self.txtAlt = Tix.Entry(frmGF,width=5)
-        self.txtAlt.grid(row=2,column=1,sticky=Tix.W)
-        Tix.Label(frmGF,text="Heading: ").grid(row=3,column=0,sticky=Tix.W)
-        self.txtHeading = Tix.Entry(frmGF,width=3)
-        self.txtHeading.grid(row=3,column=1,sticky=Tix.W)
-        lfrmGD = Tix.LabelFrame(frmG,label='Dynamic')
-        lfrmGD.grid(row=1,column=2,sticky=Tix.E+Tix.N)
-        frmGD = lfrmGD.subwidget_list['frame']
-        Tix.Label(frmGD,text="Port: ").grid(row=0,column=0,sticky=Tix.W)
-        self.txtGPSPort = Tix.Entry(frmGD,width=5)
-        self.txtGPSPort.grid(row=0,column=1,sticky=Tix.W)
-        Tix.Label(frmGD,text="Dev ID: ").grid(row=1,column=0,sticky=Tix.W)
-        self.txtDevID = Tix.Entry(frmGD,width=9)
-        self.txtDevID.grid(row=1,column=1,sticky=Tix.W)
-        Tix.Label(frmGD,text="Poll: ").grid(row=2,column=0,sticky=Tix.W)
-        self.txtPoll = Tix.Entry(frmGD,width=5)
-        self.txtPoll.grid(row=2,column=1,sticky=Tix.W)
-        Tix.Label(frmGD,text="EPX: ").grid(row=3,column=0,sticky=Tix.W)
-        self.txtEPX = Tix.Entry(frmGD,width=5)
-        self.txtEPX.grid(row=3,column=1,sticky=Tix.W)
-        Tix.Label(frmGD,text="EPY: ").grid(row=4,column=0,sticky=Tix.W)
-        self.txtEPY = Tix.Entry(frmGD,width=5)
-        self.txtEPY.grid(row=4,column=1,sticky=Tix.W)
+        frmGF = ttk.LabelFrame(frmG,text='Fixed')
+        frmGF.grid(row=1,column=0,sticky='nw')
+        ttk.Label(frmGF,text="Lat: ").grid(row=0,column=0,sticky='w')
+        self.txtLat = ttk.Entry(frmGF,width=10)
+        self.txtLat.grid(row=0,column=1,sticky='w')
+        ttk.Label(frmGF,text="Lon: ").grid(row=1,column=0,sticky='w')
+        self.txtLon = ttk.Entry(frmGF,width=10)
+        self.txtLon.grid(row=1,column=1,sticky='w')
+        ttk.Label(frmGF,text="Alt: ").grid(row=2,column=0,sticky='w')
+        self.txtAlt = ttk.Entry(frmGF,width=5)
+        self.txtAlt.grid(row=2,column=1,sticky='w')
+        ttk.Label(frmGF,text="Heading: ").grid(row=3,column=0,sticky='w')
+        self.txtHeading = ttk.Entry(frmGF,width=3)
+        self.txtHeading.grid(row=3,column=1,sticky='w')
+        frmGD = ttk.LabelFrame(frmG,text='Dynamic')
+        frmGD.grid(row=1,column=2,sticky='ne')
+        ttk.Label(frmGD,text="Port: ").grid(row=0,column=0,sticky='w')
+        self.txtGPSPort = ttk.Entry(frmGD,width=5)
+        self.txtGPSPort.grid(row=0,column=1,sticky='w')
+        ttk.Label(frmGD,text="Dev ID: ").grid(row=1,column=0,sticky='w')
+        self.txtDevID = ttk.Entry(frmGD,width=9)
+        self.txtDevID.grid(row=1,column=1,sticky='w')
+        ttk.Label(frmGD,text="Poll: ").grid(row=2,column=0,sticky='w')
+        self.txtPoll = ttk.Entry(frmGD,width=5)
+        self.txtPoll.grid(row=2,column=1,sticky='w')
+        ttk.Label(frmGD,text="EPX: ").grid(row=3,column=0,sticky='w')
+        self.txtEPX = ttk.Entry(frmGD,width=5)
+        self.txtEPX.grid(row=3,column=1,sticky='w')
+        ttk.Label(frmGD,text="EPY: ").grid(row=4,column=0,sticky='w')
+        self.txtEPY = ttk.Entry(frmGD,width=5)
+        self.txtEPY.grid(row=4,column=1,sticky='w')
 
         # misc tab
-        frmM = Tix.Frame(nb.misc)
-        frmM.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-        lfrmMS = Tix.LabelFrame(frmM,label='Storage')
-        lfrmMS.grid(row=0,column=0,sticky=Tix.W)
-        frmMS = lfrmMS.subwidget_list['frame']
-        self.cvar = Tix.IntVar()
-        self.chkCollated = Tix.Checkbutton(frmMS,text='Collated',border=0,variable=self.cvar)
-        self.chkCollated.grid(row=0,column=0,sticky=Tix.W)
-        Tix.Label(frmMS,text=' Host: ').grid(row=0,column=1)
-        self.txtStoreHost = Tix.Entry(frmMS,width=15)
+        frmM = ttk.Frame(nb.misc)
+        frmM.grid(row=0,column=0,sticky='nwse')
+        frmMS = ttk.LabelFrame(frmM,text='Storage')
+        frmMS.grid(row=0,column=0,sticky='w')
+        self.cvar = tk.IntVar()
+        self.chkCollated = ttk.Checkbutton(frmMS,text='Collated',variable=self.cvar)
+        self.chkCollated.grid(row=0,column=0,sticky='w')
+        ttk.Label(frmMS,text=' Host: ').grid(row=0,column=1)
+        self.txtStoreHost = ttk.Entry(frmMS,width=15)
         self.txtStoreHost.grid(row=0,column=2)
-        Tix.Label(frmMS,text=' Port: ').grid(row=0,column=3)
-        self.txtStorePort = Tix.Entry(frmMS,width=5)
+        ttk.Label(frmMS,text=' Port: ').grid(row=0,column=3)
+        self.txtStorePort = ttk.Entry(frmMS,width=5)
         self.txtStorePort.grid(row=0,column=4)
-        lfrmML = Tix.LabelFrame(frmM,label='Local')
-        lfrmML.grid(row=1,column=0,sticky=Tix.W)
-        frmML = lfrmML.subwidget_list['frame']
-        Tix.Label(frmML,text="Region: ").grid(row=0,column=0,sticky=Tix.W)
-        self.txtRegion = Tix.Entry(frmML,width=2)
+        frmML = ttk.LabelFrame(frmM,text='Local')
+        frmML.grid(row=1,column=0,sticky='w')
+        ttk.Label(frmML,text="Region: ").grid(row=0,column=0,sticky='w')
+        self.txtRegion = ttk.Entry(frmML,width=2)
         self.txtRegion.grid(row=0,column=1)
-        Tix.Label(frmML,text=" C2C: ").grid(row=0,column=2,sticky=Tix.W)
-        self.txtC2CPort = Tix.Entry(frmML,width=5)
+        ttk.Label(frmML,text=" C2C: ").grid(row=0,column=2,sticky='w')
+        self.txtC2CPort = ttk.Entry(frmML,width=5)
         self.txtC2CPort.grid(row=0,column=3)
 
     def _initialize(self):
@@ -788,78 +770,78 @@ class DySKTConfigPanel(gui.ConfigPanel):
             return
 
         # start by reading the recon radio details
-        self.txtReconNic.delete(0,Tix.END)
+        self.txtReconNic.delete(0,tk.END)
         if cp.has_option('Recon','nic'):
             self.txtReconNic.insert(0,cp.get('Recon','nic'))
-        self.txtReconSpoof.delete(0,Tix.END)
+        self.txtReconSpoof.delete(0,tk.END)
         if cp.has_option('Recon','spoof'):
             self.txtReconSpoof.insert(0,cp.get('Recon','spoof'))
-        self.txtReconDesc.delete(1.0,Tix.END)
+        self.txtReconDesc.delete(1.0,tk.END)
         if cp.has_option('Recon','desc'):
-            self.txtReconDesc.insert(Tix.END,cp.get('Recon','desc'))
-        self.txtReconAntNum.delete(0,Tix.END)
+            self.txtReconDesc.insert(tk.END,cp.get('Recon','desc'))
+        self.txtReconAntNum.delete(0,tk.END)
         if cp.has_option('Recon','antennas'):
             self.txtReconAntNum.insert(0,cp.get('Recon','antennas'))
-        self.txtReconAntGain.delete(0,Tix.END)
+        self.txtReconAntGain.delete(0,tk.END)
         if cp.has_option('Recon','antenna_gain'):
             self.txtReconAntGain.insert(0,cp.get('Recon','antenna_gain'))
-        self.txtReconAntType.delete(0,Tix.END)
+        self.txtReconAntType.delete(0,tk.END)
         if cp.has_option('Recon','antenna_type'):
             self.txtReconAntType.insert(0,cp.get('Recon','antenna_type'))
-        self.txtReconAntLoss.delete(0,Tix.END)
+        self.txtReconAntLoss.delete(0,tk.END)
         if cp.has_option('Recon','antenna_loss'):
             self.txtReconAntLoss.insert(0,cp.get('Recon','antenna_loss'))
-        self.txtReconAntXYZ.delete(0,Tix.END)
+        self.txtReconAntXYZ.delete(0,tk.END)
         if cp.has_option('Recon','antenna_xyz'):
             self.txtReconAntXYZ.insert(0,cp.get('Recon','antenna_xyz'))
-        self.txtReconScanDwell.delete(0,Tix.END)
+        self.txtReconScanDwell.delete(0,tk.END)
         if cp.has_option('Recon','dwell'):
             self.txtReconScanDwell.insert(0,cp.get('Recon','dwell'))
-        self.txtReconScanStart.delete(0,Tix.END)
+        self.txtReconScanStart.delete(0,tk.END)
         if cp.has_option('Recon','scan_start'):
             self.txtReconScanStart.insert(0,cp.get('Recon','scan_start'))
-        self.txtReconScanScan.delete(0,Tix.END)
+        self.txtReconScanScan.delete(0,tk.END)
         if cp.has_option('Recon','scan'):
             self.txtReconScanScan.insert(0,cp.get('Recon','scan'))
-        self.txtReconScanPass.delete(0,Tix.END)
+        self.txtReconScanPass.delete(0,tk.END)
         if cp.has_option('Recon','pass'):
             self.txtReconScanPass.insert(0,cp.get('Recon','pass'))
 
         # then the collection radio details
-        self.txtCollectionNic.delete(0,Tix.END)
+        self.txtCollectionNic.delete(0,tk.END)
         if cp.has_option('Collection','nic'):
             self.txtCollectionNic.insert(0,cp.get('Collection','nic'))
-        self.txtCollectionSpoof.delete(0,Tix.END)
+        self.txtCollectionSpoof.delete(0,tk.END)
         if cp.has_option('Collection','spoof'):
             self.txtCollectionSpoof.insert(0,cp.get('Collection','spoof'))
-        self.txtCollectionDesc.delete(1.0,Tix.END)
+        self.txtCollectionDesc.delete(1.0,tk.END)
         if cp.has_option('Collection','desc'):
-            self.txtCollectionDesc.insert(Tix.END,cp.get('Collection','desc'))
-        self.txtCollectionAntNum.delete(0,Tix.END)
+            self.txtCollectionDesc.insert(tk.END,cp.get('Collection','desc'))
+        self.txtCollectionAntNum.delete(0,tk.END)
         if cp.has_option('Collection','antennas'):
             self.txtCollectionAntNum.insert(0,cp.get('Collection','antennas'))
-        self.txtCollectionAntGain.delete(0,Tix.END)
+        self.txtCollectionAntGain.delete(0,tk.END)
         if cp.has_option('Collection','antenna_gain'):
             self.txtCollectionAntGain.insert(0,cp.get('Collection','antenna_gain'))
-        self.txtCollectionAntType.delete(0,Tix.END)
+        self.txtCollectionAntType.delete(0,tk.END)
         if cp.has_option('Collection','antenna_type'):
             self.txtCollectionAntType.insert(0,cp.get('Collection','antenna_type'))
-        self.txtCollectionAntLoss.delete(0,Tix.END)
+        self.txtCollectionAntLoss.delete(0,tk.END)
         if cp.has_option('Collection','antenna_loss'):
             self.txtCollectionAntLoss.insert(0,cp.get('Collection','antenna_loss'))
-        self.txtCollectionAntXYZ.delete(0,Tix.END)
+        self.txtCollectionAntXYZ.delete(0,tk.END)
         if cp.has_option('Collection','antenna_xyz'):
             self.txtCollectionAntXYZ.insert(0,cp.get('Collection','antenna_xyz'))
-        self.txtCollectionScanDwell.delete(0,Tix.END)
+        self.txtCollectionScanDwell.delete(0,tk.END)
         if cp.has_option('Collection','dwell'):
             self.txtCollectionScanDwell.insert(0,cp.get('Collection','dwell'))
-        self.txtCollectionScanStart.delete(0,Tix.END)
+        self.txtCollectionScanStart.delete(0,tk.END)
         if cp.has_option('Collection','scan_start'):
             self.txtCollectionScanStart.insert(0,cp.get('Collection','scan_start'))
-        self.txtCollectionScanScan.delete(0,Tix.END)
+        self.txtCollectionScanScan.delete(0,tk.END)
         if cp.has_option('Collection','scan'):
             self.txtCollectionScanScan.insert(0,cp.get('Collection','scan'))
-        self.txtCollectionScanPass.delete(0,Tix.END)
+        self.txtCollectionScanPass.delete(0,tk.END)
         if cp.has_option('Collection','pass'):
             self.txtCollectionScanPass.insert(0,cp.get('Collection','pass'))
 
@@ -869,23 +851,23 @@ class DySKTConfigPanel(gui.ConfigPanel):
         except:
             fixed = 0
         self.gvar.set(fixed)
-        self.txtLat.delete(0,Tix.END)
+        self.txtLat.delete(0,tk.END)
         if cp.has_option('GPS','lat'): self.txtLat.insert(0,cp.get('GPS','lat'))
-        self.txtLon.delete(0,Tix.END)
+        self.txtLon.delete(0,tk.END)
         if cp.has_option('GPS','lon'): self.txtLon.insert(0,cp.get('GPS','lon'))
-        self.txtAlt.delete(0,Tix.END)
+        self.txtAlt.delete(0,tk.END)
         if cp.has_option('GPS','alt'): self.txtAlt.insert(0,cp.get('GPS','alt'))
-        self.txtHeading.delete(0,Tix.END)
+        self.txtHeading.delete(0,tk.END)
         if cp.has_option('GPS','heading'): self.txtHeading.insert(0,cp.get('GPS','heading'))
-        self.txtGPSPort.delete(0,Tix.END)
+        self.txtGPSPort.delete(0,tk.END)
         if cp.has_option('GPS','port'): self.txtGPSPort.insert(0,cp.get('GPS','port'))
-        self.txtDevID.delete(0,Tix.END)
+        self.txtDevID.delete(0,tk.END)
         if cp.has_option('GPS','devid'): self.txtDevID.insert(0,cp.get('GPS','devid'))
-        self.txtPoll.delete(0,Tix.END)
+        self.txtPoll.delete(0,tk.END)
         if cp.has_option('GPS','poll'): self.txtPoll.insert(0,cp.get('GPS','poll'))
-        self.txtEPX.delete(0,Tix.END)
+        self.txtEPX.delete(0,tk.END)
         if cp.has_option('GPS','epx'): self.txtEPX.insert(0,cp.get('GPS','epx'))
-        self.txtEPY.delete(0,Tix.END)
+        self.txtEPY.delete(0,tk.END)
         if cp.has_option('GPS','epy'): self.txtEPY.insert(0,cp.get('GPS','epy'))
         self.gpscb() # enable/disable entries
 
@@ -895,13 +877,13 @@ class DySKTConfigPanel(gui.ConfigPanel):
         except:
             collated = 0
         self.cvar.set(collated)
-        self.txtStoreHost.delete(0,Tix.END)
+        self.txtStoreHost.delete(0,tk.END)
         if cp.has_option('Storage','host'): self.txtStoreHost.insert(0,cp.get('Storage','host'))
-        self.txtStorePort.delete(0,Tix.END)
+        self.txtStorePort.delete(0,tk.END)
         if cp.has_option('Storage','port'): self.txtStorePort.insert(0,cp.get('Storage','port'))
-        self.txtRegion.delete(0,Tix.END)
+        self.txtRegion.delete(0,tk.END)
         if cp.has_option('Local','region'): self.txtRegion.insert(0,cp.get('Local','region'))
-        self.txtC2CPort.delete(0,Tix.END)
+        self.txtC2CPort.delete(0,tk.END)
         if cp.has_option('Local','C2C'): self.txtC2CPort.insert(0,cp.get('Local','C2C'))
 
     def _validate(self):
@@ -1141,7 +1123,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 cp.set('Recon','antenna_loss',self.txtReconAntLoss.get())
                 cp.set('Recon','antenna_type',self.txtReconAntType.get())
                 cp.set('Recon','antenna_xyz',self.txtReconAntXYZ.get())
-            desc = self.txtReconDesc.get(1.0,Tix.END).strip()
+            desc = self.txtReconDesc.get(1.0,tk.END).strip()
             if desc: cp.set('Recon','desc',desc)
             cp.set('Recon','dwell',self.txtReconScanDwell.get())
             cp.set('Recon','scan',self.txtReconScanScan.get())
@@ -1159,7 +1141,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                     cp.set('Collection','antenna_loss',self.txtCollectionAntLoss.get())
                     cp.set('Collection','antenna_type',self.txtCollectionAntType.get())
                     cp.set('Collection','antenna_xyz',self.txtCollectionAntXYZ.get())
-                desc = self.txtCollectionDesc.get(1.0,Tix.END).strip()
+                desc = self.txtCollectionDesc.get(1.0,tk.END).strip()
                 if desc: cp.set('Collection','desc',desc)
                 cp.set('Collection','dwell',self.txtCollectionScanDwell.get())
                 cp.set('Collection','scan',self.txtCollectionScanScan.get())
@@ -1205,26 +1187,26 @@ class DySKTConfigPanel(gui.ConfigPanel):
         """ enable/disable gps entries as necessary """
         if self.gvar.get():
             # fixed is on enable only fixed entries
-            self.txtLat.configure(state=Tix.NORMAL)
-            self.txtLon.configure(state=Tix.NORMAL)
-            self.txtAlt.configure(state=Tix.NORMAL)
-            self.txtHeading.configure(state=Tix.NORMAL)
-            self.txtGPSPort.configure(state=Tix.DISABLED)
-            self.txtDevID.configure(state=Tix.DISABLED)
-            self.txtPoll.configure(state=Tix.DISABLED)
-            self.txtEPX.configure(state=Tix.DISABLED)
-            self.txtEPY.configure(state=Tix.DISABLED)
+            self.txtLat.configure(state=tk.NORMAL)
+            self.txtLon.configure(state=tk.NORMAL)
+            self.txtAlt.configure(state=tk.NORMAL)
+            self.txtHeading.configure(state=tk.NORMAL)
+            self.txtGPSPort.configure(state=tk.DISABLED)
+            self.txtDevID.configure(state=tk.DISABLED)
+            self.txtPoll.configure(state=tk.DISABLED)
+            self.txtEPX.configure(state=tk.DISABLED)
+            self.txtEPY.configure(state=tk.DISABLED)
         else:
             # fixed is off enable only dynamic entries
-            self.txtLat.configure(state=Tix.DISABLED)
-            self.txtLon.configure(state=Tix.DISABLED)
-            self.txtAlt.configure(state=Tix.DISABLED)
-            self.txtHeading.configure(state=Tix.DISABLED)
-            self.txtGPSPort.configure(state=Tix.NORMAL)
-            self.txtDevID.configure(state=Tix.NORMAL)
-            self.txtPoll.configure(state=Tix.NORMAL)
-            self.txtEPX.configure(state=Tix.NORMAL)
-            self.txtEPY.configure(state=Tix.NORMAL)
+            self.txtLat.configure(state=tk.DISABLED)
+            self.txtLon.configure(state=tk.DISABLED)
+            self.txtAlt.configure(state=tk.DISABLED)
+            self.txtHeading.configure(state=tk.DISABLED)
+            self.txtGPSPort.configure(state=tk.NORMAL)
+            self.txtDevID.configure(state=tk.NORMAL)
+            self.txtPoll.configure(state=tk.NORMAL)
+            self.txtEPX.configure(state=tk.NORMAL)
+            self.txtEPY.configure(state=tk.NORMAL)
 
 # Help-->About
 class AboutPanel(gui.SimplePanel):
@@ -1234,12 +1216,12 @@ class AboutPanel(gui.SimplePanel):
 
     def _body(self,frm):
         self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/wraith-banner.png"))
-        Tix.Label(frm,bg='white',image=self.logo).grid(row=0,column=0,sticky=Tix.N)
-        Tix.Label(frm,text="wraith-rt %s" % wraith.__version__,
-                  fg='white',font=("Roman",16,'bold')).grid(row=1,column=0,sticky=Tix.N)
-        Tix.Label(frm,text="Wireless reconnaissance, collection, assault and exploitation toolkit",
-                  fg='white',font=("Roman",8,'bold')).grid(row=2,column=0,sticky=Tix.N)
-        Tix.Label(frm,text="Copyright %s %s %s" % (COPY,
+        ttk.Label(frm,bg='white',image=self.logo).grid(row=0,column=0,sticky='n')
+        ttk.Label(frm,text="wraith-rt %s" % wraith.__version__,
+                  font=("Roman",16,'bold')).grid(row=1,column=0,sticky='n')
+        ttk.Label(frm,text="Wireless reconnaissance, collection, assault and exploitation toolkit",
+                  font=("Roman",8,'bold')).grid(row=2,column=0,sticky='n')
+        ttk.Label(frm,text="Copyright %s %s %s" % (COPY,
                                                    wraith.__date__.split(' ')[1],
                                                    wraith.__email__),
-                  fg='white',font=('Roman',8,'bold')).grid(row=3,column=0,sticky=Tix.N)
+                  font=('Roman',8,'bold')).grid(row=3,column=0,sticky='n')

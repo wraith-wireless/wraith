@@ -22,7 +22,7 @@ for subclasses as they becomes necessary.
    5) create a method in MasterPanel to handle creation of signular pattern i.e.
      panel = self.getpanels(desc,False)
      if not panel:
-        t = Tix.Toplevel()
+        t = ttk.Toplevel()
         pnl = PanelClase(t,self,argc)
         self.addpanel(pnl.name,gui.PanelRecord(t,pnl,desc))
       else:
@@ -34,7 +34,7 @@ for subclasses as they becomes necessary.
 
 __name__ = 'panel'
 __license__ = 'GPL v3.0'
-__version__ = '0.13.6'
+__version__ = '0.13.7'
 __date__ = 'March 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -46,11 +46,18 @@ import time                       # dtg parsing etc
 import pickle                     # load and dump
 import threading                  # for threads
 import Queue                      # for Queue class and Empty exception
-import Tix                        # Tix widgets
+import Tkinter as tk              # gui constructs
+import tkFont                     # gui fonts
+import ttk                        # ttk widgets
 import tkMessageBox as tkMB       # info dialogs
 import tkFileDialog as tkFD       # file gui dialogs
 import tkSimpleDialog as tkSD     # input dialogs
 from PIL import Image,ImageTk     # image input & support
+
+# HELPER FUNCTIONS
+
+# return the width in pixels of the string s
+def lenpix(s): return tkFont.Font().measure(s)
 
 #### PANEL EXCEPTIONS ####
 class PanelException(Exception): pass # TopLevel generic error
@@ -58,7 +65,7 @@ class PanelException(Exception): pass # TopLevel generic error
 class PanelRecord(tuple):
     """
      a record of a panel used as an item in a list of active "slave" panels
-      tk - toplevel
+      tk - the Toplevel
       pnl - access this panel's methods
       desc - string description of this panel
     """
@@ -82,8 +89,8 @@ class PasswordDialog(tkSD.Dialog):
         self.canceled = False
     def body(self,master):
         self.title('sudo Password')
-        Tix.Label(master,text='Password: ').grid(row=0,column=1)
-        self.entPWD = Tix.Entry(master,show='*')
+        ttk.Label(master,text='Password: ').grid(row=0,column=1)
+        self.entPWD = ttk.Entry(master,show='*')
         self.entPWD.grid(row=0,column=1)
         return self.entPWD
     def validate(self):
@@ -94,7 +101,7 @@ class PasswordDialog(tkSD.Dialog):
 
 #### SUPER GUI CLASSES ####
 
-class Panel(Tix.Frame):
+class Panel(ttk.Frame):
     """
      Panel: This is the base class from which which all non-modal gui classes are
       derived
@@ -117,19 +124,19 @@ class Panel(Tix.Frame):
       notifyclose if the derived class needs to process closing slaves
     """
     # noinspection PyProtectedMember
-    def __init__(self,toplevel,iconPath=None,resize=False):
+    def __init__(self,tl,iconPath=None,resize=False):
         """
-         toplevel - this is the Toplevel widget for this panel (managed directly
+         tl - this is the Toplevel widget for this panel (managed directly
           by the window manger)
          iconPath - path of icon (if one) to display the title bar
          resize - allow resize of Panel ornot
         """
-        Tix.Frame.__init__(self,toplevel)
+        ttk.Frame.__init__(self,tl)
         self.appicon = ImageTk.PhotoImage(Image.open(iconPath)) if iconPath else None
         if self.appicon: self.tk.call('wm','iconphoto',self.master._w,self.appicon)
         self.master.protocol("WM_DELETE_WINDOW",self.delete)
         self._panels = {}
-        self.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
+        self.grid(row=0,column=0,sticky='nwse')
         if not resize: self.master.resizable(0,0)
 
     # properties/attributes
@@ -240,9 +247,9 @@ class SlavePanel(Panel):
      NOTE: The SlavePanel itself has no methods to define gui widgets, i.e.
       menu, main frame etc
     """
-    def __init__(self,toplevel,chief,iconPath=None,resize=False):
+    def __init__(self,tl,chief,iconPath=None,resize=False):
         """ chief is the controlling (Master) panel """
-        Panel.__init__(self,toplevel,iconPath,resize)
+        Panel.__init__(self,tl,iconPath,resize)
         self._chief = chief
 
     def _shutdown(self):
@@ -287,11 +294,11 @@ class SimplePanel(SlavePanel):
       reset,update if dynamic data is being displayed
       _shutdown if any cleanup needs to be performed prior to closing
     """
-    def __init__(self,toplevel,chief,title,iconpath=None,resize=False):
-        SlavePanel.__init__(self,toplevel,chief,iconpath,resize)
+    def __init__(self,tl,chief,title,iconpath=None,resize=False):
+        SlavePanel.__init__(self,tl,chief,iconpath,resize)
         self.master.title(title)
-        frm = Tix.Frame(self)
-        frm.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
+        frm = ttk.Frame(self)
+        frm.grid(row=0,column=0,sticky='nwse')
         self._body(frm)
     def _body(self,frm): raise NotImplementedError("SimplePanel::_body")
     def reset(self): pass
@@ -316,25 +323,25 @@ class ConfigPanel(SlavePanel):
        are valid, False otherwise
       _write writes the values of the entries into the config file
     """
-    def __init__(self,toplevel,chief,title,resize=False):
+    def __init__(self,tl,chief,title,resize=False):
         """ initialize configuration panel """
-        SlavePanel.__init__(self,toplevel,chief,"widgets/icons/config.png",resize)
+        SlavePanel.__init__(self,tl,chief,"widgets/icons/config.png",resize)
         self.master.title(title)
 
         # set up the input widget frame
-        frmConfs = Tix.Frame(self)
+        frmConfs = ttk.Frame(self)
         self._makegui(frmConfs)
-        frmConfs.grid(row=0,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
+        frmConfs.grid(row=0,column=0,sticky='nwse')
 
         # set up the button widget frame
-        frmBtns = Tix.Frame(self)
-        frmBtns.grid(row=1,column=0,sticky=Tix.N+Tix.S)
+        frmBtns = ttk.Frame(self)
+        frmBtns.grid(row=1,column=0,sticky='ns')
 
         # four buttons, Ok, Apply, Reset and Cancel
-        Tix.Button(frmBtns,text='OK',command=self.ok).grid(row=0,column=0)
-        Tix.Button(frmBtns,text='Apply',command=self.apply).grid(row=0,column=1)
-        Tix.Button(frmBtns,text='Reset',command=self.widgetreset).grid(row=0,column=2)
-        Tix.Button(frmBtns,text='Cancel',command=self.cancel).grid(row=0,column=3)
+        ttk.Button(frmBtns,text='OK',command=self.ok).grid(row=0,column=0)
+        ttk.Button(frmBtns,text='Apply',command=self.apply).grid(row=0,column=1)
+        ttk.Button(frmBtns,text='Reset',command=self.widgetreset).grid(row=0,column=2)
+        ttk.Button(frmBtns,text='Cancel',command=self.cancel).grid(row=0,column=3)
 
         # insert values from config file
         self._initialize()
@@ -367,69 +374,82 @@ class ConfigPanel(SlavePanel):
         """ make now changes and close """
         self.delete()
 
-class ListPanel(SlavePanel):
+class TabularPanel(SlavePanel):
     """
-     ListPanel - A simple SlavePanel with a ScrolledHList which displays
-     information and the option to add widgets to a topframe and/or bottom frame.
-     Derived classes can configure the ScrolledHList's number of columns, and
-     whether or not to include headers for the columns.
+     TabularPanel - A simple SlavePanel to display tabular information and the
+     option to add widgets to a topframe and/or bottom frame. Derived classes can
+     configure the ScrolledHList's number of columns, and whether or not to
+     include headers for the columns.
 
      NOTE: this class does not define any methods to insert/remove/delete from
       this list
 
+     Derived class must implement:
+      _shutdown: perform necessary cleanup functionality
+      reset: Master panel is requesting the panel to reset itself
+      update: Master panel is requesting the panel to update itself
+
      Derived classes should implement:
       topframe if any widgets need to be added to the top frame
       bottomframe if any widgets need to be added to the bottom frame
+
+     Derived classes can also manipulate the style of the tree as desired
+
+     NOTE:
+      derived classes can change selection mode and display of icon, headers
+      as desired
     """
-    def __init__(self,toplevel,chief,ttl,sz,cols=1,httl=None,iconPath=None,resize=False):
-        SlavePanel.__init__(self,toplevel,chief,iconPath,resize)
+    def __init__(self,tl,chief,ttl,h,cols=None,iconPath=None,resize=False):
+        """
+         initialize
+         tl: the Toplevel of this panel
+         chief: the master/controlling panel
+         ttl: title to display
+         h: # of lines to configure the treeview's height
+         cols: a list of tuples t =(l,w) where:
+           l is the text to display in the header
+           w is the desired width of the column in pixels
+         iconPath: path of appicon
+         resize: allow Panel to be resized by user
+        """
+        SlavePanel.__init__(self,tl,chief,iconPath,resize)
         self.master.title(ttl)
 
         # create and allow derived classes to setup top frame
-        curRow = 0
-        frmTop = Tix.Frame(self)
-        if self.topframe(frmTop):
-            frmTop.grid(row=curRow,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-            curRow += 1
+        frmT = ttk.Frame(self)
+        if self.topframe(frmT): frmT.grid(row=0,column=0,sticky='nwse')
 
-        # need hdr value for HList init
-        hdr = True
-        if not httl: hdr = False
+        # setup the main frame (NOTE: we set the row to 1 regardless of topframe)
+        frmM = ttk.Frame(self)
+        frmM.grid(row=1,column=0,sticky='nwse')
 
-        # setup the hlist
-        self.frmMain = Tix.Frame(self)
-        self.frmMain.grid(row=curRow,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-        curRow += 1
+        # create a multi-column Tree
+        self.tree = ttk.Treeview(frmM)
+        self.tree.grid(row=0,column=0,sticky='nwse')
+        self.tree.config(height=h)
+        self.tree.config(selectmode='none')
 
-        # create the scrolled hlist
-        # NOTE: if necessary, should be able to use Tree as below
-        # self.slist = Tree(self.frmMain,options='hlist.columns %d hlist.header %d' % (cols,hdr))
-        self.slist = Tix.ScrolledHList(self.frmMain,
-                                       options='hlist.columns %d hlist.header %d' % (cols,hdr))
+        # with attached horizontal/vertical scrollbars
+        vscroll = ttk.Scrollbar(frmM,orient=tk.VERTICAL,command=self.tree.yview)
+        vscroll.grid(row=0,column=1,sticky='ns')
+        self.tree['yscrollcommand'] = vscroll.set
+        hscroll = ttk.Scrollbar(frmM,orient=tk.HORIZONTAL,command=self.tree.xview)
+        hscroll.grid(row=1,column=0,sticky='ew')
+        self.tree['xscrollcommand'] = hscroll.set
 
-        # configure the hlist
-        self.list = self.slist.hlist                       # get the hlist
-        if sz: self.list.config(width=sz[0],height=sz[1])  # set the width/height
-        self.list.config(selectforeground='black')         # set to black or it dissappears
-        self.list.config(selectmode='extended')            # allow multiple selects
-        self.list.config(separator='\t')                   # use tab ignoring special chars
-
-        style = {}
-        style['header'] = Tix.DisplayStyle(Tix.TEXT,
-                                           refwindow=self.list,
-                                           anchor=Tix.CENTER)
-        for i in range(len(httl)):
-            self.list.header_create(i,itemtype=Tix.TEXT,text=httl[i],
-                                      style=style['header'])
-
-        # and pack the scrolled list
-        self.slist.grid(row=curRow,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
-        curRow += 1
+        # configure the headers
+        self.tree['columns'] = [t[0] for t in cols]
+        for i in xrange(len(cols)):
+            try:
+                w = max(lenpix(cols[i][0]),cols[i][1])
+                if w is None: w = 0
+            except:
+                w = 0
+            self.tree.column(i,width=w,anchor=tk.CENTER)
 
         # allow a bottom frame
-        frmBottom = Tix.Frame(self)
-        if self.bottomframe(frmBottom):
-            frmBottom.grid(row=curRow,column=0,sticky=Tix.W+Tix.E+Tix.N+Tix.S)
+        frmB = ttk.Frame(self)
+        if self.bottomframe(frmB): frmB.grid(row=2,column=0,sticky='nwse')
 
     # noinspection PyUnusedLocal
     def topframe(self,frm): return None # override to add widgets to topframe
@@ -442,32 +462,29 @@ LOG_WARN  = 1
 LOG_ERR   = 2
 LOG_NOTE  = 3
 
-class LogPanel(ListPanel):
+class LogPanel(TabularPanel):
     """
      a singular panel which display information pertaining to the "program",
      cannot be closed by the user only by the MasterPanel
     """
-    def __init__(self,toplevel,chief):
-        ListPanel.__init__(self,toplevel,chief,"Log",(60,8),2,[],"widgets/icons/log.png")
-        self._l = threading.Lock()                              # lock on writing
-        self._n = 0                                             # current number of entries
-        self._LC = [Tix.DisplayStyle(Tix.TEXT,                  # display styles
-                                    refwindow=self.list,
-                                    foreground='Green',
-                                    selectforeground='Green'),
-                   Tix.DisplayStyle(Tix.TEXT,
-                                    refwindow=self.list,
-                                    foreground='Yellow',
-                                    selectforeground='Yellow'),
-                   Tix.DisplayStyle(Tix.TEXT,
-                                    refwindow=self.list,
-                                    foreground='Red',
-                                    selectforeground='Red'),
-                   Tix.DisplayStyle(Tix.TEXT,
-                                    refwindow=self.list,
-                                    foreground='Blue',
-                                    selectforeground='Blue')]
-        self._symbol = ["[+] ","[?] ","[-] ","[!] "]           # type symbols
+    def __init__(self,tl,chief):
+        TabularPanel.__init__(self,tl,chief,"Log",8,
+                              [('',lenpix('[+] ')),('',lenpix('00:00:00')),('',lenpix('w')*40)],
+                              "widgets/icons/log.png")
+        self._l = threading.Lock() # lock for writing
+        self._n = 0                # current entry number
+
+        # configure the tree to left justify the message column and to hide icon/headers
+        self.tree.column(2,anchor='w')
+        self.tree['show'] = ''
+
+        # set up tags and symbols for message types
+        self._symbol = ['[+]','[?]','[-]','[!]']           # type symbols
+        self.tree.tag_configure(LOG_NOERR,foreground='green')
+        self.tree.tag_configure(LOG_WARN,foreground='yellow')
+        self.tree.tag_configure(LOG_ERR,foreground='red')
+        self.tree.tag_configure(LOG_NOTE,foreground='blue')
+
     def delete(self): pass    # user can never close only the primary chief
     def reset(self): pass     # nothing needs to be reset
     def update(self): pass    # nothing needs to be updated
@@ -476,13 +493,11 @@ class LogPanel(ListPanel):
         """ writes message msg of type mtype to the log """
         self._l.acquire()
         try:
-            entry = str(self._n)
-            self.list.add(entry,itemtype=Tix.TEXT,text=time.strftime('%H:%M:%S'))
-            self.list.item_create(entry,1,text=self._symbol[mtype] + msg)
-            self.list.item_configure(entry,0,style=self._LC[mtype])
-            self.list.item_configure(entry,1,style=self._LC[mtype])
+            self.tree.insert('','end',iid=str(self._n),
+                             values=(self._symbol[mtype],time.strftime('%H:%M:%S'),msg),
+                             tags=(mtype,))
             self._n += 1
-            self.list.yview('moveto',1.0)
+            self.tree.yview('moveto',1.0)
         except:
             pass
         finally:
@@ -546,11 +561,11 @@ class TailLogger(threading.Thread):
                     self._errcb(e)
                     break
 
-class TailLogPanel(ListPanel):
+class TailLogPanel(TabularPanel):
     """ Displays log data from a file - graphically similar to tail -f <file> """
-    def __init__(self,toplevel,chief,ttl,polltime,logfile):
+    def __init__(self,tl,chief,ttl,polltime,logfile):
         """ initializes TailLogPanel to read from the file specified logfile """
-        ListPanel.__init__(self,toplevel,chief,ttl,(60,8),1,[],"widgets/icons/log.png",False)
+        TabularPanel.__init__(self,tl,chief,ttl,8,[('',60)],"widgets/icons/log.png")
         self._n = 0
         self._lf = logfile
         if not os.path.exists(logfile) and not os.path.isfile(logfile):
@@ -565,10 +580,9 @@ class TailLogPanel(ListPanel):
     def newlines(self,lines):
         """ callback for polling thread to pass new data """
         for line in lines:
-            entry = str(self._n)
-            self.list.add(entry,itemtype=Tix.TEXT,text=line.strip())
+            self.tree.insert('','end',iid=str(self._n),text=line.strip())
             self._n += 1
-            self.list.yview('moveto',1.0)
+            self.tree.yview('moveto',1.0)
 
     def logerror(self,err):
         """ received error callback for polling thread """
@@ -585,7 +599,8 @@ class TailLogPanel(ListPanel):
         # reset internal structures and clear the list
         if self._n:
             self._n = 0
-            self.list.delete_all()
+            self.tree.delete('')
+            #self.tree.delete(*self.tree.get_children())
 
         # reset the log poller
         self._startlogger()
@@ -624,15 +639,15 @@ class MasterPanel(Panel):
       showpanel -> derive for use in toolsload (loads saved panel configs)
       delete and close if the derived class must further handle shutting down
     """
-    def __init__(self,toplevel,ttl,datatypes=None,logpanel=True,iconPath=None,resize=False):
+    def __init__(self,tl,ttl,datatypes=None,logpanel=True,iconPath=None,resize=False):
         """
          ttl - title of the window/panel
          datatypes - list of strings for data bins, etc
          logpanel - if True, will initiate a logpanel
          iconPath - path of image to show as icon for this panel
         """
-        Panel.__init__(self,toplevel,iconPath,resize)
-        self.tk = toplevel
+        Panel.__init__(self,tl,iconPath,resize)
+        self.tk = tl
         self.menubar = None
         
         # data bins, registered panels, and what data is hidden, selected
@@ -648,7 +663,7 @@ class MasterPanel(Panel):
 
         # set the title
         self.master.title(ttl)
-        self.grid(sticky=Tix.W+Tix.N+Tix.E+Tix.S)
+        self.grid(sticky='nwse')
         
         # try and make the menu
         self._makemenu()
@@ -705,7 +720,7 @@ class MasterPanel(Panel):
         """ displays the log panel """
         panel = self.getpanels("log",False)
         if not panel:
-            t =Tix.Toplevel()
+            t = tk.Toplevel()
             pnl = LogPanel(t,self)
             self.addpanel(pnl._name,PanelRecord(t,pnl,"log"))
             pnl.update_idletasks()
