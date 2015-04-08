@@ -331,7 +331,7 @@ class ConfigPanel(SlavePanel):
         # set up the input widget frame
         frmConfs = ttk.Frame(self)
         self._makegui(frmConfs)
-        frmConfs.grid(row=0,column=0,sticky='nwse')
+        frmConfs.grid(row=0,column=0,sticky='ns')
 
         # set up the button widget frame
         frmBtns = ttk.Frame(self)
@@ -468,8 +468,8 @@ class LogPanel(TabularPanel):
      cannot be closed by the user only by the MasterPanel
     """
     def __init__(self,tl,chief):
-        TabularPanel.__init__(self,tl,chief,"Log",8,
-                              [('',lenpix('[+] ')),('',lenpix('00:00:00')),('',lenpix('w')*40)],
+        TabularPanel.__init__(self,tl,chief,"Log",5,
+                              [('',lenpix('[+] ')),('',lenpix('00:00:00')),('',lenpix('w')*20)],
                               "widgets/icons/log.png")
         self._l = threading.Lock() # lock for writing
         self._n = 0                # current entry number
@@ -479,11 +479,11 @@ class LogPanel(TabularPanel):
         self.tree['show'] = ''
 
         # set up tags and symbols for message types
-        self._symbol = ['[+]','[?]','[-]','[!]']           # type symbols
-        self.tree.tag_configure(LOG_NOERR,foreground='green')
-        self.tree.tag_configure(LOG_WARN,foreground='yellow')
-        self.tree.tag_configure(LOG_ERR,foreground='red')
-        self.tree.tag_configure(LOG_NOTE,foreground='blue')
+        self._symbol = ['[+]','[?]','[-]','[!]']
+        self.tree.tag_configure(LOG_NOERR,foreground='green',background='darkgray')
+        self.tree.tag_configure(LOG_WARN,foreground='yellow',background='darkgray')
+        self.tree.tag_configure(LOG_ERR,foreground='red',background='darkgray')
+        self.tree.tag_configure(LOG_NOTE,foreground='blue',background='darkgray')
 
     def delete(self): pass    # user can never close only the primary chief
     def reset(self): pass     # nothing needs to be reset
@@ -565,7 +565,7 @@ class TailLogPanel(TabularPanel):
     """ Displays log data from a file - graphically similar to tail -f <file> """
     def __init__(self,tl,chief,ttl,polltime,logfile):
         """ initializes TailLogPanel to read from the file specified logfile """
-        TabularPanel.__init__(self,tl,chief,ttl,8,[('',60)],"widgets/icons/log.png")
+        TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix('w')*20)],"widgets/icons/log.png")
         self._n = 0
         self._lf = logfile
         if not os.path.exists(logfile) and not os.path.isfile(logfile):
@@ -575,6 +575,9 @@ class TailLogPanel(TabularPanel):
         self._logPoller = None
         self._threadq = None
         self._startlogger()
+
+        # configure tree to hide icon/headers
+        self.tree['show'] = ''
 
     # CALLBACKS
     def newlines(self,lines):

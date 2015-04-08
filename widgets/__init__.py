@@ -4,12 +4,17 @@
 
 includes panel.py, the definition of gui super classes and the icons folder
 
-widgets 0.0.2
+widgets 0.0.3
  desc: gui description
  includes: icons folder, panel.py
  changes:
   - scrubbed and removed circular, redundant, confusing code
   - stopped using pack and grid geometry managers
+  - migrated to ttk
+
+TODO:
+  1) experiencing difficulties with ttk primarily schemes etc, have to read more
+     on ttk
 """
 __name__ = 'utils'
 __license__ = 'GPL v3.0'

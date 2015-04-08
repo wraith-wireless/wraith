@@ -49,6 +49,7 @@ class NidusDB(object):
         self._curs = None           # cursor to datastore
         self._sid  = None           # session id for this sensor
         self._gid  = None           # gpsd id
+        self._storage = {}          # psql connect parameters
         self._raw = {'store':False} # raw frame storage config
         self._oui = {}              # oui dict (oui->manufacturer)
 
@@ -70,7 +71,14 @@ class NidusDB(object):
 
             # save section of SSE
             try:
-                # save section
+                # storage section
+                self._storage = {'host':conf.get('Storage','host'),
+                                 'port':conf.getint('Storage','port'),
+                                 'db':conf.get('Storage','db'),
+                                 'user':conf.get('Storage','user'),
+                                 'pwd':conf.get('Storage','pwd')}
+
+                # sse section
                 self._raw['save'] = conf.getboolean('SSE','save')
                 if self._raw['save']:
                     self._raw['private'] = conf.get('SSE','save_private')
@@ -90,7 +98,6 @@ class NidusDB(object):
             if conf.has_option('OUI','path'):
                 self._oui = parseoui(conf.get('OUI','path'))
 
-
     def __del__(self):
         """ called during garbage collection forces shuts down connection """
         self.shutdown()
@@ -103,10 +110,11 @@ class NidusDB(object):
         """ client connects to NidusDB """
         try:
             # make connection, cursor and set session timezone to utc
-            self._conn = psql.connect(host="localhost",
-                                      dbname="nidus",
-                                      user="nidus",
-                                      password="nidus")
+            self._conn = psql.connect(host=self._storage['host'],
+                                      port=self._storage['port'],
+                                      dbname=self._storage['db'],
+                                      user=self._storage['user'],
+                                      password=self._storage['pwd'])
             self._curs = self._conn.cursor()
             self._curs.execute("set time zone 'UTC';")
             self._conn.commit()

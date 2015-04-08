@@ -601,6 +601,7 @@ class WraithPanel(gui.MasterPanel):
         try:
             ## STORAGE
             self._conf['store'] = {'host':conf.get('Storage','host'),
+                                   'port':conf.getint('Storage','port'),
                                    'db':conf.get('Storage','db'),
                                    'user':conf.get('Storage','user'),
                                    'pwd':conf.get('Storage','pwd')}
@@ -764,9 +765,10 @@ class WraithPanel(gui.MasterPanel):
         try:
             self.logwrite("Connecting to Nidus Datastore...",gui.LOG_NOTE)
             self._conn = psql.connect(host=self._conf['store']['host'],
+                                      port=self._conf['store']['port'],
                                       dbname=self._conf['store']['db'],
                                       user=self._conf['store']['user'],
-                                      password=self._conf['store']['pwd'],)
+                                      password=self._conf['store']['pwd'])
 
             # set to use UTC and enable CONN flag
             curs = self._conn.cursor()
@@ -935,11 +937,16 @@ class WraithPanel(gui.MasterPanel):
 
 if __name__ == '__main__':
     t = tk.Tk()
-    t.option_add('*foreground','blue')         # normal fg color
+    """t.option_add('*foreground','blue')         # normal fg color
     t.option_add('*background','black')        # normal bg color
     t.option_add('*activeBackground','black')  # bg on mouseover
     t.option_add('*activeForeground','blue')   # fg on mouseover
     t.option_add('*disabledForeground','gray') # fg on disabled widget
     t.option_add('*disabledBackground','gray') # bg on disabled widget
-    t.option_add('*troughColor','black')       # trough on scales/scrollbars
+    t.option_add('*troughColor','black')       # trough on scales/scrollbars"""
+
+    # change all Treeviews to dark gray background
+    # I don't like this as I only want to change the background of the main log
+    # panel
+    ttk.Style().configure("Treeview",fieldbackground="darkgray",background='darkgray')
     WraithPanel(t).mainloop()

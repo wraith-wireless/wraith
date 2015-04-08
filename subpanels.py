@@ -49,15 +49,19 @@ class WraithConfigPanel(gui.ConfigPanel):
         ttk.Label(frmS,text='Host: ').grid(row=0,column=0,sticky='w')
         self.txtHost = ttk.Entry(frmS,width=15)
         self.txtHost.grid(row=0,column=1,sticky='e')
+        ttk.Label(frmS,text=' ').grid(row=0,column=2) # separator
+        ttk.Label(frmS,text='Port: ').grid(row=0,column=3,sticky='w')
+        self.txtPort = ttk.Entry(frmS,width=5)
+        self.txtPort.grid(row=0,column=4,sticky='w')
         ttk.Label(frmS,text='DB: ').grid(row=1,column=0,sticky='w')
-        self.txtDB = ttk.Entry(frmS,width=15)
-        self.txtDB.grid(row=1,column=1,sticky='e')
-        ttk.Label(frmS,text='User: ').grid(row=2,column=0,sticky='w')
-        self.txtUser = ttk.Entry(frmS,width=15)
-        self.txtUser.grid(row=2,column=1,sticky='e')
-        ttk.Label(frmS,text='PWD: ').grid(row=3,column=0,sticky='w')
-        self.txtPWD = ttk.Entry(frmS,width=15)
-        self.txtPWD.grid(row=3,column=1,sticky='e')
+        self.txtDB = ttk.Entry(frmS,width=10)
+        self.txtDB.grid(row=1,column=1,sticky='w')
+        ttk.Label(frmS,text='User: ').grid(row=1,column=3,sticky='w')
+        self.txtUser = ttk.Entry(frmS,width=10)
+        self.txtUser.grid(row=1,column=4,sticky='e')
+        ttk.Label(frmS,text='PWD: ').grid(row=4,column=0,sticky='w')
+        self.txtPWD = ttk.Entry(frmS,width=10)
+        self.txtPWD.grid(row=4,column=1,sticky='w')
 
         # Policy Configuration
         frmP = ttk.LabelFrame(frm,text='Policy')
@@ -79,7 +83,7 @@ class WraithConfigPanel(gui.ConfigPanel):
         self.stype = tk.IntVar(self)
         self.rdoShutdownAuto = ttk.Radiobutton(frmP,text='Auto',variable=self.stype,value=1)
         self.rdoShutdownAuto.grid(row=0,column=4,sticky='w')
-        self.rdoShutdownManual = ttk.Radiobutton(frmP,text='Manual',variable=self.ptype,value=0)
+        self.rdoShutdownManual = ttk.Radiobutton(frmP,text='Manual',variable=self.stype,value=0)
         self.rdoShutdownManual.grid(row=1,column=4,sticky='w')
 
     def _initialize(self):
@@ -93,22 +97,22 @@ class WraithConfigPanel(gui.ConfigPanel):
         self.txtHost.delete(0,tk.END)
         if conf.has_option('Storage','host'):
             self.txtHost.insert(0,conf.get('Storage','host'))
-        else: self.txtHost.insert(0,'')
+
+        self.txtPort.delete(0,tk.END)
+        if conf.has_option('Storage','port'):
+            self.txtPort.insert(0,conf.get('Storage','port'))
 
         self.txtDB.delete(0,tk.END)
         if conf.has_option('Storage','db'):
             self.txtDB.insert(0,conf.get('Storage','db'))
-        else: self.txtDB.insert(0,'')
 
         self.txtUser.delete(0,tk.END)
         if conf.has_option('Storage','user'):
             self.txtUser.insert(0,conf.get('Storage','user'))
-        else: self.txtUser.insert(0,'')
 
         self.txtPWD.delete(0,tk.END)
         if conf.has_option('Storage','pwd'):
             self.txtPWD.insert(0,conf.get('Storage','pwd'))
-        else: self.txtPWD.insert(0,'')
 
         if conf.has_option('Policy','polite') and conf.get('Policy','polite').lower() == 'off':
             self.ptype.set(0)
@@ -125,6 +129,13 @@ class WraithConfigPanel(gui.ConfigPanel):
         host = self.txtHost.get()
         if re.match(IPADDR,host) is None and host != 'localhost':
             self.err("Invalid Input","Host %s is not valid" % host)
+            return False
+        port = self.txtPort.get()
+        try:
+            port = int(port)
+            if port < 1024 or port > 65535: raise RuntimeError("")
+        except:
+            self.err("Invalid Input","Port must be a number between 1024 and 65535")
             return False
         if len(self.txtDB.get()) < 1 or len(self.txtDB.get()) > 15:
             self.err("Invalid Input","DB name must be between 1 and 15 characters")
@@ -144,6 +155,7 @@ class WraithConfigPanel(gui.ConfigPanel):
             cp = ConfigParser.ConfigParser()
             cp.add_section('Storage')
             cp.set('Storage','host',self.txtHost.get())
+            cp.set('Storage','port',self.txtPort.get())
             cp.set('Storage','db',self.txtDB.get())
             cp.set('Storage','user',self.txtUser.get())
             cp.set('Storage','pwd',self.txtUser.get())
@@ -416,10 +428,10 @@ class NidusConfigPanel(gui.ConfigPanel):
         frmS.grid(row=0,column=0,sticky='nwse')
         ttk.Label(frmS,text='Packets: ').grid(row=0,column=0,sticky='w')
         self.svar = tk.IntVar()
-        self.chkSave = ttk.Checkbutton(frmS,text="Save",border=0,variable=self.svar,command=self.cb)
+        self.chkSave = ttk.Checkbutton(frmS,text="Save",variable=self.svar,command=self.cb)
         self.chkSave.grid(row=0,column=1,sticky='w')
         self.pvar = tk.IntVar()
-        self.chkPrivate = ttk.Checkbutton(frmS,text="Private",border=0,variable=self.pvar)
+        self.chkPrivate = ttk.Checkbutton(frmS,text="Private",variable=self.pvar)
         self.chkPrivate.grid(row=0,column=2,sticky='e')
         ttk.Label(frmS,text='Path: ').grid(row=0,column=3,sticky='w')
         self.txtPCAPPath = ttk.Entry(frmS,width=25)
@@ -1065,7 +1077,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
             try:
                 port = int(port)
                 if port < 1024 or port > 65535: raise RuntimeError("")
-            except ValueError:
+            except:
                 self.err("Invalid GPS Input","Device port must be a number between 1024 and 65535")
                 return False
             if re.match(GPSDID,self.txtDevID.get().upper()) is None:
@@ -1216,7 +1228,7 @@ class AboutPanel(gui.SimplePanel):
 
     def _body(self,frm):
         self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/wraith-banner.png"))
-        ttk.Label(frm,bg='white',image=self.logo).grid(row=0,column=0,sticky='n')
+        ttk.Label(frm,background='white',image=self.logo).grid(row=0,column=0,sticky='n')
         ttk.Label(frm,text="wraith-rt %s" % wraith.__version__,
                   font=("Roman",16,'bold')).grid(row=1,column=0,sticky='n')
         ttk.Label(frm,text="Wireless reconnaissance, collection, assault and exploitation toolkit",
