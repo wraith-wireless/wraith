@@ -503,129 +503,96 @@ class LogPanel(TabularPanel):
         finally:
             self._l.release()
 
-class TailLogger(threading.Thread):
-    """ periodically reads the specified logfile and returns any new 'lines' """
-    def __init__(self,q,cb,errcb,polltime,logfile):
-        """
-         initialize the thread
-          q - event queue
-          cb - callback function for new lines
-          errcb - callback function to report any errors
-          polltime - time to sleep between polls
-          logfile - logfile to tail
-         NOTE: the parameter cmd must be initialized/set with all keys and starting
-          values beforing being passed to __init__, any key:value pairs set after
-          initialized will not be 'seen' by the thread
-        """
-        threading.Thread.__init__(self)
-        self._q = q              # command queue from caller
-        self._errcb = errcb      # error callback to report failures
-        self._pause = polltime   # time to sleep between file checks
-        self._lf = logfile       # path of file to monitor
-        self._cb = cb            # callback for new lines
-        self._ctime = None       # last time logfile was changed
-        self._offset = None      # offset of last file
-
-    def run(self):
-        """ polls until told to stop or internal error is encountered """
-        # get intial file metadata and any intial lines
-        try:
-            self._ctime = os.stat(self._lf).st_ctime # get current change time
-            fin = open(self._lf,'r')                 # open file
-            lines = fin.readlines()                  # read all lines
-            self._offset = fin.tell()                # get current offset
-            fin.close()                              # close the file
-            self._cb(lines)                          # forward the lines
-        except Exception as e:
-            self._errcb(e)
-            return
-
-        while True:
-            try:
-                tkn = self._q.get(True,self._pause)
-                if tkn == '!STOP!': break
-                # no other commands expected ATT
-            except Queue.Empty:
-                # nothing on the queue, see if anything has changed
-                try:
-                    ctime = os.stat(self._lf).st_ctime # latest change time
-                    if ctime != self._ctime:           # any changes?
-                        fin = open(self._lf,'r')       # open for reading
-                        fin.seek(self._offset-1)       # go to last read position
-                        lines = fin.readlines()        # read all new lines
-                        self._offset = fin.tell()      # get new position
-                        fin.close()                    # close the file
-                        self._ctime = ctime            # update change time
-                        self._cb(lines)                # forward newly read lines
-                except Exception as e:
-                    self._errcb(e)
-                    break
-
 class TailLogPanel(TabularPanel):
-    """ Displays log data from a file - graphically similar to tail -f <file> """
+    """
+     Displays log data from a file - graphically similar to tail -f <file>
+     utilizing an after function
+    """
     def __init__(self,tl,chief,ttl,polltime,logfile):
-        """ initializes TailLogPanel to read from the file specified logfile """
+        """
+         initializes TailLogPanel to read from the file specified logfile
+         tl: the Toplevel
+         chief: the master panel
+         ttl: title to display
+         polltime: polltime in milliseconds to pause between file checks
+         logfile: the log file to tail
+        """
         TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix('w')*20)],"widgets/icons/log.png")
-        self._n = 0
-        self._lf = logfile
+        # check validity of logfile first
         if not os.path.exists(logfile) and not os.path.isfile(logfile):
             self._chief.logwrite("Log File %s does not exist" % logfile,LOG_ERR)
             return
+
+        # member variables
+        self._n = 0
+        self._lf = logfile
         self._polltime = polltime
-        self._logPoller = None
-        self._threadq = None
-        self._startlogger()
+        self._ctime = None
+        self._offset = None
 
         # configure tree to hide icon/headers
         self.tree['show'] = ''
 
-    # CALLBACKS
-    def newlines(self,lines):
-        """ callback for polling thread to pass new data """
-        for line in lines:
-            self.tree.insert('','end',iid=str(self._n),text=line.strip())
-            self._n += 1
-            self.tree.yview('moveto',1.0)
+        # run our polling function
+        self.tail()
 
-    def logerror(self,err):
-        """ received error callback for polling thread """
-        self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],
-                                                       err),LOG_ERR)
+    def tail(self):
+        """ checks log file for updates & writes if present """
+        # if first time, set internals
+        if self._ctime is None:
+            fin = None
+            try:
+                self._ctime = os.stat(self._lf).st_ctime
+                fin = open(self._lf,'r')
+                self._newlines(fin.readlines())
+                self._offset = fin.tell()
+            except Exception as e:
+                self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],e),LOG_ERR)
+            finally:
+                if fin: fin.close()
+        else:
+            # check for updates
+            fin = None
+            try:
+                ctime = os.stat(self._lf).st_ctime
+                if ctime != self._ctime:
+                    fin = open(self._lf,'r')
+                    fin.seek(self._offset-1)
+                    self._newlines(fin.readlines())
+                    self._offset = fin.tell()
+                    self._ctime = ctime
+                    # print lines
+            except Exception as e:
+                self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],e),LOG_ERR)
+            finally:
+                if fin: fin.close()
+
+        # pause during polltime
+        self.after()
+        self.after(self._polltime,self.tail)
 
     # VIRTUAL METHOD OVERRIDES
 
     def reset(self):
         """ resets the log panel """
-        # stop the polling thread and join
-        self._shutdown()
-
         # reset internal structures and clear the list
         if self._n:
             self._n = 0
             self.tree.delete('')
+            self._ctime = None
+            self._offset = None
             #self.tree.delete(*self.tree.get_children())
 
-        # reset the log poller
-        self._startlogger()
+    def update(self): pass    # no need to implement
+    def _shutdown(self): pass # no need to implement
 
-    def update(self): pass # no need to implement
-
-    def _shutdown(self):
-        """ clean up our polling thread """
-        # stop polling thread and wait for it to finish
-        if self._logPoller:
-            self._threadq.put('!STOP!')
-            self._logPoller.join()
-
-    def _startlogger(self):
-        try:
-            self._threadq = Queue.Queue()
-            self._logPoller = TailLogger(self._threadq,self.newlines,self.logerror,
-                                         self._polltime,self._lf)
-            self._logPoller.start()
-        except Exception as e:
-            self._logPoller = None
-            self._chief.logwrite("Log for %s failed %s" % (self._lf,e))
+    # PRIVATE HELPER
+    def _newlines(self,lines):
+        """ writes new lines to panel """
+        for line in lines:
+            self.tree.insert('','end',iid=str(self._n),text=line.strip())
+            self._n += 1
+            self.tree.yview('moveto',1.0)
 
 class MasterPanel(Panel):
     """

@@ -448,7 +448,7 @@ class WraithPanel(gui.MasterPanel):
         panel = self.getpanels('niduslog',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = gui.TailLogPanel(t,self,"Nidus Log",0.2,wraith.NIDUSLOG)
+            pnl = gui.TailLogPanel(t,self,"Nidus Log",200,wraith.NIDUSLOG)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'niduslog'))
         else:
             panel[0].tk.deiconify()
@@ -501,7 +501,7 @@ class WraithPanel(gui.MasterPanel):
         panel = self.getpanels('dysktlog',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = gui.TailLogPanel(t,self,"DySKT Log",0.2,wraith.DYSKTLOG)
+            pnl = gui.TailLogPanel(t,self,"DySKT Log",200,wraith.DYSKTLOG)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'dysktlog'))
         else:
             panel[0].tk.deiconify()
