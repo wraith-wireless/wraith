@@ -935,16 +935,6 @@ class WraithPanel(gui.MasterPanel):
 
 if __name__ == '__main__':
     t = tk.Tk()
-    """t.option_add('*foreground','blue')         # normal fg color
-    t.option_add('*background','black')        # normal bg color
-    t.option_add('*activeBackground','black')  # bg on mouseover
-    t.option_add('*activeForeground','blue')   # fg on mouseover
-    t.option_add('*disabledForeground','gray') # fg on disabled widget
-    t.option_add('*disabledBackground','gray') # bg on disabled widget
-    t.option_add('*troughColor','black')       # trough on scales/scrollbars"""
-
-    # change all Treeviews to dark gray background
-    # I don't like this as I only want to change the background of the main log
-    # panel
-    #ttk.Style().configure("Treeview",fieldbackground="darkgray",background='darkgray')
+    s = ttk.Style()
+    if 'alt' in s.theme_names(): s.theme_use('alt')
     WraithPanel(t).mainloop()

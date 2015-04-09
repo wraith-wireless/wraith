@@ -45,7 +45,6 @@ import os                         # files operations etc
 import time                       # dtg parsing etc
 import pickle                     # load and dump
 import threading                  # for threads
-import Queue                      # for Queue class and Empty exception
 import Tkinter as tk              # gui constructs
 import tkFont                     # gui fonts
 import ttk                        # ttk widgets
@@ -474,16 +473,21 @@ class LogPanel(TabularPanel):
         self._l = threading.Lock() # lock for writing
         self._n = 0                # current entry number
 
-        # configure the tree to left justify the message column and to hide icon/headers
+        # configure the tree to left justify the message column, hide icon/headers
+        # and use a darkgray background to better highlight the colored text
         self.tree.column(2,anchor='w')
         self.tree['show'] = ''
+        ttk.Style().configure('Log.Treeview',
+                              fieldbackground="darkgray",
+                              background='darkgray')
+        self.tree['style'] = 'Log.Treeview'
 
-        # set up tags and symbols for message types
+        # set symbols for message types and tags for colored text
         self._symbol = ['[+]','[?]','[-]','[!]']
-        self.tree.tag_configure(LOG_NOERR,foreground='green',background='darkgray')
-        self.tree.tag_configure(LOG_WARN,foreground='yellow',background='darkgray')
-        self.tree.tag_configure(LOG_ERR,foreground='red',background='darkgray')
-        self.tree.tag_configure(LOG_NOTE,foreground='blue',background='darkgray')
+        self.tree.tag_configure(LOG_NOERR,foreground='green')
+        self.tree.tag_configure(LOG_WARN,foreground='yellow')
+        self.tree.tag_configure(LOG_ERR,foreground='red')
+        self.tree.tag_configure(LOG_NOTE,foreground='blue')
 
     def delete(self): pass    # user can never close only the primary chief
     def reset(self): pass     # nothing needs to be reset
@@ -508,7 +512,7 @@ class TailLogPanel(TabularPanel):
      Displays log data from a file - graphically similar to tail -f <file>
      utilizing an after function
     """
-    def __init__(self,tl,chief,ttl,polltime,logfile,w=20):
+    def __init__(self,tl,chief,ttl,polltime,logfile,w=20,resize=False):
         """
          initializes TailLogPanel to read from the file specified logfile
          tl: the Toplevel
@@ -517,8 +521,10 @@ class TailLogPanel(TabularPanel):
          polltime: polltime in milliseconds to pause between file checks
          logfile: the log file to tail
          width: width of the display (in characters
+         resize: allow resize
         """
-        TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix('w')*w)],"widgets/icons/log.png")
+        TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix('w')*w)],
+                              "widgets/icons/log.png",resize)
         # check validity of logfile first
         if not os.path.exists(logfile) and not os.path.isfile(logfile):
             self._chief.logwrite("Log File %s does not exist" % logfile,LOG_ERR)

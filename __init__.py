@@ -35,8 +35,6 @@ wraith 0.0.3
      from /var/run but does not work. Have to use --make-pid to force creation
      of pid file but then, the pidfile is not removed (ubuntu does not have
      --remove-pid flag
-  2) make tkMessageBox,tkFileDialog and tkSimpleDialog derive match
-    main color scheme
   5) move display of log panel to after intializiation() so that
      wraith panel is 'first', leftmost panel - will have implement mechanism
      to send 'batch' messages after the fact
@@ -50,6 +48,8 @@ wraith 0.0.3
      - code a two-paned window for an indexed help
      - write help documentation\
  19) start postgresql and connect on start
+ 20) Horizontal scrollbars on tree view do not work
+ 21) Have to work on resize of widgets etc
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
