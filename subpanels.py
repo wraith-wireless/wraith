@@ -423,9 +423,30 @@ class NidusConfigPanel(gui.ConfigPanel):
 
     def _makegui(self,frm):
         """ set up entry widgets """
+        # Storage Configuration
+        frmSS = ttk.LabelFrame(frm,text='Storage')
+        frmSS.grid(row=0,column=0,sticky='nwse')
+        ttk.Label(frmSS,text='Host: ').grid(row=0,column=0,sticky='w')
+        self.txtHost = ttk.Entry(frmSS,width=15)
+        self.txtHost.grid(row=0,column=1,sticky='e')
+        ttk.Label(frmSS,text=' ').grid(row=0,column=2) # separator
+        ttk.Label(frmSS,text='Port: ').grid(row=0,column=3,sticky='w')
+        self.txtPort = ttk.Entry(frmSS,width=5)
+        self.txtPort.grid(row=0,column=4,sticky='w')
+        ttk.Label(frmSS,text='DB: ').grid(row=1,column=0,sticky='w')
+        self.txtDB = ttk.Entry(frmSS,width=10)
+        self.txtDB.grid(row=1,column=1,sticky='w')
+        ttk.Label(frmSS,text='User: ').grid(row=1,column=3,sticky='w')
+        self.txtUser = ttk.Entry(frmSS,width=10)
+        self.txtUser.grid(row=1,column=4,sticky='e')
+        ttk.Label(frmSS,text=' ').grid(row=1,column=5) # separator
+        ttk.Label(frmSS,text='PWD: ').grid(row=1,column=6,sticky='w')
+        self.txtPWD = ttk.Entry(frmSS,width=10)
+        self.txtPWD.grid(row=1,column=7,sticky='w')
+
         # SSE Configuration
         frmS = ttk.LabelFrame(frm,text='SSE')
-        frmS.grid(row=0,column=0,sticky='nwse')
+        frmS.grid(row=1,column=0,sticky='nwse')
         ttk.Label(frmS,text='Packets: ').grid(row=0,column=0,sticky='w')
         self.svar = tk.IntVar()
         self.chkSave = ttk.Checkbutton(frmS,text="Save",variable=self.svar,command=self.cb)
@@ -452,7 +473,7 @@ class NidusConfigPanel(gui.ConfigPanel):
 
         # OUI Configuration
         frmO = ttk.Frame(frm)
-        frmO.grid(row=1,column=0,sticky='nwse')
+        frmO.grid(row=2,column=0,sticky='nwse')
         ttk.Label(frmO,text='OUI Path: ').grid(row=0,column=0,sticky='w')
         self.txtOUIPath = ttk.Entry(frmO,width=50)
         self.txtOUIPath.grid(row=0,column=1,sticky='e')
@@ -474,6 +495,27 @@ class NidusConfigPanel(gui.ConfigPanel):
             return
 
         # in case the conf file is invalid, set to empty if not present
+        # storage server
+        self.txtHost.delete(0,tk.END)
+        if conf.has_option('Storage','host'):
+            self.txtHost.insert(0,conf.get('Storage','host'))
+
+        self.txtPort.delete(0,tk.END)
+        if conf.has_option('Storage','port'):
+            self.txtPort.insert(0,conf.get('Storage','port'))
+
+        self.txtDB.delete(0,tk.END)
+        if conf.has_option('Storage','db'):
+            self.txtDB.insert(0,conf.get('Storage','db'))
+
+        self.txtUser.delete(0,tk.END)
+        if conf.has_option('Storage','user'):
+            self.txtUser.insert(0,conf.get('Storage','user'))
+
+        self.txtPWD.delete(0,tk.END)
+        if conf.has_option('Storage','pwd'):
+            self.txtPWD.insert(0,conf.get('Storage','pwd'))
+
         # SSE section
         try:
             save = int(conf.getboolean('SSE','save'))
@@ -515,6 +557,28 @@ class NidusConfigPanel(gui.ConfigPanel):
 
     def _validate(self):
         """ validate entries """
+        # storage server
+        host = self.txtHost.get()
+        if re.match(IPADDR,host) is None and host != 'localhost':
+            self.err("Invalid Input","Host %s is not valid" % host)
+            return False
+        port = self.txtPort.get()
+        try:
+            port = int(port)
+            if port < 1024 or port > 65535: raise RuntimeError("")
+        except:
+            self.err("Invalid Input","Port must be a number between 1024 and 65535")
+            return False
+        if len(self.txtDB.get()) < 1 or len(self.txtDB.get()) > 15:
+            self.err("Invalid Input","DB name must be between 1 and 15 characters")
+            return False
+        if len(self.txtUser.get()) < 1 or len(self.txtUser.get()) > 15:
+            self.err("Invalid Input","User name must be between 1 and 15 characters")
+            return False
+        if len(self.txtPWD.get()) < 1 or len(self.txtPWD.get()) > 15:
+            self.err("Invalid Input","Password must be between 1 and 15 characters")
+            return False
+
         # if not saving pcaps, we ignore pcap options
         if self.svar.get():
             # for the pcap directory, convert to absolute path before checking existence
@@ -595,16 +659,11 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
     def _makegui(self,frm):
         """ set up entry widgets """
-        nb = ttk.NoteBook(frm)
-        nb.add('recon',label='Recon')
-        nb.add('collection',label='Collection')
-        nb.add('gps',label='GPS')
-        nb.add('misc',label='Misc.')
+        nb = ttk.Notebook(frm)
         nb.grid(row=0,column=0,sticky='nwse')
 
         # Recon Tab Configuration
-        frmR = ttk.Frame(nb.recon)
-        frmR.grid(row=0,column=0,sticky='nwse')
+        frmR = ttk.Frame(nb)
         ttk.Label(frmR,text='NIC: ').grid(row=0,column=0,sticky='nw')
         self.txtReconNic = ttk.Entry(frmR,width=5)
         self.txtReconNic.grid(row=0,column=1,sticky='nw')
@@ -654,10 +713,10 @@ class DySKTConfigPanel(gui.ConfigPanel):
         ttk.Label(frmRS,text="Pass: ").grid(row=1,column=4,sticky='w')
         self.txtReconScanPass = ttk.Entry(frmRS,width=12)
         self.txtReconScanPass.grid(row=1,column=5,sticky='e')
+        nb.add(frmR,text='Recon')
 
         # Collection Tab Configuration
-        frmC = ttk.Frame(nb.collection)
-        frmC.grid(row=0,column=0,sticky='nwse')
+        frmC = ttk.Frame(nb)
         ttk.Label(frmC,text='NIC: ').grid(row=0,column=0,sticky='nw')
         self.txtCollectionNic = ttk.Entry(frmC,width=5)
         self.txtCollectionNic.grid(row=0,column=1,sticky='nw')
@@ -707,15 +766,13 @@ class DySKTConfigPanel(gui.ConfigPanel):
         ttk.Label(frmCS,text="Pass: ").grid(row=1,column=4,sticky='w')
         self.txtCollectionScanPass = ttk.Entry(frmCS,width=12)
         self.txtCollectionScanPass.grid(row=1,column=5,sticky='e')
+        nb.add(frmC,text='Collection')
 
         # GPS Tab Configuration
         # use a checkbutton & two subframes to differentiate betw/ fixed & dyanmic
-        frmG = ttk.Frame(nb.gps)
-        frmG.grid(row=0,column=0,sticky='nwse')
+        frmG = ttk.Frame(nb)
         self.gvar = tk.IntVar()
-        self.chkFixed = ttk.Checkbutton(frmG,text="Fixed",border=0,
-                                        variable=self.gvar,
-                                        command=self.gpscb)
+        self.chkFixed = ttk.Checkbutton(frmG,text="Fixed",variable=self.gvar,command=self.gpscb)
         self.chkFixed.grid(row=0,column=0,sticky='w')
 
         # separate dynamic and fixed
@@ -750,10 +807,10 @@ class DySKTConfigPanel(gui.ConfigPanel):
         ttk.Label(frmGD,text="EPY: ").grid(row=4,column=0,sticky='w')
         self.txtEPY = ttk.Entry(frmGD,width=5)
         self.txtEPY.grid(row=4,column=1,sticky='w')
+        nb.add(frmG,text='GPS')
 
         # misc tab
-        frmM = ttk.Frame(nb.misc)
-        frmM.grid(row=0,column=0,sticky='nwse')
+        frmM = ttk.Frame(nb)
         frmMS = ttk.LabelFrame(frmM,text='Storage')
         frmMS.grid(row=0,column=0,sticky='w')
         self.cvar = tk.IntVar()
@@ -768,11 +825,12 @@ class DySKTConfigPanel(gui.ConfigPanel):
         frmML = ttk.LabelFrame(frmM,text='Local')
         frmML.grid(row=1,column=0,sticky='w')
         ttk.Label(frmML,text="Region: ").grid(row=0,column=0,sticky='w')
-        self.txtRegion = ttk.Entry(frmML,width=2)
-        self.txtRegion.grid(row=0,column=1)
+        self.txtRegion = ttk.Entry(frmML,width=3)
+        self.txtRegion.grid(row=0,column=1,sticky='w')
         ttk.Label(frmML,text=" C2C: ").grid(row=0,column=2,sticky='w')
         self.txtC2CPort = ttk.Entry(frmML,width=5)
-        self.txtC2CPort.grid(row=0,column=3)
+        self.txtC2CPort.grid(row=0,column=3,sticky='w')
+        nb.add(frmM,text='Misc.')
 
     def _initialize(self):
         """ insert values from config file into entry boxes """
