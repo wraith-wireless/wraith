@@ -448,7 +448,7 @@ class WraithPanel(gui.MasterPanel):
         panel = self.getpanels('niduslog',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = gui.TailLogPanel(t,self,"Nidus Log",200,wraith.NIDUSLOG)
+            pnl = gui.TailLogPanel(t,self,"Nidus Log",200,wraith.NIDUSLOG,40)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'niduslog'))
         else:
             panel[0].tk.deiconify()
@@ -462,10 +462,8 @@ class WraithPanel(gui.MasterPanel):
             ans = self.ask("Clear Log","Clear contents of Nidus log?")
             if ans == 'no': return
             lv = self.getpanel('niduslog')
-            #if lv: lv.close()
             with open(wraith.NIDUSLOG,'w'): os.utime(wraith.NIDUSLOG,None)
             if lv: lv.reset()
-            #self.viewniduslog()
 
     def confignidus(self):
         """ display nidus config file preference editor """
@@ -501,7 +499,7 @@ class WraithPanel(gui.MasterPanel):
         panel = self.getpanels('dysktlog',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = gui.TailLogPanel(t,self,"DySKT Log",200,wraith.DYSKTLOG)
+            pnl = gui.TailLogPanel(t,self,"DySKT Log",200,wraith.DYSKTLOG,40)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'dysktlog'))
         else:
             panel[0].tk.deiconify()
@@ -516,7 +514,7 @@ class WraithPanel(gui.MasterPanel):
             if ans == 'no': return
             with open(wraith.DYSKTLOG,'w'): pass
             lv = self.getpanel('dysktlog')
-            if lv: lv.pnlreset()
+            if lv: lv.reset()
 
     def configdyskt(self):
         """ display dyskt config file preference editor """
@@ -948,5 +946,5 @@ if __name__ == '__main__':
     # change all Treeviews to dark gray background
     # I don't like this as I only want to change the background of the main log
     # panel
-    ttk.Style().configure("Treeview",fieldbackground="darkgray",background='darkgray')
+    #ttk.Style().configure("Treeview",fieldbackground="darkgray",background='darkgray')
     WraithPanel(t).mainloop()

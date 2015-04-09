@@ -508,7 +508,7 @@ class TailLogPanel(TabularPanel):
      Displays log data from a file - graphically similar to tail -f <file>
      utilizing an after function
     """
-    def __init__(self,tl,chief,ttl,polltime,logfile):
+    def __init__(self,tl,chief,ttl,polltime,logfile,w=20):
         """
          initializes TailLogPanel to read from the file specified logfile
          tl: the Toplevel
@@ -516,8 +516,9 @@ class TailLogPanel(TabularPanel):
          ttl: title to display
          polltime: polltime in milliseconds to pause between file checks
          logfile: the log file to tail
+         width: width of the display (in characters
         """
-        TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix('w')*20)],"widgets/icons/log.png")
+        TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix('w')*w)],"widgets/icons/log.png")
         # check validity of logfile first
         if not os.path.exists(logfile) and not os.path.isfile(logfile):
             self._chief.logwrite("Log File %s does not exist" % logfile,LOG_ERR)
@@ -530,8 +531,9 @@ class TailLogPanel(TabularPanel):
         self._ctime = None
         self._offset = None
 
-        # configure tree to hide icon/headers
+        # configure tree to hide icon/headers and left-justify message column
         self.tree['show'] = ''
+        self.tree.column(0,anchor='w')
 
         # run our polling function
         self.tail()
@@ -561,14 +563,12 @@ class TailLogPanel(TabularPanel):
                     self._newlines(fin.readlines())
                     self._offset = fin.tell()
                     self._ctime = ctime
-                    # print lines
             except Exception as e:
                 self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],e),LOG_ERR)
             finally:
                 if fin: fin.close()
 
         # pause during polltime
-        self.after()
         self.after(self._polltime,self.tail)
 
     # VIRTUAL METHOD OVERRIDES
@@ -590,7 +590,8 @@ class TailLogPanel(TabularPanel):
     def _newlines(self,lines):
         """ writes new lines to panel """
         for line in lines:
-            self.tree.insert('','end',iid=str(self._n),text=line.strip())
+            #print line
+            self.tree.insert('','end',iid=str(self._n),values=(line.strip(),))
             self._n += 1
             self.tree.yview('moveto',1.0)
 
