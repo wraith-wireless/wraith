@@ -85,32 +85,7 @@ class WraithPanel(gui.MasterPanel):
             # update state
             self._setstate(_STATE_STORE_)
 
-            curs = None
-            try:
-                # attempt to connect and set state accordingly
-                self._conn = psql.connect(host=self._conf['store']['host'],
-                                          dbname=self._conf['store']['db'],
-                                          user=self._conf['store']['user'],
-                                          password=self._conf['store']['pwd'])
-
-                # set to use UTC and enable CONN flag
-                curs = self._conn.cursor()
-                curs.execute("set time zone 'UTC';")
-                self._conn.commit()
-                self._setstate(_STATE_CONN_)
-                self.logwrite("Connected to database",gui.LOG_NOTE)
-            except psql.OperationalError as e:
-                if e.__str__().find('connect') > 0:
-                    self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
-                    self._setstate(_STATE_STORE_,False)
-                elif e.__str__().find('authentication') > 0:
-                    self.logwrite("Authentication string is invalid",gui.LOG_ERR)
-                else:
-                    self.logwrite("Unspecified DB error occurred",gui.LOG_ERR)
-                    self._conn.rollback()
-                self.logwrite("Not connected to database",gui.LOG_WARN)
-            finally:
-                if curs: curs.close()
+            self._psqlconnect()
         else:
             self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
             self.logwrite("Not connected to database",gui.LOG_WARN)

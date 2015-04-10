@@ -4,7 +4,7 @@
 
 Server frontend to store collected information to database
 """
-__name__ = 'nidus'
+#__name__ = 'nidus'
 __license__ = 'GPL v3.0'
 __version__ = '0.0.3'
 __date__ = 'September 2014'
@@ -187,7 +187,7 @@ class Nidus(object):
         logging.info("Nidus shutting down")
         self.server.quit = True
 
-if __name__ == 'nidus':
+if __name__ == '__nidus__':
     try:
         # command line parsing
         opts = ap.ArgumentParser(description="Nidus %s (C) %s %s" % (nidus.__version__,

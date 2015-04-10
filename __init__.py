@@ -40,8 +40,6 @@ wraith 0.0.3
      to send 'batch' messages after the fact
   6) need to periodically recheck state -> status of postgres,nidusd and dyskt
  10) get log panel to scroll automatically
- 13) viewniduslog and viewdysktlog hang whenever respective logs are cleared
-     - after moving to ttk will also hang if master attempts to close them
  14) need to further test config panels primarily DySKTConfigPanel
  16) fresnel zone calculation - is it correct?
  17) Help Panel

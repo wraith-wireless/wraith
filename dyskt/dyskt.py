@@ -6,7 +6,7 @@
 by an external process.
 """
 
-__name__ = 'dyskt'
+#__name__ = 'dyskt'
 __license__ = 'GPL v3.0'
 __version__ = '0.0.10'
 __date__ = 'November 2014'
@@ -412,7 +412,7 @@ class DySKT(object):
 
         return r
 
-if __name__ == 'dyskt':
+if __name__ == '__main__':
     try:
         # setup the argument parser
         desc = "DySKT %s - (C) %s %s" % (dyskt.__version__,

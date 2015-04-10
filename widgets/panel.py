@@ -584,10 +584,9 @@ class TailLogPanel(TabularPanel):
         # reset internal structures and clear the list
         if self._n:
             self._n = 0
-            self.tree.delete('')
             self._ctime = None
             self._offset = None
-            #self.tree.delete(*self.tree.get_children())
+            self.tree.delete(*self.tree.get_children())
 
     def update(self): pass    # no need to implement
     def _shutdown(self): pass # no need to implement
