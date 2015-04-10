@@ -337,10 +337,10 @@ class ConfigPanel(SlavePanel):
         frmBtns.grid(row=1,column=0,sticky='ns')
 
         # four buttons, Ok, Apply, Reset and Cancel
-        ttk.Button(frmBtns,text='OK',command=self.ok).grid(row=0,column=0)
-        ttk.Button(frmBtns,text='Apply',command=self.apply).grid(row=0,column=1)
-        ttk.Button(frmBtns,text='Reset',command=self.widgetreset).grid(row=0,column=2)
-        ttk.Button(frmBtns,text='Cancel',command=self.cancel).grid(row=0,column=3)
+        ttk.Button(frmBtns,text='OK',width=6,command=self.ok).grid(row=0,column=0)
+        ttk.Button(frmBtns,text='Apply',width=6,command=self.apply).grid(row=0,column=1)
+        ttk.Button(frmBtns,text='Reset',width=6,command=self.widgetreset).grid(row=0,column=2)
+        ttk.Button(frmBtns,text='Cancel',width=6,command=self.cancel).grid(row=0,column=3)
 
         # insert values from config file
         self._initialize()

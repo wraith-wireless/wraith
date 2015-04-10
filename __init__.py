@@ -47,7 +47,7 @@ wraith 0.0.3
      - write help documentation\
  19) start postgresql and connect on start
  20) Horizontal scrollbars on tree view do not work
- 21) Have to work on resize of widgets etc
+ 21) Have to work on resize of widgets etc with row/column configure
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

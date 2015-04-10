@@ -193,7 +193,7 @@ class ConvertPanel(gui.SimplePanel):
         ttk.Label(frmGeo,text=' MGRS: ').grid(row=0,column=2,sticky='w')
         self.txtMGRS = ttk.Entry(frmGeo,width=15)
         self.txtMGRS.grid(row=0,column=3,sticky='w')
-        ttk.Button(frmGeo,text='Convert',command=self.convertgeo).grid(row=0,column=4)
+        ttk.Button(frmGeo,text='Convert',width=8,command=self.convertgeo).grid(row=0,column=4)
         # create the power frame
         frmPwr = ttk.LabelFrame(frm,text='Power')
         frmPwr.grid(row=1,column=0,sticky='n')
@@ -207,11 +207,11 @@ class ConvertPanel(gui.SimplePanel):
         ttk.Label(frmPwr,text=" mW: ").grid(row=0,column=4)
         self.txtmW = ttk.Entry(frmPwr,width=8)
         self.txtmW.grid(row=0,column=5)
-        ttk.Button(frmPwr,text='Convert',command=self.convertpwr).grid(row=0,column=6)
+        ttk.Button(frmPwr,text='Convert',width=8,command=self.convertpwr).grid(row=0,column=6)
         frmBtns = ttk.Frame(frm,borderwidth=0)
         frmBtns.grid(row=2,column=0,sticky='n')
-        ttk.Button(frmBtns,text='OK',command=self.delete).grid(row=0,column=0)
-        ttk.Button(frmBtns,text='Clear',command=self.clear).grid(row=0,column=1)
+        ttk.Button(frmBtns,text='OK',width=6,command=self.delete).grid(row=0,column=0)
+        ttk.Button(frmBtns,text='Clear',width=6,command=self.clear).grid(row=0,column=1)
 
     def convertgeo(self):
         """convert geo from lat/lon to mgrs or vice versa """
@@ -364,9 +364,9 @@ class CalculatePanel(gui.SimplePanel):
         ttk.Label(frmAns,width=20,textvariable=self._ans).grid(row=0,column=1)
         frmBtns = ttk.Frame(frm,borderwidth=0)
         frmBtns.grid(row=2,column=0,sticky='ns')
-        ttk.Button(frmBtns,text="Calculate",command=self.calc).grid(row=0,column=0)
-        ttk.Button(frmBtns,text="Reset",command=self.clear).grid(row=0,column=1)
-        ttk.Button(frmBtns,text="Close",command=self.delete).grid(row=0,column=2)
+        ttk.Button(frmBtns,text="Calculate",width=9,command=self.calc).grid(row=0,column=0)
+        ttk.Button(frmBtns,text="Reset",width=9,command=self.clear).grid(row=0,column=1)
+        ttk.Button(frmBtns,text="Close",width=9,command=self.delete).grid(row=0,column=2)
 
     def calc(self):
         """ apply formula with entries """
