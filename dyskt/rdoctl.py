@@ -278,7 +278,7 @@ class RadioController(mp.Process):
                 iwt.ifconfig(self._nic,'up')
             except (iw.IWException,iwt.IWToolsException):
                 pass
-            raise RuntimeError("%s:Socket:%s" % (self._role,e))
+            raise RuntimeError("%s:Raw Socket:%s" % (self._role,e))
         except iw.IWException as e:
             try:
                 iw.devdel(self._vnic)
