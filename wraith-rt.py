@@ -980,11 +980,13 @@ if __name__ == '__main__':
     ap.add_argument('-p','--pwd',help="Sudo Password")
     ap.add_argument('-s','--start',help="Start with options = one of {nogui|gui|all}")
     ap.add_argument('-d','--stop',action='store_true',help="Stops all found services")
+    ap.add_argument('-x','--exclude',action='store_true',help="Does not stop PostgreSQL")
     ap.add_argument('-v','--version',action='version',version="Wraith-rt %s" % wraith.__version__)
     args = ap.parse_args()
     pwd = args.pwd
     sopts = args.start
     stop = args.stop
+    exclude = args.exclude
 
     # make sure both start and stop have both been specified
     if sopts is not None and stop == True: ap.error("Cannot specify both start and stop")
@@ -1006,30 +1008,38 @@ if __name__ == '__main__':
     # stop services - assuming no gui
     if stop:
         # stop DySKT, then Nidus, then PostgreSQL
-        sd = stopdyskt(pwd) if cmdline.dysktrunning(wraith.DYSKTPID) else True
-        sn = stopnidus(pwd) if cmdline.nidusrunning(wraith.NIDUSPID) else True
-        sp = stoppsql(pwd) if cmdline.runningprocess("postgres") else True
-        if not sd or not sn or not sp:
-            if not sd: print "Error stopping DySKT"
-            if not sn: print "Error stopping Nidus"
-            if not sp: print "Error stopping PostgreSQL"
-            sys.exit(1)
+        sd = sn = sp = True
+        if cmdline.dysktrunning(wraith.DYSKTPID):
+            sd = stopdyskt(pwd)
+            print "Stopping DySKT\t\t\t\t[%s]" % 'ok' if sd else 'fail'
+        if cmdline.nidusrunning(wraith.NIDUSPID):
+            sn = stopnidus(pwd)
+            print "Stopping Nidus\t\t\t\t[%s]" % 'ok' if sn else 'fail'
+        if cmdline.runningprocess('postgres') and not exclude:
+            sp = stoppsql(pwd)
+            print "Stopping PostgreSQL\t\t\t[%s]" % 'ok' if sp else 'fail'
         sys.exit(0)
 
     # start specified
     if sopts == 'nogui':
-        # start postgresql, nidus and dyskt
-        sp = startpsql(pwd) if not cmdline.runningprocess("postgres") else True
-        sn = startnidus(pwd) if not cmdline.nidusrunning(wraith.NIDUSPID) else True
-        if sn:
-            # no point starting DySKT if Nidus postgresqlisn't running
-            sd = startdyskt(pwd) if not cmdline.dysktrunning(wraith.DYSKTPID) else True
-        else: sd = True
-        if not sp or not sn or not sd:
-            if not sp: print "Error starting PostgreSQL"
-            if not sn: print "Error starting Nidus"
-            if not sd: print "Error starting DySKT"
-            sys.exit(1)
+        sp = sn = sd = True
+        # start postgresql (if needed), nidus and dyskt
+        if not cmdline.runningprocess('postgres'):
+            sp = startpsql(pwd)
+            print "Starting PostgreSQL\t\t\t[%s]" % 'ok' if sp else 'fail'
+        else:
+            print "PostgreSQL already running"
+        if not cmdline.nidusrunning(wraith.NIDUSPID):
+            sn = startnidus(pwd)
+            print "Starting Nidus\t\t\t\t[%s]" % 'ok' if sn else 'fail'
+        else:
+            print "Nidus already running"
+        if not cmdline.dysktrunning(wraith.DYSKTPID):
+            sd = startdyskt(pwd)
+            print "Starting DySKT\t\t\t\t[%s]" % 'ok' if sd else 'fail'
+        else:
+            print "DySKT already Running"
+
         sys.exit(0)
     else:
         sys.exit(0)
