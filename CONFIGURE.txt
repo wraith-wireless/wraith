@@ -21,6 +21,7 @@ postgres=# CREATE EXTENSION btree_gist;
 
  - iw 3.17 https://www.kernel.org/pub/software/network/iw/iw-3.17.tar.xz
    o install to /usr/sbin/iw
+   o iw.py depends upon this version
 
  - psycopg2 2.5.4 https://pypi.python.org/pypi/psycopg2
  

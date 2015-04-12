@@ -285,7 +285,7 @@ class RTO(mp.Process):
                 self._conn.send(('err','RTO',"Radio","misconfigured antennas"))
             except KeyError as e: # a radio sent a message without initiating
                 self._conn.send(('warn','RTO','Radio %s' % e,
-                                 "sent data %s of type %s w/o 'initiating'" % (ev,msg)))
+                                 "sent data %s of type %s w/o 'initiating'" % (msg,ev)))
             except Exception as e: # handle catchall error
                 self._conn.send(('err','RTO','Unknown',e))
 

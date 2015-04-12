@@ -73,17 +73,18 @@ def dev(nic=None):
      if nic is None returns a dict of phys corresponding to the iw dev command
      otherwise returns a tuple dict (phy,interfaces) or None if it does not exist
     """
-    p = sp.Popen(['iw','dev'],stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
+
+    p = sp.Popen(['/usr/sbin/iw','dev'],stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
-    
+
     # phys is a dict of dicts with each phy the key
     phys = {}
     
     try:
         # split on phy# (removing first empty) gives us a 'line' for each phy
         for line in out.split('phy#')[1:]:
-            # for each line, splitting on '\n\tInterface' gives a list of the 
-            # form ['#',<interface1>,...<interfacen>] 
+            # for each line, splitting on '\n\tInterface' gives a list of the
+            # form ['#',<interface1>,...<interfacen>]
             line = line.split('\n\tInterface')
             phy = 'phy' + line[0]
             phys[phy] = []
@@ -108,6 +109,7 @@ def dev(nic=None):
                                'cf':ch[_IFACE_CH_CF_]}
                 phys[phy].append({'nic':iface,'addr':addr,'ifindex':ifindex,
                                   'wdev':wdev,'type':ntype,'channel':channel})               
+
         if not nic:return phys
         for phy in phys:
             for i in phys[phy]:
@@ -124,7 +126,7 @@ def dev(nic=None):
 
 def devadd(nic,vnic,mode='monitor'):
     """ a sub of iw for adding a virtual interface (default is monitor) """
-    cmd = ['iw','dev',nic,'interface','add',vnic,'type',mode]
+    cmd = ['/usr/sbin/iw','dev',nic,'interface','add',vnic,'type',mode]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -132,7 +134,7 @@ def devadd(nic,vnic,mode='monitor'):
 
 def devdel(vnic):
     """ a sub of iw for deleting a virtual card """
-    cmd = ['iw','dev',vnic,'del']
+    cmd = ['/usr/sbin/iw','dev',vnic,'del']
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -140,7 +142,7 @@ def devdel(vnic):
 
 def phyadd(phy,nic,mode='managed'):
     """ a sub of iw for adding a card using the phy """
-    cmd = ['iw',phy,'interface','add',nic,'type',mode]
+    cmd = ['/usr/sbin/iw',phy,'interface','add',nic,'type',mode]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -153,7 +155,7 @@ def chget(phy):
      returns list of supported channels on phy - a subset of the commmand
      iw phy <phy> info
     """
-    cmd = ['iw','phy',phy,'info']
+    cmd = ['/usr/sbin/iw','phy',phy,'info']
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
     
@@ -182,7 +184,7 @@ def chget(phy):
 
 def chset(vnic,ch,chwidth=None):
     """ sets the specified channel of vnic - sudo iw dev vnic set channel ch [chwidth] """
-    cmd = ['iw','dev',vnic,'set','channel',ch]
+    cmd = ['/usr/sbin/iw','dev',vnic,'set','channel',ch]
     if chwidth: cmd.append(chwidth)
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
@@ -203,7 +205,7 @@ def txpwrset(nic,pwr,option="fixed"):
     if not option in ['fixed','auto','limit']:
         raise IWException("option %s must be one of {fixed|limit|auto}" % option)
 
-    cmd = ['iw','dev',nic,'set','txpower',option,str(pwr*100)]
+    cmd = ['/usr/sbin/iw','dev',nic,'set','txpower',option,str(pwr*100)]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -229,7 +231,7 @@ def regset(region):
      NOTE: IOT take effect, reg set should be called first, then take the
      card and bring it back up
     """
-    cmd = ['iw','reg','set',region]
+    cmd = ['/usr/sbin/iw','reg','set',region]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -241,7 +243,7 @@ def regget(regOnly=True):
      the two-alphanumeric code for the current region, otherwise will return
      the entire output, leaving parsing up to the caller
     """
-    cmd = ['iw','reg','get']
+    cmd = ['/usr/sbin/iw','reg','get']
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
     if err: raise IWException(err.split(':')[1].strip())

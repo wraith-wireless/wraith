@@ -29,6 +29,7 @@ wraith 0.0.3
  changes:
   GUI:
    - migrated from Tix to ttk
+   - begin accepting command line arguments
 
  TODO:
   1) tried --remove-pid/--remove-pidfile to remove pids of dysktd and nidusd
