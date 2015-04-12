@@ -67,7 +67,7 @@ class NidusDB(object):
         # parse the config file
         if cpath:
             cp = ConfigParser.RawConfigParser()
-            if not cp.read(cpath): raise NidusDBException('%s is invalid' % cpath)
+            if not cp.read('nidus.conf'): raise NidusDBException('%s is invalid' % cpath)
 
             # save section of SSE
             try:

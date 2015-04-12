@@ -144,8 +144,8 @@ class RadioController(mp.Process):
             self._mac = ifaces[0]['addr']
         except (KeyError, IndexError):
             raise RuntimeError("%s:iw.dev:error getting interfaces" % self._role)
-        except iw.IWException:
-            raise RuntimeError("%s:iw.dev:failed to get phy" % self._role)
+        except iw.IWException as e:
+            raise RuntimeError("%s:iw.dev:failed to get phy <%s>" % (self._role,e))
 
         # get properties (the below will return None rather than throw exception)
         self._chs = iw.chget(self._phy)
@@ -341,7 +341,6 @@ class RadioController(mp.Process):
                     self._conn.send(('err',"%s" % self._role,'Unknown',e))
                     break
             else:
-                print "got token ", event
                 # process the notification
                 if event == '!FAIL!':
                     self._comms.put((self._vnic,ts,'!FAIL!',msg))
@@ -386,7 +385,6 @@ class RadioController(mp.Process):
                 self._tuner = None
 
             # reset the device
-            print "resetting device"
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
@@ -394,9 +392,7 @@ class RadioController(mp.Process):
                     iwt.ifconfig(self._nic,'down')
                     iwt.resethwaddr(self._nic)
                 iwt.ifconfig(self._nic,'up')
-                print "device reset"
             except iw.IWException:
-                print "device reset failed"
                 clean = False
 
             # close socket and connection
