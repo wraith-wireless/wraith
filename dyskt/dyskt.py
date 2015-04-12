@@ -415,25 +415,25 @@ class DySKT(object):
 if __name__ == '__main__':
     try:
         # setup the argument parser
-        desc = "DySKT %s - (C) %s %s" % (dyskt.__version__,
-                                         dyskt.__date__.split(" ")[1],
-                                         dyskt.__author__)
-        opts = ap.ArgumentParser(description=desc)
-        opts.add_argument("--config",help="load specified configuration file")
-        args = opts.parse_args()
+        #desc = "DySKT %s - (C) %s %s" % (dyskt.__version__,
+        #                                 dyskt.__date__.split(" ")[1],
+        #                                 dyskt.__author__)
+        #opts = ap.ArgumentParser(description=desc)
+        #opts.add_argument("--config",help="load specified configuration file")
+        #args = opts.parse_args()
         
         # set optional values
-        cpath = args.config if args.config else None
+        #cpath = args.config if args.config else None
         
         # verify validity
-        if cpath:
-            if not os.path.exists(cpath):
-                logging.error("Config file %s does not exits" % cpath)
-                raise DySKTConfException("Config file %s does not exist" % cpath)
+        #if cpath:
+        #    if not os.path.exists(cpath):
+        #        logging.error("Config file %s does not exits" % cpath)
+        #        raise DySKTConfException("Config file %s does not exist" % cpath)
         
         # create DySKT and start execution
         logging.info("DySKT %s",dyskt.__version__)
-        skt = DySKT(cpath)
+        skt = DySKT()
         skt.start()
     except DySKTConfException as err:
         logging.error("Configuration Error: %s",err)

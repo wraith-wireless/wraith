@@ -55,7 +55,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
         connected = True
         try:
             # interface to db
-            db = nidusdb.NidusDB('nidus.conf')
+            db = nidusdb.NidusDB(os.path.join(GPATH,'nidus.conf'))
             db.connect() 
         except nidusdb.NidusDBException as e:
             logging.error("DB Interface failed: %s",e)
@@ -189,24 +189,6 @@ class Nidus(object):
 
 if __name__ == '__main__':
     try:
-        # command line parsing
-        #opts = ap.ArgumentParser(description="Nidus %s (C) %s %s" % (nidus.__version__,
-        #                                                             nidus.__date__.split(" ")[1],
-        #                                                             nidus.__author__))
-        #opts.add_argument("--config",help="load specified config file")
-        #args = opts.parse_args()
-
-        #cpath = args.config if args.config else None
-        #if cpath:
-        #    if not os.path.exists(cpath):
-        #        logging.error("Config file %s does not exist" % cpath)
-        #        raise NidusConfException("Config file %s does not exist" % cpath)
-        #    else:
-        #        CONFPATH = cpath
-        #else:
-        #    CONFPATH = 'nidus.conf'
-
-        # create Wasp and start execution
         logging.info("Nidus %s",nidus.__version__)
         store = Nidus()
         store.start()
