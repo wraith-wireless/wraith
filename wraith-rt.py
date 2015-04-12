@@ -12,16 +12,162 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import os                                  # file info etc
+import sys                                 # for exit
 import time                                # sleeping, timestamps
 import psycopg2 as psql                    # postgresql api
 import Tkinter as tk                       # gui constructs
 import ttk                                 # ttk widgets
+from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
+import argparse                            # cmd line arguments
 import wraith                              # version info
 import wraith.widgets.panel as gui         # graphics suite
 import wraith.subpanels as subgui          # our subpanels
 from wraith.utils import bits              # bitmask functions
 from wraith.utils import cmdline           # command line stuff
+
+# server/services functions shared by splash and main panel
+
+def startpsql(pwd):
+    """
+     start postgresl server
+      pwd: the sudo password
+    """
+    try:
+        cmdline.service('postgresql',pwd)
+        time.sleep(0.5)
+        if not cmdline.runningprocess('postgres'): raise RuntimeError
+    except RuntimeError:
+        return False
+    else:
+        return True
+
+def stoppsql(pwd):
+    """
+     shut down posgresql.
+     pwd: the sudo password
+    """
+    try:
+        cmdline.service('postgresql',pwd,False)
+        while cmdline.runningprocess('postgres'): time.sleep(0.5)
+    except RuntimeError:
+        return False
+    else:
+        return True
+
+def startnidus(pwd):
+    """
+     start nidus server
+     pwd: the sudo password
+    """
+    try:
+        cmdline.service('nidusd',pwd)
+        time.sleep(0.5)
+        if not cmdline.nidusrunning(wraith.NIDUSPID): raise RuntimeError
+    except RuntimeError:
+        return False
+    else:
+        return True
+
+def stopnidus(pwd):
+    """
+     stop nidus storage manager.
+     pwd: Sudo password
+    """
+    try:
+        cmdline.service('nidusd',pwd,False)
+        while cmdline.nidusrunning(wraith.NIDUSPID): time.sleep(1.0)
+    except RuntimeError as e:
+        return False
+    else:
+        return True
+
+def startdyskt(pwd):
+    """
+     start dyskt sensor
+     pwd: the sudo password
+    """
+    try:
+        cmdline.service('dysktd',pwd)
+        time.sleep(0.5)
+        if not cmdline.dysktrunning(wraith.DYSKTPID): raise RuntimeError
+    except RuntimeError:
+        return False
+    else:
+        return True
+
+def stopdyskt(pwd):
+    """
+     stop dyskt sensor
+     pwd: Sudo password
+    """
+    try:
+        cmdline.service('dysktd',pwd,False)
+        while cmdline.nidusrunning(wraith.DYSKTPID): time.sleep(1.0)
+    except RuntimeError as e:
+        return False
+    else:
+        return True
+
+def psqlconnect(connect):
+    """
+     connect to postgresql db with connect string
+     returns a tuple (conn,msg) where conn = None and msg = error string
+     on failure otherwise conn = psql connection and msg = ''
+    """
+    conn = None
+    curs = None
+    try:
+        conn = psql.connect(host=connect['host'],port=connect['port'],
+                            dbname=connect['db'],user=connect['user'],
+                            password=connect['pwd'])
+
+        # set to use UTC
+        curs = conn.cursor()
+        curs.execute("set time zone 'UTC';")
+    except psql.OperationalError as e:
+        if e.__str__().find('connect') > 0:
+            err = "PostgreSQL is not running"
+        elif e.__str__().find('authentication') > 0:
+            err = "Authentication string is invalid"
+        else:
+            err = "Unspecified DB error occurred"
+            conn.rollback()
+        return None,err
+    else:
+        conn.commit()
+        return conn,''
+    finally:
+        if curs: curs.close()
+
+def readconf():
+    """ read in configuration file """
+    cp = ConfigParser.RawConfigParser()
+    if not cp.read("wraith.conf"): return "wraith.conf does not exist"
+
+    conf = {}
+    try:
+        ## STORAGE
+        conf['store'] = {'host':cp.get('Storage','host'),
+                         'port':cp.getint('Storage','port'),
+                         'db':cp.get('Storage','db'),
+                         'user':cp.get('Storage','user'),
+                         'pwd':cp.get('Storage','pwd')}
+
+        ## POLICY
+        conf['policy'] = {'polite':True,'shutdown':True}
+
+        if cp.has_option('Policy','polite'):
+            if cp.get('Policy','polite').lower() == 'off':
+                conf['policy']['polite'] = False
+        if cp.has_option('Policy','shutdown'):
+            if cp.get('Policy','shutdown').lower() == 'manual':
+                conf['ploicy']['shutdown'] = False
+
+        # return no errors
+        return conf
+    except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
+        return {'err':e.__str__()}
 
 #### STATE DEFINITIONS
 _STATE_INIT_   = 0
@@ -40,17 +186,23 @@ _STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
 
 class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
-    def __init__(self,toplevel):
-        # set up, initialize parent and then initialize the gui
-        # our variables
-        self._conf = None  # configuration
-        self._state = 0    # bitmask state
-        self._conn = None  # connection to data storage
-        self._bSQL = False # postgresql was running on startup
-        self._pwd = None   # sudo password (should we not save it?)
+    def __init__(self,tl,pwd=None,start=False):
+        """
+         set up, initialize parent and then initialize the gui
+         our variables
+         tl: tk's topleve
+         pwd: sudo password
+         start: True->start all services
+        """
+        self._conf = None   # configuration
+        self._state = 0     # bitmask state
+        self._conn = None   # connection to data storage
+        self._bSQL = False  # postgresql was running on startup
+        self._pwd = pwd     # sudo password (should we not save it?)
+        self._start = start # start everything?
 
         # set up super
-        gui.MasterPanel.__init__(self,toplevel,"Wraith  v%s" % wraith.__version__,
+        gui.MasterPanel.__init__(self,tl,"Wraith  v%s" % wraith.__version__,
                                  [],True,"widgets/icons/wraith3.png",False)
 
 #### PROPS
@@ -72,20 +224,22 @@ class WraithPanel(gui.MasterPanel):
         self.logwrite("Wraith v%s" % wraith.__version__)
 
         # read in conf file, exit on error
-        confMsg = self._readconf()
-        if confMsg:
-            self.logwrite("Configuration file is invalid. " + confMsg,gui.LOG_ERR)
+        self._conf = readconf()
+        if 'err' in self._conf:
+            self.logwrite("Configuration file is invalid. %s" % self._conf['err'],gui.LOG_ERR)
             return
 
         # determine if postgresql is running
         if cmdline.runningprocess('postgres'):
+            # update self,msg and connect
             self.logwrite('PostgreSQL is running',gui.LOG_NOTE)
             self._bSQL = True
-
-            # update state
             self._setstate(_STATE_STORE_)
-
-            self._psqlconnect()
+            (self._conn,msg) = psqlconnect(self._conf['store'])
+            if not self._conn is None: self._setstate(_STATE_CONN_)
+            else:
+                self.logwrite("Error connecting to PostgreSQL: %s" % msg,gui.LOG_ERR)
+                return
         else:
             self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
             self.logwrite("Not connected to database",gui.LOG_WARN)
@@ -190,7 +344,7 @@ class WraithPanel(gui.MasterPanel):
         self.mnuDySKT.add_command(label='Start',command=self.dysktstart)   # 0
         self.mnuDySKT.add_command(label='Stop',command=self.dysktstop)     # 1
         self.mnuDySKT.add_separator()                                      # 2
-        self.mnuDySKT.add_command(label='Control',command=self.dysktctrl)  # 3            # 3
+        self.mnuDySKT.add_command(label='Control',command=self.dysktctrl)  # 3
         self.mnuDySKT.add_separator()                                      # 4
         self.mnuDySKTLog = tk.Menu(self.mnuDySKT,tearoff=0)
         self.mnuDySKTLog.add_command(label='View',command=self.viewdysktlog)   # 0
@@ -290,7 +444,7 @@ class WraithPanel(gui.MasterPanel):
         # not connected, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if not flags['conn']:
-            self._psqlconnect()
+            psqlconnect(self._conf['store'])
             self._updatestate()
             self._menuenable()
 
@@ -317,9 +471,13 @@ class WraithPanel(gui.MasterPanel):
                                   gui.LOG_WARN)
                     return
                 self._pwd = pwd
-            self._startpsql()
-            self._updatestate()
-            self._menuenable()
+            self.logwrite("Starting Postgresql...",gui.LOG_NOTE)
+            if startpsql(self._pwd):
+                self.logwrite('Postgresql started')
+                self._updatestate()
+                self._menuenable()
+            else:
+                self.logwrite("Postgresql failed to start")
 
     def psqlstop(self):
         """ starts postgresql """
@@ -334,9 +492,11 @@ class WraithPanel(gui.MasterPanel):
                                   gui.LOG_WARN)
                     return
                 self._pwd = pwd
-            self._stoppsql()
-            self._updatestate()
-            self._menuenable()
+            if stoppsql(self._pwd):
+                self._updatestate()
+                self._menuenable()
+            else:
+                self.logwrite("Failed to stop PostgreSQL",gui.LOG_ERR)
 
     def psqlfix(self):
         """
@@ -397,9 +557,11 @@ class WraithPanel(gui.MasterPanel):
                                   gui.LOG_WARN)
                     return
                 self._pwd = pwd
-            self._startnidus()
-            self._updatestate()
-            self._menuenable()
+            if startnidus(self._pwd):
+                self._updatestate()
+                self._menuenable()
+            else:
+                self.logwrite("Failed to start Nidus",gui.LOG_ERR)
 
     def nidusstop(self):
         """ stops nidus storage manager """
@@ -414,9 +576,13 @@ class WraithPanel(gui.MasterPanel):
                                   gui.LOG_WARN)
                     return
                 self._pwd = pwd
-            self._stopnidus()
-            self._updatestate()
-            self._menuenable()
+
+            self.logwrite("Starting Nidus...",gui.LOG_NOTE)
+            if stopnidus(self._pwd):
+                self._updatestate()
+                self._menuenable()
+            else:
+                self.logwrite("Failed to stop Nidus",gui.LOG_ERR)
 
     def viewniduslog(self):
         """ display Nidus log """
@@ -565,36 +731,6 @@ class WraithPanel(gui.MasterPanel):
                                              self._state,
                                              _STATE_FLAGS_NAME_[f])
 
-    def _readconf(self):
-        """ read in configuration file """
-        conf = ConfigParser.RawConfigParser()
-        if not conf.read("wraith.conf"): return "wraith.conf does not exist"
-
-        self._conf = {}
-        try:
-            ## STORAGE
-            self._conf['store'] = {'host':conf.get('Storage','host'),
-                                   'port':conf.getint('Storage','port'),
-                                   'db':conf.get('Storage','db'),
-                                   'user':conf.get('Storage','user'),
-                                   'pwd':conf.get('Storage','pwd')}
-
-            ## POLICY
-            self._conf['policy'] = {'polite':True,
-                                   'shutdown':True}
-
-            if conf.has_option('Policy','polite'):
-                if conf.get('Policy','polite').lower() == 'off':
-                    self._conf['policy']['polite'] = False
-            if conf.has_option('Policy','shutdown'):
-                if conf.get('Policy','shutdown').lower() == 'manual':
-                    self._conf['ploicy']['shutdown'] = False
-
-            # return no errors
-            return ''
-        except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
-            return e.__str__()
-
     def _menuenable(self):
         """ enable/disable menus as necessary """
         # get all flags
@@ -685,82 +821,37 @@ class WraithPanel(gui.MasterPanel):
 
         # start necessary storage components
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if not flags['store']: self._startpsql()
+        if not flags['store']:
+            self.logwrite("Starting PostgreSQL...",gui.LOG_NOTE)
+            if not startpsql(self._pwd):
+                self.logwrite("Failed to start PostgreSQL",gui.LOG_ERR)
+                return
+            else:
+                self.logwrite("PostgreSQL started")
 
         # start nidus
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if not flags['nidus'] and flags['store']: self._startnidus()
+        if not flags['nidus'] and flags['store']:
+            self.logwrite("Starting Nidus...",gui.LOG_NOTE)
+            if not startnidus(self._pwd):
+                self.logwrite("Failed to start Nidus",gui.LOG_ERR)
+                return
+            else:
+                self.logwrite("Nidus started")
 
         # connect to db
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if not flags['conn'] and flags['store']: self._psqlconnect()
-
-    def _startpsql(self):
-        """
-         start postgresl server
-         NOTE: 1) no state checking done here
-               2) assumes sudo password is entered
-        """
-        # attempt to start psql
-        try:
-            self.logwrite("Starting PostgreSQL...",gui.LOG_NOTE)
-            cmdline.service('postgresql',self._pwd)
-            time.sleep(0.5)
-            if not cmdline.runningprocess('postgres'): raise RuntimeError('unknown')
-        except RuntimeError as e:
-            self.logwrite("Error starting PostgreSQL: %s" % e,gui.LOG_ERR)
-            return
-        else:
-            self.logwrite("PostgreSQL started")
-            self._setstate(_STATE_STORE_)
-
-    def _startnidus(self):
-        """
-         start nidus storage manager
-         NOTE: 1) no state checking done here
-               2) assumes sudo password is entered
-        """
-        # attempt to start nidus
-        try:
-            self.logwrite("Starting Nidus...",gui.LOG_NOTE)
-            cmdline.service('nidusd',self._pwd)
-            time.sleep(0.5)
-            if not cmdline.nidusrunning(wraith.NIDUSPID): raise RuntimeError('unknown')
-        except RuntimeError as e:
-            self.logwrite("Error starting Nidus: %s" % e,gui.LOG_ERR)
-        else:
-            self.logwrite("Nidus Started")
-            self._setstate(_STATE_NIDUS_)
-
-    def _psqlconnect(self):
-        """ connect to postgresql db: nidus """
-        curs = None
-        try:
-            self.logwrite("Connecting to Nidus Datastore...",gui.LOG_NOTE)
-            self._conn = psql.connect(host=self._conf['store']['host'],
-                                      port=self._conf['store']['port'],
-                                      dbname=self._conf['store']['db'],
-                                      user=self._conf['store']['user'],
-                                      password=self._conf['store']['pwd'])
-
-            # set to use UTC and enable CONN flag
-            curs = self._conn.cursor()
-            curs.execute("set time zone 'UTC';")
-            self._conn.commit()
-
-            self.logwrite("Connected to datastore")
-            self._setstate(_STATE_CONN_)
-        except psql.OperationalError as e:
-            if e.__str__().find('connect') > 0:
-                self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
-                self._setstate(_STATE_STORE_,False)
-            elif e.__str__().find('authentication') > 0:
-                self.logwrite("Authentication string is invalid",gui.LOG_ERR)
+        if not flags['conn'] and flags['store']:
+            self.logwrite("Connected to database...",gui.LOG_NOTE)
+            self._conn,msg = psqlconnect(self._conf['strore'])
+            if self._conn is None:
+                self.logwrite(msg,gui.LOG_ERR)
+                return
             else:
-                self.logwrite("Unspecified DB error occurred",gui.LOG_ERR)
-                self._conn.rollback()
-        finally:
-            if curs: curs.close()
+                self.logwrite("Connected to database")
+
+        self._updatestate()
+        self._menuenable()
 
     def _stopstorage(self):
         """ stop posgresql db, nidus storage manager & disconnect """
@@ -789,7 +880,11 @@ class WraithPanel(gui.MasterPanel):
                     self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
                     return
                 self._pwd = pwd
-            self._stopnidus()
+
+            self.logwrite("Stopping Nidus...",gui.LOG_NOTE)
+            if not stopnidus(self._pwd):
+                self.logwrite("Failed to stop Nidus",gui.LOG_WARN)
+            else: self.logwrite("Nidus stopped")
 
         # shutdown postgresql (check first if polite)
         if self._conf['policy']['polite'] and self._bSQL: return
@@ -802,7 +897,14 @@ class WraithPanel(gui.MasterPanel):
                     self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
                     return
                 self._pwd = pwd
-            self._stoppsql()
+
+            self.logwrite("Stopping PostgreSQL...",gui.LOG_NOTE)
+            if not stoppsql(self._pwd):
+                self.logwrite("Failed to stop PostgreSQL",gui.LOG_WARN)
+            else: self.logwrite("PostgreSQL stopped")
+
+        self._updatestate()
+        self._menuenable()
 
     def _psqldisconnect(self):
         """ disconnect from postgresl """
@@ -811,42 +913,6 @@ class WraithPanel(gui.MasterPanel):
         self._conn = None
         self._setstate(_STATE_CONN_,False)
         self.logwrite("Disconnected from Nidus datastore")
-
-    def _stopnidus(self):
-        """
-         stop nidus storage manager.
-          NOTE: 1) no state checking done here
-                2) assumes sudo password is entered
-        """
-        try:
-            self.logwrite("Shutting down Nidus...",gui.LOG_NOTE)
-            cmdline.service('nidusd',self._pwd,False)
-            while cmdline.nidusrunning(wraith.NIDUSPID):
-                self.logwrite("Nidus still processing data...",gui.LOG_NOTE)
-                time.sleep(1.0)
-        except RuntimeError as e:
-            self.logwrite("Error shutting down Nidus: %s" % e,gui.LOG_ERR)
-        else:
-            self._setstate(_STATE_NIDUS_,False)
-            self.logwrite("Nidus shut down")
-
-    def _stoppsql(self):
-        """
-         shut down posgresql.
-         NOTE: 1) no state checking done here
-               2) assumes sudo password is entered
-        """
-        try:
-            self.logwrite("Shutting down PostgreSQL",gui.LOG_NOTE)
-            cmdline.service('postgresql',self._pwd,False)
-            while cmdline.runningprocess('postgres'):
-                self.logwrite("PostgreSQL shutting down...",gui.LOG_NOTE)
-                time.sleep(0.5)
-        except RuntimeError as e:
-            self.logwrite("Error shutting down PostgreSQL",gui.LOG_ERR)
-        else:
-            self._setstate(_STATE_STORE_,False)
-            self.logwrite("PostgreSQL shut down")
 
     def _startsensor(self):
         """ starts the DySKT sensor """
@@ -909,7 +975,75 @@ class WraithPanel(gui.MasterPanel):
             return None # canceled
 
 if __name__ == '__main__':
-    t = tk.Tk()
-    s = ttk.Style()
-    if 'alt' in s.theme_names(): s.theme_use('alt')
-    WraithPanel(t).mainloop()
+    # create arg parser and parse arguments
+    ap = argparse.ArgumentParser(description="Wraith-rt %s" % wraith.__version__)
+    ap.add_argument('-p','--pwd',help="Sudo Password")
+    ap.add_argument('-s','--start',help="Start with options = one of {nogui|gui|all}")
+    ap.add_argument('-d','--stop',action='store_true',help="Stops all found services")
+    ap.add_argument('-v','--version',action='version',version="Wraith-rt %s" % wraith.__version__)
+    args = ap.parse_args()
+    pwd = args.pwd
+    sopts = args.start
+    stop = args.stop
+
+    # make sure both start and stop have both been specified
+    if sopts is not None and stop == True: ap.error("Cannot specify both start and stop")
+
+    # make sure that at least one has been specified
+    if sopts is None and stop == False: ap.error("Must specify either start or stop")
+
+    # check for pwd if start nogui or all
+    if (sopts == 'nogui' or sopts == 'all') and pwd is None:
+        ap.error("Sudo password must be present when starting with nogui or all")
+
+    # check for pwd if stop
+    if stop and pwd is None: ap.error("Sudo password must be present when stopping")
+
+    # check for valid pwd if present
+    if pwd is not None and not cmdline.testsudopwd(pwd):
+        ap.error("Sudo password was incorrect")
+
+    # stop services - assuming no gui
+    if stop:
+        # stop DySKT, then Nidus, then PostgreSQL
+        sd = stopdyskt(pwd) if cmdline.dysktrunning(wraith.DYSKTPID) else True
+        sn = stopnidus(pwd) if cmdline.nidusrunning(wraith.NIDUSPID) else True
+        sp = stoppsql(pwd) if cmdline.runningprocess("postgres") else True
+        if not sd or not sn or not sp:
+            if not sd: print "Error stopping DySKT"
+            if not sn: print "Error stopping Nidus"
+            if not sp: print "Error stopping PostgreSQL"
+            sys.exit(1)
+        sys.exit(0)
+
+    # start specified
+    if sopts == 'nogui':
+        # start postgresql, nidus and dyskt
+        sp = startpsql(pwd) if not cmdline.runningprocess("postgres") else True
+        sn = startnidus(pwd) if not cmdline.nidusrunning(wraith.NIDUSPID) else True
+        if sn:
+            # no point starting DySKT if Nidus postgresqlisn't running
+            sd = startdyskt(pwd) if not cmdline.dysktrunning(wraith.DYSKTPID) else True
+        else: sd = True
+        if not sp or not sn or not sd:
+            if not sp: print "Error starting PostgreSQL"
+            if not sn: print "Error starting Nidus"
+            if not sd: print "Error starting DySKT"
+            sys.exit(1)
+        sys.exit(0)
+    else:
+        sys.exit(0)
+        # start gui
+        start = True if sopts == 'all' else False
+        t = tk.Tk()
+        s = ttk.Style()
+        if 'clam' in s.theme_names(): s.theme_use('clam')
+        s.configure("red.Horizontal.TProgressbar",foreground='red',background="red")
+        try:
+            WraithPanel(t,pwd,start).mainloop()
+        except Exception as e:
+            fout = open('wraith.log','a')
+            fout.write("%s\n" % e)
+            fout.close()
+
+    sys.exit(0)

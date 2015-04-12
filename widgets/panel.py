@@ -30,6 +30,7 @@ for subclasses as they becomes necessary.
         panel[0].tk.lift()
    7) disable/enable resize as necessary and if enabled ensure widgets resize
       as necessary -> self.master.resizable(0,0)
+   8) Treeview horizontal does not scroll
 """
 
 __name__ = 'panel'

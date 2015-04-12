@@ -38,8 +38,8 @@ COPY = u"\N{COPYRIGHT SIGN}"
 # Wraith->Configure
 class WraithConfigPanel(gui.ConfigPanel):
     """ Display Wraith Configuration Panel """
-    def __init__(self,toplevel,chief):
-        gui.ConfigPanel.__init__(self,toplevel,chief,"Configure Wraith")
+    def __init__(self,tl,chief):
+        gui.ConfigPanel.__init__(self,tl,chief,"Configure Wraith")
 
     def _makegui(self,frm):
         """ set up entry widgets """
@@ -177,9 +177,9 @@ class WraithConfigPanel(gui.ConfigPanel):
 # Tools->Convert
 class ConvertPanel(gui.SimplePanel):
     """ several conversion utilities """
-    def __init__(self,toplevel,chief):
+    def __init__(self,tl,chief):
         self._mgrs = mgrs.MGRS()
-        gui.SimplePanel.__init__(self,toplevel,chief,"Conversions","widgets/icons/convert.png")
+        gui.SimplePanel.__init__(self,tl,chief,"Conversions","widgets/icons/convert.png")
 
     def _body(self,frm):
         """ creates the body """
@@ -308,7 +308,7 @@ class CalculatePanel(gui.SimplePanel):
      Base calculator panel - a simple panel that displays specified entries and
      calculates a specified formula
     """
-    def __init__(self,toplevel,chief,ttl,inputs,result,rc=None):
+    def __init__(self,tl,chief,ttl,inputs,result,rc=None):
         """
           inputs is a list of tuples of the form t = (label,width,type) where:
            label is the text to display in the entry's label
@@ -332,7 +332,7 @@ class CalculatePanel(gui.SimplePanel):
         self._formula = result[0]
         self._meas = result[1]
         self._rc = rc if rc else [len(inputs)]
-        gui.SimplePanel.__init__(self,toplevel,chief,ttl,"widgets/icons/calculator.png")
+        gui.SimplePanel.__init__(self,tl,chief,ttl,"widgets/icons/calculator.png")
 
     def _body(self,frm):
         """ creates the body """
@@ -396,9 +396,9 @@ class CalculatePanel(gui.SimplePanel):
 # View->DataBin
 class DataBinPanel(gui.SimplePanel):
     """ DataBinPanel - displays a set of data bins for retrieved data storage """
-    def __init__(self,toplevel,chief):
+    def __init__(self,tl,chief):
         self._bins = {}
-        gui.SimplePanel.__init__(self,toplevel,chief,"Databin","widgets/icons/databin.png")
+        gui.SimplePanel.__init__(self,tl,chief,"Databin","widgets/icons/databin.png")
 
     def donothing(self): pass
 
@@ -418,8 +418,8 @@ class DataBinPanel(gui.SimplePanel):
 # Storage->Nidus-->Config
 class NidusConfigPanel(gui.ConfigPanel):
     """ Display Nidus Configuration Panel """
-    def __init__(self,toplevel,chief):
-        gui.ConfigPanel.__init__(self,toplevel,chief,"Configure Nidus")
+    def __init__(self,tl,chief):
+        gui.ConfigPanel.__init__(self,tl,chief,"Configure Nidus")
 
     def _makegui(self,frm):
         """ set up entry widgets """
@@ -654,8 +654,8 @@ class NidusConfigPanel(gui.ConfigPanel):
 class DySKTConfigException(Exception): pass
 class DySKTConfigPanel(gui.ConfigPanel):
     """ Display Nidus Configuration Panel """
-    def __init__(self,toplevel,chief):
-        gui.ConfigPanel.__init__(self,toplevel,chief,"Configure DySKT")
+    def __init__(self,tl,chief):
+        gui.ConfigPanel.__init__(self,tl,chief,"Configure DySKT")
 
     def _makegui(self,frm):
         """ set up entry widgets """
@@ -1281,8 +1281,8 @@ class DySKTConfigPanel(gui.ConfigPanel):
 # Help-->About
 class AboutPanel(gui.SimplePanel):
     """ AboutPanel - displays a simple About Panel """
-    def __init__(self,toplevel,chief):
-        gui.SimplePanel.__init__(self,toplevel,chief,"About Wraith","widgets/icons/about.png")
+    def __init__(self,tl,chief):
+        gui.SimplePanel.__init__(self,tl,chief,"About Wraith","widgets/icons/about.png")
 
     def _body(self,frm):
         self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/wraith-banner.png"))

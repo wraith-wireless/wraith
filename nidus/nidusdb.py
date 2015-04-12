@@ -64,39 +64,42 @@ class NidusDB(object):
         self._nExtract = 1          # num threads for extracting default is 1
         self._tExtract = []         # thread(s) for extracting
 
-        # parse the config file (if none set to defaults)
+        # parse the config file
         if cpath:
-            conf = ConfigParser.RawConfigParser()
-            if not conf.read(cpath): raise NidusDBException('%s is invalid' % cpath)
+            cp = ConfigParser.RawConfigParser()
+            if not cp.read(cpath): raise NidusDBException('%s is invalid' % cpath)
 
             # save section of SSE
             try:
                 # storage section
-                self._storage = {'host':conf.get('Storage','host'),
-                                 'port':conf.getint('Storage','port'),
-                                 'db':conf.get('Storage','db'),
-                                 'user':conf.get('Storage','user'),
-                                 'pwd':conf.get('Storage','pwd')}
+                self._storage = {'host':cp.get('Storage','host'),
+                                 'port':cp.getint('Storage','port'),
+                                 'db':cp.get('Storage','db'),
+                                 'user':cp.get('Storage','user'),
+                                 'pwd':cp.get('Storage','pwd')}
 
                 # sse section
-                self._raw['save'] = conf.getboolean('SSE','save')
+                self._raw['save'] = cp.getboolean('SSE','save')
                 if self._raw['save']:
-                    self._raw['private'] = conf.get('SSE','save_private')
-                    self._raw['path'] = conf.get('SSE','save_path')
-                    self._raw['sz'] = conf.getint('SSE','save_maxsize') * 1048576
-                    self._raw['nfiles'] = conf.getint('SSE','save_maxfiles')
+                    self._raw['private'] = cp.get('SSE','save_private')
+                    self._raw['path'] = cp.get('SSE','save_path')
+                    self._raw['sz'] = cp.getint('SSE','save_maxsize') * 1048576
+                    self._raw['nfiles'] = cp.getint('SSE','save_maxfiles')
 
                 # number of storing and extracting threads
-                self._nStore = conf.getint('SSE','store_threads')
-                self._nExtract = conf.getint('SSE','extract_threads')
+                self._nStore = cp.getint('SSE','store_threads')
+                self._nExtract = cp.getint('SSE','extract_threads')
             except ValueError as e:
                 raise NidusDBException("%s" % e)
             except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
                 raise NidusDBException("%s" % e)
 
             # oui file
-            if conf.has_option('OUI','path'):
-                self._oui = parseoui(conf.get('OUI','path'))
+            if cp.has_option('OUI','path'):
+                self._oui = parseoui(cp.get('OUI','path'))
+        else:
+            # need to set defaults?
+            pass
 
     def __del__(self):
         """ called during garbage collection forces shuts down connection """
@@ -118,7 +121,6 @@ class NidusDB(object):
             self._curs = self._conn.cursor()
             self._curs.execute("set time zone 'UTC';")
             self._conn.commit()
-
         except psql.OperationalError as e:
             if e.__str__().find('connect') > 0:
                 raise NidusDBServerException("Postgresql not running")
