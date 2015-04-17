@@ -80,6 +80,3 @@ postgres=# CREATE EXTENSION btree_gist;
         sudo setcap cap_net_raw=-ep /usr/bin/python2.7
       * Using dyskt daemon, set raw capabilities are temporarily enabled and
         then removed after the raw socket is bound
-      * NOTE: when run from command line through Python, the setcap does not
-        last long enough to enable DySKT to bind the socket. Have therefore
-        began running dysktd as root

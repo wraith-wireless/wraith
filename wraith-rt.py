@@ -17,7 +17,7 @@ import time                                # sleeping, timestamps
 import psycopg2 as psql                    # postgresql api
 import Tkinter as tk                       # gui constructs
 import ttk                                 # ttk widgets
-from PIL import Image,ImageTk              # image input & support
+#from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import argparse                            # cmd line arguments
 import wraith                              # version info
@@ -89,7 +89,7 @@ def startdyskt(pwd):
     """
     try:
         cmdline.service('dysktd',pwd)
-        time.sleep(0.5)
+        time.sleep(1.0)
         if not cmdline.dysktrunning(wraith.DYSKTPID): raise RuntimeError
     except RuntimeError:
         return False
@@ -988,13 +988,13 @@ if __name__ == '__main__':
     stop = args.stop
     exclude = args.exclude
 
-    # make sure both start and stop have both been specified
+    # default is start nogui
+    if sopts is None and stop == False: sopts = 'gui'
+
+    # make sure both start and stop have not both been specified
     if sopts is not None and stop == True: ap.error("Cannot specify both start and stop")
 
-    # make sure that at least one has been specified
-    if sopts is None and stop == False: ap.error("Must specify either start or stop")
-
-    # check for pwd if start nogui or all
+    # check for pwd if start nogui all
     if (sopts == 'nogui' or sopts == 'all') and pwd is None:
         ap.error("Sudo password must be present when starting with nogui or all")
 
@@ -1010,38 +1010,38 @@ if __name__ == '__main__':
         # stop DySKT, then Nidus, then PostgreSQL
         sd = sn = sp = True
         if cmdline.dysktrunning(wraith.DYSKTPID):
-            sd = stopdyskt(pwd)
-            print "Stopping DySKT\t\t\t\t[%s]" % 'ok' if sd else 'fail'
+            ret = 'ok' if stopdyskt(pwd) else 'fail'
+            print "Stopping DySKT\t\t\t\t[%s]" % ret
         if cmdline.nidusrunning(wraith.NIDUSPID):
-            sn = stopnidus(pwd)
-            print "Stopping Nidus\t\t\t\t[%s]" % 'ok' if sn else 'fail'
+            ret = 'ok' if stopnidus(pwd) else 'fail'
+            print "Stopping Nidus\t\t\t\t[%s]" % ret
         if cmdline.runningprocess('postgres') and not exclude:
-            sp = stoppsql(pwd)
-            print "Stopping PostgreSQL\t\t\t[%s]" % 'ok' if sp else 'fail'
+            ret = 'ok' if stoppsql(pwd) else 'fail'
+            print "Stopping PostgreSQL\t\t\t[%s]" % ret
         sys.exit(0)
 
     # start specified
     if sopts == 'nogui':
-        sp = sn = sd = True
         # start postgresql (if needed), nidus and dyskt
         if not cmdline.runningprocess('postgres'):
-            sp = startpsql(pwd)
-            print "Starting PostgreSQL\t\t\t[%s]" % 'ok' if sp else 'fail'
+            ret = 'ok' if startpsql(pwd) else 'fail'
+            print "Starting PostgreSQL\t\t\t[%s]" % ret
         else:
             print "PostgreSQL already running"
         if not cmdline.nidusrunning(wraith.NIDUSPID):
-            sn = startnidus(pwd)
-            print "Starting Nidus\t\t\t\t[%s]" % 'ok' if sn else 'fail'
+            ret = 'ok' if startnidus(pwd) else 'fail'
+            print "Starting Nidus\t\t\t\t[%s]" % ret
         else:
             print "Nidus already running"
         if not cmdline.dysktrunning(wraith.DYSKTPID):
-            sd = startdyskt(pwd)
-            print "Starting DySKT\t\t\t\t[%s]" % 'ok' if sd else 'fail'
+            # TODO: will fail because dyskt is running as root
+            ret = 'ok' if startdyskt(pwd) else 'fail'
+            print "Starting DySKT\t\t\t\t[%s]" % ret
         else:
             print "DySKT already Running"
-
         sys.exit(0)
     else:
+        print 'simulating start'
         sys.exit(0)
         # start gui
         start = True if sopts == 'all' else False

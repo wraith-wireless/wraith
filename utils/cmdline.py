@@ -36,11 +36,12 @@ def nidusrunning(pidfile):
     except (TypeError,IOError,OSError):
         return False
 
-def dysktrunning(pidfile):
+def dysktrunning(pidfile,pwd=None):
     """ see nidusrunning """
     try:
         # open the pid file and check running status with signal = 0
-        with open(pidfile) as fin: os.kill(int(fin.read()),0)
+        with open(pidfile) as fin:
+            os.kill(int(fin.read()),0)
         return True
     except (TypeError,IOError,OSError):
         return False

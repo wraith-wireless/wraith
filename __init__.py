@@ -49,6 +49,7 @@ wraith 0.0.3
  19) start postgresql and connect on start
  20) Horizontal scrollbars on tree view do not work
  21) Have to work on resize of widgets etc with row/column configure
+ 22) run dyskt as root - requires too many workarounds otherwise
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
