@@ -30,26 +30,6 @@ wraith 0.0.3
   GUI:
    - migrated from Tix to ttk
    - begin accepting command line arguments
-
- TODO:
-  1) tried --remove-pid/--remove-pidfile to remove pids of dysktd and nidusd
-     from /var/run but does not work. Have to use --make-pid to force creation
-     of pid file but then, the pidfile is not removed (ubuntu does not have
-     --remove-pid flag
-  5) move display of log panel to after intializiation() so that
-     wraith panel is 'first', leftmost panel - will have implement mechanism
-     to send 'batch' messages after the fact
-  6) need to periodically recheck state -> status of postgres,nidusd and dyskt
- 10) get log panel to scroll automatically
- 14) need to further test config panels primarily DySKTConfigPanel
- 16) fresnel zone calculation - is it correct?
- 17) Help Panel
-     - code a two-paned window for an indexed help
-     - write help documentation\
- 19) start postgresql and connect on start
- 20) Horizontal scrollbars on tree view do not work
- 21) Have to work on resize of widgets etc with row/column configure
- 22) run dyskt as root - requires too many workarounds otherwise
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

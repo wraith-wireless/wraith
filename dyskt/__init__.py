@@ -49,24 +49,6 @@ dyskt 0.1.5
     b) if it will result in unneccessary db storage or traffic
  - check specified nic for wireless capabilities/presence during conf processing
  - fixed issue with radio being reset after initialization errors
-
-TODO:
-     ** After testing remove set raw capability from python **
-      3) implement adaptive scan pattern
-     26) gps device
-       o identify/handle device failing or being removed
-       o uniquely identify with a permanent id w/out hardcoding in conf file
-     31) add interface (tcpserver? or socket?) to allow finer control of pausing,
-         holding, listening
-          o better define hold, listen, pause
-           - hold stop scanning on current channel
-           - listen stop scanning on specified channel
-           - pause stop scanning and recording
-     41) need to handle tuner thread failure in rdoctl
-     42) consider sending multiple frames as a single compressed/encrypted
-         packet for efficiency and security
-     43) why does iw.regget in dyskt.py not reflect the actual change to the
-         regulatory domain
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'

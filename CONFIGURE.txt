@@ -57,7 +57,7 @@ postgres=# CREATE EXTENSION btree_gist;
 
   - configure iw, iwconfig, ifconfig and binding raw socket for root access
    o We need root access to iw, iwconfig and ifconfig
-     * One can modify the deamons to run as root
+     * One can modify the dyskt deamon to run as root
      * One can run python interpreter as root
      * Or one can modify the sudoers file as below
        # Cmnd alias specification
@@ -79,4 +79,4 @@ postgres=# CREATE EXTENSION btree_gist;
         sudo setcap cap_net_raw=+ep /usr/bin/python2.7 
         sudo setcap cap_net_raw=-ep /usr/bin/python2.7
       * Using dyskt daemon, set raw capabilities are temporarily enabled and
-        then removed after the raw socket is bound
+        then removed after the raw socket is bound (after a short sleep)

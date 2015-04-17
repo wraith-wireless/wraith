@@ -1,0 +1,72 @@
+Overall:
+  1) tried --remove-pid/--remove-pidfile to remove pids of dysktd and nidusd
+     from /var/run but does not work. Have to use --make-pid to force creation
+     of pid file but then, the pidfile is not removed (ubuntu does not have
+     --remove-pid flag
+  2) run dyskt as root - requires too many workarounds otherwise
+   o currently have dyskt set to <user>. Have to have the daemon sleep prior
+     to disable raw socket capture
+   o if daemon is run as root, will have to modify cmdline.dysktrunning to
+     use sudo
+GUI:
+  5) move display of log panel to after intializiation() so that
+     wraith panel is 'first', leftmost panel - will have implement mechanism
+     to send 'batch' messages after the fact
+  6) need to periodically recheck state -> status of postgres,nidusd and dyskt
+ 10) get log panel to scroll automatically
+ 14) need to further test config panels primarily DySKTConfigPanel
+ 16) fresnel zone calculation - is it correct?
+ 17) Help Panel
+     o code a two-paned window for an indexed help
+     o write help documentation
+ 20) Horizontal scrollbars on tree view do not work
+ 21) Have to work on resize of widgets etc with row/column configure
+DySKT:
+  3) implement adaptive scan pattern
+ 26) gps device handling
+     o identify/handle device failing or being removed
+     o uniquely identify with a permanent id w/out hardcoding in conf file
+     o allow no gps (fixed or otherwise)
+ 31) add interface (tcpserver? or socket?) to allow finer control of pausing,
+     holding, listening
+     o better define hold, listen, pause
+       - hold stop scanning on current channel
+       - listen stop scanning on specified channel
+       - pause stop scanning and recording
+ 41) need to handle tuner thread failure in rdoctl
+ 42) send multiple frames as a single compressed/encrypted packet for efficiency
+     and security
+Nidus:
+  1) return messages instead of just closing pipe for no running server etc
+  2) need constraints either through postgresql (preferred) or nidusdb - one example
+   for each geo inserted verify first that the ts is within the period defined for
+   the corresponding sensor
+  3) Optimize postgresql database, storage, retrieval, indexing etc
+  4) identify postgresql server not running prior to request handler
+  7) encrypted socket connection from dyskt to nidus?
+  8) secured (hashed) username/password from to datastore
+ 10) how/when to partition table to offload older records
+ 12) nidusdb.py
+    o ensure only one radio submit per radio is allowed
+    o during setsensor ensure a new session for a sensor is not created if one already
+      exists
+    o Save thread does not save last n frames to file
+    o in SSE Threads handle errors in some way to at least let nidusdb know thread
+      is quitting
+      - o have started using a err variable in SSEThread class, must extend that
+        to allow nidusdb to see the error
+ 13) move to pcap-ng format?
+ 14) need to further test writing mgmt frames to db, there are still some errors
+     mainly syntatic in the sql statements
+Radio:
+1) Should we add support for AVS, Prism headers ?
+ 2) radiotap: ensure data pad is handled for atheros cards (any others?)
+ 3) in mpdu, fully parse
+    - control wrapper
+    - +htc
+    - info-elements
+     o RSN Std 8.4.2.27, #48
+     o TIM Info-Element #5 from beacons could be useful
+     o parse timing advance
+ 5) how to support a-msdu etc
+ 6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc

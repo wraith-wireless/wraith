@@ -73,6 +73,7 @@ and editing of configuration files, some manipulation of backened storage.
  - LICENSE              software license
  - README.md            this file
  - CONFIGURE.txt        setup details
+ - TODO                 todos for each subpackage
  * widgets              gui subpackage
      *  icons           icons folder
      -  \_\_init\_\_.py initialize widgets subpackage
@@ -80,7 +81,8 @@ and editing of configuration files, some manipulation of backened storage.
  * utils                utility functions
     -  \_\_init\_\_.py  initialize utils subpackage
     - bits.py           bitmask functions
-    - timestamps        timestamp conversion functions
+    - timestamps.py     timestamp conversion functions
+    - landnav.py        land navigation utilities
     - cmdline.py        various cmdline utilities for testing processes
  *  radio               subpackage for radio/radiotap
      - \_\_init\_\_.py  initialize radio subpackage

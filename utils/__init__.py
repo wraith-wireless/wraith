@@ -2,8 +2,7 @@
 
 """ utils: utility functions
 
-this also includes singular functions that currently do not have another
-place to go
+this also includes singular functions that currently do not have another place to go
 """
 __name__ = 'utils'
 __license__ = 'GPL v3.0'

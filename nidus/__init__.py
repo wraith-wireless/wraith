@@ -46,31 +46,6 @@ nidus 0.0.6
   - added nidusd daemon file to start nidus server
   - added support for platform table
   - added support for antenna data storage
-
-TODO:
-1) return messages instead of just closing pipe for no running server etc
-2) need constraints either through postgresql (preferred) or nidusdb - one example
-   for each geo inserted verify first that the ts is within the period defined for
-   the corresponding sensor
-3) Optimize postgresql database, storage, retrieval, indexing etc
-4) identify postgresql server not running prior to request handler
-7) encrypted socket connection from dyskt to nidus?
-8) secured (hashed) username/password from to datastore
-10) how/when to partition table to offload older records
-12) nidusdb.py
-  - ensure only one radio submit per radio is allowed
-  - during setsensor ensure a new session for a sensor is not created if one already
-    exists
-  - Save thread does not save last n frames to file
-  - in SSE Threads handle errors in some way to at least let nidusdb know thread
-    is quitting
-     o have started using a err variable in SSEThread class, must extend that
-       to allow nidusdb to see the error
-  - TIM (#5) from beacons could be useful
-  - parse timing advance
-13) move to pcap-ng format?
-14) need to further test writing mgmt frames to db, there are still some errors
-    mainly syntatic in the sql statements
 """
 __name__ = 'nidus'
 __license__ = 'GPL v3.0'
