@@ -186,20 +186,18 @@ _STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
 
 class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
-    def __init__(self,tl,pwd=None,start=False):
+    def __init__(self,tl,pwd=None):
         """
          set up, initialize parent and then initialize the gui
          our variables
          tl: tk's topleve
          pwd: sudo password
-         start: True->start all services
         """
         self._conf = None   # configuration
         self._state = 0     # bitmask state
         self._conn = None   # connection to data storage
         self._bSQL = False  # postgresql was running on startup
         self._pwd = pwd     # sudo password (should we not save it?)
-        self._start = start # start everything?
 
         # set up super
         gui.MasterPanel.__init__(self,tl,"Wraith  v%s" % wraith.__version__,
@@ -988,25 +986,17 @@ if __name__ == '__main__':
     stop = args.stop
     exclude = args.exclude
 
-    # default is start nogui
+    # default is start nogui (make sure both start and stop are not specified)
+    # if password is entered verified correctness
     if sopts is None and stop == False: sopts = 'gui'
+    if sopts is not None and stop == True: ap.error("Cannot start and stop")
+    if pwd is not None and not cmdline.testsudopwd(pwd): ap.error("Incorrect sudo password")
 
-    # make sure both start and stop have not both been specified
-    if sopts is not None and stop == True: ap.error("Cannot specify both start and stop")
-
-    # check for pwd if start nogui all
-    if (sopts == 'nogui' or sopts == 'all') and pwd is None:
-        ap.error("Sudo password must be present when starting with nogui or all")
-
-    # check for pwd if stop
-    if stop and pwd is None: ap.error("Sudo password must be present when stopping")
-
-    # check for valid pwd if present
-    if pwd is not None and not cmdline.testsudopwd(pwd):
-        ap.error("Sudo password was incorrect")
-
-    # stop services - assuming no gui
+    # stop services - assumes no gui
     if stop:
+        # verify pwd has been set
+        if pwd is None: ap.error("Sudo password must be entered to stop")
+
         # stop DySKT, then Nidus, then PostgreSQL
         sd = sn = sp = True
         if cmdline.dysktrunning(wraith.DYSKTPID):
@@ -1020,8 +1010,11 @@ if __name__ == '__main__':
             print "Stopping PostgreSQL\t\t\t[%s]" % ret
         sys.exit(0)
 
-    # start specified
+    # start specified services
     if sopts == 'nogui':
+        # verify pwd is present
+        if pwd is None: ap.error("Sudo password must be entered to start with 'nogui'")
+
         # start postgresql (if needed), nidus and dyskt
         if not cmdline.runningprocess('postgres'):
             ret = 'ok' if startpsql(pwd) else 'fail'
@@ -1034,26 +1027,28 @@ if __name__ == '__main__':
         else:
             print "Nidus already running"
         if not cmdline.dysktrunning(wraith.DYSKTPID):
-            # TODO: will fail because dyskt is running as root
             ret = 'ok' if startdyskt(pwd) else 'fail'
             print "Starting DySKT\t\t\t\t[%s]" % ret
         else:
             print "DySKT already Running"
         sys.exit(0)
     else:
-        print 'simulating start'
-        sys.exit(0)
+        if sopts == 'all':
+            if pwd is None: ap.error("Sudo password must be entered to start with 'all'")
+
         # start gui
-        start = True if sopts == 'all' else False
         t = tk.Tk()
         s = ttk.Style()
         if 'clam' in s.theme_names(): s.theme_use('clam')
         s.configure("red.Horizontal.TProgressbar",foreground='red',background="red")
         try:
-            WraithPanel(t,pwd,start).mainloop()
+            # WraithPanel will start everything if pwd is present otherwise, will
+            # just start the gui
+            WraithPanel(t,pwd).mainloop()
         except Exception as e:
             fout = open('wraith.log','a')
             fout.write("%s\n" % e)
             fout.close()
+            sys.exit(1)
 
     sys.exit(0)
