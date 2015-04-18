@@ -8,6 +8,7 @@ Overall:
      to disable raw socket capture
    o if daemon is run as root, will have to modify cmdline.dysktrunning to
      use sudo
+  3) Need a way to identify when nidus is processing data from a closed dyskt
 GUI:
   5) move display of log panel to after intializiation() so that
      wraith panel is 'first', leftmost panel - will have implement mechanism

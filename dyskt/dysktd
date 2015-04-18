@@ -15,7 +15,7 @@ DAEMON=/home/<user>/workspace/projects/Python/wraith/dyskt/dyskt.py
 DAEMON_NAME=dysktd
 
 # This next line determines what user the script runs as.
-DAEMON_USER=root
+DAEMON_USER=<user>
  
 # The process ID of the script when it runs is stored here:
 PIDFILE=/var/run/$DAEMON_NAME.pid
@@ -24,12 +24,15 @@ PIDFILE=/var/run/$DAEMON_NAME.pid
 . /lib/lsb/init-functions
 
 do_start() {
-    #log_daemon_msg "Setting capability cap_net_raw"
-    3setcap cap_net_raw=+ep /usr/bin/python2.7
+    # start will set raw socket before initiating the sensor, have to sleep to
+    # allow sensor to initiate fully before remove raw capture capability
+    log_daemon_msg "Setting capability cap_net_raw"
+    setcap cap_net_raw=+ep /usr/bin/python2.7
     log_daemon_msg "Starting $DAEMON_NAME"
     start-stop-daemon --start --background --pidfile $PIDFILE --make-pid --user $DAEMON_USER --chuid $DAEMON_USER --startas $DAEMON
-    #log_daemon_msg "Removing capability cap_net_raw"
-    3setcap cap_net_raw=-ep /usr/bin/python2.7
+    sleep 2
+    log_daemon_msg "Removing capability cap_net_raw"
+    setcap cap_net_raw=-ep /usr/bin/python2.7
     log_end_msg $?
 }
 

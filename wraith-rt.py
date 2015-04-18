@@ -218,6 +218,8 @@ class WraithPanel(gui.MasterPanel):
         # configure panel & write initial message
         # have to manually enter the desired size, as the menu does not expand
         # the visibile portion automatically
+        #if not self._pwd is None: self.master.withdraw()
+
         self.tk.wm_geometry("300x1+0+0")
         self.logwrite("Wraith v%s" % wraith.__version__)
 
