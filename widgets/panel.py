@@ -507,6 +507,25 @@ class LogPanel(TabularPanel):
             pass
         finally:
             self._l.release()
+    def delayedwrite(self,ms):
+        """
+         writes each msg in ms to the log where msg is a tuple (time,text,type)
+          time - time text occurred as a string
+          text - message text
+          type - type of message
+        """
+        self._l.acquire()
+        try:
+            for m in ms:
+                self.tree.insert('','end',iid=str(self._n),
+                                 values=(self._symbol[m[2]],m[0],m[1]),
+                                 tag=(m[2],))
+                self._n += 1
+                self.tree.yview('moveto',1.0)
+        except Exception as e:
+            print e
+        finally:
+            self._l.release()
 
 class TailLogPanel(TabularPanel):
     """
@@ -616,7 +635,7 @@ class MasterPanel(Panel):
       showpanel -> derive for use in toolsload (loads saved panel configs)
       delete and close if the derived class must further handle shutting down
     """
-    def __init__(self,tl,ttl,datatypes=None,logpanel=True,iconPath=None,resize=False):
+    def __init__(self,tl,ttl,datatypes=None,iconPath=None,resize=False):
         """
          ttl - title of the window/panel
          datatypes - list of strings for data bins, etc
@@ -648,9 +667,6 @@ class MasterPanel(Panel):
             self.master.config(menu=self.menubar)
         except AttributeError:
             self.master.tk.call(self.master,"config","-menu",self.menubar)
-            
-        # make the log panel?
-        if logpanel: self.viewlog()
 
         # initialiez
         self._initialize()

@@ -17,9 +17,10 @@ import time                                # sleeping, timestamps
 import psycopg2 as psql                    # postgresql api
 import Tkinter as tk                       # gui constructs
 import ttk                                 # ttk widgets
-#from PIL import Image,ImageTk              # image input & support
+from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import argparse                            # cmd line arguments
+import getpass                             # get sudo password
 import wraith                              # version info
 import wraith.widgets.panel as gui         # graphics suite
 import wraith.subpanels as subgui          # our subpanels
@@ -201,7 +202,7 @@ class WraithPanel(gui.MasterPanel):
 
         # set up super
         gui.MasterPanel.__init__(self,tl,"Wraith  v%s" % wraith.__version__,
-                                 [],True,"widgets/icons/wraith3.png",False)
+                                 [],"widgets/icons/wraith3.png",False)
 
 #### PROPS
 
@@ -218,50 +219,75 @@ class WraithPanel(gui.MasterPanel):
         # configure panel & write initial message
         # have to manually enter the desired size, as the menu does not expand
         # the visibile portion automatically
-        #if not self._pwd is None: self.master.withdraw()
-
         self.tk.wm_geometry("300x1+0+0")
-        self.logwrite("Wraith v%s" % wraith.__version__)
+        if self._pwd is None: self._create()
 
+    def _create(self):
         # read in conf file, exit on error
+        msgs = [(time.strftime('%H:%M:%S'),
+                 "Wraith v%s" % wraith.__version__,
+                 gui.LOG_NOERR)]
         self._conf = readconf()
         if 'err' in self._conf:
-            self.logwrite("Configuration file is invalid. %s" % self._conf['err'],gui.LOG_ERR)
+            msgs.append((time.strftime('%H:%M:%S'),
+                          "Configuration file is invalid. %s" % self._conf['err'],
+                          gui.LOG_ERR))
             return
 
         # determine if postgresql is running
         if cmdline.runningprocess('postgres'):
             # update self,msg and connect
-            self.logwrite('PostgreSQL is running',gui.LOG_NOTE)
-            self._bSQL = True
+            msgs.append((time.strftime('%H:%M:%S'),
+                         'PostgreSQL is running',
+                         gui.LOG_NOERR))
+            if not self._pwd: self._bSQL = True
             self._setstate(_STATE_STORE_)
-            (self._conn,msg) = psqlconnect(self._conf['store'])
+            (self._conn,ret) = psqlconnect(self._conf['store'])
             if not self._conn is None: self._setstate(_STATE_CONN_)
             else:
-                self.logwrite("Error connecting to PostgreSQL: %s" % msg,gui.LOG_ERR)
+                msgs.append((time.strftime('%H:%M:%S'),
+                             "Error connecting to PostgreSQL: %s" % ret,
+                             gui.LOG_ERR))
                 return
         else:
-            self.logwrite("PostgreSQL is not running",gui.LOG_WARN)
-            self.logwrite("Not connected to database",gui.LOG_WARN)
+            msgs.append((time.strftime('%H:%M:%S'),
+                         "PostgreSQL is not running",
+                         gui.LOG_WARN))
+            msgs.append((time.strftime('%H:%M:%S'),
+                         "Not connected to database",
+                         gui.LOG_WARN))
 
         # nidus running?
         if cmdline.nidusrunning(wraith.NIDUSPID):
-            self.logwrite("Nidus is running")
+            msgs.append((time.strftime('%H:%M:%S'),
+                         "Nidus is running",
+                         gui.LOG_NOERR))
             self._setstate(_STATE_NIDUS_)
         else:
-            self.logwrite("Nidus is not running",gui.LOG_WARN)
+            msgs.append((time.strftime('%H:%M:%S'),
+                         "Nidus is not running",
+                         gui.LOG_WARN))
 
+        # dyskt running?
         if cmdline.dysktrunning(wraith.DYSKTPID):
-            self.logwrite("DySKT is running")
+            msgs.append((time.strftime('%H:%M:%S'),
+                         "DySKT is running",
+                         gui.LOG_NOERR))
             self._setstate(_STATE_DYSKT_)
         else:
-            self.logwrite("DySKT is not running",gui.LOG_WARN)
+            msgs.append((time.strftime('%H:%M:%S'),
+                         "DySKt is not running",
+                         gui.LOG_WARN))
 
         # set initial state to initialized
         self._setstate(_STATE_INIT_)
 
         # adjust menu options accordingly
         self._menuenable()
+
+        # show log and write messages
+        self.viewlog()
+        self.getpanel("log",True).delayedwrite(msgs)
 
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
@@ -974,16 +1000,126 @@ class WraithPanel(gui.MasterPanel):
         except AttributeError:
             return None # canceled
 
+class WraithSplash(object):
+    """ Splash Window """
+    def __init__(self,tl,wp,pwd):
+        """
+         tl: Toplevel
+         wp: WraithPanel
+        """
+        self._tl = tl
+        self._wp = wp
+        self._pwd = pwd
+        self._finished = False
+        self._tl.overrideredirect(True) # hide the title bar
+
+        # create our splash image, progress bar and status label
+        self._logo = ImageTk.PhotoImage(Image.open("widgets/icons/splash.png"))
+        ttk.Label(self._tl,image=self._logo,
+                  style="splash.TLabel").grid(row=0,column=0,sticky='nwse')
+        self._pb = ttk.Progressbar(self._tl,style="splash.Horizontal.TProgressbar",
+                                   maximum=10,orient=tk.HORIZONTAL,length=272,
+                                   mode='determinate')
+        self._pb.grid(row=1,column=0,sticky='nwse')
+        #self._pb.start(10)
+        self._sv = tk.StringVar()
+        self._sv.set("Initializing...")
+        ttk.Label(self._tl,style="splash.TLabel",width=20,textvariable=self._sv,
+                  justify=tk.CENTER).grid(row=2,column=0,sticky='nwse')
+
+        # center on screen
+        w = self._tl.winfo_screenwidth()
+        h = self._tl.winfo_screenheight()
+        sz = tuple(int(_) for _ in self._tl.geometry().split('+')[0].split('x'))
+        x = (w/2 - sz[0])/2
+        y = (h/2 - sz[1])/2
+        self._tl.geometry("+%d+%d" % (x,y))
+
+        # start 'polling'
+        self._bconfig = False
+        self._bpsql = False
+        self._bnidus = False
+        self._bfinished = False
+        self._tl.after(1000,self._busy)
+
+    def _busy(self):
+        if self._bfinished:
+            self._wp.master.deiconify()
+            self._wp._create()
+            self._tl.destroy()
+        else:
+            if not self._bconfig: self._chkconfig()
+            elif not self._bpsql: self._chkpsql()
+            elif not self._bnidus: self._chknidus()
+            else: self._chkdyskt()
+            self._tl.after(1000,self._busy)
+
+    def _chkconfig(self):
+        self._sv.set("Checking configuration file...")
+        self._pb.step(0.5)
+        conf = readconf()
+        if 'err' in conf: raise RuntimeError("Config file invalid: %s" % conf['err'])
+        else: self._sv.set('Configuration file is valid')
+        self._bconfig = True
+        self._pb.step(2.0)
+
+    def _chkpsql(self):
+        self._sv.set("Checking PostgreSQL..")
+        self._pb.step(0.5)
+        if not cmdline.runningprocess('postgres'):
+            self._sv.set("Starting PostgreSQL")
+            if startpsql(pwd):
+                self._sv.set("PostgreSQL started")
+            else:
+                self._sv.set("Failed to start PostgreSQL")
+        else:
+            self._sv.set("PostgreSQL already running")
+        self._bpsql = True
+        self._pb.step(2.0)
+
+    def _chknidus(self):
+        self._sv.set("Checking Nidus...")
+        self._pb.step(0.5)
+        if not cmdline.nidusrunning(wraith.NIDUSPID):
+            self._sv.set("Starting Nidus")
+            if startnidus(pwd):
+                self._sv.set("Nidus started")
+            else:
+                self._sv.set("Failed to start Nidus")
+        else:
+            self._sv.set("Nidus already running")
+        self._bnidus = True
+        self._pb.step(2.0)
+
+    def _chkdyskt(self):
+        self._sv.set("Checking DySKT...")
+        self._pb.step(2.0)
+        if not cmdline.dysktrunning(wraith.DYSKTPID):
+            self._sv.set("Starting DySKT")
+            if not startpsql(pwd):
+                # because DySKT can sometimes take a while, we will run
+                # this several times
+                i = 5
+                while not cmdline.dysktrunning(wraith.DYSKTPID):
+                    i -= 1
+                    if i == 0: break
+                    time.sleep(0.5)
+            if cmdline.dysktrunning(wraith.DYSKTPID):
+                self._sv.set("DySKT started")
+            else:
+                self._sv.set("Failed to start DySKT")
+        else:
+            self._sv.set("DySKT already running")
+        self._bfinished = True
+
 if __name__ == '__main__':
     # create arg parser and parse arguments
     ap = argparse.ArgumentParser(description="Wraith-rt %s" % wraith.__version__)
-    ap.add_argument('-p','--pwd',help="Sudo Password")
     ap.add_argument('-s','--start',help="Start with options = one of {nogui|gui|all}")
     ap.add_argument('-d','--stop',action='store_true',help="Stops all found services")
     ap.add_argument('-x','--exclude',action='store_true',help="Does not stop PostgreSQL")
     ap.add_argument('-v','--version',action='version',version="Wraith-rt %s" % wraith.__version__)
     args = ap.parse_args()
-    pwd = args.pwd
     sopts = args.start
     stop = args.stop
     exclude = args.exclude
@@ -992,30 +1128,42 @@ if __name__ == '__main__':
     # if password is entered verified correctness
     if sopts is None and stop == False: sopts = 'gui'
     if sopts is not None and stop == True: ap.error("Cannot start and stop")
-    if pwd is not None and not cmdline.testsudopwd(pwd): ap.error("Incorrect sudo password")
 
     # stop services - assumes no gui
     if stop:
         # verify pwd has been set
-        if pwd is None: ap.error("Sudo password must be entered to stop")
+        i = 2
+        pwd = getpass.unix_getpass(prompt="Password [for %s]:" % getpass.getuser())
+        while not cmdline.testsudopwd(pwd) and i > 0:
+            pwd = getpass.unix_getpass(prompt="Incorrect password, try again:")
+            i -= 1
+        if not pwd: ap.error("Three incorrect password attempts")
 
         # stop DySKT, then Nidus, then PostgreSQL
         sd = sn = sp = True
         if cmdline.dysktrunning(wraith.DYSKTPID):
             ret = 'ok' if stopdyskt(pwd) else 'fail'
             print "Stopping DySKT\t\t\t\t[%s]" % ret
+        else: print "DySKT not running"
         if cmdline.nidusrunning(wraith.NIDUSPID):
             ret = 'ok' if stopnidus(pwd) else 'fail'
             print "Stopping Nidus\t\t\t\t[%s]" % ret
+        else: print "Nidus not running"
         if cmdline.runningprocess('postgres') and not exclude:
             ret = 'ok' if stoppsql(pwd) else 'fail'
             print "Stopping PostgreSQL\t\t\t[%s]" % ret
+        else: print "PostgreSQL not running"
         sys.exit(0)
 
     # start specified services
     if sopts == 'nogui':
         # verify pwd is present
-        if pwd is None: ap.error("Sudo password must be entered to start with 'nogui'")
+        i = 2
+        pwd = getpass.unix_getpass(prompt="Password [for %s]:" % getpass.getuser())
+        while not cmdline.testsudopwd(pwd) and i > 0:
+            pwd = getpass.unix_getpass(prompt="Incorrect password, try again:")
+            i -= 1
+        if not pwd: ap.error("Three incorrect password attempts")
 
         # start postgresql (if needed), nidus and dyskt
         if not cmdline.runningprocess('postgres'):
@@ -1036,21 +1184,37 @@ if __name__ == '__main__':
         sys.exit(0)
     else:
         if sopts == 'all':
-            if pwd is None: ap.error("Sudo password must be entered to start with 'all'")
+            i = 2
+            pwd = getpass.unix_getpass(prompt="Password [for %s]:" % getpass.getuser())
+            while not cmdline.testsudopwd(pwd) and i > 0:
+                pwd = getpass.unix_getpass(prompt="Incorrect password, try again:")
+                i -= 1
+            if not pwd: ap.error("Three incorrect password attempts")
+        else: pwd = None
 
-        # start gui
-        t = tk.Tk()
+        # configure style
+        t = tk.Tk()     # call our main program root first or Style() will do so
         s = ttk.Style()
         if 'clam' in s.theme_names(): s.theme_use('clam')
-        s.configure("red.Horizontal.TProgressbar",foreground='red',background="red")
+
+        # WraithPanel will start everything if pwd is present otherwise, will
+        # just start the gui
         try:
-            # WraithPanel will start everything if pwd is present otherwise, will
-            # just start the gui
-            WraithPanel(t,pwd).mainloop()
+            wp = WraithPanel(t,pwd)                     # create main program
+            if sopts == 'all':
+                # figure out how to remove the progressbar relief/border
+                s.configure("splash.Horizontal.TProgressbar",foreground='green',
+                            background='green',troughcolor='black',
+                            troughrelief='black',borderwidth=0)
+                s.configure("splash.TLabel",foreground='white',
+                            background='black',border=0)
+                t.withdraw()                                # hide main programe
+                splash = WraithSplash(tk.Toplevel(),wp,pwd) # show the splash
+            wp.mainloop()                                   # start the main programe
+            sys.exit(0)
         except Exception as e:
             fout = open('wraith.log','a')
-            fout.write("%s\n" % e)
+            fout.write("%s: %s\n" % (time.strftime("%d%H%ML%b%Y").upper(),e))
             fout.close()
+            print 'Error: check wraith.log for details'
             sys.exit(1)
-
-    sys.exit(0)

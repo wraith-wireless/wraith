@@ -9,6 +9,10 @@ Overall:
    o if daemon is run as root, will have to modify cmdline.dysktrunning to
      use sudo
   3) Need a way to identify when nidus is processing data from a closed dyskt
+  4) Splash panel
+   o is it necessary?
+   o if keeping, would like to get rid of border around progressbar and progressbar.pbar
+   o many statements are not even seen, remove them
 GUI:
   5) move display of log panel to after intializiation() so that
      wraith panel is 'first', leftmost panel - will have implement mechanism
@@ -37,6 +41,7 @@ DySKT:
  41) need to handle tuner thread failure in rdoctl
  42) send multiple frames as a single compressed/encrypted packet for efficiency
      and security
+ 43) allow sensor to start in paused mode
 Nidus:
   1) return messages instead of just closing pipe for no running server etc
   2) need constraints either through postgresql (preferred) or nidusdb - one example

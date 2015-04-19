@@ -33,6 +33,14 @@ GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device 
 # Some constants
 COPY = u"\N{COPYRIGHT SIGN}"
 
+#class WraithSplash(object):
+#    """ a simple modal dialog which initiates program, showing progress bar """
+#    def __init__(self,chief,pwd):
+#        self.tl = tk.Toplevel(chief)
+#        self._pwd = pwd
+#        label = ttk.Label(text='Test')
+#        label.grid()
+
 #### MENU PANELS
 
 # Wraith->Configure

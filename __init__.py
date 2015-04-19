@@ -29,7 +29,8 @@ wraith 0.0.3
  changes:
   GUI:
    - migrated from Tix to ttk
-   - begin accepting command line arguments
+   - implemented command line argument to fully start wraith if desired
+   - added a splash panel that initiates services
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
