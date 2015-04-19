@@ -539,7 +539,6 @@ class NidusDB(object):
 
     def _setradio(self,ts,did,state):
         """ set the state of a radio """
-        # TODO: should we commit each statement?
         if not state:
             # close out antenna
             sql = """
@@ -1031,9 +1030,6 @@ class ExtractThread(SSEThread):
                 addrs[l2[a]]['loc'].append(i+1)
             else:
                 addrs[l2[a]] = {'loc':[i+1],'id':None}
-        # TODO: cannot remember what the below does
-        saddrs = set(addrs.keys())
-        if len(saddrs) != len(addrs): print 'consume', addrs
 
         # each _insert function will reraise psql related errors after
         # setting the internal err tuple

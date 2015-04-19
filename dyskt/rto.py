@@ -245,8 +245,6 @@ class RTO(mp.Process):
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                     else:
                         # send antennas
-                        # TODO: make sure for below that nA = [] if no antennas
-                        # are specified
                         for i in xrange(msg['nA']):
                             ret = self._send('ANTENNA',ts,{'mac':msg['mac'],
                                                            'index':i,

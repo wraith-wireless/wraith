@@ -64,6 +64,7 @@ Nidus:
  13) move to pcap-ng format?
  14) need to further test writing mgmt frames to db, there are still some errors
      mainly syntatic in the sql statements
+ 15) should we commit individual statements in long functions i.e. _setradio
 Radio:
 1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)

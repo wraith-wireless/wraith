@@ -56,7 +56,6 @@ def leastx(x,v):
 
 def midx(s,x,v):
     """ returns the (unsigned int) value of x bits starting at s from v """
-    # TODO: is this correct
     return leastx(x,(v >> s))
 
 def mostx(s,v):
