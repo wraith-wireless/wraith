@@ -23,6 +23,7 @@ import wraith.widgets.panel as gui         # graphics suite
 from wraith.radio.iw import IW_CHWS        # channel width list
 from wraith.radio.iwtools import wifaces   # check nic validity
 from wraith.dyskt.dyskt import parsechlist # channelist validity check
+from wraith.utils import timestamps        # valid data/time
 from wraith.utils import landnav           # lang nav utilities
 
 # Validation reg. exp.
@@ -486,20 +487,18 @@ class QueryPanel(gui.SlavePanel):
         ttk.Label(frmDP,text='DD-MON-YY').grid(row=0,column=1,sticky='ne')
         ttk.Label(frmDP,text='HH:MM:SS').grid(row=0,column=2,sticky='ne')
         ttk.Label(frmDP,text='From: ').grid(row=1,column=0,sticky='w')
-        txtFromDate = ttk.Entry(frmDP,width=9)
-        txtFromDate.grid(row=1,column=1,sticky='e')
-        txtFromTime = ttk.Entry(frmDP,width=9)
-        txtFromTime.grid(row=1,column=2,sticky='e')
+        self.txtFromDate = ttk.Entry(frmDP,width=9)
+        self.txtFromDate.grid(row=1,column=1,sticky='e')
+        self.txtFromTime = ttk.Entry(frmDP,width=9)
+        self.txtFromTime.grid(row=1,column=2,sticky='e')
         ttk.Label(frmDP,text='To: ').grid(row=2,column=0,sticky='w')
-        txtToDate = ttk.Entry(frmDP,width=9)
-        txtToDate.grid(row=2,column=1,sticky='e')
-        txtToTime = ttk.Entry(frmDP,width=9)
-        txtToTime.grid(row=2,column=2,sticky='e')
+        self.txtToDate = ttk.Entry(frmDP,width=9)
+        self.txtToDate.grid(row=2,column=1,sticky='e')
+        self.txtToTime = ttk.Entry(frmDP,width=9)
+        self.txtToTime.grid(row=2,column=2,sticky='e')
         self.cvar = tk.IntVar()
         self.chkCollate = ttk.Checkbutton(frmD,text="Collate",variable=self.cvar)
         self.chkCollate.grid(row=1,column=1,sticky='nw')
-        #frmD.columnconfigure(0,weight=1)
-        #frmD.columnconfigure(1,weight=0)
 
         # filters frame (For now, allow filters on Radio,Frame,Signal,Traffic,STA
         frmF = ttk.LabelFrame(self,text='Filters')
@@ -530,12 +529,6 @@ class QueryPanel(gui.SlavePanel):
         ttk.Button(frmB,text='Reset',width=6,command=self.widgetreset).grid(row=0,column=1)
         ttk.Button(frmB,text='Cancel',width=6,command=self.delete).grid(row=0,column=2)
 
-        # configure main expand options
-        #self.master.rowconfigure(0,weight=1)
-        #self.master.rowconfigure(1,weight=1)
-        #self.master.rowconfigure(2,weight=0)
-        #self.master.columnconfigure(0,weight=1)
-
     # virtual implementations
 
     def _shutdown(self): pass
@@ -544,8 +537,40 @@ class QueryPanel(gui.SlavePanel):
 
     # button callbacks
 
-    def query(self): pass
-    def widgetreset(self): pass
+    def query(self):
+        """ queries db for specified data """
+        if self._validate():
+            pass
+
+    def widgetreset(self):
+        """ clears all user inputed data """
+        # clear all tree selections (selection_toggle? selection_remove?)
+        self.txtFromDate.delete(0,tk.END)
+        self.txtFromTime.delete(0,tk.END)
+        self.txtToDate.delete(0,tk.END)
+        self.txtToTime.delete(0,tk.END)
+        self.cvar.set(0)
+
+    # private helper functions
+
+    def _validate(self):
+        """ validates all entries """
+        d = self.txtFromDate.get()
+        if d and not timestamps.validdate(d):
+            self.err("Invalid Input","From date is not valid")
+            return False
+        t = self.txtFromTime.get()
+        if t and not timestamps.validtime(t):
+            return False
+        d = self.txtToDate.get()
+        if d and not timestamps.validdate(d):
+            self.err("Invalid Input","To date is not valid")
+            return False
+        t = self.txtToTime.get()
+        if t and not timestamps.validtime(t):
+            return False
+
+        return True
 
 # Storage->Nidus-->Config
 class NidusConfigPanel(gui.ConfigPanel):
