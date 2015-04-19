@@ -37,7 +37,7 @@ SET TIME ZONE 'UTC';
 -- defines a sensor session. A sensor is a hostname, ip address and the period
 -- during which it is used
 -- TODO: should we create an index on period?
-DROP TABLE IF EXISTS sensor;
+DROP TABLE IF EXISTS session;
 CREATE TABLE sensor(
    session_id serial,             -- the session id
    hostname VARCHAR(64) NOT NULL, -- hostname of sensor
@@ -947,37 +947,38 @@ CREATE TABLE action(
   FOREIGN KEY (ap) REFERENCES sta(id)
 );
 
-DROP TYPE IF EXISTS STA_TYPE;
-CREATE TYPE STA_TYPE AS ENUM ('unknown','ap','sta','wired');
+
+-- NOTE CURRENTLY USED --
+--DROP TYPE IF EXISTS STA_TYPE;
+--CREATE TYPE STA_TYPE AS ENUM ('unknown','ap','sta','wired');
 
 -- TODO: add AID
-DROP TABLE IF EXISTS sta_info;
-CREATE TABLE sta_info(
-   staid integer NOT NULL,            -- fk to sta
-   fid bigint NOT NULL,               -- fk to frame these details were seen
-   type STA_TYPE default 'unknown',   -- type of sta 
-   ip inet,                           -- ip if known
-   os_name VARCHAR(50),               -- name of os i.e. Windows
-   os_flavor VARCHAR(50),             -- name of os flavor i.e. XP
-   os_vers VARCHAR(50),               -- os vers i.e XP
-   os_sp VARCHAR(50),                 -- os service pack or revision
-   os_lang VARCHAR(50),               -- human language of os
-   hw_name VARCHAR(50),               -- hw name i.e. Buffalo
-   hw_flavor VARCHAR(50),             -- hw flavor i.e. N750
-   hw_vers VARCHAR(50),               -- hw version
-   hw_sp VARCHAR(50),                 -- hw service pack or revision
-   hw_lang VARCHAR(50),               -- language
-   fw_name VARCHAR(50),               -- fw/card name i.e. intel
-   fw_flavor VARCHAR(50),             -- fw/card flavor i.e. centrino 1000
-   fw_vers VARCHAR(50),               -- fw/card version
-   fw_rev VARCHAR(50),                -- fw/card revision
-   fw_driver VARCHAR(50),             -- driver of the card 
-   fw_chipset VARCHAR(50),            -- chipset of the card
-   CONSTRAINT ch_sid CHECK (sid > 0),
-   CONSTRAINT ch_staid CHECK (staid > 0),
-   FOREIGN KEY(sid) REFERENCES sensor(session_id),
-   FOREIGN KEY(staid) REFERENCES sta(id)
-);
+--DROP TABLE IF EXISTS sta_info;
+--CREATE TABLE sta_info(
+--   staid integer NOT NULL,            -- fk to sta
+--   fid bigint NOT NULL,               -- fk to frame these details were seen
+--   type STA_TYPE default 'unknown',   -- type of sta
+--   ip inet,                           -- ip if known
+--   os_name VARCHAR(50),               -- name of os i.e. Windows
+--   os_flavor VARCHAR(50),             -- name of os flavor i.e. XP
+--   os_vers VARCHAR(50),               -- os vers i.e XP
+--   os_sp VARCHAR(50),                 -- os service pack or revision
+--   os_lang VARCHAR(50),               -- human language of os
+--   hw_name VARCHAR(50),               -- hw name i.e. Buffalo
+--   hw_flavor VARCHAR(50),             -- hw flavor i.e. N750
+--   hw_vers VARCHAR(50),               -- hw version
+--   hw_sp VARCHAR(50),                 -- hw service pack or revision
+--   hw_lang VARCHAR(50),               -- language
+--   fw_name VARCHAR(50),               -- fw/card name i.e. intel
+--   fw_flavor VARCHAR(50),             -- fw/card flavor i.e. centrino 1000
+--   fw_vers VARCHAR(50),               -- fw/card version
+--   fw_rev VARCHAR(50),                -- fw/card revision
+--   fw_driver VARCHAR(50),             -- driver of the card
+--   fw_chipset VARCHAR(50),            -- chipset of the card
+--   CONSTRAINT ch_staid CHECK (staid > 0),
+--   FOREIGN KEY(sid) REFERENCES sensor(session_id),
+--   FOREIGN KEY(staid) REFERENCES sta(id)
+--);
 
 #### STORED PROCEDURES
 

@@ -247,10 +247,11 @@ class SlavePanel(Panel):
      NOTE: The SlavePanel itself has no methods to define gui widgets, i.e.
       menu, main frame etc
     """
-    def __init__(self,tl,chief,iconPath=None,resize=False):
+    def __init__(self,tl,chief,title,iconPath=None,resize=False):
         """ chief is the controlling (Master) panel """
         Panel.__init__(self,tl,iconPath,resize)
         self._chief = chief
+        self.master.title(title)
 
     def _shutdown(self):
         """ cleanup functionality prior to quitting """
@@ -295,8 +296,7 @@ class SimplePanel(SlavePanel):
       _shutdown if any cleanup needs to be performed prior to closing
     """
     def __init__(self,tl,chief,title,iconpath=None,resize=False):
-        SlavePanel.__init__(self,tl,chief,iconpath,resize)
-        self.master.title(title)
+        SlavePanel.__init__(self,tl,chief,title,iconpath,resize)
         frm = ttk.Frame(self)
         frm.grid(row=0,column=0,sticky='nwse')
         self._body(frm)
@@ -333,15 +333,13 @@ class ConfigPanel(SlavePanel):
         self._makegui(frmConfs)
         frmConfs.grid(row=0,column=0,sticky='ns')
 
-        # set up the button widget frame
+        # # four buttons, Ok, Apply, Reset and Cancel
         frmBtns = ttk.Frame(self)
         frmBtns.grid(row=1,column=0,sticky='ns')
-
-        # four buttons, Ok, Apply, Reset and Cancel
         ttk.Button(frmBtns,text='OK',width=6,command=self.ok).grid(row=0,column=0)
         ttk.Button(frmBtns,text='Apply',width=6,command=self.apply).grid(row=0,column=1)
         ttk.Button(frmBtns,text='Reset',width=6,command=self.widgetreset).grid(row=0,column=2)
-        ttk.Button(frmBtns,text='Cancel',width=6,command=self.cancel).grid(row=0,column=3)
+        ttk.Button(frmBtns,text='Cancel',width=6,command=self.delete).grid(row=0,column=3)
 
         # insert values from config file
         self._initialize()
@@ -369,10 +367,6 @@ class ConfigPanel(SlavePanel):
     def widgetreset(self):
         """ reset entries to orginal configuration file """
         self._initialize()
-
-    def cancel(self):
-        """ make now changes and close """
-        self.delete()
 
 class TabularPanel(SlavePanel):
     """

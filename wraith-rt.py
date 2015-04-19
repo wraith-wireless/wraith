@@ -212,6 +212,24 @@ class WraithPanel(gui.MasterPanel):
     @property
     def getstateflags(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)
 
+    @property
+    def isinitialized(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['init']
+
+    @property
+    def psqlisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['store']
+
+    @property
+    def isconnected(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['conn']
+
+    @property
+    def nidusisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['nidus']
+
+    @property
+    def dysktisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['dyskt']
+
+    @property
+    def isexiting(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['exit']
+
 #### OVERRIDES
 
     def _initialize(self):
@@ -219,7 +237,8 @@ class WraithPanel(gui.MasterPanel):
         # configure panel & write initial message
         # have to manually enter the desired size, as the menu does not expand
         # the visibile portion automatically
-        self.tk.wm_geometry("300x1+0+0")
+        self.tk.wm_geometry("300x1+0+0") # our desired size
+        self.update_idletasks()          # force update -> should put the log panel 2nd
         if self._pwd is None: self._create()
 
     def _create(self):
@@ -440,7 +459,7 @@ class WraithPanel(gui.MasterPanel):
         panel = self.getpanels('databin',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = subgui.DataBinPanel(t,self)
+            pnl = subgui.DatabinPanel(t,self)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'databin'))
         else:
             panel[0].tk.deiconify()
@@ -531,7 +550,7 @@ class WraithPanel(gui.MasterPanel):
          error during insert of new records
         """
         # should not be enabled unless postgres is running, we are connected
-        # and a sensor is not running, but check anyway
+        # and no sensors are running
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if flags['store'] and flags['conn'] and not flags['dyskt']:
             curs = None

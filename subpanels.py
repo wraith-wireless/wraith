@@ -33,14 +33,6 @@ GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device 
 # Some constants
 COPY = u"\N{COPYRIGHT SIGN}"
 
-#class WraithSplash(object):
-#    """ a simple modal dialog which initiates program, showing progress bar """
-#    def __init__(self,chief,pwd):
-#        self.tl = tk.Toplevel(chief)
-#        self._pwd = pwd
-#        label = ttk.Label(text='Test')
-#        label.grid()
-
 #### MENU PANELS
 
 # Wraith->Configure
@@ -402,26 +394,158 @@ class CalculatePanel(gui.SimplePanel):
         self._ans.set('')
 
 # View->DataBin
-class DataBinPanel(gui.SimplePanel):
-    """ DataBinPanel - displays a set of data bins for retrieved data storage """
+class DatabinPanel(gui.SimplePanel):
+    """ DatabinPanel - displays a set of data bins for retrieved data storage """
     def __init__(self,tl,chief):
         self._bins = {}
-        gui.SimplePanel.__init__(self,tl,chief,"Databin","widgets/icons/databin.png")
+        gui.SimplePanel.__init__(self,tl,chief,"Databin","widgets/icons/db.png")
 
     def donothing(self): pass
 
     def _body(self,frm):
         """ creates the body """
         # add the bin buttons
-        for b in wraith.BINS:
-            try:
-                self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
-            except:
-                self._bins[b] = {'img':None}
-                self._bins[b]['btn'] = ttk.Button(frm,text=b,command=self.donothing)
-            else:
-                self._bins[b]['btn'] = ttk.Button(frm,image=self._bins[b]['img'],command=self.donothing)
-            self._bins[b]['btn'].grid(row=0,column=wraith.BINS.index(b),sticky='w')
+        # NOTE: for whatever reason, trying to creat individual viewquery functions
+        # for each bin b results in issues, if the button w/ function call is
+        # created directly in the loop. But, if a function is called that creates
+        # the button w/ function, there is no issue
+        for b in wraith.BINS: self._makebin(frm,b)
+
+    def _makebin(self,frm,b):
+        """ makes a button for bin b """
+        try:
+            self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
+        except:
+            self._bins[b] = {'img':None}
+            self._bins[b]['btn'] = ttk.Button(frm,text=b,command=self.donothing)
+        else:
+            self._bins[b]['btn'] = ttk.Button(frm,image=self._bins[b]['img'],
+                                              command=lambda:self.viewquery(b))
+        self._bins[b]['btn'].grid(row=0,column=wraith.BINS.index(b),sticky='w')
+
+    def viewquery(self,b):
+        """ shows query panel for bin b """
+        # notify user if not connected to database
+        #if not self._chief.isconnected:
+        #    self.err("Disconnected","Will not be able to retrieve any records. Connect and try again")
+        #    return
+
+        panel = self.getpanels('query%s' % b,False)
+        if not panel:
+            t = tk.Toplevel()
+            pnl = QueryPanel(t,self,"Query [bin %s]" % b,b)
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'niduslog'))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
+
+# Databin->Query
+class QueryPanel(gui.SlavePanel):
+    """Display query for data panel """
+    def __init__(self,tl,parent,ttl,b):
+        """
+         tl: Toplevel
+         parent: our master panel
+         ttl: title
+         b: databin querying for
+        """
+        gui.SlavePanel.__init__(self,tl,parent,ttl,'widgets/icons/bin%s.png'%b,False)
+        self._bin = b
+        self._makegui()
+
+    def _makegui(self):
+        """ make the query gui """
+        # three frames 1) data, 2) Filters, 3) buttons
+        self.grid(sticky='nwse')
+
+        # session/time frame
+        # two subframes: 'left' Session(s) Frame has a tree view of sessions, 'right'
+        # Period has entries to select from and to date/times. Additionally, below
+        # the period subframe is a checkbox to enable data collation
+        frmD = ttk.LabelFrame(self,text='Data',borderwidth=1)
+        frmD.grid(row=0,column=0,sticky='nwse')
+        frmDS = ttk.LabelFrame(frmD,text='Session(s)')
+        frmDS.grid(row=0,column=0,rowspan=2,sticky='nwse')
+        # make session tree w/ attached vertical scrollbar
+        self.treeSession = ttk.Treeview(frmDS)
+        self.treeSession.grid(row=0,column=0,sticky='nwse')
+        self.treeSession.config(height=6)
+        self.treeSession.config(selectmode='extended')
+        self.treeSession['show'] = 'headings'
+        vscroll = ttk.Scrollbar(frmDS,orient=tk.VERTICAL,command=self.treeSession.yview)
+        vscroll.grid(row=0,column=1,sticky='ns')
+        self.treeSession['yscrollcommand'] = vscroll.set
+        # configure session tree's headers
+        hdrs = ['ID','Host','From','To','Frames']
+        self.treeSession['columns'] = hdrs
+        for i in xrange(len(hdrs)):
+            self.treeSession.column(i,width=gui.lenpix(hdrs[i])+10,anchor=tk.CENTER)
+            self.treeSession.heading(i,text=hdrs[i])
+        frmDP = ttk.LabelFrame(frmD,text='Period')
+        frmDP.grid(row=0,column=1,sticky='nwse')
+        ttk.Label(frmDP,text='DD-MON-YY').grid(row=0,column=1,sticky='ne')
+        ttk.Label(frmDP,text='HH:MM:SS').grid(row=0,column=2,sticky='ne')
+        ttk.Label(frmDP,text='From: ').grid(row=1,column=0,sticky='w')
+        txtFromDate = ttk.Entry(frmDP,width=9)
+        txtFromDate.grid(row=1,column=1,sticky='e')
+        txtFromTime = ttk.Entry(frmDP,width=9)
+        txtFromTime.grid(row=1,column=2,sticky='e')
+        ttk.Label(frmDP,text='To: ').grid(row=2,column=0,sticky='w')
+        txtToDate = ttk.Entry(frmDP,width=9)
+        txtToDate.grid(row=2,column=1,sticky='e')
+        txtToTime = ttk.Entry(frmDP,width=9)
+        txtToTime.grid(row=2,column=2,sticky='e')
+        self.cvar = tk.IntVar()
+        self.chkCollate = ttk.Checkbutton(frmD,text="Collate",variable=self.cvar)
+        self.chkCollate.grid(row=1,column=1,sticky='nw')
+        #frmD.columnconfigure(0,weight=1)
+        #frmD.columnconfigure(1,weight=0)
+
+        # filters frame (For now, allow filters on Radio,Frame,Signal,Traffic,STA
+        frmF = ttk.LabelFrame(self,text='Filters')
+        frmF.grid(row=1,column=0,sticky='nwse')
+        nb = ttk.Notebook(frmF)
+        nb.grid(row=0,column=0,sticky='nwse')
+
+        # Radio tab
+        frmR = ttk.Frame(nb)
+        nb.add(frmR,text='Radio')
+
+        frmF = ttk.Frame(nb)
+        nb.add(frmF,text='Frame')
+
+        frmS = ttk.Frame(nb)
+        nb.add(frmS,text='Signal')
+
+        frmT = ttk.Frame(nb)
+        nb.add(frmT,text='Traffic')
+
+        frmSta = ttk.Frame(nb)
+        nb.add(frmSta,text='Station')
+
+        # 3 buttons query,reset and cancel
+        frmB = ttk.Frame(self)
+        frmB.grid(row=2,column=0,sticky='ns')
+        ttk.Button(frmB,text='Query',width=6,command=self.query).grid(row=0,column=0)
+        ttk.Button(frmB,text='Reset',width=6,command=self.widgetreset).grid(row=0,column=1)
+        ttk.Button(frmB,text='Cancel',width=6,command=self.delete).grid(row=0,column=2)
+
+        # configure main expand options
+        #self.master.rowconfigure(0,weight=1)
+        #self.master.rowconfigure(1,weight=1)
+        #self.master.rowconfigure(2,weight=0)
+        #self.master.columnconfigure(0,weight=1)
+
+    # virtual implementations
+
+    def _shutdown(self): pass
+    def reset(self): pass
+    def update(self): pass
+
+    # button callbacks
+
+    def query(self): pass
+    def widgetreset(self): pass
 
 # Storage->Nidus-->Config
 class NidusConfigPanel(gui.ConfigPanel):
