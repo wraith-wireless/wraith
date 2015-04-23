@@ -19,10 +19,10 @@ def ts2iso(ts): return dt.datetime.utcfromtimestamp(ts).isoformat()
 # convert isoformat to unix timestamp
 def iso2ts(iso): return (dtparser.parse(iso)-dt.datetime.utcfromtimestamp(0)).total_seconds()
 
-# confirm string s is of the form DD-MON-YY and is a valid date
+# confirm string s is of the form YYYY-MM-DD and is a valid date
 def validdate(s):
     try:
-        dt.datetime.strptime(s,'%d-%b-%y')
+        dt.datetime.strptime(s,'%Y-%m-%d')
         return True
     except:
         return False

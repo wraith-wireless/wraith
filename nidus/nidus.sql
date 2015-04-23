@@ -15,12 +15,6 @@
 -- CREATE EXTENSION postgis;
 -- \q
 
--- ERRORS
--- Error in reassocreq table
--- DB Error:  ('42601', 'ERROR:  syntax error at or near ")"
--- \nLINE 7: vendors))\n
--- ^\n', 'reassocreq', 539L)
-
 -- to login with nidus & verify postgis
 psql -h localhost -U nidus -d nidus
 -- SELECT postgis_full_version();
@@ -113,7 +107,7 @@ CREATE TABLE using_gpsd(
 -- >20	 Poor	    measurements are inaccurate and should be discard
 DROP TABLE IF EXISTS geo;
 CREATE TABLE geo(
-   gid integer NOT NULL,        -- FOREIGN KEY to gpsd id
+   sid integer NOT NULL,        -- FOREIGN KEY to sensor
    ts TIMESTAMPTZ NOT NULL,     -- timestamp of geolocation
    coord VARCHAR(15) NOT NULL,  -- geolocation in mgrs
    alt REAL,                    -- altitude
@@ -134,8 +128,8 @@ CREATE TABLE geo(
    CONSTRAINT ch_pdop CHECK (pdop > 0),
    CONSTRAINT ch_epx CHECK (epx >= 0),
    CONSTRAINT ch_epy CHECK (epy >= 0),
-   FOREIGN KEY (gid) REFERENCES gpsd(id),
-   PRIMARY KEY(gid,ts)
+   FOREIGN KEY (sid) REFERENCES sensor(session_id),
+   PRIMARY KEY(sid,ts)
 );
 
 -- radio table

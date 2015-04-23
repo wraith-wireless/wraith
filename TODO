@@ -24,6 +24,7 @@ GUI:
  20) Horizontal scrollbars on tree view do not work
  21) Have to work on resize of widgets etc with row/column configure
  22) use Tk validatecommand on widgets
+ 23) provide a panel to view interfaces
 DySKT:
   3) implement adaptive scan pattern
  26) gps device handling

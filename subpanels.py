@@ -16,6 +16,7 @@ import Tkinter as tk                       # gui constructs
 import ttk                                 # ttk widgets
 import mgrs                                # for mgrs2latlon conversions etc
 import math                                # for conversions, calculations
+import time                                # for timestamps
 from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
@@ -484,18 +485,20 @@ class QueryPanel(gui.SlavePanel):
             self.treeSession.heading(i,text=hdrs[i])
         frmDP = ttk.LabelFrame(frmD,text='Period')
         frmDP.grid(row=0,column=1,sticky='nwse')
-        ttk.Label(frmDP,text='DD-MON-YY').grid(row=0,column=1,sticky='ne')
+        ttk.Label(frmDP,text='YYYY-MM-DD').grid(row=0,column=1,sticky='ne')
         ttk.Label(frmDP,text='HH:MM:SS').grid(row=0,column=2,sticky='ne')
         ttk.Label(frmDP,text='From: ').grid(row=1,column=0,sticky='w')
-        self.txtFromDate = ttk.Entry(frmDP,width=9)
+        self.txtFromDate = ttk.Entry(frmDP,width=10)
         self.txtFromDate.grid(row=1,column=1,sticky='e')
         self.txtFromTime = ttk.Entry(frmDP,width=9)
         self.txtFromTime.grid(row=1,column=2,sticky='e')
+        ttk.Button(frmDP,text='Now',width=4,command=self.fromnow).grid(row=1,column=3,sticky='w')
         ttk.Label(frmDP,text='To: ').grid(row=2,column=0,sticky='w')
-        self.txtToDate = ttk.Entry(frmDP,width=9)
+        self.txtToDate = ttk.Entry(frmDP,width=10)
         self.txtToDate.grid(row=2,column=1,sticky='e')
         self.txtToTime = ttk.Entry(frmDP,width=9)
         self.txtToTime.grid(row=2,column=2,sticky='e')
+        ttk.Button(frmDP,text='Now',width=4,command=self.tonow).grid(row=2,column=3,sticky='w')
         self.cvar = tk.IntVar()
         self.chkCollate = ttk.Checkbutton(frmD,text="Collate",variable=self.cvar)
         self.chkCollate.grid(row=1,column=1,sticky='nw')
@@ -506,52 +509,58 @@ class QueryPanel(gui.SlavePanel):
         nb = ttk.Notebook(frmF)
         nb.grid(row=0,column=0,sticky='nwse')
 
-        # Radio tab
-        frmR = ttk.Frame(nb)
-        #ttk.Label(frmR,text="Parameters").grid(row=0,column=1,sticky='w')
-        ttk.Label(frmR,text='Not').grid(row=0,column=2,sticky='w')
-        ttk.Label(frmR,text='Role').grid(row=0,column=3,sticky='w')
-        ttk.Label(frmR,text='NIC: ').grid(row=1,column=0,sticky='w')
-        self.txtRadioNic = ttk.Entry(frmR,width=5)
-        self.txtRadioNic.grid(row=1,column=1,sticky='e')
-        self.rnevar = tk.IntVar()
-        self.chkRNExclude = ttk.Checkbutton(frmR,variable=self.rnevar)
-        self.chkRNExclude.grid(row=1,column=2,sticky='w')
-        ttk.Label(frmR,text='MAC: ').grid(row=2,column=0,sticky='w')
-        self.txtRadioMac = ttk.Entry(frmR,width=17)
-        self.txtRadioMac.grid(row=2,column=1,sticky='e')
-        self.rmevar = tk.IntVar()
-        self.chkRMExclude = ttk.Checkbutton(frmR,variable=self.rmevar)
-        self.chkRMExclude.grid(row=2,column=2,sticky='w')
-        ttk.Label(frmR,text='Standards: ').grid(row=3,column=0,sticky='w')
-        self.txtRadioStd = ttk.Entry(frmR,width=5)
-        self.txtRadioStd.grid(row=3,column=1,sticky='e')
+        # Sensor tab
+        frmS = ttk.Frame(nb)
+        ttk.Label(frmS,text='Interface').grid(row=0,column=0,columnspan=2,sticky='w')
+        ttk.Label(frmS,text='Not').grid(row=0,column=2,sticky='w')
+        ttk.Label(frmS,text='Role').grid(row=0,column=3,sticky='w')
+        ttk.Label(frmS,text='Host: ').grid(row=1,column=0,sticky='w')
+        self.txtSensorHost = ttk.Entry(frmS,width=17)
+        self.txtSensorHost.grid(row=1,column=1,sticky='e')
+        self.nothost = tk.IntVar()
+        ttk.Checkbutton(frmS,variable=self.nothost).grid(row=1,column=2,sticky='w')
+        ttk.Label(frmS,text='NIC: ').grid(row=2,column=0,sticky='w')
+        self.txtSensorNic = ttk.Entry(frmS,width=5)
+        self.txtSensorNic.grid(row=2,column=1,sticky='e')
+        self.notnic = tk.IntVar()
+        ttk.Checkbutton(frmS,variable=self.notnic).grid(row=2,column=2,sticky='w')
+        ttk.Label(frmS,text='MAC: ').grid(row=3,column=0,sticky='w')
+        self.txtSensorMac = ttk.Entry(frmS,width=17)
+        self.txtSensorMac.grid(row=3,column=1,sticky='e')
+        self.notmac = tk.IntVar()
+        ttk.Checkbutton(frmS,variable=self.notmac).grid(row=3,column=2,sticky='w')
+        ttk.Label(frmS,text='STDs: ').grid(row=4,column=0,sticky='w')
+        self.txtSensorStd = ttk.Entry(frmS,width=5)
+        self.txtSensorStd.grid(row=4,column=1,sticky='e')
         self.rsevar = tk.IntVar()
-        self.chkRSExclude = ttk.Checkbutton(frmR,variable=self.rsevar)
-        self.chkRSExclude.grid(row=3,column=2,sticky='w')
+        ttk.Checkbutton(frmS,variable=self.rsevar).grid(row=4,column=2,sticky='w')
         self.rvar = tk.IntVar()
         self.rvar.set(1)
-        self.chkRecon = ttk.Checkbutton(frmR,text='Recon',variable=self.rvar)
-        self.chkRecon.grid(row=1,column=3,sticky='w')
+        ttk.Checkbutton(frmS,text='Recon',variable=self.rvar).grid(row=1,column=3,sticky='w')
         self.cvar = tk.IntVar()
         self.cvar.set(1)
-        self.chkColl = ttk.Checkbutton(frmR,text='Collection',variable=self.cvar)
-        self.chkColl.grid(row=2,column=3,sticky='w')
-        frmRL = ttk.LabelFrame(frmR,text='Location')
-        frmRL.grid(row=4,column=0,columnspan=4,sticky='w')
-        ttk.Label(frmRL,text='Center PT: ').grid(row=0,column=0,sticky='w')
-        self.txtCenterPT = ttk.Entry(frmRL,width=15)
-        self.txtCenterPT.grid(row=0,column=1,sticky='w')
-        ttk.Label(frmRL,text='Radius: (m)').grid(row=0,column=2,sticky='w')
-        self.txtRadius = ttk.Entry(frmRL,width=6)
-        self.txtRadius.grid(row=0,column=3,sticky='w')
-        nb.add(frmR,text='Radio')
+        ttk.Checkbutton(frmS,text='Collection',variable=self.cvar).grid(row=2,column=3,sticky='w')
+        ttk.Separator(frmS,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=5,sticky='ns')
+        ttk.Label(frmS,text='Location').grid(row=0,column=5,columnspan=2,sticky='w')
+        ttk.Label(frmS,text='Center PT: ').grid(row=1,column=5,sticky='w')
+        self.txtCenterPT = ttk.Entry(frmS,width=15)
+        self.txtCenterPT.grid(row=1,column=6,sticky='w')
+        ttk.Label(frmS,text='Radius: (m)').grid(row=2,column=5,sticky='w')
+        self.txtRadius = ttk.Entry(frmS,width=6)
+        self.txtRadius.grid(row=2,column=6,sticky='w')
+        self.svar = tk.IntVar()
+        self.svar.set(1)
+        ttk.Checkbutton(frmS,text='Fixed',variable=self.svar).grid(row=3,column=5,sticky='w')
+        self.dvar = tk.IntVar()
+        self.dvar.set(1)
+        ttk.Checkbutton(frmS,text='Dynamic',variable=self.svar).grid(row=3,column=6,sticky='w')
+        nb.add(frmS,text='Sensor')
 
         frmF = ttk.Frame(nb)
         nb.add(frmF,text='Frame')
 
-        frmS = ttk.Frame(nb)
-        nb.add(frmS,text='Signal')
+        frmSig = ttk.Frame(nb)
+        nb.add(frmSig,text='Signal')
 
         frmT = ttk.Frame(nb)
         nb.add(frmT,text='Traffic')
@@ -588,6 +597,24 @@ class QueryPanel(gui.SlavePanel):
         self.txtToTime.delete(0,tk.END)
         self.cvar.set(0)
 
+    def fromnow(self):
+        """assign now() to the from entries """
+        d,t = timestamps.ts2iso(time.time()).split('T') # split isoformat on 'T'
+        t = t[:8]                                       # drop the microseconds
+        self.txtFromDate.delete(0,tk.END)               # delete from entries
+        self.txtFromDate.insert(0,d)                    # and add now
+        self.txtFromTime.delete(0,tk.END)
+        self.txtFromTime.insert(0,t)
+
+    def tonow(self):
+        """ assign now() to the to entries """
+        d,t = timestamps.ts2iso(time.time()).split('T') # split isoformat on 'T'
+        t = t[:8]                                       # drop the microseconds
+        self.txtToDate.delete(0,tk.END)                 # delete from entries
+        self.txtToDate.insert(0,d)                      # and add now
+        self.txtToTime.delete(0,tk.END)
+        self.txtToTime.insert(0,t)
+
     # private helper functions
 
     def _validate(self):
@@ -606,7 +633,12 @@ class QueryPanel(gui.SlavePanel):
         t = self.txtToTime.get()
         if t and not timestamps.validtime(t):
             return False
-
+        # allow all in host, nic
+        mac = self.txtSensorMac.get().upper()
+        if mac and re.match(MACADDR,mac) is None:
+            self.err("Invalid Input","MAC addr %s is not valid")
+            return False
+        # TODO: check standards for list of letters
         return True
 
 # Storage->Nidus-->Config
