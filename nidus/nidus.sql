@@ -1,7 +1,7 @@
 -- timestamp for eternity = infinity
 -- using postgresql 9.3.4
 -- ensure postgresql service is running - sudo service postgresql start
--- version 0.0.11
+-- version 0.0.12
 
 -- create nidus user and nidus database  
 --postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
@@ -31,7 +31,7 @@ SET TIME ZONE 'UTC';
 -- defines a sensor session. A sensor is a hostname, ip address and the period
 -- during which it is used
 -- TODO: should we create an index on period?
-DROP TABLE IF EXISTS session;
+DROP TABLE IF EXISTS sensor;
 CREATE TABLE sensor(
    session_id serial,             -- the session id
    hostname VARCHAR(64) NOT NULL, -- hostname of sensor
@@ -163,7 +163,7 @@ CREATE TABLE antenna(
   y REAL,                           -- rotation of antenna along y-axis
   z REAL,                           -- rotation of antenna along y-axis
   type ANTENNA_TYPE DEFAULT 'omni', -- type of antenna
-  period TSTZRANGE NOT NULL,        -- timerange the radio is using this antenna
+  ts TIMESTAMPTZ NOT NULL,    -- timestamp properties became true
   CONSTRAINT ch_ind CHECK (ind >= 0),
   CONSTRAINT ch_x CHECK(x >=0 and x < 360),
   CONSTRAINT ch_y CHECK(y >=0 and y < 360),
@@ -171,36 +171,25 @@ CREATE TABLE antenna(
   CONSTRAINT ch_gain CHECK(gain >= 0),
   CONSTRAINT ch_loss CHECK(loss >= 0),
   FOREIGN KEY (mac) REFERENCES radio(mac),
-  EXCLUDE USING gist (mac WITH =,ind WITH =,period WITH &&)
+  PRIMARY KEY(mac,ts,ind)
 );
 
 -- radio role type enumeration
 DROP TYPE IF EXISTS ROLE;
 CREATE TYPE ROLE AS ENUM ('recon','collection');
 
--- radio_epoch
--- epochal properties of a radio, these are expected to change (if at all) 
--- only after some period of time
-DROP TABLE IF EXISTS radio_epoch;
-CREATE TABLE radio_epoch(
-   mac macaddr NOT NULL,            -- foreign key to radio mac addr
-   role ROLE NOT NULL,              -- what role is radio playing now
-   description VARCHAR(200),        -- brief description of radio
-   period TSTZRANGE NOT NULL,       -- period during which record is true
-   FOREIGN KEY (mac) REFERENCES radio(mac),
-   EXCLUDE USING gist (mac WITH =, period WITH &&)
-);
-
--- radio_period
--- periodic properties of a radio, these can change 'instantly'
-DROP TABLE IF EXISTS radio_period;
-CREATE TABLE radio_period(
+-- radio_properties
+-- properties of a radio at a given timestamp
+DROP TABLE IF EXISTS radio_properties;
+CREATE TABLE radio_properties(
    mac macaddr NOT NULL,       -- foreign key to radio mac addr
+   role ROLE NOT NULL,         -- what role is radio playing now
+   description VARCHAR(200),   -- brief description of radio
    spoofed VARCHAR(17),        -- virtual (spoofed) mac address
    txpwr SMALLINT DEFAULT 15,  -- transmit power in dBm
-   period TSTZRANGE NOT NULL,  -- period during which record is true
+   ts TIMESTAMPTZ NOT NULL,    -- timestamp properties became true
    FOREIGN KEY (mac) REFERENCES radio(mac),
-   EXCLUDE USING gist (mac WITH =, period WITH &&)
+   PRIMARY KEY(mac,ts)
 );
 
 -- radio state enumerations
@@ -1011,9 +1000,8 @@ CREATE FUNCTION delete_all()
       DELETE FROM gpsd;
       ALTER SEQUENCE gpsd_id_seq RESTART;
       DELETE FROM using_radio;
-      DELETE FROM radio_epoch;
+      DELETE FROM radio_properties;
       DELETE FROM radio_event;
-      DELETE FROM radio_period;
       DELETE FROM antenna;
       DELETE FROM radio;
       DELETE FROM sensor;
@@ -1029,9 +1017,6 @@ CREATE OR REPLACE FUNCTION fix_nullperiod()
     BEGIN
       SET TIME ZONE 'UTC';
       UPDATE sensor SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
-      UPDATE antenna SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
-      UPDATE radio_epoch SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
-      UPDATE radio_period SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
       UPDATE using_radio SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
       UPDATE using_gpsd SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
     END;
@@ -1069,9 +1054,8 @@ DELETE FROM geo;
 DELETE FROM gpsd;
 ALTER SEQUENCE gpsd_id_seq RESTART;
 DELETE FROM using_radio;
-DELETE FROM radio_epoch;
+DELETE FROM radio_properties;
 DELETE FROM radio_event;
-DELETE FROM radio_period;
 DELETE FROM antenna;
 DELETE FROM radio;
 DELETE FROM sensor;
@@ -1104,9 +1088,8 @@ DROP TABLE using_gpsd;
 DROP TABLE geo;
 DROP TABLE gpsd;
 DROP TABLE using_radio;
-DROP TABLE radio_epoch;
+DROP TABLE radio_properties;
 DROP TABLE radio_event;
-DROP TABLE radio_period;
 DROP TABLE antenna;
 DROP TABLE radio;
 DROP TABLE sensor;

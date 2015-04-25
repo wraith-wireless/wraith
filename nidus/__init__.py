@@ -46,6 +46,9 @@ nidus 0.0.6
   - added nidusd daemon file to start nidus server
   - added support for platform table
   - added support for antenna data storage
+  - modified database
+    o condensed some of the radio tables
+    o using timestamp rather than periods for radio tables (exluding using_radio)
 """
 __name__ = 'nidus'
 __license__ = 'GPL v3.0'

@@ -492,16 +492,17 @@ class QueryPanel(gui.SlavePanel):
         self.txtFromDate.grid(row=1,column=1,sticky='e')
         self.txtFromTime = ttk.Entry(frmDP,width=9)
         self.txtFromTime.grid(row=1,column=2,sticky='e')
-        ttk.Button(frmDP,text='Now',width=4,command=self.fromnow).grid(row=1,column=3,sticky='w')
+        ttk.Button(frmDP,text='Now',width=4,
+                  command=self.fromnow).grid(row=1,column=3,sticky='w')
         ttk.Label(frmDP,text='To: ').grid(row=2,column=0,sticky='w')
         self.txtToDate = ttk.Entry(frmDP,width=10)
         self.txtToDate.grid(row=2,column=1,sticky='e')
         self.txtToTime = ttk.Entry(frmDP,width=9)
         self.txtToTime.grid(row=2,column=2,sticky='e')
         ttk.Button(frmDP,text='Now',width=4,command=self.tonow).grid(row=2,column=3,sticky='w')
-        self.cvar = tk.IntVar()
-        self.chkCollate = ttk.Checkbutton(frmD,text="Collate",variable=self.cvar)
-        self.chkCollate.grid(row=1,column=1,sticky='nw')
+        self.vcollate = tk.IntVar()
+        chkCollate = ttk.Checkbutton(frmD,text="Collate",
+                                     variable=self.vcollate).grid(row=1,column=1,sticky='nw')
 
         # filters frame (For now, allow filters on Radio,Frame,Signal,Traffic,STA
         frmF = ttk.LabelFrame(self,text='Filters')
@@ -517,29 +518,29 @@ class QueryPanel(gui.SlavePanel):
         ttk.Label(frmS,text='Host: ').grid(row=1,column=0,sticky='w')
         self.txtSensorHost = ttk.Entry(frmS,width=17)
         self.txtSensorHost.grid(row=1,column=1,sticky='e')
-        self.nothost = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.nothost).grid(row=1,column=2,sticky='w')
+        self.vnothost = tk.IntVar()
+        ttk.Checkbutton(frmS,variable=self.vnothost).grid(row=1,column=2,sticky='w')
         ttk.Label(frmS,text='NIC: ').grid(row=2,column=0,sticky='w')
-        self.txtSensorNic = ttk.Entry(frmS,width=5)
+        self.txtSensorNic = ttk.Entry(frmS,width=10)
         self.txtSensorNic.grid(row=2,column=1,sticky='e')
-        self.notnic = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.notnic).grid(row=2,column=2,sticky='w')
+        self.vnotnic = tk.IntVar()
+        ttk.Checkbutton(frmS,variable=self.vnotnic).grid(row=2,column=2,sticky='w')
         ttk.Label(frmS,text='MAC: ').grid(row=3,column=0,sticky='w')
         self.txtSensorMac = ttk.Entry(frmS,width=17)
         self.txtSensorMac.grid(row=3,column=1,sticky='e')
-        self.notmac = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.notmac).grid(row=3,column=2,sticky='w')
+        self.vnotmac = tk.IntVar()
+        ttk.Checkbutton(frmS,variable=self.vnotmac).grid(row=3,column=2,sticky='w')
         ttk.Label(frmS,text='STDs: ').grid(row=4,column=0,sticky='w')
         self.txtSensorStd = ttk.Entry(frmS,width=5)
         self.txtSensorStd.grid(row=4,column=1,sticky='e')
-        self.rsevar = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.rsevar).grid(row=4,column=2,sticky='w')
-        self.rvar = tk.IntVar()
-        self.rvar.set(1)
-        ttk.Checkbutton(frmS,text='Recon',variable=self.rvar).grid(row=1,column=3,sticky='w')
-        self.cvar = tk.IntVar()
-        self.cvar.set(1)
-        ttk.Checkbutton(frmS,text='Collection',variable=self.cvar).grid(row=2,column=3,sticky='w')
+        self.vnotstd = tk.IntVar()
+        ttk.Checkbutton(frmS,variable=self.vnotstd).grid(row=4,column=2,sticky='w')
+        self.vrecon = tk.IntVar()
+        self.vrecon.set(1)
+        ttk.Checkbutton(frmS,text='Recon',variable=self.vrecon).grid(row=1,column=3,sticky='w')
+        self.vcoll = tk.IntVar()
+        self.vcoll.set(1)
+        ttk.Checkbutton(frmS,text='Collection',variable=self.vcoll).grid(row=2,column=3,sticky='w')
         ttk.Separator(frmS,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=5,sticky='ns')
         ttk.Label(frmS,text='Location').grid(row=0,column=5,columnspan=2,sticky='w')
         ttk.Label(frmS,text='Center PT: ').grid(row=1,column=5,sticky='w')
@@ -548,12 +549,12 @@ class QueryPanel(gui.SlavePanel):
         ttk.Label(frmS,text='Radius: (m)').grid(row=2,column=5,sticky='w')
         self.txtRadius = ttk.Entry(frmS,width=6)
         self.txtRadius.grid(row=2,column=6,sticky='w')
-        self.svar = tk.IntVar()
-        self.svar.set(1)
-        ttk.Checkbutton(frmS,text='Fixed',variable=self.svar).grid(row=3,column=5,sticky='w')
-        self.dvar = tk.IntVar()
-        self.dvar.set(1)
-        ttk.Checkbutton(frmS,text='Dynamic',variable=self.svar).grid(row=3,column=6,sticky='w')
+        self.vfixed = tk.IntVar()
+        self.vfixed.set(1)
+        ttk.Checkbutton(frmS,text='Fixed',variable=self.vfixed).grid(row=3,column=5,sticky='w')
+        self.vdynamic = tk.IntVar()
+        self.vdynamic.set(1)
+        ttk.Checkbutton(frmS,text='Dynamic',variable=self.vdynamic).grid(row=3,column=6,sticky='w')
         nb.add(frmS,text='Sensor')
 
         frmF = ttk.Frame(nb)
@@ -595,7 +596,23 @@ class QueryPanel(gui.SlavePanel):
         self.txtFromTime.delete(0,tk.END)
         self.txtToDate.delete(0,tk.END)
         self.txtToTime.delete(0,tk.END)
-        self.cvar.set(0)
+        self.vcollate.set(0)
+        self.txtSensorHost.delete(0,tk.END)
+        self.vnothost.set(0)
+        self.txtSensorNic.delete(0,tk.END)
+        self.vnotnic.set(0)
+        self.txtSensorMac.delete(0,tk.END)
+        self.vnotmac.set(0)
+        self.txtSensorStd.delete(0,tk.END)
+        self.vnotstd.set(0)
+        self.vrecon.set(1)
+        self.vcoll.set(1)
+        self.txtCenterPT.delete(0,tk.END)
+        self.txtRadius.delete(0,tk.END)
+        self.vfixed.set(1)
+        self.vdynamic.set(1)
+
+
 
     def fromnow(self):
         """assign now() to the from entries """
@@ -638,7 +655,25 @@ class QueryPanel(gui.SlavePanel):
         if mac and re.match(MACADDR,mac) is None:
             self.err("Invalid Input","MAC addr %s is not valid")
             return False
-        # TODO: check standards for list of letters
+        stds = self.txtSensorStd.get(',')
+        if stds:
+            for std in stds:
+                if not std in ['a','b','g','n','ac']:
+                    self.err("Invalid Input","Invalid standard specifier %s" % std)
+        r = self.vrecon.get()
+        c = self.vcoll.get()
+        if not r and not c:
+            self.err("Invalid Input","Recon and/or Collection role must be specified")
+            return False
+        cp = self.txtCenterPT.get()
+        if cp and not landnav.validMGRS(cp):
+            self.err("Invalid Input","Center point is not a valid MGRS location")
+            return False
+        f = self.vfixed.get()
+        d = self.vdynamic.get()
+        if not f and not d:
+            self.err("Invalid Input","Fixed and/or dynamic location must be specified")
+
         return True
 
 # Storage->Nidus-->Config
@@ -674,11 +709,14 @@ class NidusConfigPanel(gui.ConfigPanel):
         frmS = ttk.LabelFrame(frm,text='SSE')
         frmS.grid(row=1,column=0,sticky='nwse')
         ttk.Label(frmS,text='Packets: ').grid(row=0,column=0,sticky='w')
-        self.svar = tk.IntVar()
-        self.chkSave = ttk.Checkbutton(frmS,text="Save",variable=self.svar,command=self.cb)
-        self.chkSave.grid(row=0,column=1,sticky='w')
-        self.pvar = tk.IntVar()
-        self.chkPrivate = ttk.Checkbutton(frmS,text="Private",variable=self.pvar)
+        self.vsave = tk.IntVar()
+        ttk.Checkbutton(frmS,
+                        text="Save",
+                        variable=self.vsave,
+                        command=self.cb).grid(row=0,column=1,sticky='w')
+        self.vprivate = tk.IntVar()
+        self.chkPrivate = ttk.Checkbutton(frmS,text="Private",
+                                          variable=self.vprivate)
         self.chkPrivate.grid(row=0,column=2,sticky='e')
         ttk.Label(frmS,text='Path: ').grid(row=0,column=3,sticky='w')
         self.txtPCAPPath = ttk.Entry(frmS,width=25)
@@ -706,7 +744,7 @@ class NidusConfigPanel(gui.ConfigPanel):
 
     def cb(self):
         """ Save Checkbutton callback: disable/enable Save options as necessary """
-        if self.svar.get(): state = tk.NORMAL
+        if self.vsave.get(): state = tk.NORMAL
         else: state = tk.DISABLED
         self.chkPrivate.configure(state=state)
         self.txtPCAPPath.configure(state=state)
@@ -806,7 +844,7 @@ class NidusConfigPanel(gui.ConfigPanel):
             return False
 
         # if not saving pcaps, we ignore pcap options
-        if self.svar.get():
+        if self.vsave.get():
             # for the pcap directory, convert to absolute path before checking existence
             pPCAP = self.txtPCAPPath.get()
             if not os.path.isabs(pPCAP):
@@ -855,8 +893,8 @@ class NidusConfigPanel(gui.ConfigPanel):
         try:
             cp = ConfigParser.ConfigParser()
             cp.add_section('SSE')
-            cp.set('SSE','save','yes' if self.svar.get() else 'no')
-            cp.set('SSE','save_private','yes' if self.pvar.get() else 'no')
+            cp.set('SSE','save','yes' if self.vsave.get() else 'no')
+            cp.set('SSE','save_private','yes' if self.vprivate.get() else 'no')
             cp.set('SSE','save_path',self.txtPCAPPath.get())
             cp.set('SSE','save_maxsize',self.txtMaxSz.get())
             cp.set('SSE','save_maxfiles',self.txtMaxFiles.get())
@@ -997,9 +1035,11 @@ class DySKTConfigPanel(gui.ConfigPanel):
         # GPS Tab Configuration
         # use a checkbutton & two subframes to differentiate betw/ fixed & dyanmic
         frmG = ttk.Frame(nb)
-        self.gvar = tk.IntVar()
-        self.chkFixed = ttk.Checkbutton(frmG,text="Fixed",variable=self.gvar,command=self.gpscb)
-        self.chkFixed.grid(row=0,column=0,sticky='w')
+        self.vfixed = tk.IntVar()
+        ttk.Checkbutton(frmG,
+                        text="Fixed",
+                        variable=self.vfixed,
+                        command=self.gpscb).grid(row=0,column=0,sticky='w')
 
         # separate dynamic and fixed
         frmGF = ttk.LabelFrame(frmG,text='Fixed')
@@ -1039,15 +1079,12 @@ class DySKTConfigPanel(gui.ConfigPanel):
         frmM = ttk.Frame(nb)
         frmMS = ttk.LabelFrame(frmM,text='Storage')
         frmMS.grid(row=0,column=0,sticky='w')
-        self.cvar = tk.IntVar()
-        self.chkCollated = ttk.Checkbutton(frmMS,text='Collated',variable=self.cvar)
-        self.chkCollated.grid(row=0,column=0,sticky='w')
-        ttk.Label(frmMS,text=' Host: ').grid(row=0,column=1)
+        ttk.Label(frmMS,text=' Host: ').grid(row=0,column=0)
         self.txtStoreHost = ttk.Entry(frmMS,width=15)
-        self.txtStoreHost.grid(row=0,column=2)
-        ttk.Label(frmMS,text=' Port: ').grid(row=0,column=3)
+        self.txtStoreHost.grid(row=0,column=1)
+        ttk.Label(frmMS,text=' Port: ').grid(row=0,column=2)
         self.txtStorePort = ttk.Entry(frmMS,width=5)
-        self.txtStorePort.grid(row=0,column=4)
+        self.txtStorePort.grid(row=0,column=3)
         frmML = ttk.LabelFrame(frmM,text='Local')
         frmML.grid(row=1,column=0,sticky='w')
         ttk.Label(frmML,text="Region: ").grid(row=0,column=0,sticky='w')
@@ -1146,7 +1183,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
             fixed = int(cp.getboolean('GPS','fixed'))
         except:
             fixed = 0
-        self.gvar.set(fixed)
+        self.vfixed.set(fixed)
         self.txtLat.delete(0,tk.END)
         if cp.has_option('GPS','lat'): self.txtLat.insert(0,cp.get('GPS','lat'))
         self.txtLon.delete(0,tk.END)
@@ -1168,11 +1205,6 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self.gpscb() # enable/disable entries
 
         # misc entries
-        try:
-            collated = int(cp.getboolean('Storage','collated'))
-        except:
-            collated = 0
-        self.cvar.set(collated)
         self.txtStoreHost.delete(0,tk.END)
         if cp.has_option('Storage','host'): self.txtStoreHost.insert(0,cp.get('Storage','host'))
         self.txtStorePort.delete(0,tk.END)
@@ -1335,7 +1367,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 return False
 
         # gps - only process enabled widgets
-        if self.gvar.get():
+        if self.vfixed.get():
             # fixed is set
             try:
                 float(self.txtLat.get())
@@ -1444,7 +1476,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 cp.set('Collection','pass',self.txtCollectionScanPass.get())
                 cp.set('Collection','scan_start',self.txtCollectionScanStart.get())
             cp.add_section('GPS')
-            fixed = self.gvar.get()
+            fixed = self.vfixed.get()
             cp.set('GPS','fixed','yes' if fixed else 'no')
             if fixed:
                 cp.set('GPS','lat',self.txtLat.get())
@@ -1458,7 +1490,6 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 cp.set('GPS','epx',self.txtEPX.get())
                 cp.set('GPS','epy',self.txtEPY.get())
             cp.add_section('Storage')
-            cp.set('Storage','collated','yes' if self.cvar.get() else 'no')
             cp.set('Storage','host',self.txtStoreHost.get())
             cp.set('Storage','port',self.txtStorePort.get())
             region = self.txtRegion.get()
@@ -1481,7 +1512,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
     def gpscb(self):
         """ enable/disable gps entries as necessary """
-        if self.gvar.get():
+        if self.vfixed.get():
             # fixed is on enable only fixed entries
             self.txtLat.configure(state=tk.NORMAL)
             self.txtLon.configure(state=tk.NORMAL)

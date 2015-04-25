@@ -229,27 +229,6 @@ class NidusDB(object):
             self._curs.execute(sql,(self._sid,))
             for row in self._curs.fetchall():
                 mac = row[0]
-
-                # close out antenna
-                sql = """
-                       update antenna set period = tstzrange(lower(period),%s)
-                       where mac = %s and upper(period) is NULL;
-                      """
-
-                # close out radio_epoch
-                sql = """
-                       update radio_epoch set period = tstzrange(lower(period),%s)
-                       where mac = %s and upper(period) is NULL;
-                      """
-                self._curs.execute(sql,(ts,mac))
-
-                # close out radio_period
-                sql = """
-                       update radio_period set period = tstzrange(lower(period),%s)
-                       where mac = %s and upper(period) is NULL;
-                      """
-                self._curs.execute(sql,(ts,mac))
-
                 # close out using_radio
                 sql = """
                        update using_radio set period = tstzrange(lower(period),%s)
@@ -326,17 +305,11 @@ class NidusDB(object):
 
             # insert epochal
             sql = """
-                   insert into radio_epoch (mac,role,description,period)
-                   values (%s,%s,%s,tstzrange(%s,NULL,'[]'));
+                   insert into radio_properties (mac,role,description,spoofed,txpwr,ts)
+                   values (%s,%s,%s,%s);
                   """
-            self._curs.execute(sql,(ds['mac'],ds['role'],ds['desc'],ds['ts']))
-
-            # insert periodic
-            sql = """
-                   insert into radio_period (mac,spoofed,txpwr,period)
-                   values (%s,%s,%s,tstzrange(%s,NULL,'[]'));
-                  """
-            self._curs.execute(sql,(ds['mac'],ds['spoofed'],ds['txpwr'],ds['ts']))
+            self._curs.execute(sql,(ds['mac'],ds['role'],ds['desc'],
+                                    ds['spoofed'],ds['txpwr'],ds['ts']))
 
             # insert using_radio
             sql = """
@@ -374,8 +347,8 @@ class NidusDB(object):
             # tokenize f and convert to dict and insert into db
             ds = nmp.data2dict(nmp.tokenize(f),"ANTENNA")
             sql = """
-                   insert into antenna (mac,ind,gain,loss,x,y,z,type,period)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,tstzrange(%s,NULL,'[]'));
+                   insert into antenna (mac,ind,gain,loss,x,y,z,type,ts)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
                   """
             self._curs.execute(sql,(ds['mac'],ds['index'],ds['gain'],ds['loss'],
                                     ds['x'],ds['y'],ds['z'],ds['type'],ds['ts']))
