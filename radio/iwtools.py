@@ -297,5 +297,5 @@ def getchipset(driver):
     if driver == "orinoco": return "Hermes/Prism"
     if driver == "wl12xx": return "TI WL1251/WL1271"
     if driver == "r871x_usb_drv": return "Realtek 81XX"
-    return "UNK Chipset"
+    return "Unknown"
 

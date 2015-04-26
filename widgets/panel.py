@@ -326,7 +326,6 @@ class ConfigPanel(SlavePanel):
     def __init__(self,tl,chief,title,resize=False):
         """ initialize configuration panel """
         SlavePanel.__init__(self,tl,chief,"widgets/icons/config.png",resize)
-        self.master.title(title)
 
         # set up the input widget frame
         frmConfs = ttk.Frame(self)
@@ -406,8 +405,7 @@ class TabularPanel(SlavePanel):
          iconPath: path of appicon
          resize: allow Panel to be resized by user
         """
-        SlavePanel.__init__(self,tl,chief,iconPath,resize)
-        self.master.title(ttl)
+        SlavePanel.__init__(self,tl,chief,ttl,iconPath,resize)
 
         # create and allow derived classes to setup top frame
         frmT = ttk.Frame(self)
@@ -440,6 +438,7 @@ class TabularPanel(SlavePanel):
             except:
                 w = 0
             self.tree.column(i,width=w,anchor=tk.CENTER)
+            if cols[i][0] != '': self.tree.heading(i,text=cols[i][0])
 
         # allow a bottom frame
         frmB = ttk.Frame(self)

@@ -349,13 +349,16 @@ class WraithPanel(gui.MasterPanel):
         self.mnuToolsCalcs.add_command(label='Terminus',command=lambda:self.calc('Terminus'))
         self.mnuToolsCalcs.add_command(label='Cut',command=lambda:self.calc('Cut'))
         self.mnuTools.add_cascade(label='Calcuators',menu=self.mnuToolsCalcs)
+        self.mnuTools.add_separator()
+        self.mnuTools.add_command(label='Interfaces',command=self.viewinterfaces)
 
-        # View Menu
+        # Data Menu
         # all options will always be enabled
-        self.mnuView = tk.Menu(self.menubar,tearoff=0)
-        self.mnuView.add_command(label='Data Bins',command=self.viewdatabins)
-        self.mnuView.add_separator()
-        self.mnuView.add_command(label='Data',command=self.viewdata)
+        self.mnuData = tk.Menu(self.menubar,tearoff=0)
+        self.mnuData.add_command(label='Data Bins',command=self.viewdatabins)
+        self.mnuData.add_separator()
+        self.mnuData.add_command(label='Data',command=self.viewdata)
+        #self.mnuData.add_separator()
 
         # Storage Menu
         self.mnuStorage = tk.Menu(self.menubar,tearoff=0)
@@ -406,7 +409,7 @@ class WraithPanel(gui.MasterPanel):
         # add the menus
         self.menubar.add_cascade(label='Wraith',menu=self.mnuWraith)
         self.menubar.add_cascade(label="Tools",menu=self.mnuTools)
-        self.menubar.add_cascade(label='View',menu=self.mnuView)
+        self.menubar.add_cascade(label='Data',menu=self.mnuData)
         self.menubar.add_cascade(label='Storage',menu=self.mnuStorage)
         self.menubar.add_cascade(label='DySKT',menu=self.mnuDySKT)
         self.menubar.add_cascade(label='Help',menu=self.mnuHelp)
@@ -448,6 +451,17 @@ class WraithPanel(gui.MasterPanel):
                                                    subgui.CALCS[key]['answer'],
                                                    subgui.CALCS[key]['rc'])
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'%scalc' % key))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
+
+    def viewinterfaces(self):
+        """ show all interfaces """
+        panel = self.getpanels('interfaces',False)
+        if not panel:
+            t = tk.Toplevel()
+            pnl = subgui.InterfacePanel(t,self)
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'interfaces'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()

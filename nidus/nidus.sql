@@ -231,7 +231,6 @@ CREATE TABLE using_radio(
 -- each traffic is defined by its id, timestampe and src and describes basic
 -- details of the signal to include the type of frame header, and type/subtype
 -- of the mpdu layer
--- TODO: add location here or force separate select on geo table
 DROP TABLE IF EXISTS frame;
 CREATE TABLE frame(
    id bigserial NOT NULL,            -- frame primary key

@@ -21,8 +21,8 @@ from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
-from wraith.radio.iw import IW_CHWS        # channel width list
-from wraith.radio.iwtools import wifaces   # check nic validity
+from wraith.radio import iw                # wireless interface details
+from wraith.radio import iwtools as iwt    # interface details
 from wraith.dyskt.dyskt import parsechlist # channelist validity check
 from wraith.utils import timestamps        # valid data/time
 from wraith.utils import landnav           # lang nav utilities
@@ -289,9 +289,10 @@ CALCS = {'EIRP':{'inputs':[('Pwr (mW)',5,'float'),('Gain (dBi)',5,'float')],
                         'rc':[3,2,2]},
          'Fresnel Zone':{'inputs':[('Dist. 1 (kM)',5,'float'),
                                    ('Dist. 2 (kM)',5,'float'),
-                                   ('RF (MHz)',4,'float')],
-                         'answer':("17.3*(math.sqrt(($0*$1)/($2/1000)*($0+$1)))",'m'),
-                         'rc':[3]},
+                                   ('RF (MHz)',4,'float'),
+                                   ('Zone #',3,'int')],
+                         'answer':("17.3*math.sqrt(($3/($2/1000))*($1*$0/($1+$0)))",'m'),
+                         'rc':[4]},
          'Distance':{'inputs':[("Start (mgrs)",15,'str'),("End (mgrs)",15,'str')],
                      'answer':("landnav.dist($0,$1)[0]",'m'),
                      'rc':[1,1]},
@@ -395,19 +396,61 @@ class CalculatePanel(gui.SimplePanel):
         for entry in self._entries: entry.delete(0,tk.END)
         self._ans.set('')
 
+class InterfacePanel(gui.TabularPanel):
+    """
+     a singular panel which display information pertaining to the "program",
+     cannot be closed by the user only by the MasterPanel
+    """
+    def __init__(self,tl,chief):
+        gui.TabularPanel.__init__(self,tl,chief,"Interfaces",5,
+                                  [('PHY',gui.lenpix('w')*5),
+                                   ('NIC',gui.lenpix('w')*5),
+                                   ('MAC',gui.lenpix('w')*15),
+                                   ('Mode',gui.lenpix('managed')),
+                                   ('Driver',gui.lenpix('w')*10),
+                                   ('Chipset',gui.lenpix('w')*15)],
+                                  "widgets/icons/sensor.png",False)
+
+        # configure tree to show headings but not 0th column
+        self.tree['show'] = 'headings'
+
+        # start our poll function
+        self.update()
+        self.after(500,self.poll)
+
+    def update(self):
+        """ lists interfaces """
+        # delete any entries
+        self.tree.delete(*self.tree.get_children())
+
+        # then get all entries
+        for nic in iwt.wifaces():
+            (phy,w) = iw.dev(nic)
+            d = iwt.getdriver(nic)
+            c = iwt.getchipset(d)
+            self.tree.insert('','end',iid=nic,values=(phy,nic,w[0]['addr'],w[0]['type'],d,c))
+
+    def _shutdown(self): pass
+    def reset(self): pass
+
+    def poll(self):
+        """ checks for new interfaces """
+        self.update()
+        self.after(500,self.poll)
+
 # View->DataBin
 class DatabinPanel(gui.SimplePanel):
     """ DatabinPanel - displays a set of data bins for retrieved data storage """
     def __init__(self,tl,chief):
         self._bins = {}
-        gui.SimplePanel.__init__(self,tl,chief,"Databin","widgets/icons/db.png")
+        gui.SimplePanel.__init__(self,tl,chief,'Databin',"widgets/icons/db.png")
 
     def donothing(self): pass
 
     def _body(self,frm):
         """ creates the body """
         # add the bin buttons
-        # NOTE: for whatever reason, trying to creat individual viewquery functions
+        # NOTE: for whatever reason, trying to create individual viewquery functions
         # for each bin b results in issues, if the button w/ function call is
         # created directly in the loop. But, if a function is called that creates
         # the button w/ function, there is no issue
@@ -504,7 +547,7 @@ class QueryPanel(gui.SlavePanel):
         chkCollate = ttk.Checkbutton(frmD,text="Collate",
                                      variable=self.vcollate).grid(row=1,column=1,sticky='nw')
 
-        # filters frame (For now, allow filters on Radio,Frame,Signal,Traffic,STA
+        # filters frame (For now, allow filters on Radio/Sensor,Signal,Traffic,STA
         frmF = ttk.LabelFrame(self,text='Filters')
         frmF.grid(row=1,column=0,sticky='nwse')
         nb = ttk.Notebook(frmF)
@@ -556,9 +599,6 @@ class QueryPanel(gui.SlavePanel):
         self.vdynamic.set(1)
         ttk.Checkbutton(frmS,text='Dynamic',variable=self.vdynamic).grid(row=3,column=6,sticky='w')
         nb.add(frmS,text='Sensor')
-
-        frmF = ttk.Frame(nb)
-        nb.add(frmF,text='Frame')
 
         frmSig = ttk.Frame(nb)
         nb.add(frmSig,text='Signal')
@@ -612,8 +652,6 @@ class QueryPanel(gui.SlavePanel):
         self.vfixed.set(1)
         self.vdynamic.set(1)
 
-
-
     def fromnow(self):
         """assign now() to the from entries """
         d,t = timestamps.ts2iso(time.time()).split('T') # split isoformat on 'T'
@@ -635,7 +673,11 @@ class QueryPanel(gui.SlavePanel):
     # private helper functions
 
     def _validate(self):
-        """ validates all entries """
+        """
+         validates all entries
+         NOTE: this does not validate for non-sensical queries i.e. those that
+         will never return results
+        """
         d = self.txtFromDate.get()
         if d and not timestamps.validdate(d):
             self.err("Invalid Input","From date is not valid")
@@ -655,24 +697,15 @@ class QueryPanel(gui.SlavePanel):
         if mac and re.match(MACADDR,mac) is None:
             self.err("Invalid Input","MAC addr %s is not valid")
             return False
-        stds = self.txtSensorStd.get(',')
-        if stds:
+        stds = self.txtSensorStd.get().split(',')
+        if stds and stds != ['']:
             for std in stds:
                 if not std in ['a','b','g','n','ac']:
                     self.err("Invalid Input","Invalid standard specifier %s" % std)
-        r = self.vrecon.get()
-        c = self.vcoll.get()
-        if not r and not c:
-            self.err("Invalid Input","Recon and/or Collection role must be specified")
-            return False
         cp = self.txtCenterPT.get()
         if cp and not landnav.validMGRS(cp):
             self.err("Invalid Input","Center point is not a valid MGRS location")
             return False
-        f = self.vfixed.get()
-        d = self.vdynamic.get()
-        if not f and not d:
-            self.err("Invalid Input","Fixed and/or dynamic location must be specified")
 
         return True
 
@@ -1221,7 +1254,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
         if not nic:
             self.err("Invalid Recon Input","Radio nic must be specified")
             return False
-        elif not nic in wifaces():
+        elif not nic in iwt.wifaces():
             self.warn("Not Found","Recon radio may not be wireless")
         spoof = self.txtReconSpoof.get().upper()
         if spoof and re.match(MACADDR,spoof) is None:
@@ -1277,7 +1310,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                     ch = start
                     chw = None
                 ch = int(ch)
-                if chw and not chw in IW_CHWS:
+                if chw and not chw in iw.IW_CHWS:
                     raise RuntimeError("Specified channel width is not valid")
         except ValueError:
             self.err("Invalid Recon Input","Scan start must be integer")
@@ -1295,7 +1328,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
         # then collection radio details
         nic = self.txtCollectionNic.get()
         if nic:
-            if not nic in wifaces(): self.warn("Not Found","Radio may not be wireless")
+            if not nic in iwt.wifaces(): self.warn("Not Found","Radio may not be wireless")
             spoof = self.txtCollectionSpoof.get().upper()
             if spoof and re.match(MACADDR,spoof) is None:
                 self.err("Invalid Colleciton Input","Spoofed MAC address is not valid")
@@ -1351,7 +1384,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                         ch = start
                         chw = None
                     ch = int(ch)
-                    if chw and not chw in IW_CHWS:
+                    if chw and not chw in iw.IW_CHWS:
                         raise RuntimeError("Specified channel width is not valid")
             except ValueError:
                 self.err("Invalid Collection Input", "Scan start must be integer")
