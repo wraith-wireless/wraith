@@ -745,8 +745,8 @@ class MasterPanel(Panel):
         """ loads a saved toolset configuration """
         if not fpath:
             fpath = tkFD.askopenfilename(title='Open Toolset',
-                                        filetypes=[('Toolset files','*.ts')],
-                                        parent=self)
+                                         filetypes=[('Toolset files','*.ts')],
+                                         parent=self)
         
         if fpath:
             # open & get the saved windows + their geometry
