@@ -409,18 +409,18 @@ class NidusDB(object):
         except mpdu.MPDUException:
             # the radiotap was valid but mpdu failed - initialize empty mpdu
             validMPDU = False
-            vs = (self._sid,ds['ts'],lF,dR['sz'],0,[dR['sz'],lF],
+            vs = (self._sid,ds['ts'],lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
                   int('a-mpdu' in dR['present']),0,0)
         else:
             vs = (self._sid,ds['ts'],lF,dR['sz'],
                   dM.offset,[(dR['sz']+dM.offset),(lF-dM.stripped)],
-                  int('a-mpdu' in dR['present']),
+                  dR['flags'],int('a-mpdu' in dR['present']),
                   rtap.flags_get(dR['flags'],'fcs'))
 
         # insert the frame
         sql = """
-               insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,ampdu,fcs)
-               values (%s,%s,%s,%s,%s,%s,%s,%s) returning id;
+               insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning id;
               """
         try:
             self._curs.execute(sql,vs)

@@ -240,11 +240,13 @@ CREATE TABLE frame(
    bRTAP smallint,                   -- bytes in radiotap
    bMPDU smallint,                   -- bytes in mmpdu
    data smallint[2] NOT NULL,        -- left,right indexes into data portion 
-   ampdu smallint not NULL,          -- ampdu is present    
+   flags smallint default '0',       -- radiotap frame flags
+   ampdu smallint not NULL,          -- ampdu is present
    fcs smallint not NULL,            -- fcs is present (1) or not (0)
    CONSTRAINT ch_bytes CHECK (bytes > 0),
    CONSTRAINT ch_bytesRTAP CHECK (bRTAP >= 0),
    CONSTRAINT ch_bytesMPDU CHECK (bMPDU >= 0),
+   CONSTRAINT ch_flags CHECK (flags >= 0),
    CONSTRAINT ch_ampdu CHECK (ampdu >= 0 AND ampdu <= 1),
    CONSTRAINT ch_fcs CHECK (fcs >= 0 AND fcs <= 1),
    FOREIGN KEY(sid) REFERENCES sensor(session_id),

@@ -601,6 +601,33 @@ class QueryPanel(gui.SlavePanel):
         nb.add(frmS,text='Sensor')
 
         frmSig = ttk.Frame(nb)
+        #ttk.Label(frmS,text='').grid(row=0,column=0,columnspan=2,sticky='w')
+        ttk.Label(frmSig,text='Not').grid(row=0,column=2,sticky='w')
+        #ttk.Label(frmS,text='Role').grid(row=0,column=3,sticky='w')
+        ttk.Label(frmSig,text='Standard(s)').grid(row=1,column=0,sticky='w')
+        self.txtSignalStd = ttk.Entry(frmSig,width=10)
+        self.txtSignalStd.grid(row=1,column=1,sticky='e')
+        self.vnotstd = tk.IntVar()
+        ttk.Checkbutton(frmSig,variable=self.vnotstd).grid(row=1,column=2,sticky='w')
+        ttk.Label(frmSig,text='Rate(s)').grid(row=2,column=0,sticky='w')
+        self.txtSignalRate = ttk.Entry(frmSig,width=10)
+        self.txtSignalRate.grid(row=2,column=1,sticky='e')
+        self.vnotrate = tk.IntVar()
+        ttk.Checkbutton(frmSig,variable=self.vnotrate).grid(row=2,column=2,sticky='w')
+        ttk.Label(frmSig,text='Channel(s)').grid(row=3,column=0,sticky='w')
+        self.txtSignalCh = ttk.Entry(frmSig,width=10)
+        self.txtSignalCh.grid(row=3,column=1,sticky='e')
+        self.vnotch = tk.IntVar()
+        ttk.Checkbutton(frmSig,variable=self.vnotch).grid(row=3,column=2,sticky='w')
+        ttk.Label(frmSig,text='Ch Flag(s)').grid(row=4,column=0,sticky='w')
+        self.txtSignalChFlags = ttk.Entry(frmSig,width=10)
+        self.txtSignalChFlags.grid(row=4,column=1,sticky='e')
+        self.vnotchflags = tk.IntVar()
+        ttk.Checkbutton(frmSig,variable=self.vnotchflags).grid(row=4,column=2,sticky='w')
+        self.vchflags = tk.StringVar()
+        self.cboChFlags = ttk.Combobox(frmSig,textvariable=self.vchflags)
+        self.cboChFlags.grid(row=5,column=0,columnspan=2,sticky='w')
+        self.cboChFlags['values'] = ('Turbo','CCK','OFDM','2 GHz','5 Ghz','Passive','CCK-OFDM','GFSS')
         nb.add(frmSig,text='Signal')
 
         frmT = ttk.Frame(nb)
@@ -615,6 +642,9 @@ class QueryPanel(gui.SlavePanel):
         ttk.Button(frmB,text='Query',width=6,command=self.query).grid(row=0,column=0)
         ttk.Button(frmB,text='Reset',width=6,command=self.widgetreset).grid(row=0,column=1)
         ttk.Button(frmB,text='Cancel',width=6,command=self.delete).grid(row=0,column=2)
+
+        # bindings
+        self.cboChFlags.bind('<<ComboboxSelected>>',self._addflag)
 
     # virtual implementations
 
