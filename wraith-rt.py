@@ -301,12 +301,11 @@ class WraithPanel(gui.MasterPanel):
         # set initial state to initialized
         self._setstate(_STATE_INIT_)
 
-        # adjust menu options accordingly
-        self._menuenable()
-
         # show log and write messages
         self.viewlog()
         self.getpanel("log",True).delayedwrite(msgs)
+
+        self.after(500,self._poll)
 
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
@@ -759,6 +758,12 @@ class WraithPanel(gui.MasterPanel):
         else: raise RuntimeError, "WTF Cannot open %s" % desc
 
 #### HELPER FUNCTIONS
+
+    def _poll(self):
+        """ periodically recheck state """
+        self._updatestate()
+        self._menuenable()
+        self.after(500,self._poll)
 
     def _updatestate(self):
         """ reevaluates internal state """

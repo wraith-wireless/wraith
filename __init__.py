@@ -22,6 +22,8 @@ wraith 0.0.2
      o start/stop services
      o log viewing
      o conversion/calculation panels
+     o interfaces panel
+   - started work on the query panel
 
 wraith 0.0.3
  desc: non-data panels are completed (excluding Help)
