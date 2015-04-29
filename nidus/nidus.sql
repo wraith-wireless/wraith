@@ -255,7 +255,7 @@ CREATE TABLE frame(
 
 -- frame_path table
 -- stores the file that this frame is save in
--- NOTE: this is the same id as frame.id but we do not make a reference in 
+-- NOTE: this is the same id as frame.id but we do not make a reference in
 -- case the different threads processing thsee are out of sync
 DROP TABLE IF EXISTS frame_path;
 CREATE TABLE frame_path(
@@ -287,7 +287,7 @@ CREATE TABLE source(
    antenna smallint default '0', -- antenna of source collecting signal
    rfpwr smallint,               -- rf power in dB
    CONSTRAINT ch_fid CHECK (fid > 0),
-   CONSTRAINT ch_ant CHECK (antenna >= 0 and antenna < 256),   
+   CONSTRAINT ch_ant CHECK (antenna >= 0 and antenna < 256),
    CONSTRAINT ch_rfpwr CHECK (rfpwr > -150 and rfpwr < 150),
    FOREIGN KEY (src) REFERENCES radio(mac),
    FOREIGN KEY (fid) REFERENCES frame(id)
@@ -362,7 +362,7 @@ CREATE TABLE traffic(
    fid bigint NOT NULL,             -- foreign key to frame
    type FT_TYPE NOT NULL,           -- type of frame
    subtype FT_SUBTYPE NOT NULL,     -- subtype of frame
-   td smallint default '0',         -- to ds bit 
+   td smallint default '0',         -- to ds bit
    fd smallint default '0',         -- from ds bit
    mf smallint default '0',         -- more fragments bit
    rt smallint default '0',         -- retry bit
@@ -378,7 +378,7 @@ CREATE TABLE traffic(
    fragnum smallint,                -- seq control fragment number
    seqnum smallint,                 -- seq control sequence number
    addr4 macaddr,                   -- fourth address
-   crypt CRYPT_TYPE default 'none', -- encryption type 
+   crypt CRYPT_TYPE default 'none', -- encryption type
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_td CHECK (td >= 0 and td <= 1),
    CONSTRAINT ch_fd CHECK (fd >= 0 and fd <= 1),
@@ -468,7 +468,7 @@ CREATE TABLE ccmpcrypt(
 -- already exists in some form in the above tables
 
 -- host table
--- consolidates multiple stas under a single host 
+-- consolidates multiple stas under a single host
 DROP TABLE IF EXISTS host;
 CREATE TABLE host(
   id serial NOT NULL, -- primary key
@@ -487,8 +487,8 @@ CREATE TABLE has_sta(
 
 -- sta table
 -- primary entity of a network. A sta is a client or an ap of a BSS/IBSS or
--- a station attempting to enter/create a BSS/IBSS or the ap a sta is 
--- probing for 
+-- a station attempting to enter/create a BSS/IBSS or the ap a sta is
+-- probing for
 -- the sta table exists across sessions
 DROP TABLE IF EXISTS sta;
 CREATE TABLE sta(
@@ -515,15 +515,15 @@ CREATE TABLE sta(
 --  lastSeen - timestamp this station was last referenced in traffic
 --  firstHeard - timestamp this station first transmitted
 --  lastHeard - timestamp this station last transmitted
--- The sta_activity table defines a sta's activity on a per session basis 
+-- The sta_activity table defines a sta's activity on a per session basis
 DROP TABLE IF EXISTS sta_activity;
 CREATE TABLE sta_activity(
    sid integer NOT NULL,   -- foreign key to session id
    staid integer NOT NULL, -- foreign key to sta id
    firstSeen TIMESTAMPTZ,  -- ts this station was first seen
-   lastSeen TIMESTAMPTZ,   -- ts this station was las seen 
+   lastSeen TIMESTAMPTZ,   -- ts this station was las seen
    firstHeard TIMESTAMPTZ, -- ts this station was first heard
-   lastHeard TIMESTAMPTZ,  -- ts this station was last heard 
+   lastHeard TIMESTAMPTZ,  -- ts this station was last heard
    CONSTRAINT ch_sid CHECK (sid > 0),
    CONSTRAINT ch_staid CHECK (staid > 0),
    FOREIGN KEY(sid) REFERENCES sensor(session_id),
@@ -535,16 +535,16 @@ CREATE TABLE sta_activity(
 
 -- assocreq table
 -- similar to beacon table, the assocreq references the sid it was seen in, the
--- frame it is part of and the id of the AP as well as the id of the requesting 
+-- frame it is part of and the id of the AP as well as the id of the requesting
 -- sta.
 DROP TABLE IF EXISTS assocreq;
 CREATE TABLE assocreq(
   fid bigint NOT NULL,              -- fk to frame
   client integer NOT NULL,          -- fk to STA - this is the client
   ap integer NOT NULL,              -- fk to STA - this is the AP
-  ess smallint default '0',         -- ess bit (comes from an AP) 
+  ess smallint default '0',         -- ess bit (comes from an AP)
   ibss smallint default '0',        -- ibss bit (comes from an ibss)
-  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35  
+  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35
   cf_poll_req smallint default '0', -- see above
   privacy smallint default '0',     -- indicates data is encrypted
   short_pre smallint default '0',   -- AP supports short preambles
@@ -563,7 +563,7 @@ CREATE TABLE assocreq(
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
-  CONSTRAINT ch_fid CHECK (fid > 0), 
+  CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_client CHECK (client > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
   CONSTRAINT ch_listen_int CHECK (listen_int > 0),
@@ -587,23 +587,23 @@ CREATE TABLE assocreq(
   FOREIGN KEY (client) REFERENCES sta(id),
   FOREIGN KEY (ap) REFERENCES sta(id)
 );
- 
+
 -- association type
 DROP TYPE IF EXISTS ASSOC_TYPE;
 CREATE TYPE ASSOC_TYPE AS ENUM ('assoc','reassoc');
 
--- assocresp table 
+-- assocresp table
 -- The assocresp table stores response for both association and reassociation
--- response. See beacon for capability bits information 
+-- response. See beacon for capability bits information
 DROP TABLE IF EXISTS assocresp;
 CREATE TABLE assocresp(
   fid bigint NOT NULL,              -- fk to frame
   client integer NOT NULL,          -- fk to STA - this is the client
   ap integer NOT NULL,              -- fk to STA - this is the AP
   type ASSOC_TYPE NOT NULL,         -- one of {association|reassociation}
-  ess smallint default '0',         -- ess bit (comes from an AP) 
+  ess smallint default '0',         -- ess bit (comes from an AP)
   ibss smallint default '0',        -- ibss bit (comes from an ibss)
-  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35  
+  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35
   cf_poll_req smallint default '0', -- see above
   privacy smallint default '0',     -- indicates data is encrypted
   short_pre smallint default '0',   -- AP supports short preambles
@@ -617,13 +617,13 @@ CREATE TABLE assocresp(
   dsss_ofdm smallint default '0',   -- deprecated
   del_ba smallint default '0',      -- delayed block ack supported
   imm_ba smallint default '0',      -- immediate block ack supported
-  status integer NOT NULL,          -- status code - 0 means success 
+  status integer NOT NULL,          -- status code - 0 means success
   aid integer,                      -- if successful, the sta's AID
   ssid VARCHAR(32),                 -- the ssid of this network (NULL for cloaked,
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
-  CONSTRAINT ch_fid CHECK (fid > 0), 
+  CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_client CHECK (client > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
   CONSTRAINT ch_ess CHECK (ess >=0 and ess <=1),
@@ -648,7 +648,7 @@ CREATE TABLE assocresp(
   FOREIGN KEY (client) REFERENCES sta(id),
   FOREIGN KEY (ap) REFERENCES sta(id)
 );
- 
+
 -- reassocreq table
 -- near similar to assocreq table but includes the bssid/mac address of the
 -- ap the sta is currently associated(or authenticated) to
@@ -657,9 +657,9 @@ CREATE TABLE reassocreq(
   fid bigint NOT NULL,              -- fk to frame
   client integer NOT NULL,          -- fk to STA - this is the client
   ap integer NOT NULL,              -- fk to STA - this is the AP
-  ess smallint default '0',         -- ess bit (comes from an AP) 
+  ess smallint default '0',         -- ess bit (comes from an AP)
   ibss smallint default '0',        -- ibss bit (comes from an ibss)
-  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35  
+  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35
   cf_poll_req smallint default '0', -- see above
   privacy smallint default '0',     -- indicates data is encrypted
   short_pre smallint default '0',   -- AP supports short preambles
@@ -679,7 +679,7 @@ CREATE TABLE reassocreq(
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
-  CONSTRAINT ch_fid CHECK (fid > 0), 
+  CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_client CHECK (client > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
   CONSTRAINT ch_listen_int CHECK (listen_int > 0),
@@ -704,7 +704,7 @@ CREATE TABLE reassocreq(
   FOREIGN KEY (client) REFERENCES sta(id),
   FOREIGN KEY (ap) REFERENCES sta(id),
   FOREIGN KEY (cur_ap) REFERENCES sta(id)
-); 
+);
 
 -- probereq table
 -- A probe request coming from a client, we track only ssid, supported rates
@@ -723,13 +723,13 @@ CREATE TABLE probereq(
   FOREIGN KEY (fid) REFERENCES frame(id),
   FOREIGN KEY (client) REFERENCES sta(id),
   FOREIGN KEY (ap) REFERENCES sta(id)
-); 
+);
 
 -- proberesp table
--- Very similar to the beacon table. References, the sid it was seen in, frame 
--- it is in and the  id of the STA or BSSID and the ts it was captured. It exposes 
--- the beacon ts as hex, the beacon interval, and capabilities info as 16 {0|1} 
--- smallints. It will also expose (if present) the ssid, supporated rates and 
+-- Very similar to the beacon table. References, the sid it was seen in, frame
+-- it is in and the  id of the STA or BSSID and the ts it was captured. It exposes
+-- the beacon ts as hex, the beacon interval, and capabilities info as 16 {0|1}
+-- smallints. It will also expose (if present) the ssid, supporated rates and
 -- extended rates. In addition, it will expose the sta id of the client, the
 -- ap is responding to
 DROP TABLE IF EXISTS proberesp;
@@ -739,9 +739,9 @@ CREATE TABLE proberesp(
   ap integer NOT NULL,              -- fk to STA - this is the bss
   beacon_ts bytea NOT NULL,         -- beacon ts (as hex due to lack of 8-byte unsigned in postgres
   beacon_int integer NOT NULL,      -- beacon interval in microseconds
-  ess smallint default '0',         -- ess bit (comes from an AP) 
+  ess smallint default '0',         -- ess bit (comes from an AP)
   ibss smallint default '0',        -- ibss bit (comes from an ibss)
-  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35  
+  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35
   cf_poll_req smallint default '0', -- see above
   privacy smallint default '0',     -- indicates data is encrypted
   short_pre smallint default '0',   -- AP supports short preambles
@@ -759,7 +759,7 @@ CREATE TABLE proberesp(
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
-  CONSTRAINT ch_fid CHECK (fid > 0), 
+  CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_client CHECK (client > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
   CONSTRAINT ch_beacon_int CHECK (beacon_int > 0),
@@ -785,11 +785,11 @@ CREATE TABLE proberesp(
 );
 
 -- beacon table
--- The beacon table references, the sid it was seen in, frame it is in and the 
--- id of the STA or BSSID and the ts it was captured. It exposes the beacon ts 
--- as hex, the beacon interval, and capabilities info as 16 {0|1} smallints. 
+-- The beacon table references, the sid it was seen in, frame it is in and the
+-- id of the STA or BSSID and the ts it was captured. It exposes the beacon ts
+-- as hex, the beacon interval, and capabilities info as 16 {0|1} smallints.
 -- It will also expose (if present) the ssid, supporated rates and extended rates.
--- 
+--
 -- TODO: include TIM field
 DROP TABLE IF EXISTS beacon;
 CREATE TABLE beacon(
@@ -797,9 +797,9 @@ CREATE TABLE beacon(
   ap integer NOT NULL,              -- fk to STA - this is the bss
   beacon_ts bytea NOT NULL,         -- beacon ts (as hex due to lack of 8-byte unsigned in postgres
   beacon_int integer NOT NULL,      -- beacon interval in microseconds
-  ess smallint default '0',         -- ess bit (comes from an AP) 
+  ess smallint default '0',         -- ess bit (comes from an AP)
   ibss smallint default '0',        -- ibss bit (comes from an ibss)
-  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35  
+  cf_pollable smallint default '0', -- set IAW Std Table 8-34/8-35
   cf_poll_req smallint default '0', -- see above
   privacy smallint default '0',     -- indicates data is encrypted
   short_pre smallint default '0',   -- AP supports short preambles
@@ -817,7 +817,7 @@ CREATE TABLE beacon(
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
-  CONSTRAINT ch_fid CHECK (fid > 0), 
+  CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
   CONSTRAINT ch_beacon_int CHECK (beacon_int > 0),
   CONSTRAINT ch_ess CHECK (ess >=0 and ess <=1),

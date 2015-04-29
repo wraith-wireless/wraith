@@ -485,6 +485,28 @@ class DatabinPanel(gui.SimplePanel):
             panel[0].tk.lift()
 
 # Databin->Query
+
+# Radiotap Flag constansts
+RT_FLAGS = ['CFP','Short','WEP','Frag','FCS','Failed','Pad']
+RT_FLAG_CFP   = 0
+RT_FLAG_SHORT = 1
+RT_FLAG_WEP   = 2
+RT_FLAG_FRAG  = 3
+RT_FLAG_FCS   = 4
+RT_FLAG_FAIL  = 5
+RT_FLAG_PAD   = 6
+
+# Channel Flag constants
+CH_FLAGS = ['Turbo','CCK','OFDM','2 GHz','5 Ghz','Passive','CCK-OFDM','GFSS']
+CH_FLAGS_TURBO     = 0
+CH_FLAGS_CCK      = 1
+CH_FLAGS_OFDM     = 2
+CH_FLAGS_2GHZ     = 3
+CH_FLAGS_5GHZ     = 4
+CH_FLAGS_PASSIVE  = 5
+CH_FLAGS_CCK_OFDM = 6
+CH_FLAGS_GFSS     = 7
+
 class QueryPanel(gui.SlavePanel):
     """Display query for data panel """
     def __init__(self,tl,parent,ttl,b):
@@ -544,12 +566,20 @@ class QueryPanel(gui.SlavePanel):
         self.txtToTime.grid(row=2,column=2,sticky='e')
         ttk.Button(frmDP,text='Now',width=4,command=self.tonow).grid(row=2,column=3,sticky='w')
         self.vcollate = tk.IntVar()
-        chkCollate = ttk.Checkbutton(frmD,text="Collate",
-                                     variable=self.vcollate).grid(row=1,column=1,sticky='nw')
+        chkCollate = ttk.Checkbutton(frmD,text="Collate",variable=self.vcollate).grid(row=1,column=1,sticky='nw')
+
+        # filter on frame
+        frmFO = ttk.LabelFrame(self,text="Filter On")
+        frmFO.grid(row=1,column=0,sticky='nwse')
+        filters = ['Sensor','Signal','Traffic']
+        self.vfilteron = []
+        for i in xrange(3):
+            self.vfilteron.append(tk.IntVar())
+            ttk.Checkbutton(frmFO,text=filters[i],variable=self.vfilteron[i]).grid(row=0,column=i,sticky='w')
 
         # filters frame (For now, allow filters on Radio/Sensor,Signal,Traffic,STA
         frmF = ttk.LabelFrame(self,text='Filters')
-        frmF.grid(row=1,column=0,sticky='nwse')
+        frmF.grid(row=2,column=0,sticky='nwse')
         nb = ttk.Notebook(frmF)
         nb.grid(row=0,column=0,sticky='nwse')
 
@@ -578,13 +608,18 @@ class QueryPanel(gui.SlavePanel):
         self.txtSensorStd.grid(row=4,column=1,sticky='e')
         self.vnotstd = tk.IntVar()
         ttk.Checkbutton(frmS,variable=self.vnotstd).grid(row=4,column=2,sticky='w')
+        ttk.Label(frmS,text='Driver: ').grid(row=5,column=0,sticky='w')
+        self.txtSensorDriver = ttk.Entry(frmS,width=17)
+        self.txtSensorDriver.grid(row=5,column=1,sticky='e')
+        self.vnotdriver = tk.IntVar()
+        ttk.Checkbutton(frmS,variable=self.vnotdriver).grid(row=5,column=2,sticky='w')
         self.vrecon = tk.IntVar()
         self.vrecon.set(1)
         ttk.Checkbutton(frmS,text='Recon',variable=self.vrecon).grid(row=1,column=3,sticky='w')
         self.vcoll = tk.IntVar()
         self.vcoll.set(1)
         ttk.Checkbutton(frmS,text='Collection',variable=self.vcoll).grid(row=2,column=3,sticky='w')
-        ttk.Separator(frmS,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=5,sticky='ns')
+        ttk.Separator(frmS,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=6,sticky='ns')
         ttk.Label(frmS,text='Location').grid(row=0,column=5,columnspan=2,sticky='w')
         ttk.Label(frmS,text='Center PT: ').grid(row=1,column=5,sticky='w')
         self.txtCenterPT = ttk.Entry(frmS,width=15)
@@ -601,9 +636,7 @@ class QueryPanel(gui.SlavePanel):
         nb.add(frmS,text='Sensor')
 
         frmSig = ttk.Frame(nb)
-        #ttk.Label(frmS,text='').grid(row=0,column=0,columnspan=2,sticky='w')
         ttk.Label(frmSig,text='Not').grid(row=0,column=2,sticky='w')
-        #ttk.Label(frmS,text='Role').grid(row=0,column=3,sticky='w')
         ttk.Label(frmSig,text='Standard(s)').grid(row=1,column=0,sticky='w')
         self.txtSignalStd = ttk.Entry(frmSig,width=10)
         self.txtSignalStd.grid(row=1,column=1,sticky='e')
@@ -619,32 +652,51 @@ class QueryPanel(gui.SlavePanel):
         self.txtSignalCh.grid(row=3,column=1,sticky='e')
         self.vnotch = tk.IntVar()
         ttk.Checkbutton(frmSig,variable=self.vnotch).grid(row=3,column=2,sticky='w')
-        ttk.Label(frmSig,text='Ch Flag(s)').grid(row=4,column=0,sticky='w')
-        self.txtSignalChFlags = ttk.Entry(frmSig,width=10)
-        self.txtSignalChFlags.grid(row=4,column=1,sticky='e')
-        self.vnotchflags = tk.IntVar()
-        ttk.Checkbutton(frmSig,variable=self.vnotchflags).grid(row=4,column=2,sticky='w')
-        self.vchflags = tk.StringVar()
-        self.cboChFlags = ttk.Combobox(frmSig,textvariable=self.vchflags)
-        self.cboChFlags.grid(row=5,column=0,columnspan=2,sticky='w')
-        self.cboChFlags['values'] = ('Turbo','CCK','OFDM','2 GHz','5 Ghz','Passive','CCK-OFDM','GFSS')
+        # flags and channel flags are contained in separate frames
+        # we want rows of 4 flags
+        frmSigFlags = ttk.LabelFrame(frmSig,text='Flags')
+        frmSigFlags.grid(row=4,column=0,columnspan=3,sticky='nwse')
+        self.vrtflags = []
+        for i in xrange(len(RT_FLAGS)):
+            self.vrtflags.append(tk.IntVar())
+            chk = ttk.Checkbutton(frmSigFlags,text=RT_FLAGS[i],variable=self.vrtflags[i])
+            chk.grid(row=(i / 4),column=(i % 4),sticky='w')
+
+        frmSigChFlags = ttk.LabelFrame(frmSig,text="Channel Flags")
+        frmSigChFlags.grid(row=5,column=0,columnspan=3,sticky='nwse')
+        self.vchflags = []
+        for i in xrange(len(CH_FLAGS)):
+            self.vchflags.append(tk.IntVar())
+            chk = ttk.Checkbutton(frmSigChFlags,text=CH_FLAGS[i],variable=self.vchflags[i])
+            chk.grid(row=(i / 4),column=(i % 4),sticky='w')
+        # add HT data parameters
+        frmSigHT = ttk.LabelFrame(frmSig,text="HT Parameters")
+        frmSigHT.grid(row=0,column=3,rowspan=6,sticky='nwse')
+
+
         nb.add(frmSig,text='Signal')
 
         frmT = ttk.Frame(nb)
         nb.add(frmT,text='Traffic')
 
-        frmSta = ttk.Frame(nb)
-        nb.add(frmSta,text='Station')
+        # progress frame
+        frmP = ttk.Frame(self)
+        frmP.grid(row=3,column=0,sticky='nwse')
+        self._pb = ttk.Progressbar(frmP,maximum=10,
+                                   orient=tk.HORIZONTAL,
+                                   mode='determinate')
+        self._pb.grid(row=0,column=0,sticky='nwse')
 
         # 3 buttons query,reset and cancel
         frmB = ttk.Frame(self)
-        frmB.grid(row=2,column=0,sticky='ns')
+        frmB.grid(row=4,column=0,sticky='ns')
         ttk.Button(frmB,text='Query',width=6,command=self.query).grid(row=0,column=0)
         ttk.Button(frmB,text='Reset',width=6,command=self.widgetreset).grid(row=0,column=1)
         ttk.Button(frmB,text='Cancel',width=6,command=self.delete).grid(row=0,column=2)
 
-        # bindings
-        self.cboChFlags.bind('<<ComboboxSelected>>',self._addflag)
+        # we have to force an update, get size of holding frame and set pbar's length
+        self.update_idletasks()
+        self._pb.configure(length=frmP.winfo_width())
 
     # virtual implementations
 
@@ -675,6 +727,8 @@ class QueryPanel(gui.SlavePanel):
         self.vnotmac.set(0)
         self.txtSensorStd.delete(0,tk.END)
         self.vnotstd.set(0)
+        self.txtSensorDriver.delete(0,tk.END)
+        self.vnotdriver.set(0)
         self.vrecon.set(1)
         self.vcoll.set(1)
         self.txtCenterPT.delete(0,tk.END)
@@ -722,7 +776,7 @@ class QueryPanel(gui.SlavePanel):
         t = self.txtToTime.get()
         if t and not timestamps.validtime(t):
             return False
-        # allow all in host, nic
+        # allow all in host, nic, driver
         mac = self.txtSensorMac.get().upper()
         if mac and re.match(MACADDR,mac) is None:
             self.err("Invalid Input","MAC addr %s is not valid")

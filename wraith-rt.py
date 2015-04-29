@@ -1059,7 +1059,6 @@ class WraithSplash(object):
                                    maximum=10,orient=tk.HORIZONTAL,length=272,
                                    mode='determinate')
         self._pb.grid(row=1,column=0,sticky='nwse')
-        #self._pb.start(10)
         self._sv = tk.StringVar()
         self._sv.set("Initializing...")
         ttk.Label(self._tl,style="splash.TLabel",width=20,textvariable=self._sv,
