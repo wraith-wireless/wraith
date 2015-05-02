@@ -507,6 +507,13 @@ CH_FLAGS_PASSIVE  = 5
 CH_FLAGS_CCK_OFDM = 6
 CH_FLAGS_GFSS     = 7
 
+# HT BWs (0: 20, 1: 40, 2: 20L, 3: 20U)
+BW_FLAGS = ['20','40','20L','20U']
+BW_20  = 0
+BW_40  = 1
+BW_20L = 2
+BW_20U = 3
+
 class QueryPanel(gui.SlavePanel):
     """Display query for data panel """
     def __init__(self,tl,parent,ttl,b):
@@ -614,10 +621,8 @@ class QueryPanel(gui.SlavePanel):
         self.vnotdriver = tk.IntVar()
         ttk.Checkbutton(frmS,variable=self.vnotdriver).grid(row=5,column=2,sticky='w')
         self.vrecon = tk.IntVar()
-        self.vrecon.set(1)
         ttk.Checkbutton(frmS,text='Recon',variable=self.vrecon).grid(row=1,column=3,sticky='w')
         self.vcoll = tk.IntVar()
-        self.vcoll.set(1)
         ttk.Checkbutton(frmS,text='Collection',variable=self.vcoll).grid(row=2,column=3,sticky='w')
         ttk.Separator(frmS,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=6,sticky='ns')
         ttk.Label(frmS,text='Location').grid(row=0,column=5,columnspan=2,sticky='w')
@@ -628,10 +633,8 @@ class QueryPanel(gui.SlavePanel):
         self.txtRadius = ttk.Entry(frmS,width=6)
         self.txtRadius.grid(row=2,column=6,sticky='w')
         self.vfixed = tk.IntVar()
-        self.vfixed.set(1)
         ttk.Checkbutton(frmS,text='Fixed',variable=self.vfixed).grid(row=3,column=5,sticky='w')
         self.vdynamic = tk.IntVar()
-        self.vdynamic.set(1)
         ttk.Checkbutton(frmS,text='Dynamic',variable=self.vdynamic).grid(row=3,column=6,sticky='w')
         nb.add(frmS,text='Sensor')
 
@@ -661,7 +664,6 @@ class QueryPanel(gui.SlavePanel):
             self.vrtflags.append(tk.IntVar())
             chk = ttk.Checkbutton(frmSigFlags,text=RT_FLAGS[i],variable=self.vrtflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
-
         frmSigChFlags = ttk.LabelFrame(frmSig,text="Channel Flags")
         frmSigChFlags.grid(row=5,column=0,columnspan=3,sticky='nwse')
         self.vchflags = []
@@ -670,10 +672,37 @@ class QueryPanel(gui.SlavePanel):
             chk = ttk.Checkbutton(frmSigChFlags,text=CH_FLAGS[i],variable=self.vchflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
         # add HT data parameters
-        frmSigHT = ttk.LabelFrame(frmSig,text="HT Parameters")
+        frmSigHT = ttk.LabelFrame(frmSig,text="802.11 Parameters")
         frmSigHT.grid(row=0,column=3,rowspan=6,sticky='nwse')
-
-
+        frmSigHT1 = ttk.Frame(frmSigHT)
+        frmSigHT1.grid(row=0,column=0,sticky='nwse')
+        self.vhtonly = tk.IntVar()
+        ttk.Checkbutton(frmSigHT1,text="HT Only",variable=self.vhtonly).grid(row=0,column=0,sticky='nwse')
+        self.vampdu = tk.IntVar()
+        ttk.Checkbutton(frmSigHT1,text='AMPDU',variable=self.vampdu).grid(row=0,column=1,sticky='nwse')
+        frmSigHTBW = ttk.Frame(frmSigHT)
+        frmSigHTBW.grid(row=1,column=0,sticky='nwse')
+        ttk.Label(frmSigHTBW,text='BW: ').grid(row=0,column=0,sticky='nwse')
+        self.vbws = []
+        for i in xrange(len(BW_FLAGS)):
+            self.vbws.append(tk.IntVar())
+            chk = ttk.Checkbutton(frmSigHTBW,text=BW_FLAGS[i],variable=self.vbws[i])
+            chk.grid(row=0,column=i+1,sticky='w')
+        frmSigHT2 = ttk.Frame(frmSigHT)
+        frmSigHT2.grid(row=2,column=0)
+        ttk.Label(frmSigHT2,text='GI: ').grid(row=0,column=0,sticky='nwse')
+        self.vgis = [tk.IntVar(),tk.IntVar()]
+        ttk.Checkbutton(frmSigHT2,text='Short',variable=self.vgis[0]).grid(row=0,column=1,sticky='nwse')
+        ttk.Checkbutton(frmSigHT2,text='Long',variable=self.vgis[1]).grid(row=1,column=1,sticky='nwse')
+        self.vformatss = [tk.IntVar(),tk.IntVar()]
+        ttk.Label(frmSigHT2,text='Format: ').grid(row=0,column=2,sticky='nwse')
+        ttk.Checkbutton(frmSigHT2,text='Mixed',variable=self.vgis[0]).grid(row=0,column=3,sticky='nwse')
+        ttk.Checkbutton(frmSigHT2,text='Greenfield',variable=self.vgis[1]).grid(row=1,column=3,sticky='nwse')
+        frmSigHT3 = ttk.Frame(frmSigHT)
+        frmSigHT3.grid(row=3,column=0,sticky='nwse')
+        ttk.Label(frmSigHT3,text='MCS Index: ').grid(row=0,column=0,sticky='nwse')
+        self.txtIndex = ttk.Entry(frmSigHT3,width=15)
+        self.txtIndex.grid(row=0,column=1,sticky='nwse')
         nb.add(frmSig,text='Signal')
 
         frmT = ttk.Frame(nb)
@@ -729,12 +758,12 @@ class QueryPanel(gui.SlavePanel):
         self.vnotstd.set(0)
         self.txtSensorDriver.delete(0,tk.END)
         self.vnotdriver.set(0)
-        self.vrecon.set(1)
-        self.vcoll.set(1)
+        self.vrecon.set(0)
+        self.vcoll.set(0)
         self.txtCenterPT.delete(0,tk.END)
         self.txtRadius.delete(0,tk.END)
-        self.vfixed.set(1)
-        self.vdynamic.set(1)
+        self.vfixed.set(0)
+        self.vdynamic.set(0)
 
     def fromnow(self):
         """assign now() to the from entries """

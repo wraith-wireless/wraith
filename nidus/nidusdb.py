@@ -828,7 +828,7 @@ class StoreThread(SSEThread):
                 gi = 1 if 'gi' in mcsflags and mcsflags['gi'] > 0 else 0
                 ht = 1 if 'ht' in mcsflags and mcsflags['ht'] > 0 else 0
                 index = r['mcs'][2]
-                rate = mcs.mcs_rate(r['mcs'][2],width,gi)
+                rate = mcs.mcs_rate(index,width,gi)
                 hasMCS = 1
             except:
                 if r['channel'][0] in channels.ISM_24_F2C:
