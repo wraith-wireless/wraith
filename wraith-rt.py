@@ -1229,23 +1229,23 @@ if __name__ == '__main__':
             if not pwd: ap.error("Three incorrect password attempts")
         else: pwd = None
 
-        # configure style
+        # configure style, using the alt theme
         t = tk.Tk()     # call our main program root first or Style() will do so
         s = ttk.Style()
         if 'alt' in s.theme_names(): s.theme_use('alt')
-        #if 'clam' in s.theme_names(): s.theme_use('clam')
+        # figure out how to remove the progressbar relief/border
+        s.configure("splash.Horizontal.TProgressbar",foreground='green',
+                    background='green',troughcolor='black',
+                    troughrelief='black',borderwidth=0)
+        s.configure("splash.TLabel",foreground='white',background='black',border=0)
+        s.configure("reg.Horizontal.TProgressbar",foreground='green',
+                    background='green',borderwidth=0)
 
         # WraithPanel will start everything if pwd is present otherwise, will
         # just start the gui
         try:
             wp = WraithPanel(t,pwd)                     # create main program
             if sopts == 'all':
-                # figure out how to remove the progressbar relief/border
-                s.configure("splash.Horizontal.TProgressbar",foreground='green',
-                            background='green',troughcolor='black',
-                            troughrelief='black',borderwidth=0)
-                s.configure("splash.TLabel",foreground='white',
-                            background='black',border=0)
                 t.withdraw()                                # hide main programe
                 splash = WraithSplash(tk.Toplevel(),wp,pwd) # show the splash
             wp.mainloop()                                   # start the main program

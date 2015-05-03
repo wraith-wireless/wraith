@@ -544,7 +544,7 @@ class QueryPanel(gui.SlavePanel):
         frmLS.grid(row=0,column=0,sticky='nwse')
         self.treeSession = ttk.Treeview(frmLS)
         self.treeSession.grid(row=0,column=0,sticky='nwse')
-        self.treeSession.config(height=6)
+        self.treeSession.config(height=8)
         self.treeSession.config(selectmode='extended')
         self.treeSession['show'] = 'headings'
         vscroll = ttk.Scrollbar(frmLS,orient=tk.VERTICAL,command=self.treeSession.yview)
@@ -574,20 +574,34 @@ class QueryPanel(gui.SlavePanel):
         self.txtToTime.grid(row=2,column=2,sticky='e')
         ttk.Button(frmRP,text='Now',width=4,command=self.tonow).grid(row=2,column=3,sticky='w')
         self.vcollate = tk.IntVar()
-        chkCollate = ttk.Checkbutton(frmR,text="Collate",variable=self.vcollate).grid(row=1,column=0,sticky='nwse')
+        chkCollate = ttk.Checkbutton(frmRP,text="Collate",variable=self.vcollate).grid(row=3,column=0,sticky='nwse')
 
         # filter on frame
-        frmFO = ttk.LabelFrame(self,text="Filter On")
-        frmFO.grid(row=1,column=0,columnspan=2,sticky='nwse')
+        frmFO = ttk.LabelFrame(frmR,text="Filter On")
+        frmFO.grid(row=1,column=0,sticky='nwse')
         filters = ['Sensor','Signal','Traffic']
         self.vfilteron = []
         for i in xrange(3):
             self.vfilteron.append(tk.IntVar())
             ttk.Checkbutton(frmFO,text=filters[i],variable=self.vfilteron[i]).grid(row=0,column=i,sticky='w')
 
+        # progress frame
+        frmP = ttk.Frame(frmR)
+        frmP.grid(row=2,column=0,sticky='nwse')
+        self._pb = ttk.Progressbar(frmP,style="reg.Horizontal.TProgressbar",
+                                   maximum=10,orient=tk.HORIZONTAL,mode='determinate')
+        self._pb.grid(row=0,column=0,sticky='nwse')
+
+        # 3 buttons query,reset and cancel
+        frmB = ttk.Frame(frmR)
+        frmB.grid(row=3,column=0,sticky='ns')
+        ttk.Button(frmB,text='Query',width=6,command=self.query).grid(row=0,column=0)
+        ttk.Button(frmB,text='Clear',width=6,command=self.widgetreset).grid(row=0,column=1)
+        ttk.Button(frmB,text='Cancel',width=6,command=self.delete).grid(row=0,column=2)
+
         # filters frame (For now, allow filters on Radio/Sensor,Signal,Traffic,STA
         frmF = ttk.LabelFrame(self,text='Filters')
-        frmF.grid(row=2,column=0,columnspan=2,sticky='nwse')
+        frmF.grid(row=1,column=0,columnspan=2,sticky='nwse')
         nb = ttk.Notebook(frmF)
         nb.grid(row=0,column=0,sticky='nwse')
 
@@ -714,21 +728,6 @@ class QueryPanel(gui.SlavePanel):
 
         frmT = ttk.Frame(nb)
         nb.add(frmT,text='Traffic')
-
-        # progress frame
-        frmP = ttk.Frame(self)
-        frmP.grid(row=3,column=0,columnspan=2,sticky='nwse')
-        self._pb = ttk.Progressbar(frmP,maximum=10,
-                                   orient=tk.HORIZONTAL,
-                                   mode='determinate')
-        self._pb.grid(row=0,column=0,sticky='nwse')
-
-        # 3 buttons query,reset and cancel
-        frmB = ttk.Frame(self)
-        frmB.grid(row=4,column=0,columnspan=2,sticky='ns')
-        ttk.Button(frmB,text='Query',width=6,command=self.query).grid(row=0,column=0)
-        ttk.Button(frmB,text='Reset',width=6,command=self.widgetreset).grid(row=0,column=1)
-        ttk.Button(frmB,text='Cancel',width=6,command=self.delete).grid(row=0,column=2)
 
         # we have to force an update, get size of holding frame and set pbar's length
         self.update_idletasks()
@@ -867,8 +866,7 @@ class QueryPanel(gui.SlavePanel):
             except ValueError:
                 self.err("Invalid Input","Rate(s) must be numeric")
                 return False
-        chs = self.txtSignalCh.get().split(',')
-        if not parsechlist(chs,'scan'):
+        if not parsechlist(self.txtSignalCh.get(),'scan'):
             self.err("Invalid Input","Invalid channel(s0 specification")
             return False
         mis = self.txtIndex.get().split(',')
