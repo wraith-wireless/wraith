@@ -536,17 +536,18 @@ class QueryPanel(gui.SlavePanel):
         # two subframes: 'left' Session(s) Frame has a tree view of sessions, 'right'
         # Period has entries to select from and to date/times. Additionally, below
         # the period subframe is a checkbox to enable data collation
-        frmD = ttk.LabelFrame(self,text='Data',borderwidth=1)
-        frmD.grid(row=0,column=0,sticky='nwse')
-        frmDS = ttk.LabelFrame(frmD,text='Session(s)')
-        frmDS.grid(row=0,column=0,rowspan=2,sticky='nwse')
-        # make session tree w/ attached vertical scrollbar
-        self.treeSession = ttk.Treeview(frmDS)
+        frmL = ttk.Frame(self)
+        frmL.grid(row=0,column=0,sticky='nwse')
+        frmR = ttk.Frame(self)
+        frmR.grid(row=0,column=1,sticky='nwse')
+        frmLS = ttk.LabelFrame(frmL,text='Session(s)')
+        frmLS.grid(row=0,column=0,sticky='nwse')
+        self.treeSession = ttk.Treeview(frmLS)
         self.treeSession.grid(row=0,column=0,sticky='nwse')
         self.treeSession.config(height=6)
         self.treeSession.config(selectmode='extended')
         self.treeSession['show'] = 'headings'
-        vscroll = ttk.Scrollbar(frmDS,orient=tk.VERTICAL,command=self.treeSession.yview)
+        vscroll = ttk.Scrollbar(frmLS,orient=tk.VERTICAL,command=self.treeSession.yview)
         vscroll.grid(row=0,column=1,sticky='ns')
         self.treeSession['yscrollcommand'] = vscroll.set
         # configure session tree's headers
@@ -555,29 +556,29 @@ class QueryPanel(gui.SlavePanel):
         for i in xrange(len(hdrs)):
             self.treeSession.column(i,width=gui.lenpix(hdrs[i])+10,anchor=tk.CENTER)
             self.treeSession.heading(i,text=hdrs[i])
-        frmDP = ttk.LabelFrame(frmD,text='Period')
-        frmDP.grid(row=0,column=1,sticky='nwse')
-        ttk.Label(frmDP,text='YYYY-MM-DD').grid(row=0,column=1,sticky='ne')
-        ttk.Label(frmDP,text='HH:MM:SS').grid(row=0,column=2,sticky='ne')
-        ttk.Label(frmDP,text='From: ').grid(row=1,column=0,sticky='w')
-        self.txtFromDate = ttk.Entry(frmDP,width=10)
+        frmRP = ttk.LabelFrame(frmR,text='Period')
+        frmRP.grid(row=0,column=0,sticky='nwse')
+        ttk.Label(frmRP,text='YYYY-MM-DD').grid(row=0,column=1,sticky='ne')
+        ttk.Label(frmRP,text='HH:MM:SS').grid(row=0,column=2,sticky='ne')
+        ttk.Label(frmRP,text='From: ').grid(row=1,column=0,sticky='w')
+        self.txtFromDate = ttk.Entry(frmRP,width=10)
         self.txtFromDate.grid(row=1,column=1,sticky='e')
-        self.txtFromTime = ttk.Entry(frmDP,width=9)
+        self.txtFromTime = ttk.Entry(frmRP,width=9)
         self.txtFromTime.grid(row=1,column=2,sticky='e')
-        ttk.Button(frmDP,text='Now',width=4,
+        ttk.Button(frmRP,text='Now',width=4,
                   command=self.fromnow).grid(row=1,column=3,sticky='w')
-        ttk.Label(frmDP,text='To: ').grid(row=2,column=0,sticky='w')
-        self.txtToDate = ttk.Entry(frmDP,width=10)
+        ttk.Label(frmRP,text='To: ').grid(row=2,column=0,sticky='w')
+        self.txtToDate = ttk.Entry(frmRP,width=10)
         self.txtToDate.grid(row=2,column=1,sticky='e')
-        self.txtToTime = ttk.Entry(frmDP,width=9)
+        self.txtToTime = ttk.Entry(frmRP,width=9)
         self.txtToTime.grid(row=2,column=2,sticky='e')
-        ttk.Button(frmDP,text='Now',width=4,command=self.tonow).grid(row=2,column=3,sticky='w')
+        ttk.Button(frmRP,text='Now',width=4,command=self.tonow).grid(row=2,column=3,sticky='w')
         self.vcollate = tk.IntVar()
-        chkCollate = ttk.Checkbutton(frmD,text="Collate",variable=self.vcollate).grid(row=1,column=1,sticky='nw')
+        chkCollate = ttk.Checkbutton(frmR,text="Collate",variable=self.vcollate).grid(row=1,column=0,sticky='nwse')
 
         # filter on frame
         frmFO = ttk.LabelFrame(self,text="Filter On")
-        frmFO.grid(row=1,column=0,sticky='nwse')
+        frmFO.grid(row=1,column=0,columnspan=2,sticky='nwse')
         filters = ['Sensor','Signal','Traffic']
         self.vfilteron = []
         for i in xrange(3):
@@ -586,7 +587,7 @@ class QueryPanel(gui.SlavePanel):
 
         # filters frame (For now, allow filters on Radio/Sensor,Signal,Traffic,STA
         frmF = ttk.LabelFrame(self,text='Filters')
-        frmF.grid(row=2,column=0,sticky='nwse')
+        frmF.grid(row=2,column=0,columnspan=2,sticky='nwse')
         nb = ttk.Notebook(frmF)
         nb.grid(row=0,column=0,sticky='nwse')
 
@@ -610,21 +611,27 @@ class QueryPanel(gui.SlavePanel):
         self.txtSensorMac.grid(row=3,column=1,sticky='e')
         self.vnotmac = tk.IntVar()
         ttk.Checkbutton(frmS,variable=self.vnotmac).grid(row=3,column=2,sticky='w')
-        ttk.Label(frmS,text='STDs: ').grid(row=4,column=0,sticky='w')
+        ttk.Label(frmS,text='Spoof: ').grid(row=4,column=0,sticky='w')
+        self.txtSensorSpoof = ttk.Entry(frmS,width=17)
+        self.txtSensorSpoof.grid(row=4,column=1,sticky='e')
+        self.vnotspoof = tk.IntVar()
+        ttk.Checkbutton(frmS,variable=self.vnotspoof).grid(row=4,column=2,sticky='w')
+
+        ttk.Label(frmS,text='STDs: ').grid(row=5,column=0,sticky='w')
         self.txtSensorStd = ttk.Entry(frmS,width=5)
-        self.txtSensorStd.grid(row=4,column=1,sticky='e')
+        self.txtSensorStd.grid(row=5,column=1,sticky='e')
         self.vnotstd = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.vnotstd).grid(row=4,column=2,sticky='w')
-        ttk.Label(frmS,text='Driver: ').grid(row=5,column=0,sticky='w')
+        ttk.Checkbutton(frmS,variable=self.vnotstd).grid(row=5,column=2,sticky='w')
+        ttk.Label(frmS,text='Driver: ').grid(row=6,column=0,sticky='w')
         self.txtSensorDriver = ttk.Entry(frmS,width=17)
-        self.txtSensorDriver.grid(row=5,column=1,sticky='e')
+        self.txtSensorDriver.grid(row=6,column=1,sticky='e')
         self.vnotdriver = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.vnotdriver).grid(row=5,column=2,sticky='w')
+        ttk.Checkbutton(frmS,variable=self.vnotdriver).grid(row=6,column=2,sticky='w')
         self.vrecon = tk.IntVar()
         ttk.Checkbutton(frmS,text='Recon',variable=self.vrecon).grid(row=1,column=3,sticky='w')
         self.vcoll = tk.IntVar()
         ttk.Checkbutton(frmS,text='Collection',variable=self.vcoll).grid(row=2,column=3,sticky='w')
-        ttk.Separator(frmS,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=6,sticky='ns')
+        ttk.Separator(frmS,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=7,sticky='ns')
         ttk.Label(frmS,text='Location').grid(row=0,column=5,columnspan=2,sticky='w')
         ttk.Label(frmS,text='Center PT: ').grid(row=1,column=5,sticky='w')
         self.txtCenterPT = ttk.Entry(frmS,width=15)
@@ -694,7 +701,7 @@ class QueryPanel(gui.SlavePanel):
         self.vgis = [tk.IntVar(),tk.IntVar()]
         ttk.Checkbutton(frmSigHT2,text='Short',variable=self.vgis[0]).grid(row=0,column=1,sticky='nwse')
         ttk.Checkbutton(frmSigHT2,text='Long',variable=self.vgis[1]).grid(row=1,column=1,sticky='nwse')
-        self.vformatss = [tk.IntVar(),tk.IntVar()]
+        self.vformats = [tk.IntVar(),tk.IntVar()]
         ttk.Label(frmSigHT2,text='Format: ').grid(row=0,column=2,sticky='nwse')
         ttk.Checkbutton(frmSigHT2,text='Mixed',variable=self.vgis[0]).grid(row=0,column=3,sticky='nwse')
         ttk.Checkbutton(frmSigHT2,text='Greenfield',variable=self.vgis[1]).grid(row=1,column=3,sticky='nwse')
@@ -710,7 +717,7 @@ class QueryPanel(gui.SlavePanel):
 
         # progress frame
         frmP = ttk.Frame(self)
-        frmP.grid(row=3,column=0,sticky='nwse')
+        frmP.grid(row=3,column=0,columnspan=2,sticky='nwse')
         self._pb = ttk.Progressbar(frmP,maximum=10,
                                    orient=tk.HORIZONTAL,
                                    mode='determinate')
@@ -718,7 +725,7 @@ class QueryPanel(gui.SlavePanel):
 
         # 3 buttons query,reset and cancel
         frmB = ttk.Frame(self)
-        frmB.grid(row=4,column=0,sticky='ns')
+        frmB.grid(row=4,column=0,columnspan=2,sticky='ns')
         ttk.Button(frmB,text='Query',width=6,command=self.query).grid(row=0,column=0)
         ttk.Button(frmB,text='Reset',width=6,command=self.widgetreset).grid(row=0,column=1)
         ttk.Button(frmB,text='Cancel',width=6,command=self.delete).grid(row=0,column=2)
@@ -743,17 +750,21 @@ class QueryPanel(gui.SlavePanel):
     def widgetreset(self):
         """ clears all user inputed data """
         # clear all tree selections (selection_toggle? selection_remove?)
+        # time periods
         self.txtFromDate.delete(0,tk.END)
         self.txtFromTime.delete(0,tk.END)
         self.txtToDate.delete(0,tk.END)
         self.txtToTime.delete(0,tk.END)
         self.vcollate.set(0)
+        # sensor
         self.txtSensorHost.delete(0,tk.END)
         self.vnothost.set(0)
         self.txtSensorNic.delete(0,tk.END)
         self.vnotnic.set(0)
         self.txtSensorMac.delete(0,tk.END)
         self.vnotmac.set(0)
+        self.txtSensorSpoof.delete(0,tk.END)
+        self.vnotspoof.set(0)
         self.txtSensorStd.delete(0,tk.END)
         self.vnotstd.set(0)
         self.txtSensorDriver.delete(0,tk.END)
@@ -764,6 +775,22 @@ class QueryPanel(gui.SlavePanel):
         self.txtRadius.delete(0,tk.END)
         self.vfixed.set(0)
         self.vdynamic.set(0)
+        # signal
+        self.txtSignalStd.delete(0,tk.END)
+        self.vnotstd.set(0)
+        self.txtSignalRate.delete(0,tk.END)
+        self.vnotrate.set(0)
+        self.txtSignalCh.delete(0,tk.END)
+        self.vnotch.set(0)
+        for chk in self.vrtflags: chk.set(0)
+        for chk in self.vchflags: chk.set(0)
+        self.vhtonly.set(0)
+        self.vampdu.set(0)
+        for chk in self.vbws: chk.set(0)
+        for chk in self.vgis: chk.set(0)
+        for chk in self.vformats: chk.set(0)
+        self.txtIndex.delete(0,tk.END)
+        # traffic
 
     def fromnow(self):
         """assign now() to the from entries """
@@ -791,6 +818,7 @@ class QueryPanel(gui.SlavePanel):
          NOTE: this does not validate for non-sensical queries i.e. those that
          will never return results
         """
+        # period
         d = self.txtFromDate.get()
         if d and not timestamps.validdate(d):
             self.err("Invalid Input","From date is not valid")
@@ -805,20 +833,56 @@ class QueryPanel(gui.SlavePanel):
         t = self.txtToTime.get()
         if t and not timestamps.validtime(t):
             return False
+        # sensor
         # allow all in host, nic, driver
         mac = self.txtSensorMac.get().upper()
         if mac and re.match(MACADDR,mac) is None:
             self.err("Invalid Input","MAC addr %s is not valid")
+            return False
+        spoof = self.txtSensorSpoof.get().upper()
+        if spoof and re.match(MACADDR,spoof) is None:
+            self.err("Invalid Input","Spoof addr %s is not valid")
             return False
         stds = self.txtSensorStd.get().split(',')
         if stds and stds != ['']:
             for std in stds:
                 if not std in ['a','b','g','n','ac']:
                     self.err("Invalid Input","Invalid standard specifier %s" % std)
+                    return False
         cp = self.txtCenterPT.get()
         if cp and not landnav.validMGRS(cp):
             self.err("Invalid Input","Center point is not a valid MGRS location")
             return False
+        # signal
+        stds = self.txtSignalStd.get().split(',')
+        if stds and stds != ['']:
+            for std in stds:
+                if not std in ['a','b','g','n','ac']:
+                    self.err("Invalid Input","Invalid standard specifier %s" % std)
+                    return False
+        rs = self.txtSignalRate.get().split(',')
+        if rs and rs != ['']:
+            try:
+                map(float,rs)
+            except ValueError:
+                self.err("Invalid Input","Rate(s) must be numeric")
+                return False
+        chs = self.txtSignalCh.get().split(',')
+        if not parsechlist(chs,'scan'):
+            self.err("Invalid Input","Invalid channel(s0 specification")
+            return False
+        mis = self.txtIndex.get().split(',')
+        if mis and mis != ['']:
+            try:
+                mis = map(int,mis)
+            except ValueError:
+                self.err("Invalid Input","MCS Index must be integer(s)")
+                return False
+            else:
+                for mi in mis:
+                    if mi < 0 or mi > 31:
+                        self.err("Invalid Input","mcs index must be between 0 and 31")
+                        return False
 
         return True
 
