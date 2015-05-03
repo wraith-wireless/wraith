@@ -183,10 +183,10 @@ class ConvertPanel(gui.SimplePanel):
         self._mgrs = mgrs.MGRS()
         gui.SimplePanel.__init__(self,tl,chief,"Conversions","widgets/icons/convert.png")
 
-    def _body(self,frm):
+    def _body(self):
         """ creates the body """
         # create the location frame
-        frmGeo = ttk.LabelFrame(frm,text='Location')
+        frmGeo = ttk.LabelFrame(self,text='Location')
         frmGeo.grid(row=0,column=0,sticky='w')
         # add widgets to the location frame
         ttk.Label(frmGeo,text='Lat/Lon: ').grid(row=0,column=0,sticky='w')
@@ -197,7 +197,7 @@ class ConvertPanel(gui.SimplePanel):
         self.txtMGRS.grid(row=0,column=3,sticky='w')
         ttk.Button(frmGeo,text='Convert',width=8,command=self.convertgeo).grid(row=0,column=4)
         # create the power frame
-        frmPwr = ttk.LabelFrame(frm,text='Power')
+        frmPwr = ttk.LabelFrame(self,text='Power')
         frmPwr.grid(row=1,column=0,sticky='n')
         # add widgets to the power frame
         ttk.Label(frmPwr,text="dBm: ").grid(row=0,column=0)
@@ -210,7 +210,7 @@ class ConvertPanel(gui.SimplePanel):
         self.txtmW = ttk.Entry(frmPwr,width=8)
         self.txtmW.grid(row=0,column=5)
         ttk.Button(frmPwr,text='Convert',width=8,command=self.convertpwr).grid(row=0,column=6)
-        frmBtns = ttk.Frame(frm,borderwidth=0)
+        frmBtns = ttk.Frame(self,borderwidth=0)
         frmBtns.grid(row=2,column=0,sticky='n')
         ttk.Button(frmBtns,text='OK',width=6,command=self.delete).grid(row=0,column=0)
         ttk.Button(frmBtns,text='Clear',width=6,command=self.clear).grid(row=0,column=1)
@@ -337,10 +337,10 @@ class CalculatePanel(gui.SimplePanel):
         self._rc = rc if rc else [len(inputs)]
         gui.SimplePanel.__init__(self,tl,chief,ttl,"widgets/icons/calculator.png")
 
-    def _body(self,frm):
+    def _body(self):
         """ creates the body """
         # entries frame
-        frmEnt = ttk.Frame(frm,borderwidth=0)
+        frmEnt = ttk.Frame(self,borderwidth=0)
         frmEnt.grid(row=0,column=0,sticky='w')
 
         # create the widgets
@@ -361,11 +361,11 @@ class CalculatePanel(gui.SimplePanel):
             r += 1
 
         # answer frame, then button frames
-        frmAns = ttk.Frame(frm,borderwidth=0)
+        frmAns = ttk.Frame(self,borderwidth=0)
         frmAns.grid(row=1,column=0,sticky='n')
         ttk.Label(frmAns,text="Answer: ").grid(row=0,column=0)
         ttk.Label(frmAns,width=20,textvariable=self._ans).grid(row=0,column=1)
-        frmBtns = ttk.Frame(frm,borderwidth=0)
+        frmBtns = ttk.Frame(self,borderwidth=0)
         frmBtns.grid(row=2,column=0,sticky='ns')
         ttk.Button(frmBtns,text="Calculate",width=9,command=self.calc).grid(row=0,column=0)
         ttk.Button(frmBtns,text="Reset",width=9,command=self.clear).grid(row=0,column=1)
@@ -447,14 +447,14 @@ class DatabinPanel(gui.SimplePanel):
 
     def donothing(self): pass
 
-    def _body(self,frm):
+    def _body(self):
         """ creates the body """
         # add the bin buttons
         # NOTE: for whatever reason, trying to create individual viewquery functions
         # for each bin b results in issues, if the button w/ function call is
         # created directly in the loop. But, if a function is called that creates
         # the button w/ function, there is no issue
-        for b in wraith.BINS: self._makebin(frm,b)
+        for b in wraith.BINS: self._makebin(self,b)
 
     def _makebin(self,frm,b):
         """ makes a button for bin b """
@@ -1751,14 +1751,14 @@ class AboutPanel(gui.SimplePanel):
     def __init__(self,tl,chief):
         gui.SimplePanel.__init__(self,tl,chief,"About Wraith","widgets/icons/about.png")
 
-    def _body(self,frm):
+    def _body(self):
         self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/wraith-banner.png"))
-        ttk.Label(frm,background='white',image=self.logo).grid(row=0,column=0,sticky='n')
-        ttk.Label(frm,text="wraith-rt %s" % wraith.__version__,
+        ttk.Label(self,background='white',image=self.logo).grid(row=0,column=0,sticky='n')
+        ttk.Label(self,text="wraith-rt %s" % wraith.__version__,
                   font=("Roman",16,'bold')).grid(row=1,column=0,sticky='n')
-        ttk.Label(frm,text="Wireless reconnaissance, collection, assault and exploitation toolkit",
+        ttk.Label(self,text="Wireless reconnaissance, collection, assault and exploitation toolkit",
                   font=("Roman",8,'bold')).grid(row=2,column=0,sticky='n')
-        ttk.Label(frm,text="Copyright %s %s %s" % (COPY,
+        ttk.Label(self,text="Copyright %s %s %s" % (COPY,
                                                    wraith.__date__.split(' ')[1],
                                                    wraith.__email__),
                   font=('Roman',8,'bold')).grid(row=3,column=0,sticky='n')

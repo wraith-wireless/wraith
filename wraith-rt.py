@@ -1232,8 +1232,8 @@ if __name__ == '__main__':
         # configure style
         t = tk.Tk()     # call our main program root first or Style() will do so
         s = ttk.Style()
-        #if 'alt' in s.theme_names(): s.theme_use('alt')
-        if 'clam' in s.theme_names(): s.theme_use('clam')
+        if 'alt' in s.theme_names(): s.theme_use('alt')
+        #if 'clam' in s.theme_names(): s.theme_use('clam')
 
         # WraithPanel will start everything if pwd is present otherwise, will
         # just start the gui

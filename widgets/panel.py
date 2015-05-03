@@ -297,10 +297,11 @@ class SimplePanel(SlavePanel):
     """
     def __init__(self,tl,chief,title,iconpath=None,resize=False):
         SlavePanel.__init__(self,tl,chief,title,iconpath,resize)
-        frm = ttk.Frame(self)
-        frm.grid(row=0,column=0,sticky='nwse')
-        self._body(frm)
-    def _body(self,frm): raise NotImplementedError("SimplePanel::_body")
+        #frm = ttk.Frame(self)
+        #frm.grid(row=0,column=0,sticky='nwse')
+        self.grid(row=0,column=0,sticky='nwse')
+        self._body()
+    def _body(self): raise NotImplementedError("SimplePanel::_body")
     def reset(self): pass
     def update(self): pass
     def _shutdown(self): pass
