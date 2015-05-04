@@ -23,6 +23,7 @@ import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
 from wraith.radio import iw                # wireless interface details
 from wraith.radio import iwtools as iwt    # interface details
+from wraith.radio import mpdu              # for 802.11 types/subtypes
 from wraith.dyskt.dyskt import parsechlist # channelist validity check
 from wraith.utils import timestamps        # valid data/time
 from wraith.utils import landnav           # lang nav utilities
@@ -542,20 +543,20 @@ class QueryPanel(gui.SlavePanel):
         frmR.grid(row=0,column=1,sticky='nwse')
         frmLS = ttk.LabelFrame(frmL,text='Session(s)')
         frmLS.grid(row=0,column=0,sticky='nwse')
-        self.treeSession = ttk.Treeview(frmLS)
-        self.treeSession.grid(row=0,column=0,sticky='nwse')
-        self.treeSession.config(height=8)
-        self.treeSession.config(selectmode='extended')
-        self.treeSession['show'] = 'headings'
-        vscroll = ttk.Scrollbar(frmLS,orient=tk.VERTICAL,command=self.treeSession.yview)
-        vscroll.grid(row=0,column=1,sticky='ns')
-        self.treeSession['yscrollcommand'] = vscroll.set
+        self.trSession = ttk.Treeview(frmLS)
+        self.trSession.grid(row=0,column=0,sticky='nwse')
+        self.trSession.config(height=8)
+        self.trSession.config(selectmode='extended')
+        self.trSession['show'] = 'headings'
+        sessvscroll = ttk.Scrollbar(frmLS,orient=tk.VERTICAL,command=self.trSession.yview)
+        sessvscroll.grid(row=0,column=1,sticky='ns')
+        self.trSession['yscrollcommand'] = sessvscroll.set
         # configure session tree's headers
         hdrs = ['ID','Host','From','To','Frames']
-        self.treeSession['columns'] = hdrs
+        self.trSession['columns'] = hdrs
         for i in xrange(len(hdrs)):
-            self.treeSession.column(i,width=gui.lenpix(hdrs[i])+10,anchor=tk.CENTER)
-            self.treeSession.heading(i,text=hdrs[i])
+            self.trSession.column(i,width=gui.lenpix(hdrs[i])+10,anchor=tk.CENTER)
+            self.trSession.heading(i,text=hdrs[i])
         frmRP = ttk.LabelFrame(frmR,text='Period')
         frmRP.grid(row=0,column=0,sticky='nwse')
         ttk.Label(frmRP,text='YYYY-MM-DD').grid(row=0,column=1,sticky='ne')
@@ -725,8 +726,35 @@ class QueryPanel(gui.SlavePanel):
         self.txtIndex = ttk.Entry(frmSigHT3,width=15)
         self.txtIndex.grid(row=0,column=1,sticky='nwse')
         nb.add(frmSig,text='Signal')
-
+        # traffic
         frmT = ttk.Frame(nb)
+        frmL = ttk.Frame(frmT)
+        frmL.grid(row=0,column=0,sticky='nwse')
+        self.trTypes = ttk.Treeview(frmL)
+        self.trTypes.grid(row=0,column=0,sticky='nwse')
+        self.trTypes.config(height=10)
+        self.trTypes.config(selectmode='extended')
+        self.trTypes['show'] = 'tree'
+        typevscroll = ttk.Scrollbar(frmL,orient=tk.VERTICAL,command=self.trTypes.yview)
+        typevscroll.grid(row=0,column=1,sticky='ns')
+        self.trTypes['yscrollcommand'] = typevscroll.set
+        # fill the tree
+        self.trTypes['columns'] = ('one')
+        self.trTypes.column('#0',stretch=0,width=15,anchor='w')
+        self.trTypes.column('one',stretch=0,width=140,anchor='w')
+        self.trTypes.insert('','end',iid='MGMT',values=('MGMT',))
+        for mgmt in mpdu.ST_MGMT_TYPES:
+            if mgmt == 'rsrv': continue
+            self.trTypes.insert('MGMT','end',iid="%s.%s" % ('MGMT',mgmt),values=(mgmt,))
+        self.trTypes.insert('','end',iid='CTRL',values=('CTRL',))
+        for ctrl in mpdu.ST_CTRL_TYPES:
+            if ctrl == 'rsrv': continue
+            self.trTypes.insert('CTRL','end',iid="%s.%s" % ('CTRL',ctrl),values=(ctrl,))
+        self.trTypes.insert('','end',iid='DATA',values=('DATA',))
+        for data in mpdu.ST_DATA_TYPES:
+            if data == 'rsrv': continue
+            self.trTypes.insert('DATA','end',iid="%s.%s" % ('DATA',data),values=(data,))
+
         nb.add(frmT,text='Traffic')
 
         # we have to force an update, get size of holding frame and set pbar's length
