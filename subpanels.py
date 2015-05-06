@@ -499,7 +499,7 @@ RT_FLAG_PAD   = 6
 
 # Channel Flag constants
 CH_FLAGS = ['Turbo','CCK','OFDM','2 GHz','5 Ghz','Passive','CCK-OFDM','GFSS']
-CH_FLAGS_TURBO     = 0
+CH_FLAGS_TURBO    = 0
 CH_FLAGS_CCK      = 1
 CH_FLAGS_OFDM     = 2
 CH_FLAGS_2GHZ     = 3
@@ -514,6 +514,17 @@ BW_20  = 0
 BW_40  = 1
 BW_20L = 2
 BW_20U = 3
+
+# Frame Control Flags constants
+FC_FLAGS = ['To DS','From DS','More Frag','Retry','PWR Mgmt','More Data','Protected','Ordered']
+FC_FLAGS_TODS      = 0
+FC_FLAGS_FROMDS    = 1
+FC_FLAGS_FRAG      = 2
+FC_FLAGS_RETRY     = 3
+FC_FLAGS_PWRMGMT   = 4
+FC_FLAGS_MOREDATA  = 5
+FC_FLAGS_PROTECTED = 6
+FC_FLAGS_ORDERED   = 7
 
 class QueryPanel(gui.SlavePanel):
     """Display query for data panel """
@@ -548,9 +559,9 @@ class QueryPanel(gui.SlavePanel):
         self.trSession.config(height=8)
         self.trSession.config(selectmode='extended')
         self.trSession['show'] = 'headings'
-        sessvscroll = ttk.Scrollbar(frmLS,orient=tk.VERTICAL,command=self.trSession.yview)
-        sessvscroll.grid(row=0,column=1,sticky='ns')
-        self.trSession['yscrollcommand'] = sessvscroll.set
+        vscroll = ttk.Scrollbar(frmLS,orient=tk.VERTICAL,command=self.trSession.yview)
+        vscroll.grid(row=0,column=1,sticky='ns')
+        self.trSession['yscrollcommand'] = vscroll.set
         # configure session tree's headers
         hdrs = ['ID','Host','From','To','Frames']
         self.trSession['columns'] = hdrs
@@ -631,7 +642,6 @@ class QueryPanel(gui.SlavePanel):
         self.txtSensorSpoof.grid(row=4,column=1,sticky='e')
         self.vnotspoof = tk.IntVar()
         ttk.Checkbutton(frmS,variable=self.vnotspoof).grid(row=4,column=2,sticky='w')
-
         ttk.Label(frmS,text='STDs: ').grid(row=5,column=0,sticky='w')
         self.txtSensorStd = ttk.Entry(frmS,width=5)
         self.txtSensorStd.grid(row=5,column=1,sticky='e')
@@ -659,7 +669,7 @@ class QueryPanel(gui.SlavePanel):
         self.vdynamic = tk.IntVar()
         ttk.Checkbutton(frmS,text='Dynamic',variable=self.vdynamic).grid(row=3,column=6,sticky='w')
         nb.add(frmS,text='Sensor')
-
+        # signal tab
         frmSig = ttk.Frame(nb)
         ttk.Label(frmSig,text='Not').grid(row=0,column=2,sticky='w')
         ttk.Label(frmSig,text='Standard(s)').grid(row=1,column=0,sticky='w')
@@ -687,7 +697,7 @@ class QueryPanel(gui.SlavePanel):
             chk = ttk.Checkbutton(frmSigFlags,text=RT_FLAGS[i],variable=self.vrtflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
         frmSigChFlags = ttk.LabelFrame(frmSig,text="Channel Flags")
-        frmSigChFlags.grid(row=5,column=0,columnspan=3,sticky='nwse')
+        frmSigChFlags.grid(row=5,column=0,columnspan=4,sticky='nwse')
         self.vchflags = []
         for i in xrange(len(CH_FLAGS)):
             self.vchflags.append(tk.IntVar())
@@ -735,9 +745,9 @@ class QueryPanel(gui.SlavePanel):
         self.trTypes.config(height=10)
         self.trTypes.config(selectmode='extended')
         self.trTypes['show'] = 'tree'
-        typevscroll = ttk.Scrollbar(frmL,orient=tk.VERTICAL,command=self.trTypes.yview)
-        typevscroll.grid(row=0,column=1,sticky='ns')
-        self.trTypes['yscrollcommand'] = typevscroll.set
+        vscroll = ttk.Scrollbar(frmL,orient=tk.VERTICAL,command=self.trTypes.yview)
+        vscroll.grid(row=0,column=1,sticky='ns')
+        self.trTypes['yscrollcommand'] = vscroll.set
         # fill the tree
         self.trTypes['columns'] = ('one')
         self.trTypes.column('#0',stretch=0,width=15,anchor='w')
@@ -754,7 +764,15 @@ class QueryPanel(gui.SlavePanel):
         for data in mpdu.ST_DATA_TYPES:
             if data == 'rsrv': continue
             self.trTypes.insert('DATA','end',iid="%s.%s" % ('DATA',data),values=(data,))
-
+        frmR = ttk.Frame(frmT)
+        frmR.grid(row=0,column=1,sticky='nswe')
+        frmRFC = ttk.LabelFrame(frmR,text="Frame Control Frames")
+        frmRFC.grid(row=0,column=0,sticky='nwse')
+        self.vfcflags = []
+        for i in xrange(len(FC_FLAGS)):
+            self.vfcflags.append(tk.IntVar())
+            chk = ttk.Checkbutton(frmRFC,text=FC_FLAGS[i],variable=self.vfcflags[i])
+            chk.grid(row=(i / 4),column=(i % 4),sticky='w')
         nb.add(frmT,text='Traffic')
 
         # we have to force an update, get size of holding frame and set pbar's length
