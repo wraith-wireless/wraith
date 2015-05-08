@@ -619,55 +619,59 @@ class QueryPanel(gui.SlavePanel):
 
         # Sensor tab
         frmS = ttk.Frame(nb)
-        ttk.Label(frmS,text='Interface').grid(row=0,column=0,columnspan=2,sticky='w')
-        ttk.Label(frmS,text='Not').grid(row=0,column=2,sticky='w')
-        ttk.Label(frmS,text='Role').grid(row=0,column=3,sticky='w')
-        ttk.Label(frmS,text='Host: ').grid(row=1,column=0,sticky='w')
-        self.txtSensorHost = ttk.Entry(frmS,width=17)
+        frmSL = ttk.Frame(frmS)
+        frmSL.grid(row=0,column=0,sticky='nwse')
+        frmSR = ttk.Frame(frmS)
+        frmSR.grid(row=0,column=1,sticky='nwse')
+        ttk.Label(frmSL,text='Interface').grid(row=0,column=0,columnspan=2,sticky='w')
+        ttk.Label(frmSL,text='Not').grid(row=0,column=2,sticky='w')
+        ttk.Label(frmSL,text='Role').grid(row=0,column=3,sticky='w')
+        ttk.Label(frmSL,text='Host: ').grid(row=1,column=0,sticky='w')
+        self.txtSensorHost = ttk.Entry(frmSL,width=17)
         self.txtSensorHost.grid(row=1,column=1,sticky='e')
         self.vnothost = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.vnothost).grid(row=1,column=2,sticky='w')
-        ttk.Label(frmS,text='NIC: ').grid(row=2,column=0,sticky='w')
-        self.txtSensorNic = ttk.Entry(frmS,width=10)
+        ttk.Checkbutton(frmSL,variable=self.vnothost).grid(row=1,column=2,sticky='w')
+        ttk.Label(frmSL,text='NIC: ').grid(row=2,column=0,sticky='w')
+        self.txtSensorNic = ttk.Entry(frmSL,width=10)
         self.txtSensorNic.grid(row=2,column=1,sticky='e')
         self.vnotnic = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.vnotnic).grid(row=2,column=2,sticky='w')
-        ttk.Label(frmS,text='MAC: ').grid(row=3,column=0,sticky='w')
-        self.txtSensorMac = ttk.Entry(frmS,width=17)
+        ttk.Checkbutton(frmSL,variable=self.vnotnic).grid(row=2,column=2,sticky='w')
+        ttk.Label(frmSL,text='MAC: ').grid(row=3,column=0,sticky='w')
+        self.txtSensorMac = ttk.Entry(frmSL,width=17)
         self.txtSensorMac.grid(row=3,column=1,sticky='e')
         self.vnotmac = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.vnotmac).grid(row=3,column=2,sticky='w')
-        ttk.Label(frmS,text='Spoof: ').grid(row=4,column=0,sticky='w')
-        self.txtSensorSpoof = ttk.Entry(frmS,width=17)
+        ttk.Checkbutton(frmSL,variable=self.vnotmac).grid(row=3,column=2,sticky='w')
+        ttk.Label(frmSL,text='Spoof: ').grid(row=4,column=0,sticky='w')
+        self.txtSensorSpoof = ttk.Entry(frmSL,width=17)
         self.txtSensorSpoof.grid(row=4,column=1,sticky='e')
         self.vnotspoof = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.vnotspoof).grid(row=4,column=2,sticky='w')
-        ttk.Label(frmS,text='STDs: ').grid(row=5,column=0,sticky='w')
-        self.txtSensorStd = ttk.Entry(frmS,width=5)
+        ttk.Checkbutton(frmSL,variable=self.vnotspoof).grid(row=4,column=2,sticky='w')
+        ttk.Label(frmSL,text='STDs: ').grid(row=5,column=0,sticky='w')
+        self.txtSensorStd = ttk.Entry(frmSL,width=5)
         self.txtSensorStd.grid(row=5,column=1,sticky='e')
         self.vnotstd = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.vnotstd).grid(row=5,column=2,sticky='w')
-        ttk.Label(frmS,text='Driver: ').grid(row=6,column=0,sticky='w')
-        self.txtSensorDriver = ttk.Entry(frmS,width=17)
+        ttk.Checkbutton(frmSL,variable=self.vnotstd).grid(row=5,column=2,sticky='w')
+        ttk.Label(frmSL,text='Driver: ').grid(row=6,column=0,sticky='w')
+        self.txtSensorDriver = ttk.Entry(frmSL,width=17)
         self.txtSensorDriver.grid(row=6,column=1,sticky='e')
         self.vnotdriver = tk.IntVar()
-        ttk.Checkbutton(frmS,variable=self.vnotdriver).grid(row=6,column=2,sticky='w')
+        ttk.Checkbutton(frmSL,variable=self.vnotdriver).grid(row=6,column=2,sticky='w')
         self.vrecon = tk.IntVar()
-        ttk.Checkbutton(frmS,text='Recon',variable=self.vrecon).grid(row=1,column=3,sticky='w')
+        ttk.Checkbutton(frmSL,text='Recon',variable=self.vrecon).grid(row=1,column=3,sticky='w')
         self.vcoll = tk.IntVar()
-        ttk.Checkbutton(frmS,text='Collection',variable=self.vcoll).grid(row=2,column=3,sticky='w')
-        ttk.Separator(frmS,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=7,sticky='ns')
-        ttk.Label(frmS,text='Location').grid(row=0,column=5,columnspan=2,sticky='w')
-        ttk.Label(frmS,text='Center PT: ').grid(row=1,column=5,sticky='w')
-        self.txtCenterPT = ttk.Entry(frmS,width=15)
+        ttk.Checkbutton(frmSL,text='Collection',variable=self.vcoll).grid(row=2,column=3,sticky='w')
+        frmSRL = ttk.LabelFrame(frmSR,text='Location')
+        frmSRL.grid(row=0,column=1,sticky='nwse')
+        ttk.Label(frmSRL,text='Center PT: ').grid(row=1,column=5,sticky='w')
+        self.txtCenterPT = ttk.Entry(frmSRL,width=15)
         self.txtCenterPT.grid(row=1,column=6,sticky='w')
-        ttk.Label(frmS,text='Radius: (m)').grid(row=2,column=5,sticky='w')
-        self.txtRadius = ttk.Entry(frmS,width=6)
+        ttk.Label(frmSRL,text='Radius: (m)').grid(row=2,column=5,sticky='w')
+        self.txtRadius = ttk.Entry(frmSRL,width=6)
         self.txtRadius.grid(row=2,column=6,sticky='w')
         self.vfixed = tk.IntVar()
-        ttk.Checkbutton(frmS,text='Fixed',variable=self.vfixed).grid(row=3,column=5,sticky='w')
+        ttk.Checkbutton(frmSRL,text='Fixed',variable=self.vfixed).grid(row=3,column=5,sticky='w')
         self.vdynamic = tk.IntVar()
-        ttk.Checkbutton(frmS,text='Dynamic',variable=self.vdynamic).grid(row=3,column=6,sticky='w')
+        ttk.Checkbutton(frmSRL,text='Dynamic',variable=self.vdynamic).grid(row=3,column=6,sticky='w')
         nb.add(frmS,text='Sensor')
         # signal tab
         frmSig = ttk.Frame(nb)
@@ -773,6 +777,24 @@ class QueryPanel(gui.SlavePanel):
             self.vfcflags.append(tk.IntVar())
             chk = ttk.Checkbutton(frmRFC,text=FC_FLAGS[i],variable=self.vfcflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
+        frmRA = ttk.LabelFrame(frmR,text='HW ADDR')
+        frmRA.grid(row=1,column=0,sticky='nwse')
+        ttk.Label(frmRA,text='Single: ').grid(row=0,column=0,sticky='nwse')
+        self.txtHWAddr = ttk.Entry(frmRA,width=17)
+        self.txtHWAddr.grid(row=0,column=1,sticky='nwse')
+        ttk.Label(frmRA,text='File: ').grid(row=1,column=0,sticky='nwse')
+        self.txtSelFile = ttk.Entry(frmRA,width=20)
+        self.txtSelFile.grid(row=1,column=1,sticky='ne')
+        ttk.Button(frmRA,text='Browse',width=6,command=self.browse).grid(row=1,column=2,sticky='nw')
+        ttk.Button(frmRA,text='Clear',width=6,command=self.clearselfile).grid(row=1,column=3,sticky='nw')
+        ttk.Label(frmRA,text='Limit To: ').grid(row=2,column=0)
+        frmRAL = ttk.Frame(frmRA,border=0)
+        frmRAL.grid(row=2,column=1,columnspan=3)
+        self.vlimitto = []
+        for i in xrange(4):
+            self.vlimitto.append(tk.IntVar())
+            chk = ttk.Checkbutton(frmRAL,text="ADDR %d" % (i+1),variable=self.vlimitto[i])
+            chk.grid(row=0,column=i,sticky='nwse')
         nb.add(frmT,text='Traffic')
 
         # we have to force an update, get size of holding frame and set pbar's length
@@ -794,8 +816,8 @@ class QueryPanel(gui.SlavePanel):
 
     def widgetreset(self):
         """ clears all user inputed data """
-        # clear all tree selections (selection_toggle? selection_remove?)
         # time periods
+        for s in self.trSession.selection(): self.trSession.selection_remove(s)
         self.txtFromDate.delete(0,tk.END)
         self.txtFromTime.delete(0,tk.END)
         self.txtToDate.delete(0,tk.END)
@@ -836,6 +858,11 @@ class QueryPanel(gui.SlavePanel):
         for chk in self.vformats: chk.set(0)
         self.txtIndex.delete(0,tk.END)
         # traffic
+        for s in self.trTypes.selection(): self.trTypes.selection_remove(s)
+        for chk in self.vfcflags: chk.set(0)
+        self.txtHWAddr.delete(0,tk.END)
+        self.txtSelFile.delete(0,tk.END)
+        for chk in self.vlimitto: chk.set(0)
 
     def fromnow(self):
         """assign now() to the from entries """
@@ -854,6 +881,9 @@ class QueryPanel(gui.SlavePanel):
         self.txtToDate.insert(0,d)                      # and add now
         self.txtToTime.delete(0,tk.END)
         self.txtToTime.insert(0,t)
+
+    def browse(self): pass
+    def clearselfile(self): pass
 
     # private helper functions
 
@@ -882,11 +912,11 @@ class QueryPanel(gui.SlavePanel):
         # allow all in host, nic, driver
         mac = self.txtSensorMac.get().upper()
         if mac and re.match(MACADDR,mac) is None:
-            self.err("Invalid Input","MAC addr %s is not valid")
+            self.err("Invalid Input","MAC addr %s is not valid" % mac)
             return False
-        spoof = self.txtSensorSpoof.get().upper()
-        if spoof and re.match(MACADDR,spoof) is None:
-            self.err("Invalid Input","Spoof addr %s is not valid")
+        mac = self.txtSensorSpoof.get().upper()
+        if mac and re.match(MACADDR,mac) is None:
+            self.err("Invalid Input","Spoof addr %s is not valid" % mac)
             return False
         stds = self.txtSensorStd.get().split(',')
         if stds and stds != ['']:
@@ -927,7 +957,25 @@ class QueryPanel(gui.SlavePanel):
                     if mi < 0 or mi > 31:
                         self.err("Invalid Input","mcs index must be between 0 and 31")
                         return False
-
+        mac = self.txtHWAddr.get().upper()
+        if mac and re.match(MACADDR,mac) is None:
+            self.err("Invalid Input","HW Addr %s is not valid" % mac)
+            return False
+        # check file path and file
+        fin = None
+        try:
+            fpath = self.txtSelFile.get()
+            fin = open(fpath,'r')
+        except IOError:
+            ss = fin.read().split(',')
+            for s in ss:
+                if re.match(MACADDR,s.strip()) is None:
+                    self.err("Invalid Input","Selector file %s has invalid data %s" % (fpath,s))
+                    return False
+            self.err("Invalid Input","Select file %s does not exist" % fpath)
+            return False
+        else:
+            if fin: fin.close()
         return True
 
 # Storage->Nidus-->Config
