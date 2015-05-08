@@ -13,6 +13,7 @@ __status__ = 'Development'
 import os                                  # file info etc
 import re                                  # reg. exp.
 import Tkinter as tk                       # gui constructs
+import tkFileDialog as tkFD                # import file gui dialogs
 import ttk                                 # ttk widgets
 import mgrs                                # for mgrs2latlon conversions etc
 import math                                # for conversions, calculations
@@ -882,8 +883,18 @@ class QueryPanel(gui.SlavePanel):
         self.txtToTime.delete(0,tk.END)
         self.txtToTime.insert(0,t)
 
-    def browse(self): pass
-    def clearselfile(self): pass
+    def browse(self):
+        """ open a file browsing dialog for selector file """
+        fpath = tkFD.askopenfilename(title="Open Selector File",
+                                     filetypes=[("Text Files","*.txt"),
+                                                ("Selector Files","*.sel")],
+                                     parent=self)
+        self.clearselfile()
+        self.txtSelFile.insert(0,fpath)
+
+    def clearselfile(self):
+        """ clear the selection file """
+        self.txtSelFile.delete(0,tk.END)
 
     # private helper functions
 
@@ -963,15 +974,16 @@ class QueryPanel(gui.SlavePanel):
             return False
         # check file path and file
         fin = None
+        fpath = None
         try:
             fpath = self.txtSelFile.get()
             fin = open(fpath,'r')
-        except IOError:
             ss = fin.read().split(',')
             for s in ss:
                 if re.match(MACADDR,s.strip()) is None:
                     self.err("Invalid Input","Selector file %s has invalid data %s" % (fpath,s))
                     return False
+        except IOError:
             self.err("Invalid Input","Select file %s does not exist" % fpath)
             return False
         else:
