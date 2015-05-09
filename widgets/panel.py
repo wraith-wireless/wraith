@@ -628,6 +628,9 @@ class MasterPanel(Panel):
        by slave panels
       showpanel -> derive for use in toolsload (loads saved panel configs)
       delete and close if the derived class must further handle shutting down
+
+     Derived classes can:
+      call guiload, _makemenu in initialization function as needed
     """
     def __init__(self,tl,ttl,datatypes=None,iconPath=None,resize=False):
         """
@@ -657,16 +660,17 @@ class MasterPanel(Panel):
         
         # try and make the menu
         self._makemenu()
-        try:
-            self.master.config(menu=self.menubar)
-        except AttributeError:
-            self.master.tk.call(self.master,"config","-menu",self.menubar)
+        if self.menubar:
+            try:
+                self.master.config(menu=self.menubar)
+            except AttributeError:
+                self.master.tk.call(self.master,"config","-menu",self.menubar)
 
         # initialiez
         self._initialize()
 
         # is there a default toolset saved?
-        if os.path.exists('default.ts'): self.guiload('default.ts')
+        #if os.path.exists('default.ts'): self.guiload('default.ts')
         self.update_idletasks()
 
     # Panel overrides

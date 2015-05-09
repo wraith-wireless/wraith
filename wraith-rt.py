@@ -4,8 +4,8 @@
 
 #__name__ = 'wraith-rt'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.3'
-__revdate__ = 'February 2015'
+__version__ = '0.0.4'
+__revdate__ = 'May 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -163,7 +163,7 @@ def readconf():
                 conf['policy']['polite'] = False
         if cp.has_option('Policy','shutdown'):
             if cp.get('Policy','shutdown').lower() == 'manual':
-                conf['ploicy']['shutdown'] = False
+                conf['policy']['shutdown'] = False
 
         # return no errors
         return conf
@@ -255,7 +255,7 @@ class WraithPanel(gui.MasterPanel):
 
         # determine if postgresql is running
         if cmdline.runningprocess('postgres'):
-            # update self,msg and connect
+            # update self, msg and connect
             msgs.append((time.strftime('%H:%M:%S'),
                          'PostgreSQL is running',
                          gui.LOG_NOERR))
@@ -301,9 +301,10 @@ class WraithPanel(gui.MasterPanel):
         # set initial state to initialized
         self._setstate(_STATE_INIT_)
 
-        # show log and write messages
+        # show log, write messages & display any saved panels
         self.viewlog()
         self.getpanel("log",True).delayedwrite(msgs)
+        if os.path.exists('default.ts'): self.guiload('default.ts')
 
         self.after(500,self._poll)
 
@@ -472,7 +473,7 @@ class WraithPanel(gui.MasterPanel):
         panel = self.getpanels('databin',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = subgui.DatabinPanel(t,self)
+            pnl = subgui.DatabinPanel(t,self,self._conn)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'databin'))
         else:
             panel[0].tk.deiconify()
@@ -1052,17 +1053,23 @@ class WraithSplash(object):
         self._tl.overrideredirect(True) # hide the title bar
 
         # create our splash image, progress bar and status label
+        ttk.Label(self._tl,style="splash.TLabel",font=('Gothic',20,'bold'),
+                  text="WRAITH-RT %s" % wraith.__version__,
+                  justify=tk.CENTER).grid(row=0,column=0,sticky='nwse')
         self._logo = ImageTk.PhotoImage(Image.open("widgets/icons/splash.png"))
         ttk.Label(self._tl,image=self._logo,
-                  style="splash.TLabel").grid(row=0,column=0,sticky='nwse')
+                  style="splash.TLabel").grid(row=1,column=0,sticky='nwse')
+        ttk.Label(self._tl,style="splash.TLabel",font=('Helvetica',10,'italic'),
+                  text="You knew that I reap where I have not sown\nand gather where I scattered no seed.",
+                  justify=tk.LEFT).grid(row=2,column=0,sticky='nwse')
         self._pb = ttk.Progressbar(self._tl,style="splash.Horizontal.TProgressbar",
-                                   maximum=10,orient=tk.HORIZONTAL,length=272,
+                                   maximum=10,orient=tk.HORIZONTAL,
                                    mode='determinate')
-        self._pb.grid(row=1,column=0,sticky='nwse')
+        self._pb.grid(row=3,column=0,sticky='nwse')
         self._sv = tk.StringVar()
         self._sv.set("Initializing...")
-        ttk.Label(self._tl,style="splash.TLabel",width=20,textvariable=self._sv,
-                  justify=tk.CENTER).grid(row=2,column=0,sticky='nwse')
+        ttk.Label(self._tl,style="splash.TLabel",textvariable=self._sv,
+                  justify=tk.CENTER).grid(row=4,column=0,sticky='nwse')
 
         # center on screen
         w = self._tl.winfo_screenwidth()
@@ -1171,10 +1178,10 @@ if __name__ == '__main__':
         # verify pwd has been set
         i = 2
         pwd = getpass.unix_getpass(prompt="Password [for %s]:" % getpass.getuser())
-        while not cmdline.testsudopwd(pwd) and i > 0:
+        while not cmdline.testsudopwd(pwd):
             pwd = getpass.unix_getpass(prompt="Incorrect password, try again:")
             i -= 1
-        if not pwd: ap.error("Three incorrect password attempts")
+            if i == 0: ap.error("Three incorrect password attempts")
 
         # stop DySKT, then Nidus, then PostgreSQL
         sd = sn = sp = True
@@ -1197,10 +1204,10 @@ if __name__ == '__main__':
         # verify pwd is present
         i = 2
         pwd = getpass.unix_getpass(prompt="Password [for %s]:" % getpass.getuser())
-        while not cmdline.testsudopwd(pwd) and i > 0:
+        while not cmdline.testsudopwd(pwd):
             pwd = getpass.unix_getpass(prompt="Incorrect password, try again:")
             i -= 1
-        if not pwd: ap.error("Three incorrect password attempts")
+            if i == 0: ap.error("Three incorrect password attempts")
 
         # start postgresql (if needed), nidus and dyskt
         if not cmdline.runningprocess('postgres'):
@@ -1223,10 +1230,10 @@ if __name__ == '__main__':
         if sopts == 'all':
             i = 2
             pwd = getpass.unix_getpass(prompt="Password [for %s]:" % getpass.getuser())
-            while not cmdline.testsudopwd(pwd) and i > 0:
+            while not cmdline.testsudopwd(pwd):
                 pwd = getpass.unix_getpass(prompt="Incorrect password, try again:")
                 i -= 1
-            if not pwd: ap.error("Three incorrect password attempts")
+                if i == 0: ap.error("Three incorrect password attempts")
         else: pwd = None
 
         # configure style, using the alt theme
@@ -1241,8 +1248,7 @@ if __name__ == '__main__':
         s.configure("reg.Horizontal.TProgressbar",foreground='green',
                     background='green',borderwidth=0)
 
-        # WraithPanel will start everything if pwd is present otherwise, will
-        # just start the gui
+        # WraithPanel will start everything if pwd is present otherwise just the gui
         try:
             wp = WraithPanel(t,pwd)                     # create main program
             if sopts == 'all':

@@ -60,6 +60,6 @@ def testsudopwd(pwd):
     """ tests the pwd for sudo rights using a simple sudo ls -l """
     p = Popen(['sudo','-S','ls','-l'],stdout=PIPE,stdin=PIPE,
               stderr=PIPE,universal_newlines=True)
-    out,err=p.communicate(pwd+'\n')
+    out,err = p.communicate(pwd+'\n')
     if out: return True
     return False

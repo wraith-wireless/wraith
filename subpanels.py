@@ -4,7 +4,7 @@
 __name__ = 'subpanels'
 __license__ = 'GPL v3.0'
 __version__ = '0.0.3'
-__revdate__ = 'March 2015'
+__revdate__ = 'May 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -19,6 +19,8 @@ import mgrs                                # for mgrs2latlon conversions etc
 import math                                # for conversions, calculations
 import time                                # for timestamps
 from PIL import Image,ImageTk              # image input & support
+import psycopg2 as psql                    # postgresql api
+import psycopg2.extras as pextras          # cursors and such
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
@@ -443,8 +445,9 @@ class InterfacePanel(gui.TabularPanel):
 # View->DataBin
 class DatabinPanel(gui.SimplePanel):
     """ DatabinPanel - displays a set of data bins for retrieved data storage """
-    def __init__(self,tl,chief):
+    def __init__(self,tl,chief,conn):
         self._bins = {}
+        self._curs = conn
         gui.SimplePanel.__init__(self,tl,chief,'Databin',"widgets/icons/db.png")
 
     def donothing(self): pass
@@ -473,9 +476,8 @@ class DatabinPanel(gui.SimplePanel):
     def viewquery(self,b):
         """ shows query panel for bin b """
         # notify user if not connected to database
-        #if not self._chief.isconnected:
-        #    self.err("Disconnected","Will not be able to retrieve any records. Connect and try again")
-        #    return
+        if not self._chief.isconnected:
+            self.warn("Disconnected","Will not be able to retrieve any records. Connect and try again")
 
         panel = self.getpanels('query%s' % b,False)
         if not panel:
@@ -539,6 +541,7 @@ class QueryPanel(gui.SlavePanel):
         gui.SlavePanel.__init__(self,tl,parent,ttl,'widgets/icons/bin%s.png'%b,False)
         self._bin = b
         self._makegui()
+        self._makemenu()
 
     def _makegui(self):
         """ make the query gui """
@@ -754,7 +757,7 @@ class QueryPanel(gui.SlavePanel):
         vscroll.grid(row=0,column=1,sticky='ns')
         self.trTypes['yscrollcommand'] = vscroll.set
         # fill the tree
-        self.trTypes['columns'] = ('one')
+        self.trTypes['columns'] = ('one',)
         self.trTypes.column('#0',stretch=0,width=15,anchor='w')
         self.trTypes.column('one',stretch=0,width=140,anchor='w')
         self.trTypes.insert('','end',iid='MGMT',values=('MGMT',))
@@ -802,11 +805,29 @@ class QueryPanel(gui.SlavePanel):
         self.update_idletasks()
         self._pb.configure(length=frmP.winfo_width())
 
+    def _makemenu(self):
+        """ display simple file menu with open/save option """
+        self.menubar = tk.Menu(self)
+        self.mnuFile = tk.Menu(self.menubar,tearoff=0)
+        self.mnuFile.add_command(label='Open',command=self.qrysave)
+        self.mnuFile.add_command(label='Save',command=self.qryload)
+        self.menubar.add_cascade(label='File',menu=self.mnuFile)
+        try:
+            self.master.config(menu=self.menubar)
+        except AttributeError:
+            self.master.tk.call(self.master,"config","-menu",self.menubar)
+
     # virtual implementations
 
     def _shutdown(self): pass
     def reset(self): pass
     def update(self): pass
+
+    # menu callbacks
+
+    def qrysave(self): pass
+
+    def qryload(self): pass
 
     # button callbacks
 
@@ -1856,11 +1877,12 @@ class AboutPanel(gui.SimplePanel):
         gui.SimplePanel.__init__(self,tl,chief,"About Wraith","widgets/icons/about.png")
 
     def _body(self):
-        self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/wraith-banner.png"))
-        ttk.Label(self,background='white',image=self.logo).grid(row=0,column=0,sticky='n')
+        self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/splash.png"))
+        ttk.Label(self,image=self.logo).grid(row=0,column=0,sticky='n')
         ttk.Label(self,text="wraith-rt %s" % wraith.__version__,
                   font=("Roman",16,'bold')).grid(row=1,column=0,sticky='n')
-        ttk.Label(self,text="Wireless reconnaissance, collection, assault and exploitation toolkit",
+        ttk.Label(self,justify=tk.CENTER,
+                  text="Wireless reconnaissance, collection,\nassault and exploitation toolkit",
                   font=("Roman",8,'bold')).grid(row=2,column=0,sticky='n')
         ttk.Label(self,text="Copyright %s %s %s" % (COPY,
                                                    wraith.__date__.split(' ')[1],

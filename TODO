@@ -16,9 +16,8 @@ Overall:
    o many statements are not even seen, remove them
 GUI:
  10) get log panel to scroll automatically
- 14) need to further test config panels primarily DySKTConfigPanel
  17) Help Panel
-     o code a two-paned window for an indexed help
+     o use a two-paned window for an indexed help
      o write help documentation
  20) Treeview/TabularPanel
      o Horizontal scrollbars on tree view do not work
