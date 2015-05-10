@@ -482,7 +482,7 @@ class DatabinPanel(gui.SimplePanel):
     def viewquery(self,b):
         """ shows query panel for bin b """
         # notify user if not connected to database
-        if not self._chief.isconnected():
+        if not self._chief.isconnected:
             self.warn("Disconnected","Cannot retrieve any records. Connect and try again")
 
         panel = self.getpanels('query%s' % b,False)
@@ -1031,19 +1031,18 @@ class QueryPanel(gui.SlavePanel):
 
     def _getsessions(self):
         """ retrieve all sessions and add to tree """
-        sql1 = "SELECT * FROM sensor;"
+        sql1 = "SELECT session_id,hostname,ip,lower(period),upper(period) FROM sensor;"
         sql2 = "SELECT count(id) FROM frame WHERE sid=%s;"
         self._curs.execute(sql1)
         ss = self._curs.fetchall()
         for s in ss:
             self._curs.execute(sql2,(s['session_id'],))
             fc = self._curs.fetchone()
-            cnt = fc['count']
-            self.trSession.insert('','end',iid=str(s['id']),values=(s['session_id'],
-                                                                    s['host'],
-                                                                    '',
-                                                                    '',
-                                                                    cnt))
+            self.trSession.insert('','end',iid=str(s['session_id']),values=(s['session_id'],
+                                                                            s['hostname'],
+                                                                            s['lower'],
+                                                                            s['upper'],
+                                                                            fc['count']))
 
 
 # Storage->Nidus-->Config
