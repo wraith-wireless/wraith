@@ -306,7 +306,7 @@ class NidusDB(object):
             # insert epochal
             sql = """
                    insert into radio_properties (mac,role,description,spoofed,txpwr,ts)
-                   values (%s,%s,%s,%s);
+                   values (%s,%s,%s,%s,%s,%s);
                   """
             self._curs.execute(sql,(ds['mac'],ds['role'],ds['desc'],
                                     ds['spoofed'],ds['txpwr'],ds['ts']))
@@ -454,11 +454,11 @@ class NidusDB(object):
 
             # submit to db
             sql = """
-                   insert into geo (gid,ts,coord,alt,spd,dir,
+                   insert into geo (sid,ts,coord,alt,spd,dir,
                                     fix,xdop,ydop,pdop,epx,epy)
                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
                   """
-            self._curs.execute(sql,(self._gid,ds['ts'],ds['coord'],ds['alt'],
+            self._curs.execute(sql,(self._sid,ds['ts'],ds['coord'],ds['alt'],
                                     ds['spd'],ds['dir'],ds['fix'],ds['xdop'],
                                     ds['ydop'],ds['pdop'],ds['epx'],ds['epy']))
         except nmp.NMPException as e:
@@ -513,28 +513,7 @@ class NidusDB(object):
     def _setradio(self,ts,did,state):
         """ set the state of a radio """
         if not state:
-            # close out antenna
-            sql = """
-                   update antenna set period = tstzrange(lower(period),%s)
-                   where mac = %s and upper(period) is NULL;
-                  """
-            self._curs.execute(sql,(ts,did))
-
-            # close out radio_epoch,
-            sql = """
-                   update radio_epoch set period = tstzrange(lower(period),%s)
-                   where mac = %s and upper(period) is NULL;
-                  """
-            self._curs.execute(sql,(ts,did))
-
-            # radio_periodic
-            sql = """
-                   update radio_period set period = tstzrange(lower(period),%s)
-                   where mac = %s and upper(period) is NULL;
-                  """
-            self._curs.execute(sql,(ts,did))
-
-            # and using_radio record
+            # close out  using_radio record
             sql = """
                    update using_radio set period = tstzrange(lower(period),%s)
                    where sid = %s and mac = %s;
@@ -1130,7 +1109,7 @@ class ExtractThread(SSEThread):
                        select firstSeen,lastSeen,firstHeard,lastHeard
                        from sta_activity where sid=%s and staid=%s;
                       """
-                curs.execute(sql,(self._sid,addrs[addr]['id']))
+                curs.execute(sql,(self._sid,(addrs[addr]['id']),))
                 row = curs.fetchone()
 
                 if row:

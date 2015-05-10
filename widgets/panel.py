@@ -10,27 +10,11 @@ NOTE:
  a panel may be a master panel and a slave panel.
  one and only panel will be "The Master" Panel
 
-This was actually written in 2009 but was forgotten after two deployments.
+This was originally written in 2009 but was forgotten after two deployments.
 Dragging it back out IOT to use a subset for the LOBster program, I noticed that
 there were a lot of small errors, irrelevant or redudant code and code that just
 did not make sense. So, I am starting basically from scratch and adding the code
 for subclasses as they becomes necessary.
-
- TODO:
-   3) handle no icons or invalid icon paths
-   4) issues happen with the TailLogger after the corresponding logfile is deleted
-   5) create a method in MasterPanel to handle creation of signular pattern i.e.
-     panel = self.getpanels(desc,False)
-     if not panel:
-        t = ttk.Toplevel()
-        pnl = PanelClase(t,self,argc)
-        self.addpanel(pnl.name,gui.PanelRecord(t,pnl,desc))
-      else:
-        panel[0].tk.deiconify()
-        panel[0].tk.lift()
-   7) disable/enable resize as necessary and if enabled ensure widgets resize
-      as necessary -> self.master.resizable(0,0)
-   8) Treeview horizontal does not scroll
 """
 
 __name__ = 'panel'

@@ -78,11 +78,11 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 # nidus server shutdown, close out the db
                 db.submitdropped()
                 connected = False
-            except Exception as e:
-                # lost connection with sensor, minimize errors to database
-                db.submitdropped()
-                logging.error("Sensor %s:%d dropped - %s",caddr,cport,e)
-                connected = False
+            #except Exception as e:
+            #    # lost connection with sensor, minimize errors to database
+            #    db.submitdropped()
+            #    logging.error("Sensor %s:%d dropped - %s",caddr,cport,e)
+            #    connected = False
         
         # clean up
         db.disconnect()

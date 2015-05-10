@@ -119,7 +119,7 @@ CREATE TABLE geo(
    pdop REAL DEFAULT 0,         -- position (3D) dilution of precision
    epx REAL DEFAULT 0,          -- longitude uncertainty
    epy REAL DEFAULT 0,          -- latitude uncertainty
-   CONSTRAINT ch_gid CHECK (gid >= 0),
+   CONSTRAINT ch_gid CHECK (sid >= 0),
    CONSTRAINT ch_spd CHECK (spd >= 0),
    CONSTRAINT ch_dir CHECK(dir >=0 and dir <= 360),
    CONSTRAINT ch_fix CHECK (fix >= -1 and fix <= 3),
@@ -163,7 +163,7 @@ CREATE TABLE antenna(
   y REAL,                           -- rotation of antenna along y-axis
   z REAL,                           -- rotation of antenna along y-axis
   type ANTENNA_TYPE DEFAULT 'omni', -- type of antenna
-  ts TIMESTAMPTZ NOT NULL,    -- timestamp properties became true
+  ts TIMESTAMPTZ NOT NULL,          -- timestamp properties became true
   CONSTRAINT ch_ind CHECK (ind >= 0),
   CONSTRAINT ch_x CHECK(x >=0 and x < 360),
   CONSTRAINT ch_y CHECK(y >=0 and y < 360),

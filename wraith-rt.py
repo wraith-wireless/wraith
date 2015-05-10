@@ -306,7 +306,8 @@ class WraithPanel(gui.MasterPanel):
         self.getpanel("log",True).delayedwrite(msgs)
         if os.path.exists('default.ts'): self.guiload('default.ts')
 
-        self.after(500,self._poll)
+        # this causes the menu to refresh itself, have to figure out another way
+        #self.after(500,self._poll)
 
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
@@ -636,7 +637,7 @@ class WraithPanel(gui.MasterPanel):
                     return
                 self._pwd = pwd
 
-            self.logwrite("Starting Nidus...",gui.LOG_NOTE)
+            self.logwrite("Stopping Nidus...",gui.LOG_NOTE)
             if stopnidus(self._pwd):
                 self._updatestate()
                 self._menuenable()

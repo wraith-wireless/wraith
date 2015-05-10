@@ -447,7 +447,8 @@ class DatabinPanel(gui.SimplePanel):
     """ DatabinPanel - displays a set of data bins for retrieved data storage """
     def __init__(self,tl,chief,conn):
         self._bins = {}
-        self._curs = conn
+        self._curs = {}
+        self._conn = conn
         gui.SimplePanel.__init__(self,tl,chief,'Databin',"widgets/icons/db.png")
 
     def donothing(self): pass
@@ -456,9 +457,9 @@ class DatabinPanel(gui.SimplePanel):
         """ creates the body """
         # add the bin buttons
         # NOTE: for whatever reason, trying to create individual viewquery functions
-        # for each bin b results in issues, if the button w/ function call is
+        # for each bin results in issues, if the button w/ function call is
         # created directly in the loop. But, if a function is called that creates
-        # the button w/ function, there is no issue
+        # the button w/ lambda function, there is no issue
         for b in wraith.BINS: self._makebin(self,b)
 
     def _makebin(self,frm,b):
@@ -473,17 +474,29 @@ class DatabinPanel(gui.SimplePanel):
                                               command=lambda:self.viewquery(b))
         self._bins[b]['btn'].grid(row=0,column=wraith.BINS.index(b),sticky='w')
 
+    def notifyclose(self,name):
+        """ close the associated bin's cursor """
+        self._curs[name].close()
+        gui.SimplePanel.notifyclose(self,name)
+
     def viewquery(self,b):
         """ shows query panel for bin b """
         # notify user if not connected to database
-        if not self._chief.isconnected:
-            self.warn("Disconnected","Will not be able to retrieve any records. Connect and try again")
+        if not self._chief.isconnected():
+            self.warn("Disconnected","Cannot retrieve any records. Connect and try again")
 
         panel = self.getpanels('query%s' % b,False)
         if not panel:
-            t = tk.Toplevel()
-            pnl = QueryPanel(t,self,"Query [bin %s]" % b,b)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'query%s' % b))
+            curs = None
+            try:
+                curs = self._conn.cursor(cursor_factory=pextras.DictCursor)
+            except:
+                self.err("Unspecified Error","Cannot connect to database")
+            else:
+                t = tk.Toplevel()
+                pnl = QueryPanel(t,self,"Query [bin %s]" % b,b,curs)
+                self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'query%s' % b))
+                self._curs['query%s'%b] = curs
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -531,15 +544,17 @@ FC_FLAGS_ORDERED   = 7
 
 class QueryPanel(gui.SlavePanel):
     """Display query for data panel """
-    def __init__(self,tl,parent,ttl,b):
+    def __init__(self,tl,parent,ttl,b,curs):
         """
          tl: Toplevel
          parent: our master panel
          ttl: title
          b: databin querying for
+         curs: cursor for our queries
         """
         gui.SlavePanel.__init__(self,tl,parent,ttl,'widgets/icons/bin%s.png'%b,False)
         self._bin = b
+        self._curs = curs
         self._makegui()
         self._makemenu()
 
@@ -805,6 +820,9 @@ class QueryPanel(gui.SlavePanel):
         self.update_idletasks()
         self._pb.configure(length=frmP.winfo_width())
 
+        # fill the session tree
+        self._getsessions()
+
     def _makemenu(self):
         """ display simple file menu with open/save option """
         self.menubar = tk.Menu(self)
@@ -1010,6 +1028,23 @@ class QueryPanel(gui.SlavePanel):
         else:
             if fin: fin.close()
         return True
+
+    def _getsessions(self):
+        """ retrieve all sessions and add to tree """
+        sql1 = "SELECT * FROM sensor;"
+        sql2 = "SELECT count(id) FROM frame WHERE sid=%s;"
+        self._curs.execute(sql1)
+        ss = self._curs.fetchall()
+        for s in ss:
+            self._curs.execute(sql2,(s['session_id'],))
+            fc = self._curs.fetchone()
+            cnt = fc['count']
+            self.trSession.insert('','end',iid=str(s['id']),values=(s['session_id'],
+                                                                    s['host'],
+                                                                    '',
+                                                                    '',
+                                                                    cnt))
+
 
 # Storage->Nidus-->Config
 class NidusConfigPanel(gui.ConfigPanel):
