@@ -484,6 +484,7 @@ class DatabinPanel(gui.SimplePanel):
         # notify user if not connected to database
         if not self._chief.isconnected:
             self.warn("Disconnected","Cannot retrieve any records. Connect and try again")
+            return
 
         panel = self.getpanels('query%s' % b,False)
         if not panel:
@@ -582,14 +583,14 @@ class QueryPanel(gui.SlavePanel):
         vscroll.grid(row=0,column=1,sticky='ns')
         self.trSession['yscrollcommand'] = vscroll.set
         # configure session tree's headers
-        hdrs = ['ID','Host','From','To','Frames']
-        hdrlens = [gui.lenpix('0000'),gui.lenpix('hostname'),
-                   gui.lenpix('00/00/00 00:00:00'),gui.lenpix('00/00/00 00:00:00'),
-                   gui.lenpix('00000')]
+        hdrs = ['ID','Host','Start','Frames']
+        hdrlens = [gui.lenpix('000'),gui.lenpix('HOST'),
+                   gui.lenpix('DDMMYY HHMM'),gui.lenpix('0000')]
         self.trSession['columns'] = hdrs
         for i in xrange(len(hdrs)):
             self.trSession.column(i,width=hdrlens[i],anchor=tk.CENTER)
             self.trSession.heading(i,text=hdrs[i])
+        self._getsessions() # fill the session tree
         frmRP = ttk.LabelFrame(frmR,text='Period')
         frmRP.grid(row=0,column=0,sticky='nwse')
         ttk.Label(frmRP,text='YYYY-MM-DD').grid(row=0,column=1,sticky='ne')
@@ -697,41 +698,51 @@ class QueryPanel(gui.SlavePanel):
         nb.add(frmS,text='Sensor')
         # signal tab
         frmSig = ttk.Frame(nb)
-        ttk.Label(frmSig,text='Not').grid(row=0,column=2,sticky='w')
-        ttk.Label(frmSig,text='Standard(s)').grid(row=1,column=0,sticky='w')
-        self.txtSignalStd = ttk.Entry(frmSig,width=10)
+        frmSigParams = ttk.Frame(frmSig)
+        frmSigParams.grid(row=0,column=0,sticky='nwse')
+        ttk.Label(frmSigParams,text='Not').grid(row=0,column=2,sticky='w')
+        ttk.Label(frmSigParams,text='Standard(s)').grid(row=1,column=0,sticky='w')
+        self.txtSignalStd = ttk.Entry(frmSigParams,width=10)
         self.txtSignalStd.grid(row=1,column=1,sticky='e')
         self.vnotstd = tk.IntVar()
-        ttk.Checkbutton(frmSig,variable=self.vnotstd).grid(row=1,column=2,sticky='w')
-        ttk.Label(frmSig,text='Rate(s)').grid(row=2,column=0,sticky='w')
-        self.txtSignalRate = ttk.Entry(frmSig,width=10)
+        ttk.Checkbutton(frmSigParams,variable=self.vnotstd).grid(row=1,column=2,sticky='w')
+        ttk.Label(frmSigParams,text='Rate(s)').grid(row=2,column=0,sticky='w')
+        self.txtSignalRate = ttk.Entry(frmSigParams,width=10)
         self.txtSignalRate.grid(row=2,column=1,sticky='e')
         self.vnotrate = tk.IntVar()
-        ttk.Checkbutton(frmSig,variable=self.vnotrate).grid(row=2,column=2,sticky='w')
-        ttk.Label(frmSig,text='Channel(s)').grid(row=3,column=0,sticky='w')
-        self.txtSignalCh = ttk.Entry(frmSig,width=10)
+        ttk.Checkbutton(frmSigParams,variable=self.vnotrate).grid(row=2,column=2,sticky='w')
+        ttk.Label(frmSigParams,text='Channel(s)').grid(row=3,column=0,sticky='w')
+        self.txtSignalCh = ttk.Entry(frmSigParams,width=10)
         self.txtSignalCh.grid(row=3,column=1,sticky='e')
         self.vnotch = tk.IntVar()
-        ttk.Checkbutton(frmSig,variable=self.vnotch).grid(row=3,column=2,sticky='w')
+        ttk.Checkbutton(frmSigParams,variable=self.vnotch).grid(row=3,column=2,sticky='w')
         # flags and channel flags are contained in separate frames
         # we want rows of 4 flags
         frmSigFlags = ttk.LabelFrame(frmSig,text='Flags')
-        frmSigFlags.grid(row=4,column=0,columnspan=3,sticky='nwse')
+        frmSigFlags.grid(row=1,column=0,sticky='nwse')
         self.vrtflags = []
         for i in xrange(len(RT_FLAGS)):
             self.vrtflags.append(tk.IntVar())
             chk = ttk.Checkbutton(frmSigFlags,text=RT_FLAGS[i],variable=self.vrtflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
+        ttk.Separator(frmSigFlags,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=2,sticky='ns')
+        self.vandorrtflags = tk.IntVar()
+        ttk.Radiobutton(frmSigFlags,text='AND',variable=self.vandorrtflags,value=0).grid(row=0,column=5,sticky='w')
+        ttk.Radiobutton(frmSigFlags,text='OR',variable=self.vandorrtflags,value=1).grid(row=1,column=5,sticky='w')
         frmSigChFlags = ttk.LabelFrame(frmSig,text="Channel Flags")
-        frmSigChFlags.grid(row=5,column=0,columnspan=4,sticky='nwse')
+        frmSigChFlags.grid(row=2,column=0,sticky='nwse')
         self.vchflags = []
         for i in xrange(len(CH_FLAGS)):
             self.vchflags.append(tk.IntVar())
             chk = ttk.Checkbutton(frmSigChFlags,text=CH_FLAGS[i],variable=self.vchflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
+        ttk.Separator(frmSigChFlags,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=2,sticky='ns')
+        self.vandorchflags = tk.IntVar()
+        ttk.Radiobutton(frmSigChFlags,text='AND',variable=self.vandorchflags,value=0).grid(row=0,column=5,sticky='w')
+        ttk.Radiobutton(frmSigChFlags,text='OR',variable=self.vandorchflags,value=1).grid(row=1,column=5,sticky='w')
         # add HT data parameters
         frmSigHT = ttk.LabelFrame(frmSig,text="802.11 Parameters")
-        frmSigHT.grid(row=0,column=3,rowspan=6,sticky='nwse')
+        frmSigHT.grid(row=0,column=1,rowspan=2,sticky='nwse')
         frmSigHT1 = ttk.Frame(frmSigHT)
         frmSigHT1.grid(row=0,column=0,sticky='nwse')
         self.vhtonly = tk.IntVar()
@@ -799,6 +810,11 @@ class QueryPanel(gui.SlavePanel):
             self.vfcflags.append(tk.IntVar())
             chk = ttk.Checkbutton(frmRFC,text=FC_FLAGS[i],variable=self.vfcflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
+        ttk.Separator(frmRFC,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=2,sticky='ns')
+        self.vandorfcflags = tk.IntVar()
+        ttk.Radiobutton(frmRFC,text='AND',variable=self.vandorfcflags,value=0).grid(row=0,column=5,sticky='w')
+        ttk.Radiobutton(frmRFC,text='OR',variable=self.vandorfcflags,value=1).grid(row=1,column=5,sticky='w')
+
         frmRA = ttk.LabelFrame(frmR,text='HW ADDR')
         frmRA.grid(row=1,column=0,sticky='nwse')
         ttk.Label(frmRA,text='Single: ').grid(row=0,column=0,sticky='nwse')
@@ -823,15 +839,14 @@ class QueryPanel(gui.SlavePanel):
         self.update_idletasks()
         self._pb.configure(length=frmP.winfo_width())
 
-        # fill the session tree
-        self._getsessions()
-
     def _makemenu(self):
         """ display simple file menu with open/save option """
         self.menubar = tk.Menu(self)
         self.mnuFile = tk.Menu(self.menubar,tearoff=0)
         self.mnuFile.add_command(label='Open',command=self.qrysave)
         self.mnuFile.add_command(label='Save',command=self.qryload)
+        self.menubar.add_separator()
+        self.menubar.add_command(label='Quit',command=self.close)
         self.menubar.add_cascade(label='File',menu=self.mnuFile)
         try:
             self.master.config(menu=self.menubar)
@@ -893,7 +908,9 @@ class QueryPanel(gui.SlavePanel):
         self.txtSignalCh.delete(0,tk.END)
         self.vnotch.set(0)
         for chk in self.vrtflags: chk.set(0)
+        self.vandorrtflags.set(0)
         for chk in self.vchflags: chk.set(0)
+        self.vandorchflags.set(0)
         self.vhtonly.set(0)
         self.vampdu.set(0)
         for chk in self.vbws: chk.set(0)
@@ -903,6 +920,7 @@ class QueryPanel(gui.SlavePanel):
         # traffic
         for s in self.trTypes.selection(): self.trTypes.selection_remove(s)
         for chk in self.vfcflags: chk.set(0)
+        self.vandorfcflags.set(0)
         self.txtHWAddr.delete(0,tk.END)
         self.txtSelFile.delete(0,tk.END)
         for chk in self.vlimitto: chk.set(0)
@@ -961,92 +979,97 @@ class QueryPanel(gui.SlavePanel):
         t = self.txtToTime.get()
         if t and not timestamps.validtime(t):
             return False
+
         # sensor
-        # allow all in host, nic, driver
-        mac = self.txtSensorMac.get().upper()
-        if mac and re.match(MACADDR,mac) is None:
-            self.err("Invalid Input","MAC addr %s is not valid" % mac)
-            return False
-        mac = self.txtSensorSpoof.get().upper()
-        if mac and re.match(MACADDR,mac) is None:
-            self.err("Invalid Input","Spoof addr %s is not valid" % mac)
-            return False
-        stds = self.txtSensorStd.get().split(',')
-        if stds and stds != ['']:
-            for std in stds:
-                if not std in ['a','b','g','n','ac']:
-                    self.err("Invalid Input","Invalid standard specifier %s" % std)
-                    return False
-        cp = self.txtCenterPT.get()
-        if cp and not landnav.validMGRS(cp):
-            self.err("Invalid Input","Center point is not a valid MGRS location")
-            return False
-        # signal
-        stds = self.txtSignalStd.get().split(',')
-        if stds and stds != ['']:
-            for std in stds:
-                if not std in ['a','b','g','n','ac']:
-                    self.err("Invalid Input","Invalid standard specifier %s" % std)
-                    return False
-        rs = self.txtSignalRate.get().split(',')
-        if rs and rs != ['']:
-            try:
-                map(float,rs)
-            except ValueError:
-                self.err("Invalid Input","Rate(s) must be numeric")
+        if self.vfilteron[0]:
+            # allow all in host, nic, driver
+            mac = self.txtSensorMac.get().upper()
+            if mac and re.match(MACADDR,mac) is None:
+                self.err("Invalid Input","MAC addr %s is not valid" % mac)
                 return False
-        if not parsechlist(self.txtSignalCh.get(),'scan'):
-            self.err("Invalid Input","Invalid channel(s0 specification")
-            return False
-        mis = self.txtIndex.get().split(',')
-        if mis and mis != ['']:
+            mac = self.txtSensorSpoof.get().upper()
+            if mac and re.match(MACADDR,mac) is None:
+                self.err("Invalid Input","Spoof addr %s is not valid" % mac)
+                return False
+            stds = self.txtSensorStd.get().split(',')
+            if stds and stds != ['']:
+                for std in stds:
+                    if not std in ['a','b','g','n','ac']:
+                        self.err("Invalid Input","Invalid standard specifier %s" % std)
+                        return False
+            cp = self.txtCenterPT.get()
+            if cp and not landnav.validMGRS(cp):
+                self.err("Invalid Input","Center point is not a valid MGRS location")
+                return False
+
+        # signal
+        if self.vfilteron[1]:
+            stds = self.txtSignalStd.get().split(',')
+            if stds and stds != ['']:
+                for std in stds:
+                    if not std in ['a','b','g','n','ac']:
+                        self.err("Invalid Input","Invalid standard specifier %s" % std)
+                        return False
+            rs = self.txtSignalRate.get().split(',')
+            if rs and rs != ['']:
+                try:
+                    map(float,rs)
+                except ValueError:
+                    self.err("Invalid Input","Rate(s) must be numeric")
+                    return False
+            if not parsechlist(self.txtSignalCh.get(),'scan'):
+                self.err("Invalid Input","Invalid channel(s0 specification")
+                return False
+            mis = self.txtIndex.get().split(',')
+            if mis and mis != ['']:
+                try:
+                    mis = map(int,mis)
+                except ValueError:
+                    self.err("Invalid Input","MCS Index must be integer(s)")
+                    return False
+                else:
+                    for mi in mis:
+                        if mi < 0 or mi > 31:
+                            self.err("Invalid Input","mcs index must be between 0 and 31")
+                            return False
+
+        if self.vfilter[2]:
+            mac = self.txtHWAddr.get().upper()
+            if mac and re.match(MACADDR,mac) is None:
+                self.err("Invalid Input","HW Addr %s is not valid" % mac)
+                return False
+            # check file path and file
+            fin = None
+            fpath = None
             try:
-                mis = map(int,mis)
-            except ValueError:
-                self.err("Invalid Input","MCS Index must be integer(s)")
+                fpath = self.txtSelFile.get()
+                fin = open(fpath,'r')
+                ss = fin.read().split(',')
+                for s in ss:
+                    if re.match(MACADDR,s.strip()) is None:
+                        self.err("Invalid Input","Selector file %s has invalid data %s" % (fpath,s))
+                        return False
+            except IOError:
+                self.err("Invalid Input","Select file %s does not exist" % fpath)
                 return False
             else:
-                for mi in mis:
-                    if mi < 0 or mi > 31:
-                        self.err("Invalid Input","mcs index must be between 0 and 31")
-                        return False
-        mac = self.txtHWAddr.get().upper()
-        if mac and re.match(MACADDR,mac) is None:
-            self.err("Invalid Input","HW Addr %s is not valid" % mac)
-            return False
-        # check file path and file
-        fin = None
-        fpath = None
-        try:
-            fpath = self.txtSelFile.get()
-            fin = open(fpath,'r')
-            ss = fin.read().split(',')
-            for s in ss:
-                if re.match(MACADDR,s.strip()) is None:
-                    self.err("Invalid Input","Selector file %s has invalid data %s" % (fpath,s))
-                    return False
-        except IOError:
-            self.err("Invalid Input","Select file %s does not exist" % fpath)
-            return False
-        else:
-            if fin: fin.close()
+                if fin: fin.close()
         return True
 
     def _getsessions(self):
         """ retrieve all sessions and add to tree """
-        sql1 = "SELECT session_id,hostname,ip,lower(period),upper(period) FROM sensor;"
+        sql1 = "SELECT session_id,hostname,ip,lower(period) FROM sensor;"
         sql2 = "SELECT count(id) FROM frame WHERE sid=%s;"
         self._curs.execute(sql1)
         ss = self._curs.fetchall()
         for s in ss:
             self._curs.execute(sql2,(s['session_id'],))
             fc = self._curs.fetchone()
-            self.trSession.insert('','end',iid=str(s['session_id']),values=(s['session_id'],
-                                                                            s['hostname'],
-                                                                            s['lower'],
-                                                                            s['upper'],
-                                                                            fc['count']))
-
+            self.trSession.insert('','end',iid=str(s['session_id']),
+                                  values=(s['session_id'],
+                                  s['hostname'],
+                                  s['lower'].strftime("%d%m%y %H%M%S"),
+                                  fc['count']))
 
 # Storage->Nidus-->Config
 class NidusConfigPanel(gui.ConfigPanel):

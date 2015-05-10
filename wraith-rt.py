@@ -262,7 +262,11 @@ class WraithPanel(gui.MasterPanel):
             if not self._pwd: self._bSQL = True
             self._setstate(_STATE_STORE_)
             (self._conn,ret) = psqlconnect(self._conf['store'])
-            if not self._conn is None: self._setstate(_STATE_CONN_)
+            if not self._conn is None:
+                self._setstate(_STATE_CONN_)
+                msgs.append((time.strftime('%H:%M:%S'),
+                             'Connected to database',
+                             gui.LOG_NOERR))
             else:
                 msgs.append((time.strftime('%H:%M:%S'),
                              "Error connecting to PostgreSQL: %s" % ret,
