@@ -583,9 +583,12 @@ class QueryPanel(gui.SlavePanel):
         self.trSession['yscrollcommand'] = vscroll.set
         # configure session tree's headers
         hdrs = ['ID','Host','From','To','Frames']
+        hdrlens = [gui.lenpix('0000'),gui.lenpix('hostname'),
+                   gui.lenpix('00/00/00 00:00:00'),gui.lenpix('00/00/00 00:00:00'),
+                   gui.lenpix('00000')]
         self.trSession['columns'] = hdrs
         for i in xrange(len(hdrs)):
-            self.trSession.column(i,width=gui.lenpix(hdrs[i])+10,anchor=tk.CENTER)
+            self.trSession.column(i,width=hdrlens[i],anchor=tk.CENTER)
             self.trSession.heading(i,text=hdrs[i])
         frmRP = ttk.LabelFrame(frmR,text='Period')
         frmRP.grid(row=0,column=0,sticky='nwse')
