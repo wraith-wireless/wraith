@@ -50,7 +50,7 @@ An 802.11 sensor consisting of an optional collection radio (i.e. spotter), a
 mandatory reconnaissance radio (i.e. shooter) and an RTO which relays collected
 data to Nidus, the data storage system (i.e. HQ). DySKT collects data in the form
 of raw 802.11 packets with the reconnaissance (and collection if present) radios,
-forwarding that date along with any geolocational data (if a gps device is present)
+forwarding that data along with any geolocational data (if a gps device is present)
 to higher.
 
 ### c. Nidus (v 0.0.6): Data Storage Manager
