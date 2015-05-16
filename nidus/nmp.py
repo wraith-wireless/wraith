@@ -181,6 +181,14 @@ GPSD_PATH      = 6
 
 #### DATA ####
 
+#### BULK ####
+BULK_FIELDS = ['ts','n','mac','frames']
+BULK_WFIELDS = [('ts',str),('n',int),('frames',str)]
+BULK_TIMESTAMP = 0 # timestamp frames were sent
+BULK_N         = 1 # number of frames included
+BULK_MAC       = 2 # the radio mac collecting the frames
+BULK_FRAMES    = 3 # the frames (compressed)
+
 #### FRAME ####
 FRAME_FIELDS = ['ts','mac','frame']
 FRAME_WFIELDS = [('ts',str),('mac',str),('frame',str)]

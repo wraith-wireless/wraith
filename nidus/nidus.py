@@ -116,6 +116,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 elif t == 'RADIO_EVENT': db.submitradioevent(f)
                 elif t == 'GPSD': db.submitgpsd(f)
                 elif t == 'FRAME': db.submitframe(f)
+                elif t == 'BULK': db.submitbulk(f)
                 elif t == 'GPS': db.submitgeo(f)
                 else:
                     logging.warning("Sensor %s:%d sent data with invalid header %s",

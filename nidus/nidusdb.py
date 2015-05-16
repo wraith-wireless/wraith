@@ -159,19 +159,19 @@ class NidusDB(object):
         """ submitdevice - submit the string fields to the database """
         try:
             # tokenize the string f, convert to dict
-            ds = nmp.data2dict(nmp.tokenize(f),"DEVICE")
+            ds = nmp.data2dict(nmp.tokenize(f),'DEVICE')
 
             # what type of device
             if not ds['type'] in ['sensor','radio','gpsd']:
                 raise NidusDBSubmitParamException("Invalid Device type %s" % ds['type'])
-            if ds['type'] == "sensor":
+            if ds['type'] == 'sensor':
                 try:
                     self._setsensor(ds['ts'],ds['id'],ds['state'],ip)
                 except NidusDBException:
                     # one of our threads failed to connect to database - reraise
                     self._conn.rollback()
                     raise
-            elif ds['type'] == "radio":
+            elif ds['type'] == 'radio':
                 self._setradio(ds['ts'],ds['id'],ds['state'])
             elif ds['type'] == 'gpsd':
                 self._setgpsd(ds['ts'],ds['state'])
@@ -188,7 +188,7 @@ class NidusDB(object):
         """ submit platform details """
         try:
             # tokenize
-            ds = nmp.data2dict(nmp.tokenize(f),"PLATFORM")
+            ds = nmp.data2dict(nmp.tokenize(f),'PLATFORM')
 
             sql = """
                    insert into platform (sid,os,dist,version,name,kernel,machine,
@@ -252,7 +252,7 @@ class NidusDB(object):
         """ submitgpsd - submit the string fields to the database """
         try:
             # tokenize the string f and convert to dict
-            ds = nmp.data2dict(nmp.tokenize(f),"GPSD")
+            ds = nmp.data2dict(nmp.tokenize(f),'GPSD')
 
             # submit to db
             # insert into the gpsd table (if it does not already exist)
@@ -288,7 +288,7 @@ class NidusDB(object):
         """ submitradio - submit the string fields to the database """
         try:
             # tokenize the string f and convert to dict
-            ds = nmp.data2dict(nmp.tokenize(f),"RADIO")
+            ds = nmp.data2dict(nmp.tokenize(f),'RADIO')
 
             # submit to db
             # insert radio into radio table if it does not exist
@@ -325,7 +325,12 @@ class NidusDB(object):
                 self._tSave[ds['mac']] = SaveThread(self._qSave[ds['mac']],
                                                     self._raw['path'],
                                                     self._raw['private'],
-                                                    self._raw['sz'])
+                                                    self._raw['sz'],
+                                                    (self._storage['host'],
+                                                     self._storage['port'],
+                                                     self._storage['db'],
+                                                     self._storage['user'],
+                                                     self._storage['pwd']))
                 self._tSave[ds['mac']].start()
 
         except nmp.NMPException as e:
@@ -345,7 +350,7 @@ class NidusDB(object):
         """ submitantenna - submit the string fields to the database """
         try:
             # tokenize f and convert to dict and insert into db
-            ds = nmp.data2dict(nmp.tokenize(f),"ANTENNA")
+            ds = nmp.data2dict(nmp.tokenize(f),'ANTENNA')
             sql = """
                    insert into antenna (mac,ind,gain,loss,x,y,z,type,ts)
                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
@@ -364,7 +369,7 @@ class NidusDB(object):
         """ submitradioevent - submit the string fields to the database """
         try:
             # tokenize the string f and convert to dict and insert into db
-            ds = nmp.data2dict(nmp.tokenize(f),"RADIO_EVENT")
+            ds = nmp.data2dict(nmp.tokenize(f),'RADIO_EVENT')
             sql = "insert into radio_event (mac,state,params,ts) values (%s,%s,%s,%s);"
             self._curs.execute(sql,(ds['mac'],ds['event'],ds['params'],ds['ts']))
         except nmp.NMPException as e:
@@ -375,16 +380,19 @@ class NidusDB(object):
         else:
             self._conn.commit()
 
-    def submitframe(self,f):
-        """
-         submitframe - submit the string fields to the database
-          s - save frame to file
-          s - store frame in data store
-          e - extract details on nets/stas
-        """
+    def submitbulk(self,f):
+        """ submitbulk - submit string fields to the database """
         # tokenize the data
         try:
-            ds = nmp.data2dict(nmp.tokenize(f),"FRAME")
+            ds = nmp.data2dict(nmp.tokenize(f),'BULK')
+        except nmp.NMPException as e:
+            raise NidusDBSubmitParseException(e)
+
+    def submitframe(self,f):
+        """ submitframe - submit the string fields to the database """
+        # tokenize the data
+        try:
+            ds = nmp.data2dict(nmp.tokenize(f),'FRAME')
         except nmp.NMPException as e:
             raise NidusDBSubmitParseException(e)
 
@@ -450,7 +458,7 @@ class NidusDB(object):
         """ submitgeo - submit the string fields to the database """
         try:
             # tokenize the string f and convert to dict, convert lat/lon to mgrs
-            ds = nmp.data2dict(nmp.tokenize(f),"GPS")
+            ds = nmp.data2dict(nmp.tokenize(f),'GPS')
 
             # submit to db
             sql = """
@@ -488,7 +496,11 @@ class NidusDB(object):
             # store threads
             self._qStore = Queue.Queue()
             for i in xrange(self._nStore):
-                thread = StoreThread(self._qStore,self._sid)
+                thread = StoreThread(self._qStore,self._sid,(self._storage['host'],
+                                                             self._storage['port'],
+                                                             self._storage['db'],
+                                                             self._storage['user'],
+                                                             self._storage['pwd']))
                 thread.start()
                 self._tStore.append(thread)
 
@@ -496,10 +508,12 @@ class NidusDB(object):
             self._lSta = threading.Lock()
             self._qExtract = Queue.Queue()
             for i in xrange(self._nExtract):
-                thread = ExtractThread(self._qExtract,
-                                       self._lSta,
-                                       self._sid,
-                                       self._oui)
+                thread = ExtractThread(self._qExtract,self._lSta,self._sid,
+                                       self._oui,(self._storage['host'],
+                                                     self._storage['port'],
+                                                     self._storage['db'],
+                                                     self._storage['user'],
+                                                     self._storage['pwd']))
                 thread.start()
                 self._tExtract.append(thread)
         else:
@@ -595,19 +609,21 @@ class ExtractTask(tuple):
 
 class SSEThread(threading.Thread):
     """ Super Class for a SaveStoreExtract worker thread """
-    def __init__(self,tasks):
+    def __init__(self,tasks,h,p,db,u,pwd):
         """
-         sid - current session id
-         halt - stop event
-         task - queue of tasks to pull from
+         tasks: queue of tasks to pull from
+         h: database host
+         p: database port
+         db: database name
+         u: user
+         pwd: user
         """
         threading.Thread.__init__(self)
         self._qT = tasks
         self._conn = None # connection to database
         self._err = None  # internal err information
         try:
-            self._conn = psql.connect(host="localhost",dbname="nidus",
-                                      user="nidus",password="nidus")
+            self._conn = psql.connect(host=h,port=p,dbname=db,user=u,password=pwd)
             curs = self._conn.cursor()
             curs.execute("set time zone 'UTC';")
             curs.close()
@@ -644,12 +660,14 @@ class SSEThread(threading.Thread):
 
 class SaveThread(SSEThread):
     """ handles saving the frame in tasks queue to file """
-    def __init__(self,tasks,path,private,sz):
+    def __init__(self,tasks,path,private,sz,db):
         """
-         path - directory to store pcaps in
-         sz - max size of pcap file
+         path: directory to store pcaps in
+         private: {no = save entire frame|yes = save only layer 1 and 2}
+         sz: max size of pcap file
+         db: datbase connection tuple t = (h=host,p=port,db=dbname,u=user,pwd=db pwd)
         """
-        SSEThread.__init__(self,tasks)
+        SSEThread.__init__(self,tasks,db[0],db[1],db[2],db[3],db[4])
         self._path = path
         self._private = private
         self._sz = sz
@@ -722,12 +740,13 @@ class SaveThread(SSEThread):
 
 class StoreThread(SSEThread):
     """ stores the frame details in the task queue to the db """
-    def __init__(self,tasks,sid):
+    def __init__(self,tasks,sid,db):
         """
-         tasks - the tasks queue
-         sid - session id
+         tasks: the tasks queue
+         sid: session id
+         db: datbase connection tuple t = (h=host,p=port,db=dbname,u=user,pwd=db pwd)
         """
-        SSEThread.__init__(self,tasks)
+        SSEThread.__init__(self,tasks,db[0],db[1],db[2],db[3],db[4])
         self._sid = sid
 
     def _cleanup(self): pass
@@ -944,13 +963,14 @@ class ExtractThread(SSEThread):
      to facilitate analysis by decreasing the need for complex queries.
      Extracts & stores the details of nets/stas etc from mpdus
     """
-    def __init__(self,tasks,lSta,sid,oui):
+    def __init__(self,tasks,lSta,sid,oui,db):
         """
          lSta - lock on the stay dictionary
          sid - session id
          oui - oui dict
+         db: datbase connection tuple t = (h=host,p=port,db=dbname,u=user,pwd=db pwd)
         """
-        SSEThread.__init__(self,tasks)
+        SSEThread.__init__(self,tasks,db[0],db[1],db[2],db[3],db[4])
         self._l = lSta
         self._sid = sid
         self._oui = oui
@@ -969,7 +989,7 @@ class ExtractThread(SSEThread):
         # IBSS/Intra   0    0        RA=DA     TA=SA     BSSID       N/A
         # From AP      0    1        RA=DA  TA=BSSID        SA       N/A
         # To AP        1    0     RA=BSSID     TA=SA        DA       N/A
-        # Wireless DS  1    1     RA=BSSID  TA=BSSID     DA=WDS    SA=WDS
+        # Wireless DS  1    1     RA=BSSID  TA=BSSID        DA=WDS    SA=WDS
 
         # extract unique addresses of stas in the mpdu into the addr dict having
         # the form <hwaddr>->{'loc:[<i..n>],'id':<sta_id>} where i=1 through 4
