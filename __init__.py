@@ -33,6 +33,12 @@ wraith 0.0.3
    - migrated from Tix to ttk
    - implemented command line argument to fully start wraith if desired
    - added a splash panel that initiates services
+
+wraith 0.0.4
+ desc: developmental cycle
+ includes:  wraith-rt. py,subpanels.py and wraith.conf (also all subdirectories etc)
+ changes:
+  - added TLS support for encrypted comms betw/ Nidus & DySKT
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
@@ -42,6 +48,8 @@ __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
+
+import os
 
 #### CONSTANTS
 
@@ -53,3 +61,6 @@ DYSKTPID   = '/var/run/dysktd.pid'       # path to dyskt pidfile
 WRAITHCONF = 'wraith.conf'               # path to wraith config file
 NIDUSCONF  = 'nidus/nidus.conf'          # path to nidus config file
 DYSKTCONF  = 'dyskt/dyskt.conf'          # path to dyskt config file
+# path to tls cert,key
+NIDUSCERT  = os.path.join(os.path.dirname(os.path.abspath(__file__)),'nidus.cert')
+NIDUSKEY   = os.path.join(os.path.dirname(os.path.abspath(__file__)),'nidus.key')

@@ -10,8 +10,7 @@ nidus 0.0.5
   and processed. It is hoped the builtin SocketServer.TCPServer with ThreadingMixIn
   will be sufficient to handle a single-system setup. The slowest (relatively)
   process will be the submission, processing and storing of frames.
- includes: nidus 0.0.3, nmp 0.0.2, nidusdb 0.1.1 nidus.sql 0.0.9, simplepcap 0.0.1
-  nidus.conf nidus.log.conf
+ includes: nidus 0.0.3, nmp 0.0.2, nidusdb 0.1.1 nidus.sql 0.0.9 nidus.conf nidus.log.conf
  changes:
   - extends failure method to handle situations where nidus is shutdown unexpectantly
   - no longer attempts to store all packets in the data store
@@ -39,8 +38,7 @@ nidus 0.0.5
 
 nidus 0.0.6
  desc: continues from v 0.0.5
- includes: nidus 0.0.3, nmp 0.0.3, nidusdb 0.1.3 nidus.sql 0.0.10, simplepcap 0.0.1
-  nidus.conf nidus.log.conf
+ includes: nidus 0.0.3, nmp 0.0.3, nidusdb 0.1.3 nidus.sql 0.0.10 nidus.conf nidus.log.conf
  changes:
   - added extraction of all management frames (excluding timing adv)
   - added nidusd daemon file to start nidus server
@@ -49,6 +47,7 @@ nidus 0.0.6
   - modified database
     o condensed some of the radio tables
     o using timestamp rather than periods for radio tables (exluding using_radio)
+  - added encrypted comms via ssl library
 """
 __name__ = 'nidus'
 __license__ = 'GPL v3.0'

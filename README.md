@@ -85,6 +85,7 @@ and editing of configuration files, some manipulation of backened storage.
     - timestamps.py     timestamp conversion functions
     - landnav.py        land navigation utilities
     - cmdline.py        various cmdline utilities for testing processes
+    - simplepcap.py     pcap writer
  *  radio               subpackage for radio/radiotap
      - \_\_init\_\_.py  initialize radio subpackage
      - iwtools.py       iwconfig, ifconfig interface and nic utilities
@@ -110,6 +111,5 @@ and editing of configuration files, some manipulation of backened storage.
      - nidus.py         nidus server
      - nmp.py           nidus protocol definition
      - nidusdb.py       interface to storage system
-     - simplepcap.py    pcap writer
      - nidus.sql        sql tables definition
      - nidusd           nidus daemon

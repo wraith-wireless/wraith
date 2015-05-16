@@ -50,7 +50,6 @@ Nidus:
    the corresponding sensor
   3) Optimize postgresql database, storage, retrieval, indexing etc
   4) identify postgresql server not running prior to request handler
-  7) encrypted socket connection from dyskt to nidus?
   8) secured (hashed) username/password from to datastore
  10) how/when to partition table to offload older records
  12) nidusdb.py

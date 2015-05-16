@@ -80,3 +80,8 @@ postgres=# CREATE EXTENSION btree_gist;
         sudo setcap cap_net_raw=-ep /usr/bin/python2.7
       * Using dyskt daemon, set raw capabilities are temporarily enabled and
         then removed after the raw socket is bound (after a short sleep)
+
+  - configure ssl
+   o openssl req -new -x509 -days 365 -nodes -out nidus.cert -keyout nidus.key
+     * save nidus.cert and nidus.key in the toplevel wraith folder
+       NOTE: wraith/__init__.py is configured to set nidus.cert and nidus.key fullpath

@@ -980,7 +980,7 @@ class QueryPanel(gui.SlavePanel):
         if t and not timestamps.validtime(t):
             return False
 
-        # sensor
+        # only validate sensor entries if 'enabled'
         if self.vfilteron[0]:
             # allow all in host, nic, driver
             mac = self.txtSensorMac.get().upper()
@@ -1002,7 +1002,7 @@ class QueryPanel(gui.SlavePanel):
                 self.err("Invalid Input","Center point is not a valid MGRS location")
                 return False
 
-        # signal
+        # # only validate signal entries if 'enabled'
         if self.vfilteron[1]:
             stds = self.txtSignalStd.get().split(',')
             if stds and stds != ['']:
@@ -1033,7 +1033,8 @@ class QueryPanel(gui.SlavePanel):
                             self.err("Invalid Input","mcs index must be between 0 and 31")
                             return False
 
-        if self.vfilter[2]:
+        # only validate traffic entries if 'enabled'
+        if self.vfilteron[2]:
             mac = self.txtHWAddr.get().upper()
             if mac and re.match(MACADDR,mac) is None:
                 self.err("Invalid Input","HW Addr %s is not valid" % mac)

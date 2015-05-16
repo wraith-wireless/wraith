@@ -31,7 +31,7 @@ from wraith.radio import channels                    # 802.11 channels/RFs
 from wraith.radio.oui import parseoui,manufacturer   # oui functions
 from wraith.nidus import nmp                         # message protocol
 from wraith.utils.timestamps import ts2iso           # timestamp convesion
-import simplepcap as pcap                            # write frames to file
+from wraith.utils import simplepcap as pcap          # write frames to file
 
 class NidusDBException(Exception): pass                          # generic exception
 class NidusDBServerException(NidusDBException): pass             # no server/failed to connect

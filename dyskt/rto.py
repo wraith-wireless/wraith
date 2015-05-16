@@ -19,11 +19,13 @@ import sys                                 # python intepreter details
 import signal                              # signal processing
 import time                                # sleep and timestamps
 import socket                              # connection to nidus and gps device
+import ssl                                 # encrypted comms w/ nidus
 import threading                           # threads
 import mgrs                                # lat/lon to mgrs conversion
 import gps                                 # gps device access
 from Queue import Queue, Empty             # thread-safe queue
 import multiprocessing as mp               # multiprocessing
+import wraith                              # for cert path
 from wraith.utils.timestamps import ts2iso # timestamp conversion
 from wraith.radio.iw import regget         # regulatory domain
 
@@ -174,7 +176,11 @@ class RTO(mp.Process):
             self._mgrs = mgrs.MGRS()
 
             # connect to data store
-            self._nidus = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            self._nidus = ssl.wrap_socket(sock,
+                                          ca_certs=wraith.NIDUSCERT,
+                                          cert_reqs=ssl.CERT_REQUIRED,
+                                          ssl_version=ssl.PROTOCOL_TLSv1)
             self._nidus.connect((host,port))
         except socket.error as e:
             raise RuntimeError("RTO:Nidus:%s" % e)

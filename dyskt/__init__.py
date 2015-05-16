@@ -49,6 +49,7 @@ dyskt 0.1.5
     b) if it will result in unneccessary db storage or traffic
  - check specified nic for wireless capabilities/presence during conf processing
  - fixed issue with radio being reset after initialization errors
+ - initiates ssl connection with Nidus
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'

@@ -6,8 +6,8 @@ Server frontend to store collected information to database
 """
 #__name__ = 'nidus'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.3'
-__date__ = 'September 2014'
+__version__ = '0.0.4'
+__date__ = 'May 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -18,13 +18,14 @@ import re                  # pattern matching for parsing
 import signal              # signal processing
 import select              # select function
 import socket              # socket functions
+import ssl                 # add encrypted comms
 import logging             # log
 import logging.config      # log configuration
 import logging.handlers    # handlers for log
-import argparse as ap      # cmd line argument parsing
 import SocketServer as ss  # socket server
-import nidusdb  # nidus datastorage interface
+import nidusdb             # nidus datastorage interface
 from wraith import nidus   # top level package
+import wraith              # for cert and key locations
 from nmp import NMP        # nidus message protocol regular expression
 
 #### set up log
@@ -32,9 +33,6 @@ from nmp import NMP        # nidus message protocol regular expression
 GPATH = os.path.dirname(os.path.abspath(__file__))
 logpath = os.path.join(GPATH,'nidus.log.conf')
 logging.config.fileConfig(logpath)
-
-# CONF FILE path
-#global CONFPATH
 
 #### OUR EXCEPTIONS
 class NidusException(Exception): pass
@@ -78,11 +76,11 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 # nidus server shutdown, close out the db
                 db.submitdropped()
                 connected = False
-            #except Exception as e:
-            #    # lost connection with sensor, minimize errors to database
-            #    db.submitdropped()
-            #    logging.error("Sensor %s:%d dropped - %s",caddr,cport,e)
-            #    connected = False
+            except Exception as e:
+                # lost connection with sensor, minimize errors to database
+                db.submitdropped()
+                logging.error("Sensor %s:%d dropped - %s",caddr,cport,e)
+                connected = False
         
         # clean up
         db.disconnect()
@@ -143,11 +141,33 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                                 self.client_address[1],
                                 e)
 
-class NidusServer(ss.ThreadingMixIn, ss.TCPServer):
+class SSLServer(ss.TCPServer):
+    """ adds ssl to TCP Server w/ TLS 1 """
+    def __init__(self,addr,rh,cert,key,baa=True):
+        """
+         addr: server address (ip,port)
+         rhc: request handler class
+         cert: cert file
+         key: key file
+         baa: bind and activate
+        """
+        ss.TCPServer.__init__(self,addr,rh,baa)
+        self._cert = cert
+        self._key = key
+    def get_request(self):
+        sock,faddr = self.socket.accept()
+        conn = ssl.wrap_socket(sock,
+                               server_side=True,
+                               certfile=self._cert,
+                               keyfile=self._key,
+                               ssl_version=ssl.PROTOCOL_TLSv1)
+        return conn,faddr
+
+class NidusServer(ss.ThreadingMixIn, SSLServer):
     daemon_threads = False
     allow_reuse_address = True
     def __init__(self,addr,rh):
-        ss.TCPServer.__init__(self,addr,rh)
+        SSLServer.__init__(self,addr,rh,wraith.NIDUSCERT,wraith.NIDUSKEY)
         self.quit = False
     def stop(self):
         logging.info("NidusServer stopping...")
