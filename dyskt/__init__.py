@@ -49,7 +49,10 @@ dyskt 0.1.5
     b) if it will result in unneccessary db storage or traffic
  - check specified nic for wireless capabilities/presence during conf processing
  - fixed issue with radio being reset after initialization errors
- - initiates ssl connection with Nidus
+ - compresssed/encrypted comms with Nidus
+   o uses secure socket layer to send data to Nidus
+   o zlib library to compress frames (hardcoded to 14K and 1 sec delay)
+ -
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'

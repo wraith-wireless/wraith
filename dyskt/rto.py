@@ -23,11 +23,16 @@ import ssl                                 # encrypted comms w/ nidus
 import threading                           # threads
 import mgrs                                # lat/lon to mgrs conversion
 import gps                                 # gps device access
+import zlib                                # compress bulk frames
 from Queue import Queue, Empty             # thread-safe queue
 import multiprocessing as mp               # multiprocessing
 import wraith                              # for cert path
 from wraith.utils.timestamps import ts2iso # timestamp conversion
 from wraith.radio.iw import regget         # regulatory domain
+
+# CONSTANTS
+_BSZ_ = 14336   # size in bytes
+_BTM_ = 1000    # time in milliseconds
 
 class GPSPoller(threading.Thread):
     """ periodically checks gps for current location """
@@ -195,9 +200,9 @@ class RTO(mp.Process):
         signal.signal(signal.SIGINT,signal.SIG_IGN)
         signal.signal(signal.SIGTERM,signal.SIG_IGN) 
 
-        # radio map: maps callsigns to mac addr
-        rmap = {}
-        gpsid = None
+        rmap = {}    # radio map: maps callsigns to mac addr
+        bulk = {}    # stored frames
+        gpsid = None # id of gps device
 
         # send sensor up notification, platform details and gpsid
 
@@ -247,6 +252,12 @@ class RTO(mp.Process):
                     # NOTE: send the radio, nidus will take care of setting the
                     # radio device to up. Send each antenna separately
                     rmap[cs] = msg['mac']
+                    bulk[cs] = {'cob':None,       # zlib compressobj
+                                'mac':msg['mac'], # mac address of collecting radio
+                                'start':0,        # time first frame was seen
+                                'cnt':0,          # total number of frames
+                                'sz':0,           # total size of uncompressed frames
+                                'frames':''}      # the compressed frames
                     self._conn.send(('info','RTO','Radio',"%s initiated" % cs))
                     ret = self._send('RADIO',ts,msg)
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
@@ -280,9 +291,33 @@ class RTO(mp.Process):
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'hold',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!PAUSE!': pass
-                elif ev == '!FRAME!': # pass the frame on
-                    ret = self._send('FRAME',ts,[rmap[cs],msg])
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                elif ev == '!FRAME!':
+                    # save the frame and update bulk details
+                    if bulk[cs]['cnt'] == 0:
+                        bulk[cs]['start'] = ts               # reset start
+                        bulk[cs]['cob'] = zlib.compressobj() # new compression obj
+                    bulk[cs]['cnt'] += 1
+                    bulk[cs]['sz'] += len(msg)
+                    bulk[cs]['frames'] += bulk[cs]['cob'].compress('%s \x1EFB\x1F%s\x1FFE\x1E' % (ts2iso(ts),msg))
+
+                    # if we have hit our limit, compress and send the bulk frames
+                    if bulk[cs]['sz'] > _BSZ_ or (ts - bulk[cs]['start'])/1000 > _BTM_:
+                        try:
+                            bulk[cs]['frames'] += bulk[cs]['cob'].flush()
+                            ret = self._send('BULK',ts,[rmap[cs],bulk[cs]['cnt'],
+                                                        bulk[cs]['frames']])
+                            if ret: raise RuntimeError(ret)
+                        except zlib.error as e:
+                            self._conn.send(('err','RTO','zlib',e))
+                        except RuntimeError as e:
+                            self._conn.send(('err','RTO','Nidus',ret))
+                        else:
+                            # reset bulk details
+                            bulk[cs]['cnt'] = 0
+                            bulk[cs]['sz'] = 0
+                            bulk[cs]['frames'] = ''
+                    #ret = self._send('FRAME',ts,[rmap[cs],msg])
+                    #if ret: self._conn.send(('err','RTO','Nidus',ret))
                 else: # unidentified event type, notify leader
                     self._conn.send(('warn','RTO','Radio',
                                      "unidentified event %s" % ev))
@@ -382,6 +417,7 @@ class RTO(mp.Process):
             elif t == 'ANTENNA': send += self._craftantenna(ts,d)
             elif t == 'GPSD': send += self._craftgpsd(ts,d)
             elif t == 'FRAME': send += self._craftframe(ts,d)
+            elif t == 'BULK': send += self._craftbulk(ts,d)
             elif t == 'GPS': send += self._craftflt(ts,d,self._mgrs)
             elif t == 'RADIO_EVENT': send += self._craftradioevent(ts,d)
             send += "\x03\x12\x15\04"
@@ -423,6 +459,11 @@ class RTO(mp.Process):
         return "%s %s %d \x1EFB\x1F%s\x1FFE\x1E %.2f %.2f %d %d %d" %\
                (ts,d['mac'],d['index'],d['type'],d['gain'],d['loss'],d['x'],
                 d['y'],d['z'])
+
+    @staticmethod
+    def _craftbulk(ts,d):
+        """ create body of bulk message """
+        return "%s %s %s \x1EFB\x1F%s\x1FFE\x1E" % (ts,d[0],d[1],d[2])
 
     @staticmethod
     def _craftframe(ts,d):

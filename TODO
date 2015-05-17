@@ -61,13 +61,13 @@ Nidus:
       - have started using a err variable in SSEThread class, must extend that
         to allow nidusdb to see the error
     o look into processes over threads for SSE
+    o should we use nidusdb's connection or continue to create in
+      the thread?
  13) move to pcap-ng format?
  14) need to further test writing mgmt frames to db, there are still some errors
      mainly syntatic in the sql statements
  15) should we commit individual statements in long functions i.e. _setradio
  16) add radiotap mcs stbc streams and extensions spatial streams
- 17) for sse threads, should we use nidusdb's connection or continue to create in
-     the thread
 Radio:
 1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)

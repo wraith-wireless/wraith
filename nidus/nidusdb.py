@@ -24,6 +24,7 @@ from dateutil import parser as dtparser              # parse out timestamps
 import ConfigParser                                  # config file
 import threading                                     # sync items
 import Queue                                         # thread-safe queue
+import zlib                                          # decompress bulk frames
 import wraith.radio.radiotap as rtap                 # 802.11 layer 1 parsing
 from wraith.radio import mpdu                        # 802.11 layer 2 parsing
 from wraith.radio import mcs                         # mcs functions
@@ -385,8 +386,14 @@ class NidusDB(object):
         # tokenize the data
         try:
             ds = nmp.data2dict(nmp.tokenize(f),'BULK')
+            print 'Before: ', len(ds['frames'])
+            frames = zlib.decompress(ds['frames'])
+            print 'After: ', len(frames)
         except nmp.NMPException as e:
             raise NidusDBSubmitParseException(e)
+        except zlib.error as e:
+            raise NidusDBSubmitParseException(e)
+
 
     def submitframe(self,f):
         """ submitframe - submit the string fields to the database """

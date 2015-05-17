@@ -13,14 +13,14 @@ Nidus expects six major message types Radio, GPSD, Frame, GPS, Status and Sensor
  FRAME: a raw 802.11 frame
  GPS: gps location data
 
-Briefly, each message will follow (NOTE: There cannot be a space betw/ the 
-colons and the following data, control character) the below format:
+Briefly, each message will follow  the below format: (NOTE: There cannot be a
+space betw/ the colons and the data, control character)
  
  <SOH>*TYPE:<STX>FIELDS<ETX><LF><CR><EOT>
 or
  \x01*TYPE:\x02FIELDS\x03\x12\x15\x04 
 
-where TYPE is one {STATUS,SENSOR,RADIO,GPDS,FRAME,GPS} and FIELDS is a space 
+where TYPE is oneof {STATUS,SENSOR,RADIO,GPDS,BULK,FRAME,GPS} and FIELDS is a space
 delimited string as defined (for TYPE) below. Fields are defined in three 
 variables:
  TYPE_FIELDS - list of each expected field name at expected index
@@ -30,14 +30,14 @@ variables:
  TYPE_FIELDNAMEn - index of field name n into TYPE_FIELDS, TYPE_WFIELDS
 NOTE:
  o Any field that might possibly contain spaces or control characters must be 
-   delimited by \x1EFB\x1F \x1FFE\x1E
+   enclosed by \x1EFB\x1F \x1FFE\x1E i.e. \x1EFB\x1FField with spaces\x1FFE\x1E
  o Fields that are lists are formatted as strings of comma separated values
 
 """
 __name__ = 'nmp'
 __license__ = 'GPL v3.0'
 __version__ = '0.0.3'
-__date__ = 'March 2015'
+__date__ = 'May 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -182,12 +182,12 @@ GPSD_PATH      = 6
 #### DATA ####
 
 #### BULK ####
-BULK_FIELDS = ['ts','n','mac','frames']
-BULK_WFIELDS = [('ts',str),('n',int),('frames',str)]
+BULK_FIELDS = ['ts','mac','n','frames']
+BULK_WFIELDS = [('ts',str),('mac',str),('n',int),('frames',str)]
 BULK_TIMESTAMP = 0 # timestamp frames were sent
 BULK_N         = 1 # number of frames included
 BULK_MAC       = 2 # the radio mac collecting the frames
-BULK_FRAMES    = 3 # the frames (compressed)
+BULK_FRAMES    = 3 # compressed string of frames having format <time frame>
 
 #### FRAME ####
 FRAME_FIELDS = ['ts','mac','frame']
