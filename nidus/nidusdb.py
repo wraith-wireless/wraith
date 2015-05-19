@@ -396,72 +396,71 @@ class NidusDB(object):
             f = f.split('\x1EFB\x1F')
             self._submitframe_(mac,f[0].strip(),f[1])
 
-    def submitframe(self,f):
-        """ submitframe - submit the string fields to the database """
-        # tokenize the data
-        try:
-            ds = nmp.data2dict(nmp.tokenize(f),'FRAME')
-        except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
-
-        # because each thread relies on a frame id and for that frame to exist
-        # frames are inserted here. The worker threads will insert as necessary
-        # remaining details
-
-        # parse the radiotap and mpdu
-        f = ds['frame']  # pull out the frame
-        lF = len(f)      # & get the total length
-        dR = {}          # make an empty rtap dict
-        dM = mpdu.MPDU() # & an empty mpdu dict
-        validRTAP = True # rtap was parsed correctly
-        validMPDU = True # mpdu was parsed correctly
-        try:
-            dR = rtap.parse(f)
-            dM = mpdu.parse(f[dR['sz']:],rtap.flags_get(dR['flags'],'fcs'))
-        except rtap.RadiotapException:
-            # the parsing failed at radiotap, set insert values to empty
-            validRTAP = validMPDU = False
-            vs = (self._sid,ds['ts'],lF,0,0,[0,lF],0,'none',0)
-        except mpdu.MPDUException:
-            # the radiotap was valid but mpdu failed - initialize empty mpdu
-            validMPDU = False
-            vs = (self._sid,ds['ts'],lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
-                  int('a-mpdu' in dR['present']),0,0)
-        else:
-            vs = (self._sid,ds['ts'],lF,dR['sz'],
-                  dM.offset,[(dR['sz']+dM.offset),(lF-dM.stripped)],
-                  dR['flags'],int('a-mpdu' in dR['present']),
-                  rtap.flags_get(dR['flags'],'fcs'))
-
-        # insert the frame
-        sql = """
-               insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
-               values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning id;
-              """
-        try:
-            self._curs.execute(sql,vs)
-            fid = self._curs.fetchone()[0]
-        except psql.Error as e:
-            self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
-        else:
-            self._conn.commit()
-
-        # put task(s) on SSE queues
-        # S: frame will always be saved (if specified in config file
-        # S: frame will be 'stored' if radiotap is valid
-        # E: frame will be 'extracted' if mpdu is valid
-        if self._raw['save']:
-            # setup our left/right boundaries for privacy feature
-            l = r = 0
-            if validRTAP: l += dR['sz']
-            if validMPDU:
-                l += dM.offset
-                r = lF-dM.stripped
-            self._qSave[ds['mac']].put(sse.SaveTask(ds['ts'],fid,self._sid,
-                                                    ds['mac'],f,(l,r)))
-        if validRTAP: self._qStore.put(sse.StoreTask(fid,ds['mac'],dR,dM))
-        if validMPDU: self._qExtract.put(sse.ExtractTask(ds['ts'],fid,dM))
+    # single frame submission no longer supported leave for now for testing
+    #def submitframe(self,f):
+    #    """ submitframe - submit the string fields to the database """
+    #    # tokenize the data
+    #    try:
+    #        ds = nmp.data2dict(nmp.tokenize(f),'FRAME')
+    #    except nmp.NMPException as e:
+    #        raise NidusDBSubmitParseException(e)
+    #
+    #    # because each thread relies on a frame id and for that frame to exist
+    #    # frames are inserted here. The worker threads will insert as necessary
+    #    # remaining details
+    #
+    #    # parse the radiotap and mpdu
+    #    f = ds['frame']  # pull out the frame
+    #    lF = len(f)      # & get the total length
+    #    dR = {}          # make an empty rtap dict
+    #    dM = mpdu.MPDU() # & an empty mpdu dict
+    #    validRTAP = True # rtap was parsed correctly
+    #    validMPDU = True # mpdu was parsed correctly
+    #    try:
+    #        dR = rtap.parse(f)
+    #        dM = mpdu.parse(f[dR['sz']:],rtap.flags_get(dR['flags'],'fcs'))
+    #    except rtap.RadiotapException:
+    #        # the parsing failed at radiotap, set insert values to empty
+    #        validRTAP = validMPDU = False
+    #        vs = (self._sid,ds['ts'],lF,0,0,[0,lF],0,'none',0)
+    #    except mpdu.MPDUException:
+    #        # the radiotap was valid but mpdu failed - initialize empty mpdu
+    #        validMPDU = False
+    #        vs = (self._sid,ds['ts'],lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
+    #              int('a-mpdu' in dR['present']),0,0)
+    #    else:
+    #        vs = (self._sid,ds['ts'],lF,dR['sz'],
+    #              dM.offset,[(dR['sz']+dM.offset),(lF-dM.stripped)],
+    #              dR['flags'],int('a-mpdu' in dR['present']),
+    #              rtap.flags_get(dR['flags'],'fcs'))
+    #    # insert the frame
+    #    sql = """
+    #           insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
+    #           values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning id;
+    #          """
+    #    try:
+    #        self._curs.execute(sql,vs)
+    #        fid = self._curs.fetchone()[0]
+    #    except psql.Error as e:
+    #        self._conn.rollback()
+    #        raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+    #    else:
+    #        self._conn.commit()
+    #    # put task(s) on SSE queues
+    #    # S: frame will always be saved (if specified in config file
+    #    # S: frame will be 'stored' if radiotap is valid
+    #    # E: frame will be 'extracted' if mpdu is valid
+    #    if self._raw['save']:
+    #        # setup our left/right boundaries for privacy feature
+    #        l = r = 0
+    #        if validRTAP: l += dR['sz']
+    #        if validMPDU:
+    #            l += dM.offset
+    #            r = lF-dM.stripped
+    #        self._qSave[ds['mac']].put(sse.SaveTask(ds['ts'],fid,self._sid,
+    #                                                ds['mac'],f,(l,r)))
+    #    if validRTAP: self._qStore.put(sse.StoreTask(fid,ds['mac'],dR,dM))
+    #    if validMPDU: self._qExtract.put(sse.ExtractTask(ds['ts'],fid,dM))
 
     def submitgeo(self,f):
         """ submitgeo - submit the string fields to the database """
