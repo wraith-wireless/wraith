@@ -43,8 +43,6 @@ DySKT:
        - listen stop scanning on specified channel
        - pause stop scanning and recording
  41) need to handle tuner thread failure in rdoctl
- 42) send multiple frames as a single compressed/encrypted packet for efficiency
-     and security
  43) allow sensor to start in paused mode
 Nidus:
   1) return messages instead of just closing pipe for no running server etc
