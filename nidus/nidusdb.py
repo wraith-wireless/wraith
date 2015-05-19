@@ -383,8 +383,6 @@ class NidusDB(object):
         try:
             ds = nmp.data2dict(nmp.tokenize(f),'BULK')
             frames = zlib.decompress(ds['frames'])
-            print frames
-
         except nmp.NMPException as e:
             raise NidusDBSubmitParseException(e)
         except zlib.error as e:

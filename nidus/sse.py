@@ -23,7 +23,12 @@ from wraith.radio import mcs                # mcs functions
 from wraith.radio import channels           # 802.11 channels/RFs
 from wraith.radio.oui import manufacturer   # oui functions
 from wraith.utils import simplepcap as pcap # write frames to file
-import wraith.nidus.nidusdb as ndb          # for exceptions
+
+
+# EXCEPTIONS
+class SSEException(Exception): pass           # generic SSE exception
+class SSEDBException(SSEException): pass      # failure to connect
+class SSEConsumeException(SSEException): pass # failure to consume
 
 # Task Definitions
 
@@ -111,12 +116,7 @@ class SSEThread(threading.Thread):
             curs.close()
             self._conn.commit()
         except psql.OperationalError as e:
-            if e.__str__().find('connect') > 0:
-                raise ndb.NidusDBServerException("Postgresql not running")
-            elif e.__str__().find('authentication') > 0:
-                raise ndb.NidusDBAuthException("Invalid connection string")
-            else:
-                raise ndb.NidusDBException("Database failure: %s" % e)
+            raise SSEDBException("Cannot connect to db %s" % e)
 
     def run(self):
         """ processing loop - calls consume until told to stop """
@@ -125,10 +125,12 @@ class SSEThread(threading.Thread):
             if item == '!STOP!': break
             try:
                 self._consume(item)
-            except ndb.NidusDBSubmitException as e:
-                print "DB Error: ", e
+            except SSEConsumeException as e:
+                # TODO: how to 'pass', 'log' or whatever with this
+                pass
             except Exception as e:
-                print "Error: ", e
+                # TODO: how to 'pass', 'log' or whatever with this
+                pass
         self._clean() # cleanup
 
     def _clean(self):
@@ -191,7 +193,7 @@ class SaveThread(SSEThread):
                 try:
                     self._fout = pcap.pcapopen(fname)
                 except pcap.PCAPException as e:
-                    raise ndb.NidusDBSubmitException(e)
+                    raise SSEConsumeException('Save: ' + e)
 
             self._writepkts()
 
@@ -257,7 +259,7 @@ class StoreThread(SSEThread):
         except psql.Error as e:
             self._conn.rollback()
             curs.close()
-            raise ndb.NidusDBSubmitException(e.pgcode,e.pgerror,self._err[0],self._err[1])
+            raise SSEConsumeException('Store: ' + e)
         else:
             self._conn.commit()
         finally:
@@ -538,7 +540,7 @@ class ExtractThread(SSEThread):
                                        addrs[l2.addr3]['id'],True,l2,curs)
         except psql.Error as e:
             self._conn.rollback()
-            raise ndb.NidusDBSubmitException(e.pgcode,e.pgerror,self._err[0],self._err[1])
+            raise SSEConsumeException('Extract: ' + e)
         else:
             self._conn.commit()
         finally:

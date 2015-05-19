@@ -11,6 +11,9 @@ Overall:
   3) Need a way to identify when nidus is processing data from a closed dyskt
    o use an open session in database?
   5) enable delete by session
+  6) After setting up bulk submissions, there is still a delay (smaller) in time
+    DySKT quit and time Nidus gets last submissions. Test if processes for SSE
+    helps (and is worth it)
 GUI:
  10) get log panel to scroll automatically
  17) Help Panel
@@ -34,10 +37,10 @@ DySKT:
      o identify/handle device failing or being removed
      o uniquely identify with a permanent id w/out hardcoding in conf file
      o allow no gps (fixed or otherwise)
- 31) add interf4) Splash panel
-   o get rid of border around progressbar and progressbar.pbar
-   o many statements are not even seen, remove themace (tcpserver? or socket?) to allow finer control of pausing,
-     holding, listening
+ 31) add Splash panel
+     o get rid of border around progressbar and progressbar.pbar
+     o many statements are not even seen, remove themace (tcpserver? or socket?) to allow finer control of pausing,
+       holding, listening
      o better define hold, listen, pause
        - hold stop scanning on current channel
        - listen stop scanning on specified channel
