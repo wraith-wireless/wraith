@@ -111,5 +111,6 @@ and editing of configuration files, some manipulation of backened storage.
      - nidus.py         nidus server
      - nmp.py           nidus protocol definition
      - nidusdb.py       interface to storage system
+     - sse.py           frame/metaframe processing
      - nidus.sql        sql tables definition
      - nidusd           nidus daemon

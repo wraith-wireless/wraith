@@ -2,7 +2,7 @@
 
 """ nmp.py: Nidus message protocol definition 
 
-Defines the nidus message protocol. A simple definition of the nidus message protocol: 
+A simple definition of the nidus message protocol:
 
 Nidus expects six major message types Radio, GPSD, Frame, GPS, Status and Sensor
  DEVICE: state of given device has changed 

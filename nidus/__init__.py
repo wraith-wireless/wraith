@@ -48,6 +48,8 @@ nidus 0.0.6
     o condensed some of the radio tables
     o using timestamp rather than periods for radio tables (exluding using_radio)
   - added encrypted comms via ssl library
+  - added support for bulk frames
+  - moved sse thread definitions to separate file sse.py
 """
 __name__ = 'nidus'
 __license__ = 'GPL v3.0'

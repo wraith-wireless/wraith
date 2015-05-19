@@ -10,9 +10,7 @@ Overall:
      use sudo
   3) Need a way to identify when nidus is processing data from a closed dyskt
    o use an open session in database?
-  4) Splash panel
-   o get rid of border around progressbar and progressbar.pbar
-   o many statements are not even seen, remove them
+  5) enable delete by session
 GUI:
  10) get log panel to scroll automatically
  17) Help Panel
@@ -27,13 +25,18 @@ GUI:
      should we extend to every panel or leave as is
  25) add save/load query option to QueryPanel
  26) rework shutdown (shutting down services)
+ 27) Splash panel
+     o get rid of border around progressbar and progressbar.pbar
+     o many statements are not even seen, remove them
 DySKT:
   3) implement adaptive scan pattern
  26) gps device handling
      o identify/handle device failing or being removed
      o uniquely identify with a permanent id w/out hardcoding in conf file
      o allow no gps (fixed or otherwise)
- 31) add interface (tcpserver? or socket?) to allow finer control of pausing,
+ 31) add interf4) Splash panel
+   o get rid of border around progressbar and progressbar.pbar
+   o many statements are not even seen, remove themace (tcpserver? or socket?) to allow finer control of pausing,
      holding, listening
      o better define hold, listen, pause
        - hold stop scanning on current channel
