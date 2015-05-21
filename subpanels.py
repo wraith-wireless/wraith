@@ -19,7 +19,7 @@ import mgrs                                # for mgrs2latlon conversions etc
 import math                                # for conversions, calculations
 import time                                # for timestamps
 from PIL import Image,ImageTk              # image input & support
-import psycopg2 as psql                    # postgresql api
+#import psycopg2 as psql                    # postgresql api
 import psycopg2.extras as pextras          # cursors and such
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants

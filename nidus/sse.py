@@ -125,9 +125,11 @@ class SSEThread(threading.Thread):
                 self._consume(item)
             except SSEConsumeException as e:
                 # TODO: how to 'pass', 'log' or whatever with this
+                #print e
                 pass
             except Exception as e:
                 # TODO: how to 'pass', 'log' or whatever with this
+                #print e
                 pass
         self._clean() # cleanup
 
@@ -192,7 +194,7 @@ class SaveThread(SSEThread):
                 try:
                     self._fout = pcap.pcapopen(fname)
                 except pcap.PCAPException as e:
-                    raise SSEConsumeException('Save: ' + e)
+                    raise SSEConsumeException('Save: ' + e.__repr__())
 
             self._writepkts()
 
@@ -257,8 +259,10 @@ class StoreThread(SSEThread):
                 if dM.crypt: self._insertcrypt(fid,dM,curs)
         except psql.Error as e:
             self._conn.rollback()
-            curs.close()
-            raise SSEConsumeException('Store: ' + e)
+            raise SSEConsumeException('Store: ' + e.__repr__())
+        except Exception as e:
+            self._conn.rollback()
+            raise SSEConsumeException('Store: ' + e.__repr__())
         else:
             self._conn.commit()
         finally:
@@ -275,6 +279,9 @@ class StoreThread(SSEThread):
         except psql.Error:
             self._err = ('ampdu',fid)
             raise
+        except:
+            self._err = ('ampdu',fid)
+            raise
 
     def _insertsource(self,fid,rdo,r,curs):
         """
@@ -287,6 +294,9 @@ class StoreThread(SSEThread):
             sql = "insert into source (fid,src,antenna,rfpwr) values (%s,%s,%s,%s);"
             curs.execute(sql,(fid,rdo,ant,pwr))
         except psql.Error:
+            self._err = ('source',fid)
+            raise
+        except:
             self._err = ('source',fid)
             raise
 
@@ -306,7 +316,8 @@ class StoreThread(SSEThread):
                 elif mcsflags['bw'] == rtap.MCS_BW_20L: bw = '20L'
                 else: bw = '20U'
                 width = 40 if bw == '40' else 20
-                #print mcsflags['stbc']
+                stbc = mcsflags['stbc']
+                print stbc
                 gi = 1 if 'gi' in mcsflags and mcsflags['gi'] > 0 else 0
                 ht = 1 if 'ht' in mcsflags and mcsflags['ht'] > 0 else 0
                 index = r['mcs'][2]
@@ -314,27 +325,28 @@ class StoreThread(SSEThread):
                 hasMCS = 1
             except:
                 if r['channel'][0] in channels.ISM_24_F2C:
-                    if rtap.chflags_get(r['channel'][1],'cck'):
-                        std = 'b'
-                    else:
-                        std = 'g'
-                else:
-                    std = 'a'
+                    if rtap.chflags_get(r['channel'][1],'cck'): std = 'b'
+                    else: std = 'g'
+                else: std = 'a'
                 rate = r['rate'] * 0.5 if 'rate' in r else 0
                 bw = None
                 gi = None
                 ht = None
                 index = None
+                stbc = None
                 hasMCS = 0
             sql = """
-                   insert into signal (fid,std,rate,channel,chflags,rf,ht,
-                                       mcs_bw,mcs_gi,mcs_ht,mcs_index)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                   insert into signal (fid,std,rate,channel,chflags,rf,ht,mcs_bw,
+                                       mcs_gi,mcs_ht,mcs_index,mcs_stbc)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
                   """
             curs.execute(sql,(fid,std,rate,channels.f2c(r['channel'][0]),
                               r['channel'][1],r['channel'][0],hasMCS,bw,gi,
-                              ht,index))
+                              ht,index,stbc))
         except psql.Error:
+            self._err = ('signal',fid)
+            raise
+        except:
             self._err = ('signal',fid)
             raise
 
@@ -371,6 +383,9 @@ class StoreThread(SSEThread):
         except psql.Error:
             self._err = ('traffic',fid)
             raise
+        except:
+            self._err = ('traffic',fid)
+            raise
 
     def _insertqos(self,fid,m,curs):
         """
@@ -388,6 +403,9 @@ class StoreThread(SSEThread):
                                   m.qosctrl['a-msdu'],
                                   m.qosctrl['txop']))
         except psql.Error:
+            self._err = ('qosctrl',fid)
+            raise
+        except:
             self._err = ('qosctrl',fid)
             raise
 
@@ -438,6 +456,9 @@ class StoreThread(SSEThread):
                 # undefined crypt type
                 pass
         except psql.Error:
+            self._err = ('crypt',fid)
+            raise
+        except:
             self._err = ('crypt',fid)
             raise
 
@@ -540,7 +561,12 @@ class ExtractThread(SSEThread):
                                        addrs[l2.addr3]['id'],True,l2,curs)
         except psql.Error as e:
             self._conn.rollback()
-            raise SSEConsumeException('Extract: ' + e)
+            print 'Extract: ', self._err
+            raise SSEConsumeException('Extract: ' + e.__repr__())
+        except Exception as e:
+            print 'Extract: ', self._err
+            self._conn.rollback()
+            raise SSEConsumeException('Extract: ' + e.__repr__())
         else:
             self._conn.commit()
         finally:
@@ -551,8 +577,6 @@ class ExtractThread(SSEThread):
          given the frame id fid with timestamp ts and address dict of stas in
          the frame, inserts unique sta's and sta activity in db using the
          cursor curs
-         NOTE: as a side-effect will insert the sta id for each non-broadcast
-          address
         """
         #### ENTER sta CS
         try:
@@ -585,6 +609,10 @@ class ExtractThread(SSEThread):
                         addrs[addr]['id'] = curs.fetchone()[0]
                         self._conn.commit()
         except psql.Error:
+            # tag the error & reraise (letting the finally block release the lock)
+            self._err = ('sta',fid)
+            raise # reraise
+        except:
             # tag the error & reraise (letting the finally block release the lock)
             self._err = ('sta',fid)
             raise # reraise
@@ -682,6 +710,11 @@ class ExtractThread(SSEThread):
         except psql.Error:
             # tag the error and reraise, finally block will release the CS lock
             self._err = ('sta_activity',fid)
+            raise
+        except:
+            # tag the error & reraise (letting the finally block release the lock)
+            self._err = ('sta',fid)
+            raise
         finally:
             self._l.release()
             #### EXIT CS
@@ -736,6 +769,9 @@ class ExtractThread(SSEThread):
         except (ValueError,IndexError,AttributeError):
             self._err = ('assocreq',fid)
             raise
+        except:
+            self._err = ('assocreq',fid)
+            raise
 
     def _insertreassocreq(self,fid,ts,client,ap,l2,curs):
         """
@@ -764,6 +800,9 @@ class ExtractThread(SSEThread):
                     curid = curs.fetchone()[0]
                     self._conn.commit()
             except psql.Error:
+                self._err = ('reassoc',fid)
+                raise
+            except:
                 self._err = ('reassoc',fid)
                 raise
             finally:
@@ -812,6 +851,9 @@ class ExtractThread(SSEThread):
             self._err = ('reassocreq',fid)
             raise
         except (ValueError,IndexError,AttributeError):
+            self._err = ('reassocreq',fid)
+            raise
+        except:
             self._err = ('reassocreq',fid)
             raise
 
@@ -867,6 +909,9 @@ class ExtractThread(SSEThread):
         except (ValueError,IndexError,AttributeError):
             self._err = ('assocresp',fid)
             raise
+        except:
+            self._err = ('assocresp',fid)
+            raise
 
     def _insertprobereq(self,fid,client,ap,l2,curs):
         """
@@ -893,6 +938,9 @@ class ExtractThread(SSEThread):
             self._err = ('probereq',fid)
             raise
         except (ValueError,IndexError,AttributeError):
+            self._err = ('probereq',fid)
+            raise
+        except:
             self._err = ('probereq',fid)
             raise
 
@@ -944,6 +992,9 @@ class ExtractThread(SSEThread):
             self._err = ('proberesp',fid)
             raise
         except (ValueError,IndexError,AttributeError):
+            self._err = ('proberesp',fid)
+            raise
+        except:
             self._err = ('proberesp',fid)
             raise
 

@@ -36,9 +36,10 @@ wraith 0.0.3
 
 wraith 0.0.4
  desc: developmental cycle
- includes:  wraith-rt. py,subpanels.py and wraith.conf (also all subdirectories etc)
+ includes:  wraith-rt.py, subpanels.py and wraith.conf (also all subdirectories etc)
  changes:
   - added TLS support for encrypted comms betw/ Nidus & DySKT
+  - added bulk frame submission
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

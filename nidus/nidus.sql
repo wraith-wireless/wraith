@@ -324,6 +324,7 @@ CREATE TABLE signal(
    mcs_gi smallint,            -- mcs guard interval 0=long, 1=short
    mcs_ht smallint,            -- mcs ht format 0=mixed, 1=greenfield
    mcs_index smallint,         -- mcs index if known
+   mcs_stbc smallint,          -- # stbc streams if present
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_rate CHECK (rate >= 0),
    CONSTRAINT ch_channel CHECK (channel > 0 and channel < 200),
@@ -333,6 +334,7 @@ CREATE TABLE signal(
    CONSTRAINT ch_mcs_gi CHECK (mcs_gi >= 0 and mcs_gi <= 1),
    CONSTRAINT ch_mcs_ht CHECK (mcs_ht >= 0 and mcs_ht <= 1),
    CONSTRAINT ch_mcs_index CHECK (mcs_index >= 0 and mcs_index <= 31),
+   CONSTRAINT ch_mcs_stbc CHECK (mcs_stbc >= 0),
    FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
