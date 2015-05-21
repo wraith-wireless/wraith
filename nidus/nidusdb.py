@@ -258,7 +258,7 @@ class NidusDB(object):
             if not row:
                 sql = """
                        insert into gpsd (devid,version,flags,driver,bps,tty)
-                       values (%s,%s,%s,%s,%s,%s) returning id;
+                       values (%s,%s,%s,%s,%s,%s) returning gpsd_id;
                       """
                 self._curs.execute(sql,(ds['id'],ds['vers'],ds['flags'],
                                         ds['driver'],ds['bps'],ds['path']))
