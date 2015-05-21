@@ -582,40 +582,43 @@ class ExtractThread(SSEThread):
         try:
             # do not process broadcast addresses
             nonbroadcast = [addr for addr in addrs if addr != mpdu.BROADCAST]
-            if nonbroadcast:
-                sql = "select id, mac from sta where "
-                sql += " or ".join(["mac=%s" for _ in nonbroadcast])
-                sql += ';'
+            if not nonbroadcast: return
+            # setup query statement
+            sql = "select sta_id, mac from sta where "
+            sql += " or ".join(["mac=%s" for _ in nonbroadcast])
+            sql += ';'
 
-                self._l.acquire()
+            # lock so no other Extract threads can add/modify stas
+            self._l.acquire()
 
-                # get all rows with current sta(s) & add sta id if it is not new
-                curs.execute(sql,tuple(nonbroadcast))
-                for row in curs.fetchall():
-                    if row[1] in addrs: addrs[row[1]]['id'] = row[0]
+            # get all rows with current sta(s) & add sta id if it is not new
+            curs.execute(sql,tuple(nonbroadcast))
+            for row in curs.fetchall():
+                if row[1] in addrs: addrs[row[1]]['id'] = row[0]
 
-                # for each address
-                for addr in nonbroadcast:
-                    # if this one doesnt have an id (not seen before) add it
-                    if not addrs[addr]['id']:
-                        # insert the new sta - commit the transaction because
-                        # we we're experiencing duplicate key issues w/o commit
-                        sql = """
-                               insert into sta (sid,fid,spotted,mac,manuf)
-                               values (%s,%s,%s,%s,%s) RETURNING id;
-                              """
-                        curs.execute(sql,(self._sid,fid,ts,addr,
-                                          manufacturer(self._oui,addr)))
-                        addrs[addr]['id'] = curs.fetchone()[0]
-                        self._conn.commit()
-        except psql.Error:
+            # for each address
+            for a in nonbroadcast:
+                # if this one doesnt have an id (not seen before) add it
+                if not addrs[a]['id']:
+                    # insert the new sta - commit the transaction because
+                    # we we're experiencing duplicate key issues w/o commit
+                    sql = """
+                           insert into sta (sid,fid,spotted,mac,manuf)
+                           values (%s,%s,%s,%s,%s) RETURNING sta_id;
+                          """
+                    curs.execute(sql,(self._sid,fid,ts,a,manufacturer(self._oui,a)))
+                    addrs[a]['id'] = curs.fetchone()[0]
+                    self._conn.commit()
+        except psql.Error as e:
             # tag the error & reraise (letting the finally block release the lock)
+            print e
             self._err = ('sta',fid)
-            raise # reraise
-        except:
+            raise
+        except Exception as e:
             # tag the error & reraise (letting the finally block release the lock)
+            print e
             self._err = ('sta',fid)
-            raise # reraise
+            raise
         finally:
             self._l.release()
             #### EXIT CS
@@ -641,7 +644,7 @@ class ExtractThread(SSEThread):
                        select firstSeen,lastSeen,firstHeard,lastHeard
                        from sta_activity where sid=%s and staid=%s;
                       """
-                curs.execute(sql,(self._sid,(addrs[addr]['id']),))
+                curs.execute(sql,(self._sid,addrs[addr]['id']))
                 row = curs.fetchone()
 
                 if row:
@@ -696,10 +699,8 @@ class ExtractThread(SSEThread):
                     # sta has not been seen this session
                     # commit the transaction because we were experiencing
                     # duplicate key issues w/o commit
-                    if mode == 'tx':
-                        fh = lh = ts
-                    else:
-                        fs = ls = ts
+                    if mode == 'tx': fh = lh = ts
+                    else: fs = ls = ts
                     sql = """
                            insert into sta_activity (sid,staid,firstSeen,lastSeen,
                                                      firstHeard,lastHeard)
@@ -713,7 +714,7 @@ class ExtractThread(SSEThread):
             raise
         except:
             # tag the error & reraise (letting the finally block release the lock)
-            self._err = ('sta',fid)
+            self._err = ('sta_activity',fid)
             raise
         finally:
             self._l.release()

@@ -522,10 +522,9 @@ CREATE INDEX sta_mac_idx ON sta(sta_id);
 
 -- sta_activity table
 -- defines activity (seen,heard) of 802.11 station during a session
---  Seen and Heard
--- define the stations activity timestamps during the giving session:
---  firstSeen - timestamp this station was first referenced in traffic i.e.
---              through a probe, traffic sent to etc
+--  *Seen and *Heard define the stations activity by timestamps during the giving
+--  session:
+--  firstSeen - timestamp this station was first referenced in traffic
 --  lastSeen - timestamp this station was last referenced in traffic
 --  firstHeard - timestamp this station first transmitted
 --  lastHeard - timestamp this station last transmitted
@@ -533,7 +532,7 @@ CREATE INDEX sta_mac_idx ON sta(sta_id);
 -- TODO: add indexing on activity timestamps?
 DROP TABLE IF EXISTS sta_activity;
 CREATE TABLE sta_activity(
-   sid integer NOT NULL,   -- foreign key to session id
+   sid integer NOT NULL,   -- foreign key to sensor id
    staid integer NOT NULL, -- foreign key to sta id
    firstSeen TIMESTAMPTZ,  -- ts this station was first seen
    lastSeen TIMESTAMPTZ,   -- ts this station was las seen
