@@ -53,7 +53,7 @@ def service(process,pwd,start=True):
     state = 'start' if start else 'stop'
     cmd = ['sudo','-S','service',process,state]
     p = Popen(cmd,stdout=PIPE,stdin=PIPE,stderr=PIPE,universal_newlines=True)
-    out,err = p.communicate(pwd+'\n')
+    _,err = p.communicate(pwd+'\n')
     if err: raise RuntimeError(err)
 
 def testsudopwd(pwd):

@@ -244,7 +244,7 @@ CREATE TABLE frame(
    ts TIMESTAMPTZ NOT NULL,          -- time of collection
    bytes smallint NOT NULL,          -- ttl bytes
    bRTAP smallint,                   -- bytes in radiotap
-   bMPDU smallint,                   -- bytes in mmpdu
+   bMPDU smallint,                   -- bytes in mpdu
    data smallint[2] NOT NULL,        -- left,right indexes into data portion 
    flags smallint default '0',       -- radiotap frame flags
    ampdu smallint not NULL,          -- ampdu is present
@@ -1003,21 +1003,21 @@ CREATE FUNCTION delete_all()
       DELETE FROM action;
       DELETE FROM sta_activity;
       DELETE FROM sta;
-      ALTER SEQUENCE sta_id_seq restart;
+      ALTER SEQUENCE sta_sta_id_seq restart;
       DELETE FROM frame;
-      ALTER SEQUENCE frame_id_seq RESTART;
+      ALTER SEQUENCE frame_frame_id_seq RESTART;
       DELETE FROM platform;
       DELETE FROM using_gpsd;
       DELETE FROM geo;
       DELETE FROM gpsd;
-      ALTER SEQUENCE gpsd_id_seq RESTART;
+      ALTER SEQUENCE gpsd_gpsd_id_seq RESTART;
       DELETE FROM using_radio;
       DELETE FROM radio_properties;
       DELETE FROM radio_event;
       DELETE FROM antenna;
       DELETE FROM radio;
       DELETE FROM sensor;
-      ALTER SEQUENCE sensor_id_seq RESTART;
+      ALTER SEQUENCE sensor_session_id_seq RESTART;
     END;
     $$ LANGUAGE plpgsql;
 
@@ -1033,6 +1033,8 @@ CREATE OR REPLACE FUNCTION fix_nullperiod()
       UPDATE using_gpsd SET period = tstzrange(LOWER(period),now()) WHERE UPPER(period) IS NULL;
     END;
     $$ LANGUAGE plpgsql;
+
+-- BELOW is for admin purposes only
 
 -- delete data from all tables
 -- TODO: look into truncate
@@ -1057,21 +1059,21 @@ DELETE FROM auth;
 DELETE FROM action;
 DELETE FROM sta_activity;
 DELETE FROM sta;
-ALTER SEQUENCE sta_id_seq restart;
+ALTER SEQUENCE sta_sta_id_seq restart;
 DELETE FROM frame;
-ALTER SEQUENCE frame_id_seq RESTART;
+ALTER SEQUENCE frame_frame_id_seq RESTART;
 DELETE FROM platform;
 DELETE FROM using_gpsd;
 DELETE FROM geo;
 DELETE FROM gpsd;
-ALTER SEQUENCE gpsd_id_seq RESTART;
+ALTER SEQUENCE gpsd_gpsd_id_seq RESTART;
 DELETE FROM using_radio;
 DELETE FROM radio_properties;
 DELETE FROM radio_event;
 DELETE FROM antenna;
 DELETE FROM radio;
 DELETE FROM sensor;
-ALTER SEQUENCE sensor_id_seq RESTART;
+ALTER SEQUENCE sensor_session_id_seq RESTART;
 
 DROP TABLE ampdu;
 DROP TABLE ccmpcrypt;

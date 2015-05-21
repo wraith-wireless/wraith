@@ -306,6 +306,7 @@ class StoreThread(SSEThread):
                 elif mcsflags['bw'] == rtap.MCS_BW_20L: bw = '20L'
                 else: bw = '20U'
                 width = 40 if bw == '40' else 20
+                #print mcsflags['stbc']
                 gi = 1 if 'gi' in mcsflags and mcsflags['gi'] > 0 else 0
                 ht = 1 if 'ht' in mcsflags and mcsflags['ht'] > 0 else 0
                 index = r['mcs'][2]

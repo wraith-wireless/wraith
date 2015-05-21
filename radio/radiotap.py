@@ -308,7 +308,6 @@ def mcsflags_params(kn,fn):
     """
     return {n:_MCS_FLAGS_[n] & fn for n in _MCS_FLAGS_ if n in mcsknown(kn)}
 
-
 # --> A-MPDU Flags <-- http://www.radiotap.org/defined-fields/A-MPDU%20status
 # nolen Driver reports 0-length subframes
 # nolensub Frame is a 0-length subframe (only valid if nolen is set)

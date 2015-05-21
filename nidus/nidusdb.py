@@ -513,12 +513,11 @@ class NidusDB(object):
             # the radiotap was valid but mpdu failed - initialize empty mpdu
             validMPDU = False
             vs = (self._sid,ts,lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
-                  int('a-mpdu' in dR['present']),0,0)
+                  int('a-mpdu' in dR['present']),rtap.flags_get(dR['flags'],'fcs'))
         else:
-            vs = (self._sid,ts,lF,dR['sz'],
-                  dM.offset,[(dR['sz']+dM.offset),(lF-dM.stripped)],
-                  dR['flags'],int('a-mpdu' in dR['present']),
-                  rtap.flags_get(dR['flags'],'fcs'))
+            vs = (self._sid,ts,lF,dR['sz'],dM.offset,
+                  [(dR['sz']+dM.offset),(lF-dM.stripped)],dR['flags'],
+                  int('a-mpdu' in dR['present']),rtap.flags_get(dR['flags'],'fcs'))
 
         # insert the frame
         sql = """
