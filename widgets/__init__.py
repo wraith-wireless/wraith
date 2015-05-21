@@ -6,7 +6,7 @@ includes panel.py, the definition of gui super classes and the icons folder
 
 widgets 0.0.3
  desc: gui description
- includes: icons folder, panel.py
+ includes: icons folder, panel 0.13.7
  changes:
   - scrubbed and removed circular, redundant, confusing code
   - stopped using pack and grid geometry managers

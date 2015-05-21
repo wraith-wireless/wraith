@@ -1,23 +1,16 @@
 -- timestamp for eternity = infinity
 -- using postgresql 9.3.4
 -- ensure postgresql service is running - sudo service postgresql start
--- version 0.0.12
+-- version 0.0.13
 
 -- create nidus user and nidus database  
 --postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
 --  Enter password for new role: **** (nidus)
---  Enter it again: **** (nidusr)
+--  Enter it again: **** (nidus)
 --createdb --owner=nidus nidus
-
--- DEFUNCT will not be using this for now
--- add postgis extension to nidus db
--- psql -d nidus
--- CREATE EXTENSION postgis;
--- \q
 
 -- to login with nidus & verify postgis
 psql -h localhost -U nidus -d nidus
--- SELECT postgis_full_version();
 
 -- use btree_gist (see http://www.postgresql.org/docs/devel/static/rangetypes.html)
 -- sudo su - postgres
@@ -27,13 +20,15 @@ psql -h localhost -U nidus -d nidus
 -- force timezone to UTC
 SET TIME ZONE 'UTC';
 
+-- NOTE: we do not add a index on the primary keys as according to
+-- http://www.postgresql.org/docs/9.0/static/ddl-constraints.html
+-- a primary key automatically creates a unique btree index
+
 -- sensor table
--- defines a sensor session. A sensor is a hostname, ip address and the period
--- during which it is used
--- TODO: should we create an index on period?
+-- defines a sensor: a hostname, ip address and the period during which it is used
 DROP TABLE IF EXISTS sensor;
 CREATE TABLE sensor(
-   session_id serial,             -- the session id
+   session_id serial,             -- id of this session
    hostname VARCHAR(64) NOT NULL, -- hostname of sensor
    ip inet NOT NULL,              -- ip of sensor
    period TSTZRANGE NOT NULL,     -- valid range of sensor
@@ -63,24 +58,29 @@ CREATE TABLE platform(
    pylinkage varchar(10) NOT NULL,  -- python interpreter linkage
    region varchar(2) default '00',  -- regulatory domain
    CONSTRAINT ch_sid CHECK (sid > 0),
-   FOREIGN KEY (sid) REFERENCES sensor(session_id)
+   FOREIGN KEY (sid) REFERENCES sensor(session_id) ON DELETE CASCADE
 );
+--CREATE INDEX platform_sid ON platform(sid); This was already created
 
 -- gpsd table
--- details of a gps device
+-- details of a gps device.
+-- Note the dev id is not unique to a device but the model
 DROP TABLE IF EXISTS gpsd;
 CREATE TABLE gpsd(
-    id serial,                      -- primary key
+    gpsd_id serial,                 -- primary key
     devid VARCHAR(9),               -- device id (XXXX:XXXX assumes usb)
     version VARCHAR(5) NOT NULL,    -- gpsd version
     flags SMALLINT DEFAULT 1,       -- device flags
     driver VARCHAR(50) NOT NULL,    -- driver for device
     bps SMALLINT DEFAULT 4800,      -- bauds per second
     tty VARCHAR(20) NOT NULL ,      -- the path of the device
-    PRIMARY KEY (id)
+    PRIMARY KEY (gpsd_id)
 );
 
 -- using_gpsd table
+-- maps gpsd id and sensor id to a time period said gpsd is in use by the
+-- given sensor. If either the sensor is the gpsd is deleted the corresponding
+-- row will be deleted
 DROP TABLE IF EXISTS using_gpsd;
 CREATE TABLE using_gpsd(
    sid integer NOT NULL,          -- foreign key to session
@@ -88,10 +88,11 @@ CREATE TABLE using_gpsd(
    period TSTZRANGE NOT NULL,     -- timerange sensor is using gid
    CONSTRAINT ch_sid CHECK (sid > 0),
    CONSTRAINT ch_gid CHECK (gid > 0),
-   FOREIGN KEY (sid) REFERENCES sensor(session_id),
-   FOREIGN KEY (gid) REFERENCES gpsd(id),
+   FOREIGN KEY (sid) REFERENCES sensor(session_id) ON DELETE CASCADE,
+   FOREIGN KEY (gid) REFERENCES gpsd(gpsd_id) ON DELETE CASCADE,
    EXCLUDE USING gist (sid WITH =,gid WITH =,period WITH &&)
 );
+CREATE INDEX using_gpsd_period_idx ON using_gpsd USING GIST (period);
 
 -- geo table
 -- locational data of sensor NOTE: we use the sensor id over a gps device id
@@ -128,9 +129,10 @@ CREATE TABLE geo(
    CONSTRAINT ch_pdop CHECK (pdop > 0),
    CONSTRAINT ch_epx CHECK (epx >= 0),
    CONSTRAINT ch_epy CHECK (epy >= 0),
-   FOREIGN KEY (sid) REFERENCES sensor(session_id),
+   FOREIGN KEY (sid) REFERENCES sensor(session_id) ON DELETE CASCADE,
    PRIMARY KEY(sid,ts)
 );
+CREATE INDEX geo_ts_idx ON geo(ts);
 
 -- radio table
 -- static properties of a radio i.e. a wireless nic
@@ -170,9 +172,10 @@ CREATE TABLE antenna(
   CONSTRAINT ch_z CHECK(z >=0 and z < 360),
   CONSTRAINT ch_gain CHECK(gain >= 0),
   CONSTRAINT ch_loss CHECK(loss >= 0),
-  FOREIGN KEY (mac) REFERENCES radio(mac),
+  FOREIGN KEY (mac) REFERENCES radio(mac) ON DELETE CASCADE,
   PRIMARY KEY(mac,ts,ind)
 );
+CREATE INDEX antenna_ts_idx ON antenna(ts);
 
 -- radio role type enumeration
 DROP TYPE IF EXISTS ROLE;
@@ -188,9 +191,10 @@ CREATE TABLE radio_properties(
    spoofed VARCHAR(17),        -- virtual (spoofed) mac address
    txpwr SMALLINT DEFAULT 15,  -- transmit power in dBm
    ts TIMESTAMPTZ NOT NULL,    -- timestamp properties became true
-   FOREIGN KEY (mac) REFERENCES radio(mac),
+   FOREIGN KEY (mac) REFERENCES radio(mac) ON DELETE CASCADE,
    PRIMARY KEY(mac,ts)
 );
+CREATE INDEX radio_properties_ts_idx on radio_properties(ts);
 
 -- radio state enumerations
 DROP TYPE IF EXISTS RADIOSTATE;
@@ -203,9 +207,10 @@ CREATE TABLE radio_event(
    state RADIOSTATE DEFAULT 'scan', -- radio event at timestamp ts 
    params TEXT DEFAULT '',          -- free-form params of event
    ts TIMESTAMPTZ NOT NULL,         -- timestamp for event
-   FOREIGN KEY (mac) REFERENCES radio(mac),
+   FOREIGN KEY (mac) REFERENCES radio(mac) ON DELETE CASCADE,
    PRIMARY KEY(mac,ts)
 );
+CREATE INDEX radio_event_ts_idx on radio_event(ts);
 
 -- using_radio table
 DROP TABLE IF EXISTS using_radio;
@@ -217,10 +222,11 @@ CREATE TABLE using_radio(
    vnic VARCHAR(6) NOT NULL,  -- virtual nic of radio
    period TSTZRANGE NOT NULL, -- timerange sensor is using mac
    CONSTRAINT ch_sid CHECK (sid > 0),
-   FOREIGN KEY (sid) REFERENCES sensor(session_id),
-   FOREIGN KEY (mac) REFERENCES radio(mac),
+   FOREIGN KEY (sid) REFERENCES sensor(session_id) ON DELETE CASCADE,
+   FOREIGN KEY (mac) REFERENCES radio(mac) ON DELETE CASCADE,
    EXCLUDE USING gist (sid WITH =,mac WITH =,period WITH &&)
 );
+CREATE INDEX using_radio_period_idx ON using_radio USING GIST (period);
 
 -- NOTE:
 -- capture header and mpdu layers are defined in a set of tables. The phy layer 
@@ -233,7 +239,7 @@ CREATE TABLE using_radio(
 -- of the mpdu layer
 DROP TABLE IF EXISTS frame;
 CREATE TABLE frame(
-   id bigserial NOT NULL,            -- frame primary key
+   frame_id bigserial NOT NULL,      -- frame primary key
    sid integer NOT NULL,             -- foreign key to session
    ts TIMESTAMPTZ NOT NULL,          -- time of collection
    bytes smallint NOT NULL,          -- ttl bytes
@@ -249,9 +255,10 @@ CREATE TABLE frame(
    CONSTRAINT ch_flags CHECK (flags >= 0),
    CONSTRAINT ch_ampdu CHECK (ampdu >= 0 AND ampdu <= 1),
    CONSTRAINT ch_fcs CHECK (fcs >= 0 AND fcs <= 1),
-   FOREIGN KEY(sid) REFERENCES sensor(session_id),
-   PRIMARY KEY(id)
+   FOREIGN KEY(sid) REFERENCES sensor(session_id) ON DELETE CASCADE,
+   PRIMARY KEY(frame_id)
 );
+CREATE INDEX frame_ts_idx ON frame(ts);
 
 -- frame_path table
 -- stores the file that this frame is save in
@@ -262,7 +269,7 @@ CREATE TABLE frame_path(
    fid bigint NOT NULL,      -- foreign key to frame id
    filepath TEXT NOT NULL,   -- file path of this frame
    CONSTRAINT ch_fid CHECK (fid > 0),
-   FOREIGN KEY (fid) REFERENCES frame(id)
+   FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
 -- ampdu table
@@ -275,7 +282,7 @@ CREATE TABLE ampdu(
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_refnum CHECK (refnum > 0),
    CONSTRAINT ch_flags CHECK (flags > 0),
-   FOREIGN KEY (fid) REFERENCES frame(id)
+   FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
 -- source table
@@ -289,8 +296,8 @@ CREATE TABLE source(
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_ant CHECK (antenna >= 0 and antenna < 256),
    CONSTRAINT ch_rfpwr CHECK (rfpwr > -150 and rfpwr < 150),
-   FOREIGN KEY (src) REFERENCES radio(mac),
-   FOREIGN KEY (fid) REFERENCES frame(id)
+   FOREIGN KEY (src) REFERENCES radio(mac) ON DELETE CASCADE,
+   FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
 -- 802.11 standard enumeration
@@ -303,6 +310,7 @@ CREATE TYPE MCS_BW AS ENUM ('20','40','20L','20U');
 
 -- signal table
 -- defines data as captured in the frame header
+-- TODO add radiotap mcs stbc streams & extensions spatial streams
 DROP TABLE IF EXISTS signal;
 CREATE TABLE signal(
    fid bigint NOT NULL,        -- foreign key to frame
@@ -325,7 +333,7 @@ CREATE TABLE signal(
    CONSTRAINT ch_mcs_gi CHECK (mcs_gi >= 0 and mcs_gi <= 1),
    CONSTRAINT ch_mcs_ht CHECK (mcs_ht >= 0 and mcs_ht <= 1),
    CONSTRAINT ch_mcs_index CHECK (mcs_index >= 0 and mcs_index <= 31),
-   FOREIGN KEY (fid) REFERENCES frame(id)
+   FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
 -- 802.11 type enumerations
@@ -357,6 +365,7 @@ CREATE TYPE CRYPT_TYPE AS ENUM ('none','wep','tkip','ccmp','other');
 -- defines portions of the mpdu layer.
 -- The minimum mpdu is frame control, duration and address 1
 -- NOTE: for duration value is only included if the type is of vsc or aid
+-- TODO: should we index anything here? addresses?
 DROP TABLE IF EXISTS traffic;
 CREATE TABLE traffic(
    fid bigint NOT NULL,             -- foreign key to frame
@@ -390,7 +399,7 @@ CREATE TABLE traffic(
    CONSTRAINT ch_so CHECK (so >= 0 and so <= 1),
    CONSTRAINT ch_dur_val CHECK (dur_val >= 0),
    CONSTRAINT ch_seqctrl CHECK (fragnum >= 0 and seqnum >= 0),
-   FOREIGN KEY(fid) REFERENCES frame(id)
+   FOREIGN KEY(fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
 -- qos table
@@ -409,7 +418,7 @@ CREATE TABLE qosctrl(
    CONSTRAINT ch_ackpol CHECK (ackpol >= 0 and ackpol <=4),
    CONSTRAINT ch_amsdu CHECK (amsdu >=0 and amsdu <= 1),
    CONSTRAINT ch_txop CHECK (txop >= 0 and txop < 256),
-   FOREIGN KEY(fid) REFERENCES frame(id)
+   FOREIGN KEY(fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
 -- wepcrypt table
@@ -422,7 +431,7 @@ CREATE TABLE wepcrypt(
    icv bytea NOT NULL,       -- hex repr of f byte wep icv
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_key_id CHECK (key_id >= 0 and key_id < 4),
-   FOREIGN KEY(fid) REFERENCES frame(id)
+   FOREIGN KEY(fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
 -- tkipcrypt table
@@ -442,7 +451,7 @@ CREATE TABLE tkipcrypt(
    icv bytea NOT NULL,       -- hex repr of 4 byte ICV
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_key_id CHECK (key_id >= 0 and key_id < 4),
-   FOREIGN KEY(fid) REFERENCES frame(id)
+   FOREIGN KEY(fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
 -- ccmpcrypt table
@@ -460,7 +469,7 @@ CREATE TABLE ccmpcrypt(
    mic bytea NOT NULL,       -- hex repr of 8 byte mic
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_key_id CHECK (key_id >= 0 and key_id < 4),
-   FOREIGN KEY(fid) REFERENCES frame(id)
+   FOREIGN KEY(fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
 -- network entities
@@ -469,21 +478,23 @@ CREATE TABLE ccmpcrypt(
 
 -- host table
 -- consolidates multiple stas under a single host
-DROP TABLE IF EXISTS host;
-CREATE TABLE host(
-  id serial NOT NULL, -- primary key
-);
+-- TODO: how to work this and has_sta in
+--DROP TABLE IF EXISTS host;
+--CREATE TABLE host(
+--  id serial NOT NULL, -- primary key
+--);
 
-DROP TABLE IF EXISTS has_sta;
-CREATE TABLE has_sta(
-  hostid integer NOT NULL, -- fk to host
-  staid integer NOT NULL,  -- fk to sta
-  ts TIMESTAMPTZ NOT NULL, -- timestamp 'assumption' is made
-  CONSTRAINT ch_hostid CHECK (hostid > 0),
-  CONSTRAINT ch_staid CHECK (staid > 0),
-  FOREIGN KEY (hostid) REFERENCES host(id),
-  FOREIGN KEY (staid) REFERENCES sta(id)
-);
+--DROP TABLE IF EXISTS has_sta;
+--CREATE TABLE has_sta(
+--  hostid integer NOT NULL, -- fk to host
+--  staid integer NOT NULL,  -- fk to sta
+--  ts TIMESTAMPTZ NOT NULL, -- timestamp 'assumption' is made
+--  CONSTRAINT ch_hostid CHECK (hostid > 0),
+--  CONSTRAINT ch_staid CHECK (staid > 0),
+--  FOREIGN KEY (hostid) REFERENCES host(id) ON DELETE CASCADE,
+--  FOREIGN KEY (staid) REFERENCES sta(sta_id) ON DELETE CASCADE
+--);
+
 
 -- sta table
 -- primary entity of a network. A sta is a client or an ap of a BSS/IBSS or
@@ -492,7 +503,7 @@ CREATE TABLE has_sta(
 -- the sta table exists across sessions
 DROP TABLE IF EXISTS sta;
 CREATE TABLE sta(
-   id serial NOT NULL,                   -- primary key
+   sta_id bigserial NOT NULL,            -- primary key
    sid integer NOT NULL,                 -- fk to session sta was first seen
    fid bigint NOT NULL,                  -- fk to frame sta was first seen
    spotted TIMESTAMPTZ NOT NULL,         -- ts sta was first seen/heard
@@ -501,10 +512,11 @@ CREATE TABLE sta(
    note TEXT,                            -- any notes on sta
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_sid CHECK (sid > 0),
-   FOREIGN KEY (sid) REFERENCES sensor(session_id),
-   FOREIGN KEY (fid) REFERENCES frame(id),
-   PRIMARY KEY (id)
+   FOREIGN KEY (sid) REFERENCES sensor(session_id) ON DELETE CASCADE,
+   FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+   PRIMARY KEY (sta_id)
 );
+CREATE INDEX sta_mac_idx ON sta(sta_id);
 
 -- sta_activity table
 -- defines activity (seen,heard) of 802.11 station during a session
@@ -516,6 +528,7 @@ CREATE TABLE sta(
 --  firstHeard - timestamp this station first transmitted
 --  lastHeard - timestamp this station last transmitted
 -- The sta_activity table defines a sta's activity on a per session basis
+-- TODO: add indexing on activity timestamps?
 DROP TABLE IF EXISTS sta_activity;
 CREATE TABLE sta_activity(
    sid integer NOT NULL,   -- foreign key to session id
@@ -526,8 +539,8 @@ CREATE TABLE sta_activity(
    lastHeard TIMESTAMPTZ,  -- ts this station was last heard
    CONSTRAINT ch_sid CHECK (sid > 0),
    CONSTRAINT ch_staid CHECK (staid > 0),
-   FOREIGN KEY(sid) REFERENCES sensor(session_id),
-   FOREIGN KEY(staid) REFERENCES sta(id),
+   FOREIGN KEY(sid) REFERENCES sensor(session_id) ON DELETE CASCADE,
+   FOREIGN KEY(staid) REFERENCES sta(sta_id) ON DELETE CASCADE,
    PRIMARY KEY(sid,staid)
 );
 
@@ -583,9 +596,9 @@ CREATE TABLE assocreq(
   CONSTRAINT ch_dsss_ofdm CHECK (dsss_ofdm >=0 and dsss_ofdm <=1),
   CONSTRAINT ch_del_ba CHECK (del_ba >=0 and del_ba <=1),
   CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
-  FOREIGN KEY (fid) REFERENCES frame(id),
-  FOREIGN KEY (client) REFERENCES sta(id),
-  FOREIGN KEY (ap) REFERENCES sta(id)
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  FOREIGN KEY (client) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (ap) REFERENCES sta(sta_id)
 );
 
 -- association type
@@ -644,9 +657,9 @@ CREATE TABLE assocresp(
   CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
   CONSTRAINT ch_status CHECK (status >= 0),
   CONSTRAINT ch_aid CHECK (aid >= 0),
-  FOREIGN KEY (fid) REFERENCES frame(id),
-  FOREIGN KEY (client) REFERENCES sta(id),
-  FOREIGN KEY (ap) REFERENCES sta(id)
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  FOREIGN KEY (client) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
 -- reassocreq table
@@ -700,10 +713,10 @@ CREATE TABLE reassocreq(
   CONSTRAINT ch_del_ba CHECK (del_ba >=0 and del_ba <=1),
   CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
   CONSTRAINT ch_cur_ap CHECK (cur_ap > 0),
-  FOREIGN KEY (fid) REFERENCES frame(id),
-  FOREIGN KEY (client) REFERENCES sta(id),
-  FOREIGN KEY (ap) REFERENCES sta(id),
-  FOREIGN KEY (cur_ap) REFERENCES sta(id)
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  FOREIGN KEY (client) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (cur_ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
 -- probereq table
@@ -720,9 +733,9 @@ CREATE TABLE probereq(
   sup_rates decimal(5,1)[], -- list of supported rates
   ext_rates decimal(5,1)[], -- list of extended rates
   vendors char(8)[],        -- list of (unique) vendor ouis found in info-elements
-  FOREIGN KEY (fid) REFERENCES frame(id),
-  FOREIGN KEY (client) REFERENCES sta(id),
-  FOREIGN KEY (ap) REFERENCES sta(id)
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  FOREIGN KEY (client) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
 -- proberesp table
@@ -779,9 +792,9 @@ CREATE TABLE proberesp(
   CONSTRAINT ch_dsss_ofdm CHECK (dsss_ofdm >=0 and dsss_ofdm <=1),
   CONSTRAINT ch_del_ba CHECK (del_ba >=0 and del_ba <=1),
   CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
-  FOREIGN KEY (fid) REFERENCES frame(id),
-  FOREIGN KEY (client) REFERENCES sta(id),
-  FOREIGN KEY (ap) REFERENCES sta(id)
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  FOREIGN KEY (client) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
 -- beacon table
@@ -789,7 +802,6 @@ CREATE TABLE proberesp(
 -- id of the STA or BSSID and the ts it was captured. It exposes the beacon ts
 -- as hex, the beacon interval, and capabilities info as 16 {0|1} smallints.
 -- It will also expose (if present) the ssid, supporated rates and extended rates.
---
 -- TODO: include TIM field
 DROP TABLE IF EXISTS beacon;
 CREATE TABLE beacon(
@@ -836,8 +848,8 @@ CREATE TABLE beacon(
   CONSTRAINT ch_dsss_ofdm CHECK (dsss_ofdm >=0 and dsss_ofdm <=1),
   CONSTRAINT ch_del_ba CHECK (del_ba >=0 and del_ba <=1),
   CONSTRAINT ch_imm_ba CHECK (imm_ba >=0 and imm_ba <=1),
-  FOREIGN KEY (fid) REFERENCES frame(id),
-  FOREIGN KEY (ap) REFERENCES sta(id)
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
 -- dissaoc table
@@ -856,9 +868,9 @@ CREATE TABLE disassoc(
   CONSTRAINT ch_ap CHECK (ap >= 0),
   CONSTRAINT ch_fromap CHECK (fromap >= 0 and fromap <=1),
   CONSTRAINT ch_reason CHECK (reason >= 0),
-  FOREIGN KEY (fid) REFERENCES frame(id),
-  FOREIGN KEY (client) REFERENCES sta(id),
-  FOREIGN KEY (ap) REFERENCES sta(id)
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  FOREIGN KEY (client) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
 -- auth table
@@ -879,9 +891,9 @@ CREATE TABLE auth(
   CONSTRAINT ch_auth_alg CHECK (auth_alg >= 0),
   CONSTRAINT ch_auth_trans CHECK (auth_trans >= 0),
   CONSTRAINT ch_status CHECK (status >= 0),
-  FOREIGN KEY (fid) REFERENCES frame(id),
-  FOREIGN KEY (client) REFERENCES sta(id),
-  FOREIGN KEY (ap) REFERENCES sta(id)
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  FOREIGN KEY (client) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
 -- deauth table
@@ -900,9 +912,9 @@ CREATE TABLE deauth(
   CONSTRAINT ch_ap CHECK (ap >= 0),
   CONSTRAINT ch_fromap CHECK (fromap >= 0 and fromap <=1),
   CONSTRAINT ch_reason CHECK (reason >= 0),
-  FOREIGN KEY (fid) REFERENCES frame(id),
-  FOREIGN KEY (client) REFERENCES sta(id),
-  FOREIGN KEY (ap) REFERENCES sta(id)
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  FOREIGN KEY (client) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
 DROP TABLE IF EXISTS action;
@@ -925,12 +937,11 @@ CREATE TABLE action(
   CONSTRAINT ch_category CHECK (category >= 0),
   CONSTRAINT ch_action CHECK (action >= 0),
   CONSTRAINT ch_has_el CHECK (has_el >= 0 and has_el <= 1),
-  FOREIGN KEY (fid) REFERENCES frame(id),
-  FOREIGN KEY (rx) REFERENCES sta(id),
-  FOREIGN KEY (tx) REFERENCES sta(id),
-  FOREIGN KEY (ap) REFERENCES sta(id)
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  FOREIGN KEY (rx) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (tx) REFERENCES sta(sta_id) ON DELETE CASCADE,
+  FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
-
 
 -- NOTE CURRENTLY USED --
 --DROP TYPE IF EXISTS STA_TYPE;
@@ -961,7 +972,7 @@ CREATE TABLE action(
 --   fw_chipset VARCHAR(50),            -- chipset of the card
 --   CONSTRAINT ch_staid CHECK (staid > 0),
 --   FOREIGN KEY(sid) REFERENCES sensor(session_id),
---   FOREIGN KEY(staid) REFERENCES sta(id)
+--   FOREIGN KEY(staid) REFERENCES sta(sta_id)
 --);
 
 #### STORED PROCEDURES
@@ -1006,7 +1017,7 @@ CREATE FUNCTION delete_all()
       DELETE FROM antenna;
       DELETE FROM radio;
       DELETE FROM sensor;
-      ALTER SEQUENCE sensor_session_id_seq RESTART;
+      ALTER SEQUENCE sensor_id_seq RESTART;
     END;
     $$ LANGUAGE plpgsql;
 
@@ -1060,7 +1071,7 @@ DELETE FROM radio_event;
 DELETE FROM antenna;
 DELETE FROM radio;
 DELETE FROM sensor;
-ALTER SEQUENCE sensor_session_id_seq RESTART;
+ALTER SEQUENCE sensor_id_seq RESTART;
 
 DROP TABLE ampdu;
 DROP TABLE ccmpcrypt;
@@ -1129,3 +1140,25 @@ SELECT nspname || '.' || relname AS "relation",
     AND C.relkind <> 'i'
     AND nspname !~ '^pg_toast'
   ORDER BY pg_total_relation_size(C.oid) DESC;
+
+-- list all indexes
+SELECT i.relname as indname,
+       i.relowner as indowner,
+       idx.indrelid::regclass,
+       am.amname as indam,
+       idx.indkey,
+       ARRAY(
+       SELECT pg_get_indexdef(idx.indexrelid, k + 1, true)
+       FROM generate_subscripts(idx.indkey, 1) as k
+       ORDER BY k
+       ) as indkey_names,
+       idx.indexprs IS NOT NULL as indexprs,
+       idx.indpred IS NOT NULL as indpred
+FROM   pg_index as idx
+JOIN   pg_class as i
+ON     i.oid = idx.indexrelid
+JOIN   pg_am as am
+ON     i.relam = am.oid
+JOIN   pg_namespace as ns
+ON     ns.oid = i.relnamespace
+AND    ns.nspname = ANY(current_schemas(false));

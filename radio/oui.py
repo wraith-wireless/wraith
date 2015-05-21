@@ -4,8 +4,8 @@
 
 Parse the 802.11 MAC Protocol Data Unit (MPDU) IAW IEED 802.11-2012
 we use Std when referring to IEEE Std 802.11-2012
-NOTE:
- It is recommended not to import * as it may cause conflicts with other modules
+
+This requires aircrack-ng out file
 """
 
 __name__ = 'oui'

@@ -24,14 +24,12 @@ from wraith.radio import channels           # 802.11 channels/RFs
 from wraith.radio.oui import manufacturer   # oui functions
 from wraith.utils import simplepcap as pcap # write frames to file
 
-
 # EXCEPTIONS
 class SSEException(Exception): pass           # generic SSE exception
 class SSEDBException(SSEException): pass      # failure to connect
 class SSEConsumeException(SSEException): pass # failure to consume
 
 # Task Definitions
-
 class SaveTask(tuple):
     # noinspection PyInitNewSignature
     def __new__(cls,ts,fid,sid,mac,frame,lr):
@@ -188,8 +186,9 @@ class SaveThread(SSEThread):
 
             # if no file, open a new file (using ts from first pkt in name)
             if not self._fout:
-                fname = os.path.join(self._path,
-                                     "%d_%s_%s.pcap" % (sid,self._pkts[0][0],mac))
+                fname = os.path.join(self._path,"%d_%s_%s.pcap" % (sid,
+                                                                   self._pkts[0][0],
+                                                                   mac))
                 try:
                     self._fout = pcap.pcapopen(fname)
                 except pcap.PCAPException as e:
@@ -209,7 +208,7 @@ class SaveThread(SSEThread):
                 try:
                     curs.execute(sql,(pkt[1],os.path.split(self._fout.name)[1]))
                 except psql.Error as e:
-                    print 'error writing frame_path', e
+                    #print 'error writing frame_path', e
                     self._conn.rollback()
                 else:
                     self._conn.commit()

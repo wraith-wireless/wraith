@@ -253,7 +253,7 @@ class NidusDB(object):
 
             # submit to db
             # insert into the gpsd table (if it does not already exist)
-            self._curs.execute("select id from gpsd where devid=%s;",(ds['id'],))
+            self._curs.execute("select gpsd_id from gpsd where devid=%s;",(ds['id'],))
             row = self._curs.fetchone()
             if not row:
                 sql = """
@@ -396,6 +396,7 @@ class NidusDB(object):
             f = f.split('\x1EFB\x1F')
             self._submitframe(mac,f[0].strip(),f[1])
 
+    # depecrated
     def submitsingle(self,f):
         """ submitsingle - submit the string fields (single frame) to the database """
         # tokenize the data
@@ -522,7 +523,7 @@ class NidusDB(object):
         # insert the frame
         sql = """
                insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
-               values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning id;
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning frame_id;
               """
         try:
             self._curs.execute(sql,vs)
@@ -547,4 +548,3 @@ class NidusDB(object):
             self._qSave[mac].put(sse.SaveTask(ts,fid,self._sid,mac,f,(l,r)))
         if validRTAP: self._qStore.put(sse.StoreTask(fid,mac,dR,dM))
         if validMPDU: self._qExtract.put(sse.ExtractTask(ts,fid,dM))
-

@@ -325,6 +325,7 @@ class DySKT(object):
         except (RuntimeError,ValueError) as e:
             raise DySKTConfException("%s" % e)
 
+    # noinspection PyMethodMayBeStatic
     def _readradio(self,conf,rtype='Recon'):
         """ read in the rtype radio configuration from conf and return parsed dict """
         # don't bother if specified radio is not present

@@ -68,8 +68,6 @@ Nidus:
     o should we use nidusdb's connection or continue to create in
       the thread?
  13) move to pcap-ng format?
- 14) need to further test writing mgmt frames to db, there are still some errors
-     mainly syntatic in the sql statements
  15) should we commit individual statements in long functions i.e. _setradio
  16) add radiotap mcs stbc streams and extensions spatial streams
 Radio:
@@ -84,3 +82,4 @@ Radio:
      o parse timing advance
  5) how to support a-msdu etc
  6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
+ 7) compile/use own oui file, not relying aircrack-ng

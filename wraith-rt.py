@@ -1094,6 +1094,7 @@ class WraithSplash(object):
     def _busy(self):
         if self._bfinished:
             self._wp.master.deiconify()
+            # noinspection PyProtectedMember
             self._wp._create()
             self._tl.destroy()
         else:

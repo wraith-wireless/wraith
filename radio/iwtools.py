@@ -20,8 +20,6 @@ desirable but the method I have chosen is to edit /etc/sudoers and add
 with security. See below
   Cmnd_Alias	IWCONFIG = /sbin/iwconfig
   <username> ALL=NOPASSWD:IWCONFIG
-
-Tested on Ubuntu 12.04 with net-tools 1.60, ifconfig 1.42, Wireless-Tools version 30
 """
 __name__ = 'iwtools'
 __license__ = 'GPL v3.0'

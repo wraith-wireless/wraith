@@ -115,7 +115,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 elif t == 'ANTENNA': db.submitantenna(f)
                 elif t == 'RADIO_EVENT': db.submitradioevent(f)
                 elif t == 'GPSD': db.submitgpsd(f)
-                elif t == 'FRAME': db.submitsingle(f)
+                elif t == 'FRAME': db.submitsingle(f) # deprecated
                 elif t == 'BULK': db.submitbulk(f)
                 elif t == 'GPS': db.submitgeo(f)
                 else:

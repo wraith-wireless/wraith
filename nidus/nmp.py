@@ -36,7 +36,7 @@ NOTE:
 """
 __name__ = 'nmp'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 __date__ = 'May 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -182,6 +182,9 @@ GPSD_PATH      = 6
 #### DATA ####
 
 #### BULK ####
+# NOTE: frames is a compressed 'list' of frames where each frame has the format:
+#  f<i> ='timestamp \x1EFB\x1Fframe\x1FFE\x1E'
+# each f<i> is appended to the previous
 BULK_FIELDS = ['ts','mac','n','frames']
 BULK_WFIELDS = [('ts',str),('mac',str),('n',int),('frames',str)]
 BULK_TIMESTAMP = 0 # timestamp frames were sent

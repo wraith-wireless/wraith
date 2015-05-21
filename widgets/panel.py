@@ -81,6 +81,7 @@ class PasswordDialog(tkSD.Dialog):
         if self.entPWD.get() == '': return 0
         return 1
     def apply(self):
+        # noinspection PyAttributeOutsideInit
         self.pwd = self.entPWD.get()
 
 #### SUPER GUI CLASSES ####
@@ -352,6 +353,7 @@ class ConfigPanel(SlavePanel):
         """ reset entries to orginal configuration file """
         self._initialize()
 
+# noinspection PyAbstractClass
 class TabularPanel(SlavePanel):
     """
      TabularPanel - A simple SlavePanel to display tabular information and the
@@ -429,9 +431,10 @@ class TabularPanel(SlavePanel):
         frmB = ttk.Frame(self)
         if self.bottomframe(frmB): frmB.grid(row=2,column=0,sticky='nwse')
 
-    # noinspection PyUnusedLocal
+    # noinspection PyMethodMayBeStatic
     def topframe(self,frm): return None # override to add widgets to topframe
-    # noinspection PyUnusedLocal
+
+    # noinspection PyMethodMayBeStatic
     def bottomframe(self,frm): return None # override to add widgets to bottomframe
 
 #### LOG MESSAGE TYPES ####

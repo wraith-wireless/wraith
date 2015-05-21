@@ -38,7 +38,7 @@ nidus 0.0.5
 
 nidus 0.0.6
  desc: continues from v 0.0.5
- includes: nidus 0.0.3, nmp 0.0.3, nidusdb 0.1.3 nidus.sql 0.0.10 nidus.conf nidus.log.conf
+ includes: nidus 0.0.4, nmp 0.0.4, nidusdb 0.1.3 sse 0.0.1 nidus.sql 0.0.13 nidus.conf nidus.log.conf
  changes:
   - added extraction of all management frames (excluding timing adv)
   - added nidusd daemon file to start nidus server
@@ -50,6 +50,10 @@ nidus 0.0.6
   - added encrypted comms via ssl library
   - added support for bulk frames
   - moved sse thread definitions to separate file sse.py
+  - made changes to nidus.sql
+   o minor semantic/naming convention changes
+   o added ON DELETE CASCADE to tables referencing session_id, frame_id and mac
+   o added indexing on timestamp and periods
 """
 __name__ = 'nidus'
 __license__ = 'GPL v3.0'
