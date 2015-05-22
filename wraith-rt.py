@@ -1083,10 +1083,8 @@ class WraithSplash(object):
         self._pb.step(0.5)
         if not cmdline.runningprocess('postgres'):
             self._sv.set("Starting PostgreSQL")
-            if startpsql(pwd):
-                self._sv.set("PostgreSQL started")
-            else:
-                self._sv.set("Failed to start PostgreSQL")
+            if startpsql(pwd): self._sv.set("PostgreSQL started")
+            else: self._sv.set("Failed to start PostgreSQL")
         else:
             self._sv.set("PostgreSQL already running")
         self._bpsql = True
@@ -1097,10 +1095,8 @@ class WraithSplash(object):
         self._pb.step(0.5)
         if not cmdline.nidusrunning(wraith.NIDUSPID):
             self._sv.set("Starting Nidus")
-            if startnidus(pwd):
-                self._sv.set("Nidus started")
-            else:
-                self._sv.set("Failed to start Nidus")
+            if startnidus(pwd): self._sv.set("Nidus started")
+            else: self._sv.set("Failed to start Nidus")
         else:
             self._sv.set("Nidus already running")
         self._bnidus = True
@@ -1119,10 +1115,8 @@ class WraithSplash(object):
                     i -= 1
                     if i == 0: break
                     time.sleep(0.5)
-            if cmdline.dysktrunning(wraith.DYSKTPID):
-                self._sv.set("DySKT started")
-            else:
-                self._sv.set("Failed to start DySKT")
+            if cmdline.dysktrunning(wraith.DYSKTPID): self._sv.set("DySKT started")
+            else: self._sv.set("Failed to start DySKT")
         else:
             self._sv.set("DySKT already running")
         self._bfinished = True
