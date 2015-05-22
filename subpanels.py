@@ -486,7 +486,7 @@ class DatabinPanel(gui.SimplePanel):
                 t = tk.Toplevel()
                 pnl = QueryPanel(t,self,"Query [bin %s]" % b,b,curs)
                 self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'query%s' % b))
-                self._curs['query%s'%b] = curs
+                self._curs[pnl.name] = curs
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -1048,7 +1048,7 @@ class QueryPanel(gui.SlavePanel):
     def _getsessions(self):
         """ retrieve all sessions and add to tree """
         sql1 = "SELECT session_id,hostname,ip,lower(period) FROM sensor;"
-        sql2 = "SELECT count(id) FROM frame WHERE sid=%s;"
+        sql2 = "SELECT count(frame_id) FROM frame WHERE sid=%s;"
         self._curs.execute(sql1)
         ss = self._curs.fetchall()
         for s in ss:
