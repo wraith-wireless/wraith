@@ -19,7 +19,6 @@ import mgrs                                # for mgrs2latlon conversions etc
 import math                                # for conversions, calculations
 import time                                # for timestamps
 from PIL import Image,ImageTk              # image input & support
-#import psycopg2 as psql                    # postgresql api
 import psycopg2.extras as pextras          # cursors and such
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
@@ -53,21 +52,21 @@ class WraithConfigPanel(gui.ConfigPanel):
         frmS = ttk.LabelFrame(frm,text='Storage')
         frmS.grid(row=0,column=0,sticky='nwse')
         ttk.Label(frmS,text='Host: ').grid(row=0,column=0,sticky='w')
-        self.txtHost = ttk.Entry(frmS,width=15)
-        self.txtHost.grid(row=0,column=1,sticky='e')
+        self._entHost = ttk.Entry(frmS,width=15)
+        self._entHost.grid(row=0,column=1,sticky='e')
         ttk.Label(frmS,text=' ').grid(row=0,column=2) # separator
         ttk.Label(frmS,text='Port: ').grid(row=0,column=3,sticky='w')
-        self.txtPort = ttk.Entry(frmS,width=5)
-        self.txtPort.grid(row=0,column=4,sticky='w')
+        self._entPort = ttk.Entry(frmS,width=5)
+        self._entPort.grid(row=0,column=4,sticky='w')
         ttk.Label(frmS,text='DB: ').grid(row=1,column=0,sticky='w')
-        self.txtDB = ttk.Entry(frmS,width=10)
-        self.txtDB.grid(row=1,column=1,sticky='w')
+        self._entDB = ttk.Entry(frmS,width=10)
+        self._entDB.grid(row=1,column=1,sticky='w')
         ttk.Label(frmS,text='User: ').grid(row=1,column=3,sticky='w')
-        self.txtUser = ttk.Entry(frmS,width=10)
-        self.txtUser.grid(row=1,column=4,sticky='e')
+        self._entUser = ttk.Entry(frmS,width=10)
+        self._entUser.grid(row=1,column=4,sticky='e')
         ttk.Label(frmS,text='PWD: ').grid(row=4,column=0,sticky='w')
-        self.txtPWD = ttk.Entry(frmS,width=10)
-        self.txtPWD.grid(row=4,column=1,sticky='w')
+        self._entPWD = ttk.Entry(frmS,width=10)
+        self._entPWD.grid(row=4,column=1,sticky='w')
 
         # Policy Configuration
         frmP = ttk.LabelFrame(frm,text='Policy')
@@ -75,22 +74,18 @@ class WraithConfigPanel(gui.ConfigPanel):
 
         # polite
         ttk.Label(frmP,text="Polite:").grid(row=0,column=0,sticky='w')
-        self.ptype = tk.IntVar(self)
-        self.rdoPoliteOn = ttk.Radiobutton(frmP,text='On',variable=self.ptype,value=1)
-        self.rdoPoliteOn.grid(row=0,column=1,sticky='w')
-        self.rdoPoliteOff = ttk.Radiobutton(frmP,text='Off',variable=self.ptype,value=0)
-        self.rdoPoliteOff.grid(row=1,column=1,sticky='w')
+        self._vpolite = tk.IntVar(self)
+        ttk.Radiobutton(frmP,text='On',variable=self._vpolite,value=1).grid(row=0,column=1,sticky='w')
+        ttk.Radiobutton(frmP,text='Off',variable=self._vpolite,value=0).grid(row=1,column=1,sticky='w')
 
         # separator label
         ttk.Label(frmP,text=" ").grid(row=0,column=2)
 
         # shutdown
         ttk.Label(frmP,text="Shutdown:").grid(row=0,column=3,sticky='w')
-        self.stype = tk.IntVar(self)
-        self.rdoShutdownAuto = ttk.Radiobutton(frmP,text='Auto',variable=self.stype,value=1)
-        self.rdoShutdownAuto.grid(row=0,column=4,sticky='w')
-        self.rdoShutdownManual = ttk.Radiobutton(frmP,text='Manual',variable=self.stype,value=0)
-        self.rdoShutdownManual.grid(row=1,column=4,sticky='w')
+        self._vstop = tk.IntVar(self)
+        ttk.Radiobutton(frmP,text='Auto',variable=self._vstop,value=1).grid(row=0,column=4,sticky='w')
+        ttk.Radiobutton(frmP,text='Manual',variable=self._vstop,value=0).grid(row=1,column=4,sticky='w')
 
     def _initialize(self):
         """ insert values from config file into entry boxes """
@@ -100,56 +95,51 @@ class WraithConfigPanel(gui.ConfigPanel):
             return
 
         # in case the conf file is invalid, set to empty if not present
-        self.txtHost.delete(0,tk.END)
-        if conf.has_option('Storage','host'):
-            self.txtHost.insert(0,conf.get('Storage','host'))
+        self._entHost.delete(0,tk.END)
+        if conf.has_option('Storage','host'): self._entHost.insert(0,conf.get('Storage','host'))
 
-        self.txtPort.delete(0,tk.END)
-        if conf.has_option('Storage','port'):
-            self.txtPort.insert(0,conf.get('Storage','port'))
+        self._entPort.delete(0,tk.END)
+        if conf.has_option('Storage','port'): self._entPort.insert(0,conf.get('Storage','port'))
 
-        self.txtDB.delete(0,tk.END)
-        if conf.has_option('Storage','db'):
-            self.txtDB.insert(0,conf.get('Storage','db'))
+        self._entDB.delete(0,tk.END)
+        if conf.has_option('Storage','db'): self._entDB.insert(0,conf.get('Storage','db'))
 
-        self.txtUser.delete(0,tk.END)
-        if conf.has_option('Storage','user'):
-            self.txtUser.insert(0,conf.get('Storage','user'))
+        self._entUser.delete(0,tk.END)
+        if conf.has_option('Storage','user'): self._entUser.insert(0,conf.get('Storage','user'))
 
-        self.txtPWD.delete(0,tk.END)
-        if conf.has_option('Storage','pwd'):
-            self.txtPWD.insert(0,conf.get('Storage','pwd'))
+        self._entPWD.delete(0,tk.END)
+        if conf.has_option('Storage','pwd'): self._entPWD.insert(0,conf.get('Storage','pwd'))
 
         if conf.has_option('Policy','polite') and conf.get('Policy','polite').lower() == 'off':
-            self.ptype.set(0)
+            self._vpolite.set(0)
         else:
-            self.ptype.set(1)
+            self._vpolite.set(1)
 
         if conf.has_option('Policy','shutdown') and conf.get('Policy','shutdown').lower() == 'manual':
-            self.stype.set(0)
+            self._vstop.set(0)
         else:
-            self.stype.set(1)
+            self._vstop.set(1)
 
     def _validate(self):
         """ validate entries """
-        host = self.txtHost.get()
+        host = self._entHost.get()
         if re.match(IPADDR,host) is None and host != 'localhost':
             self.err("Invalid Input","Host %s is not valid" % host)
             return False
-        port = self.txtPort.get()
+        port = self._entPort.get()
         try:
             port = int(port)
             if port < 1024 or port > 65535: raise RuntimeError("")
         except:
             self.err("Invalid Input","Port must be a number between 1024 and 65535")
             return False
-        if len(self.txtDB.get()) < 1 or len(self.txtDB.get()) > 15:
+        if len(self._entDB.get()) < 1 or len(self._entDB.get()) > 15:
             self.err("Invalid Input","DB name must be between 1 and 15 characters")
             return False
-        if len(self.txtUser.get()) < 1 or len(self.txtUser.get()) > 15:
+        if len(self._entUser.get()) < 1 or len(self._entUser.get()) > 15:
             self.err("Invalid Input","User name must be between 1 and 15 characters")
             return False
-        if len(self.txtPWD.get()) < 1 or len(self.txtPWD.get()) > 15:
+        if len(self._entPWD.get()) < 1 or len(self._entPWD.get()) > 15:
             self.err("Invalid Input","Password must be between 1 and 15 characters")
             return False
         return True
@@ -160,14 +150,14 @@ class WraithConfigPanel(gui.ConfigPanel):
         try:
             cp = ConfigParser.ConfigParser()
             cp.add_section('Storage')
-            cp.set('Storage','host',self.txtHost.get())
-            cp.set('Storage','port',self.txtPort.get())
-            cp.set('Storage','db',self.txtDB.get())
-            cp.set('Storage','user',self.txtUser.get())
-            cp.set('Storage','pwd',self.txtUser.get())
+            cp.set('Storage','host',self._entHost.get())
+            cp.set('Storage','port',self._entPort.get())
+            cp.set('Storage','db',self._entDB.get())
+            cp.set('Storage','user',self._entUser.get())
+            cp.set('Storage','pwd',self._entUser.get())
             cp.add_section('Policy')
-            cp.set('Policy','polite','on' if self.ptype else 'off')
-            cp.set('Policy','shutdown','auto' if self.stype else 'manual')
+            cp.set('Policy','polite','on' if self._vpolite else 'off')
+            cp.set('Policy','shutdown','auto' if self._vstop else 'manual')
             fout = open(wraith.WRAITHCONF,'w')
             cp.write(fout)
             fout.close()
@@ -194,25 +184,25 @@ class ConvertPanel(gui.SimplePanel):
         frmGeo.grid(row=0,column=0,sticky='w')
         # add widgets to the location frame
         ttk.Label(frmGeo,text='Lat/Lon: ').grid(row=0,column=0,sticky='w')
-        self.txtLatLon = ttk.Entry(frmGeo,width=15)
-        self.txtLatLon.grid(row=0,column=1,sticky='w')
+        self._entLatLon = ttk.Entry(frmGeo,width=15)
+        self._entLatLon.grid(row=0,column=1,sticky='w')
         ttk.Label(frmGeo,text=' MGRS: ').grid(row=0,column=2,sticky='w')
-        self.txtMGRS = ttk.Entry(frmGeo,width=15)
-        self.txtMGRS.grid(row=0,column=3,sticky='w')
+        self._entMGRS = ttk.Entry(frmGeo,width=15)
+        self._entMGRS.grid(row=0,column=3,sticky='w')
         ttk.Button(frmGeo,text='Convert',width=8,command=self.convertgeo).grid(row=0,column=4)
         # create the power frame
         frmPwr = ttk.LabelFrame(self,text='Power')
         frmPwr.grid(row=1,column=0,sticky='n')
         # add widgets to the power frame
         ttk.Label(frmPwr,text="dBm: ").grid(row=0,column=0)
-        self.txtdBm = ttk.Entry(frmPwr,width=8)
-        self.txtdBm.grid(row=0,column=1)
+        self._entdBm = ttk.Entry(frmPwr,width=8)
+        self._entdBm.grid(row=0,column=1)
         ttk.Label(frmPwr,text=" mBm: ").grid(row=0,column=2)
-        self.txtmBm = ttk.Entry(frmPwr,width=8)
-        self.txtmBm.grid(row=0,column=3)
+        self._entmBm = ttk.Entry(frmPwr,width=8)
+        self._entmBm.grid(row=0,column=3)
         ttk.Label(frmPwr,text=" mW: ").grid(row=0,column=4)
-        self.txtmW = ttk.Entry(frmPwr,width=8)
-        self.txtmW.grid(row=0,column=5)
+        self._entmW = ttk.Entry(frmPwr,width=8)
+        self._entmW.grid(row=0,column=5)
         ttk.Button(frmPwr,text='Convert',width=8,command=self.convertpwr).grid(row=0,column=6)
         frmBtns = ttk.Frame(self,borderwidth=0)
         frmBtns.grid(row=2,column=0,sticky='n')
@@ -222,62 +212,62 @@ class ConvertPanel(gui.SimplePanel):
     def convertgeo(self):
         """convert geo from lat/lon to mgrs or vice versa """
         # copied from LOBster
-        m = self.txtMGRS.get()
-        ll = self.txtLatLon.get()
+        m = self._entMGRS.get()
+        ll = self._entLatLon.get()
         if m and ll: self.err('Error',"One field must be empty")
         else:
             if m:
                 try:
                     ll = self._mgrs.toLatLon(m)
-                    self.txtLatLon.insert(0,"%.3f %.3f" % (ll[0],ll[1]))
+                    self._entLatLon.insert(0,"%.3f %.3f" % (ll[0],ll[1]))
                 except:
                     self.err('Error',"MGRS is not valid")
             elif ll:
                 try:
                     ll = ll.split()
                     m = self._mgrs.toMGRS(ll[0],ll[1])
-                    self.txtMGRS.insert(0,m)
+                    self._entMGRS.insert(0,m)
                 except:
                     self.err('Error',"Lat/Lon is not valid")
 
     def convertpwr(self):
         """ convert dBm to mW or vice versa """
-        d = self.txtdBm.get()
-        w = self.txtmW.get()
-        m = self.txtmBm.get()
+        d = self._entdBm.get()
+        w = self._entmW.get()
+        m = self._entmBm.get()
         if d and not (m or w):
             try:
                 w = math.pow(10,(float(d)/10.0))
                 m = 100 * float(d)
-                self.txtmW.insert(0,'%.3f' % w)
-                self.txtmBm.insert(0,'%.3f' % m)
+                self._entmW.insert(0,'%.3f' % w)
+                self._entmBm.insert(0,'%.3f' % m)
             except:
                 self.err('Error',"dBm is not valid")
         elif w and not (m or d):
             try:
                 d = 10*math.log10(float(w))
                 m = 100 * d
-                self.txtdBm.insert(0,'%.3f' % d)
-                self.txtmBm.insert(0,'%.3f' % m)
+                self._entdBm.insert(0,'%.3f' % d)
+                self._entmBm.insert(0,'%.3f' % m)
             except:
                 self.err('Error',"dBm is not valid")
         elif m and not (d or m):
             try:
                 d = float(m) / 100
                 w = math.pow(10,(float(d)/10.0))
-                self.txtdBm.insert(0,'%.3f' % d)
-                self.txtmW.insert(0,'%.3f' % w)
+                self._entdBm.insert(0,'%.3f' % d)
+                self._entmW.insert(0,'%.3f' % w)
             except:
                 self.err('Error',"mBm is not valid")
         else: self.err('Error',"Two fields must be empty")
 
     def clear(self):
         """ clear all entries """
-        self.txtLatLon.delete(0,tk.END)
-        self.txtMGRS.delete(0,tk.END)
-        self.txtdBm.delete(0,tk.END)
-        self.txtmBm.delete(0,tk.END)
-        self.txtmW.delete(0,tk.END)
+        self._entLatLon.delete(0,tk.END)
+        self._entMGRS.delete(0,tk.END)
+        self._entdBm.delete(0,tk.END)
+        self._entmBm.delete(0,tk.END)
+        self._entmW.delete(0,tk.END)
 
 #### CALCULATIONS - dict of calculation options for CalculatePanel
 CALCS = {'EIRP':{'inputs':[('Pwr (mW)',5,'float'),('Gain (dBi)',5,'float')],
@@ -416,7 +406,7 @@ class InterfacePanel(gui.TabularPanel):
                                   "widgets/icons/sensor.png",False)
 
         # configure tree to show headings but not 0th column
-        self.tree['show'] = 'headings'
+        self._tree['show'] = 'headings'
 
         # start our poll function
         self.update()
@@ -425,14 +415,14 @@ class InterfacePanel(gui.TabularPanel):
     def update(self):
         """ lists interfaces """
         # delete any entries
-        self.tree.delete(*self.tree.get_children())
+        self._tree.delete(*self._tree.get_children())
 
         # then get all entries
         for nic in iwt.wifaces():
             (phy,w) = iw.dev(nic)
             d = iwt.getdriver(nic)
             c = iwt.getchipset(d)
-            self.tree.insert('','end',iid=nic,values=(phy,nic,w[0]['addr'],w[0]['type'],d,c))
+            self._tree.insert('','end',iid=nic,values=(phy,nic,w[0]['addr'],w[0]['type'],d,c))
 
     def _shutdown(self): pass
     def reset(self): pass
@@ -470,8 +460,7 @@ class DatabinPanel(gui.SimplePanel):
             self._bins[b] = {'img':None}
             self._bins[b]['btn'] = ttk.Button(frm,text=b,command=self.donothing)
         else:
-            self._bins[b]['btn'] = ttk.Button(frm,image=self._bins[b]['img'],
-                                              command=lambda:self.viewquery(b))
+            self._bins[b]['btn'] = ttk.Button(frm,image=self._bins[b]['img'],command=lambda:self.viewquery(b))
         self._bins[b]['btn'].grid(row=0,column=wraith.BINS.index(b),sticky='w')
 
     def notifyclose(self,name):
@@ -574,51 +563,50 @@ class QueryPanel(gui.SlavePanel):
         frmR.grid(row=0,column=1,sticky='nwse')
         frmLS = ttk.LabelFrame(frmL,text='Session(s)')
         frmLS.grid(row=0,column=0,sticky='nwse')
-        self.trSession = ttk.Treeview(frmLS)
-        self.trSession.grid(row=0,column=0,sticky='nwse')
-        self.trSession.config(height=8)
-        self.trSession.config(selectmode='extended')
-        self.trSession['show'] = 'headings'
-        vscroll = ttk.Scrollbar(frmLS,orient=tk.VERTICAL,command=self.trSession.yview)
+        self._trSess = ttk.Treeview(frmLS)
+        self._trSess.grid(row=0,column=0,sticky='nwse')
+        self._trSess.config(height=8)
+        self._trSess.config(selectmode='extended')
+        self._trSess['show'] = 'headings'
+        vscroll = ttk.Scrollbar(frmLS,orient=tk.VERTICAL,command=self._trSess.yview)
         vscroll.grid(row=0,column=1,sticky='ns')
-        self.trSession['yscrollcommand'] = vscroll.set
+        self._trSess['yscrollcommand'] = vscroll.set
         # configure session tree's headers
         hdrs = ['ID','Host','Start','Frames']
         hdrlens = [gui.lenpix('000'),gui.lenpix('HOST'),
                    gui.lenpix('DDMMYY HHMM'),gui.lenpix('0000')]
-        self.trSession['columns'] = hdrs
+        self._trSess['columns'] = hdrs
         for i in xrange(len(hdrs)):
-            self.trSession.column(i,width=hdrlens[i],anchor=tk.CENTER)
-            self.trSession.heading(i,text=hdrs[i])
+            self._trSess.column(i,width=hdrlens[i],anchor=tk.CENTER)
+            self._trSess.heading(i,text=hdrs[i])
         self._getsessions() # fill the session tree
         frmRP = ttk.LabelFrame(frmR,text='Period')
         frmRP.grid(row=0,column=0,sticky='nwse')
         ttk.Label(frmRP,text='YYYY-MM-DD').grid(row=0,column=1,sticky='ne')
         ttk.Label(frmRP,text='HH:MM:SS').grid(row=0,column=2,sticky='ne')
         ttk.Label(frmRP,text='From: ').grid(row=1,column=0,sticky='w')
-        self.txtFromDate = ttk.Entry(frmRP,width=10)
-        self.txtFromDate.grid(row=1,column=1,sticky='e')
-        self.txtFromTime = ttk.Entry(frmRP,width=9)
-        self.txtFromTime.grid(row=1,column=2,sticky='e')
-        ttk.Button(frmRP,text='Now',width=4,
-                  command=self.fromnow).grid(row=1,column=3,sticky='w')
+        self._entFromDate = ttk.Entry(frmRP,width=10)
+        self._entFromDate.grid(row=1,column=1,sticky='e')
+        self._entFromTime = ttk.Entry(frmRP,width=9)
+        self._entFromTime.grid(row=1,column=2,sticky='e')
+        ttk.Button(frmRP,text='Now',width=4,command=self.fromnow).grid(row=1,column=3,sticky='w')
         ttk.Label(frmRP,text='To: ').grid(row=2,column=0,sticky='w')
-        self.txtToDate = ttk.Entry(frmRP,width=10)
-        self.txtToDate.grid(row=2,column=1,sticky='e')
-        self.txtToTime = ttk.Entry(frmRP,width=9)
-        self.txtToTime.grid(row=2,column=2,sticky='e')
+        self._entToDate = ttk.Entry(frmRP,width=10)
+        self._entToDate.grid(row=2,column=1,sticky='e')
+        self._entToTime = ttk.Entry(frmRP,width=9)
+        self._entToTime.grid(row=2,column=2,sticky='e')
         ttk.Button(frmRP,text='Now',width=4,command=self.tonow).grid(row=2,column=3,sticky='w')
-        self.vcollate = tk.IntVar()
-        chkCollate = ttk.Checkbutton(frmRP,text="Collate",variable=self.vcollate).grid(row=3,column=0,sticky='nwse')
+        self._vcollate = tk.IntVar()
+        ttk.Checkbutton(frmRP,text="Collate",variable=self._vcollate).grid(row=3,column=0,sticky='nwse')
 
         # filter on frame
         frmFO = ttk.LabelFrame(frmR,text="Filter On")
         frmFO.grid(row=1,column=0,sticky='nwse')
         filters = ['Sensor','Signal','Traffic']
-        self.vfilteron = []
+        self._vfilteron = []
         for i in xrange(3):
-            self.vfilteron.append(tk.IntVar())
-            ttk.Checkbutton(frmFO,text=filters[i],variable=self.vfilteron[i]).grid(row=0,column=i,sticky='w')
+            self._vfilteron.append(tk.IntVar())
+            ttk.Checkbutton(frmFO,text=filters[i],variable=self._vfilteron[i]).grid(row=0,column=i,sticky='w')
 
         # progress frame
         frmP = ttk.Frame(frmR)
@@ -650,51 +638,51 @@ class QueryPanel(gui.SlavePanel):
         ttk.Label(frmSL,text='Not').grid(row=0,column=2,sticky='w')
         ttk.Label(frmSL,text='Role').grid(row=0,column=3,sticky='w')
         ttk.Label(frmSL,text='Host: ').grid(row=1,column=0,sticky='w')
-        self.txtSensorHost = ttk.Entry(frmSL,width=17)
-        self.txtSensorHost.grid(row=1,column=1,sticky='e')
-        self.vnothost = tk.IntVar()
-        ttk.Checkbutton(frmSL,variable=self.vnothost).grid(row=1,column=2,sticky='w')
+        self._entSensorHost = ttk.Entry(frmSL,width=17)
+        self._entSensorHost.grid(row=1,column=1,sticky='e')
+        self._vnothost = tk.IntVar()
+        ttk.Checkbutton(frmSL,variable=self._vnothost).grid(row=1,column=2,sticky='w')
         ttk.Label(frmSL,text='NIC: ').grid(row=2,column=0,sticky='w')
-        self.txtSensorNic = ttk.Entry(frmSL,width=10)
-        self.txtSensorNic.grid(row=2,column=1,sticky='e')
-        self.vnotnic = tk.IntVar()
-        ttk.Checkbutton(frmSL,variable=self.vnotnic).grid(row=2,column=2,sticky='w')
+        self._entSensorNic = ttk.Entry(frmSL,width=10)
+        self._entSensorNic.grid(row=2,column=1,sticky='e')
+        self._vnotnic = tk.IntVar()
+        ttk.Checkbutton(frmSL,variable=self._vnotnic).grid(row=2,column=2,sticky='w')
         ttk.Label(frmSL,text='MAC: ').grid(row=3,column=0,sticky='w')
-        self.txtSensorMac = ttk.Entry(frmSL,width=17)
-        self.txtSensorMac.grid(row=3,column=1,sticky='e')
-        self.vnotmac = tk.IntVar()
-        ttk.Checkbutton(frmSL,variable=self.vnotmac).grid(row=3,column=2,sticky='w')
+        self._entSensorMac = ttk.Entry(frmSL,width=17)
+        self._entSensorMac.grid(row=3,column=1,sticky='e')
+        self._vnotmac = tk.IntVar()
+        ttk.Checkbutton(frmSL,variable=self._vnotmac).grid(row=3,column=2,sticky='w')
         ttk.Label(frmSL,text='Spoof: ').grid(row=4,column=0,sticky='w')
-        self.txtSensorSpoof = ttk.Entry(frmSL,width=17)
-        self.txtSensorSpoof.grid(row=4,column=1,sticky='e')
-        self.vnotspoof = tk.IntVar()
-        ttk.Checkbutton(frmSL,variable=self.vnotspoof).grid(row=4,column=2,sticky='w')
+        self._entSensorSpoof = ttk.Entry(frmSL,width=17)
+        self._entSensorSpoof.grid(row=4,column=1,sticky='e')
+        self._vnotspoof = tk.IntVar()
+        ttk.Checkbutton(frmSL,variable=self._vnotspoof).grid(row=4,column=2,sticky='w')
         ttk.Label(frmSL,text='STDs: ').grid(row=5,column=0,sticky='w')
-        self.txtSensorStd = ttk.Entry(frmSL,width=5)
-        self.txtSensorStd.grid(row=5,column=1,sticky='e')
-        self.vnotstd = tk.IntVar()
-        ttk.Checkbutton(frmSL,variable=self.vnotstd).grid(row=5,column=2,sticky='w')
+        self._entSensorStd = ttk.Entry(frmSL,width=5)
+        self._entSensorStd.grid(row=5,column=1,sticky='e')
+        self._vnotstd = tk.IntVar()
+        ttk.Checkbutton(frmSL,variable=self._vnotstd).grid(row=5,column=2,sticky='w')
         ttk.Label(frmSL,text='Driver: ').grid(row=6,column=0,sticky='w')
-        self.txtSensorDriver = ttk.Entry(frmSL,width=17)
-        self.txtSensorDriver.grid(row=6,column=1,sticky='e')
-        self.vnotdriver = tk.IntVar()
-        ttk.Checkbutton(frmSL,variable=self.vnotdriver).grid(row=6,column=2,sticky='w')
-        self.vrecon = tk.IntVar()
-        ttk.Checkbutton(frmSL,text='Recon',variable=self.vrecon).grid(row=1,column=3,sticky='w')
-        self.vcoll = tk.IntVar()
-        ttk.Checkbutton(frmSL,text='Collection',variable=self.vcoll).grid(row=2,column=3,sticky='w')
+        self._entSensorDriver = ttk.Entry(frmSL,width=17)
+        self._entSensorDriver.grid(row=6,column=1,sticky='e')
+        self._vnotdriver = tk.IntVar()
+        ttk.Checkbutton(frmSL,variable=self._vnotdriver).grid(row=6,column=2,sticky='w')
+        self._vrecon = tk.IntVar()
+        ttk.Checkbutton(frmSL,text='Recon',variable=self._vrecon).grid(row=1,column=3,sticky='w')
+        self._vcoll = tk.IntVar()
+        ttk.Checkbutton(frmSL,text='Collection',variable=self._vcoll).grid(row=2,column=3,sticky='w')
         frmSRL = ttk.LabelFrame(frmSR,text='Location')
         frmSRL.grid(row=0,column=1,sticky='nwse')
         ttk.Label(frmSRL,text='Center PT: ').grid(row=1,column=5,sticky='w')
-        self.txtCenterPT = ttk.Entry(frmSRL,width=15)
-        self.txtCenterPT.grid(row=1,column=6,sticky='w')
+        self._entCenterPT = ttk.Entry(frmSRL,width=15)
+        self._entCenterPT.grid(row=1,column=6,sticky='w')
         ttk.Label(frmSRL,text='Radius: (m)').grid(row=2,column=5,sticky='w')
-        self.txtRadius = ttk.Entry(frmSRL,width=6)
-        self.txtRadius.grid(row=2,column=6,sticky='w')
+        self._entRadius = ttk.Entry(frmSRL,width=6)
+        self._entRadius.grid(row=2,column=6,sticky='w')
         self.vfixed = tk.IntVar()
         ttk.Checkbutton(frmSRL,text='Fixed',variable=self.vfixed).grid(row=3,column=5,sticky='w')
-        self.vdynamic = tk.IntVar()
-        ttk.Checkbutton(frmSRL,text='Dynamic',variable=self.vdynamic).grid(row=3,column=6,sticky='w')
+        self._vdynamic = tk.IntVar()
+        ttk.Checkbutton(frmSRL,text='Dynamic',variable=self._vdynamic).grid(row=3,column=6,sticky='w')
         nb.add(frmS,text='Sensor')
         # signal tab
         frmSig = ttk.Frame(nb)
@@ -702,39 +690,39 @@ class QueryPanel(gui.SlavePanel):
         frmSigParams.grid(row=0,column=0,sticky='nwse')
         ttk.Label(frmSigParams,text='Not').grid(row=0,column=2,sticky='w')
         ttk.Label(frmSigParams,text='Standard(s)').grid(row=1,column=0,sticky='w')
-        self.txtSignalStd = ttk.Entry(frmSigParams,width=10)
-        self.txtSignalStd.grid(row=1,column=1,sticky='e')
-        self.vnotstd = tk.IntVar()
-        ttk.Checkbutton(frmSigParams,variable=self.vnotstd).grid(row=1,column=2,sticky='w')
+        self._entSignalStd = ttk.Entry(frmSigParams,width=10)
+        self._entSignalStd.grid(row=1,column=1,sticky='e')
+        self._vnotstd = tk.IntVar()
+        ttk.Checkbutton(frmSigParams,variable=self._vnotstd).grid(row=1,column=2,sticky='w')
         ttk.Label(frmSigParams,text='Rate(s)').grid(row=2,column=0,sticky='w')
-        self.txtSignalRate = ttk.Entry(frmSigParams,width=10)
-        self.txtSignalRate.grid(row=2,column=1,sticky='e')
-        self.vnotrate = tk.IntVar()
-        ttk.Checkbutton(frmSigParams,variable=self.vnotrate).grid(row=2,column=2,sticky='w')
+        self._entSignalRate = ttk.Entry(frmSigParams,width=10)
+        self._entSignalRate.grid(row=2,column=1,sticky='e')
+        self._vnotrate = tk.IntVar()
+        ttk.Checkbutton(frmSigParams,variable=self._vnotrate).grid(row=2,column=2,sticky='w')
         ttk.Label(frmSigParams,text='Channel(s)').grid(row=3,column=0,sticky='w')
-        self.txtSignalCh = ttk.Entry(frmSigParams,width=10)
-        self.txtSignalCh.grid(row=3,column=1,sticky='e')
-        self.vnotch = tk.IntVar()
-        ttk.Checkbutton(frmSigParams,variable=self.vnotch).grid(row=3,column=2,sticky='w')
+        self._entSignalCh = ttk.Entry(frmSigParams,width=10)
+        self._entSignalCh.grid(row=3,column=1,sticky='e')
+        self._vnotch = tk.IntVar()
+        ttk.Checkbutton(frmSigParams,variable=self._vnotch).grid(row=3,column=2,sticky='w')
         # flags and channel flags are contained in separate frames
         # we want rows of 4 flags
         frmSigFlags = ttk.LabelFrame(frmSig,text='Flags')
         frmSigFlags.grid(row=1,column=0,sticky='nwse')
-        self.vrtflags = []
+        self._vrtflags = []
         for i in xrange(len(RT_FLAGS)):
-            self.vrtflags.append(tk.IntVar())
-            chk = ttk.Checkbutton(frmSigFlags,text=RT_FLAGS[i],variable=self.vrtflags[i])
+            self._vrtflags.append(tk.IntVar())
+            chk = ttk.Checkbutton(frmSigFlags,text=RT_FLAGS[i],variable=self._vrtflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
         ttk.Separator(frmSigFlags,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=2,sticky='ns')
-        self.vandorrtflags = tk.IntVar()
-        ttk.Radiobutton(frmSigFlags,text='AND',variable=self.vandorrtflags,value=0).grid(row=0,column=5,sticky='w')
-        ttk.Radiobutton(frmSigFlags,text='OR',variable=self.vandorrtflags,value=1).grid(row=1,column=5,sticky='w')
+        self._vandorrtflags = tk.IntVar()
+        ttk.Radiobutton(frmSigFlags,text='AND',variable=self._vandorrtflags,value=0).grid(row=0,column=5,sticky='w')
+        ttk.Radiobutton(frmSigFlags,text='OR',variable=self._vandorrtflags,value=1).grid(row=1,column=5,sticky='w')
         frmSigChFlags = ttk.LabelFrame(frmSig,text="Channel Flags")
         frmSigChFlags.grid(row=2,column=0,sticky='nwse')
-        self.vchflags = []
+        self._vchflags = []
         for i in xrange(len(CH_FLAGS)):
-            self.vchflags.append(tk.IntVar())
-            chk = ttk.Checkbutton(frmSigChFlags,text=CH_FLAGS[i],variable=self.vchflags[i])
+            self._vchflags.append(tk.IntVar())
+            chk = ttk.Checkbutton(frmSigChFlags,text=CH_FLAGS[i],variable=self._vchflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
         ttk.Separator(frmSigChFlags,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=2,sticky='ns')
         self.vandorchflags = tk.IntVar()
@@ -745,70 +733,70 @@ class QueryPanel(gui.SlavePanel):
         frmSigHT.grid(row=0,column=1,rowspan=2,sticky='nwse')
         frmSigHT1 = ttk.Frame(frmSigHT)
         frmSigHT1.grid(row=0,column=0,sticky='nwse')
-        self.vhtonly = tk.IntVar()
-        ttk.Checkbutton(frmSigHT1,text="HT Only",variable=self.vhtonly).grid(row=0,column=0,sticky='nwse')
-        self.vampdu = tk.IntVar()
-        ttk.Checkbutton(frmSigHT1,text='AMPDU',variable=self.vampdu).grid(row=0,column=1,sticky='nwse')
+        self._vhtonly = tk.IntVar()
+        ttk.Checkbutton(frmSigHT1,text="HT Only",variable=self._vhtonly).grid(row=0,column=0,sticky='nwse')
+        self._vampdu = tk.IntVar()
+        ttk.Checkbutton(frmSigHT1,text='AMPDU',variable=self._vampdu).grid(row=0,column=1,sticky='nwse')
         frmSigHTBW = ttk.Frame(frmSigHT)
         frmSigHTBW.grid(row=1,column=0,sticky='nwse')
         ttk.Label(frmSigHTBW,text='BW: ').grid(row=0,column=0,sticky='nwse')
-        self.vbws = []
+        self._vbws = []
         for i in xrange(len(BW_FLAGS)):
-            self.vbws.append(tk.IntVar())
-            chk = ttk.Checkbutton(frmSigHTBW,text=BW_FLAGS[i],variable=self.vbws[i])
+            self._vbws.append(tk.IntVar())
+            chk = ttk.Checkbutton(frmSigHTBW,text=BW_FLAGS[i],variable=self._vbws[i])
             chk.grid(row=0,column=i+1,sticky='w')
         frmSigHT2 = ttk.Frame(frmSigHT)
         frmSigHT2.grid(row=2,column=0)
         ttk.Label(frmSigHT2,text='GI: ').grid(row=0,column=0,sticky='nwse')
-        self.vgis = [tk.IntVar(),tk.IntVar()]
-        ttk.Checkbutton(frmSigHT2,text='Short',variable=self.vgis[0]).grid(row=0,column=1,sticky='nwse')
-        ttk.Checkbutton(frmSigHT2,text='Long',variable=self.vgis[1]).grid(row=1,column=1,sticky='nwse')
-        self.vformats = [tk.IntVar(),tk.IntVar()]
+        self._vgis = [tk.IntVar(),tk.IntVar()]
+        ttk.Checkbutton(frmSigHT2,text='Short',variable=self._vgis[0]).grid(row=0,column=1,sticky='nwse')
+        ttk.Checkbutton(frmSigHT2,text='Long',variable=self._vgis[1]).grid(row=1,column=1,sticky='nwse')
+        self._vformats = [tk.IntVar(),tk.IntVar()]
         ttk.Label(frmSigHT2,text='Format: ').grid(row=0,column=2,sticky='nwse')
-        ttk.Checkbutton(frmSigHT2,text='Mixed',variable=self.vgis[0]).grid(row=0,column=3,sticky='nwse')
-        ttk.Checkbutton(frmSigHT2,text='Greenfield',variable=self.vgis[1]).grid(row=1,column=3,sticky='nwse')
+        ttk.Checkbutton(frmSigHT2,text='Mixed',variable=self._vgis[0]).grid(row=0,column=3,sticky='nwse')
+        ttk.Checkbutton(frmSigHT2,text='Greenfield',variable=self._vgis[1]).grid(row=1,column=3,sticky='nwse')
         frmSigHT3 = ttk.Frame(frmSigHT)
         frmSigHT3.grid(row=3,column=0,sticky='nwse')
         ttk.Label(frmSigHT3,text='MCS Index: ').grid(row=0,column=0,sticky='nwse')
-        self.txtIndex = ttk.Entry(frmSigHT3,width=15)
-        self.txtIndex.grid(row=0,column=1,sticky='nwse')
+        self._entIndex = ttk.Entry(frmSigHT3,width=15)
+        self._entIndex.grid(row=0,column=1,sticky='nwse')
         nb.add(frmSig,text='Signal')
         # traffic
         frmT = ttk.Frame(nb)
         frmL = ttk.Frame(frmT)
         frmL.grid(row=0,column=0,sticky='nwse')
-        self.trTypes = ttk.Treeview(frmL)
-        self.trTypes.grid(row=0,column=0,sticky='nwse')
-        self.trTypes.config(height=10)
-        self.trTypes.config(selectmode='extended')
-        self.trTypes['show'] = 'tree'
-        vscroll = ttk.Scrollbar(frmL,orient=tk.VERTICAL,command=self.trTypes.yview)
+        self._trTypes = ttk.Treeview(frmL)
+        self._trTypes.grid(row=0,column=0,sticky='nwse')
+        self._trTypes.config(height=10)
+        self._trTypes.config(selectmode='extended')
+        self._trTypes['show'] = 'tree'
+        vscroll = ttk.Scrollbar(frmL,orient=tk.VERTICAL,command=self._trTypes.yview)
         vscroll.grid(row=0,column=1,sticky='ns')
-        self.trTypes['yscrollcommand'] = vscroll.set
+        self._trTypes['yscrollcommand'] = vscroll.set
         # fill the tree
-        self.trTypes['columns'] = ('one',)
-        self.trTypes.column('#0',stretch=0,width=15,anchor='w')
-        self.trTypes.column('one',stretch=0,width=140,anchor='w')
-        self.trTypes.insert('','end',iid='MGMT',values=('MGMT',))
+        self._trTypes['columns'] = ('one',)
+        self._trTypes.column('#0',stretch=0,width=15,anchor='w')
+        self._trTypes.column('one',stretch=0,width=140,anchor='w')
+        self._trTypes.insert('','end',iid='MGMT',values=('MGMT',))
         for mgmt in mpdu.ST_MGMT_TYPES:
             if mgmt == 'rsrv': continue
-            self.trTypes.insert('MGMT','end',iid="%s.%s" % ('MGMT',mgmt),values=(mgmt,))
-        self.trTypes.insert('','end',iid='CTRL',values=('CTRL',))
+            self._trTypes.insert('MGMT','end',iid="%s.%s" % ('MGMT',mgmt),values=(mgmt,))
+        self._trTypes.insert('','end',iid='CTRL',values=('CTRL',))
         for ctrl in mpdu.ST_CTRL_TYPES:
             if ctrl == 'rsrv': continue
-            self.trTypes.insert('CTRL','end',iid="%s.%s" % ('CTRL',ctrl),values=(ctrl,))
-        self.trTypes.insert('','end',iid='DATA',values=('DATA',))
+            self._trTypes.insert('CTRL','end',iid="%s.%s" % ('CTRL',ctrl),values=(ctrl,))
+        self._trTypes.insert('','end',iid='DATA',values=('DATA',))
         for data in mpdu.ST_DATA_TYPES:
             if data == 'rsrv': continue
-            self.trTypes.insert('DATA','end',iid="%s.%s" % ('DATA',data),values=(data,))
+            self._trTypes.insert('DATA','end',iid="%s.%s" % ('DATA',data),values=(data,))
         frmR = ttk.Frame(frmT)
         frmR.grid(row=0,column=1,sticky='nswe')
         frmRFC = ttk.LabelFrame(frmR,text="Frame Control Frames")
         frmRFC.grid(row=0,column=0,sticky='nwse')
-        self.vfcflags = []
+        self._vfcflags = []
         for i in xrange(len(FC_FLAGS)):
-            self.vfcflags.append(tk.IntVar())
-            chk = ttk.Checkbutton(frmRFC,text=FC_FLAGS[i],variable=self.vfcflags[i])
+            self._vfcflags.append(tk.IntVar())
+            chk = ttk.Checkbutton(frmRFC,text=FC_FLAGS[i],variable=self._vfcflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
         ttk.Separator(frmRFC,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=2,sticky='ns')
         self.vandorfcflags = tk.IntVar()
@@ -818,20 +806,20 @@ class QueryPanel(gui.SlavePanel):
         frmRA = ttk.LabelFrame(frmR,text='HW ADDR')
         frmRA.grid(row=1,column=0,sticky='nwse')
         ttk.Label(frmRA,text='Single: ').grid(row=0,column=0,sticky='nwse')
-        self.txtHWAddr = ttk.Entry(frmRA,width=17)
-        self.txtHWAddr.grid(row=0,column=1,sticky='nwse')
+        self._entHWAddr = ttk.Entry(frmRA,width=17)
+        self._entHWAddr.grid(row=0,column=1,sticky='nwse')
         ttk.Label(frmRA,text='File: ').grid(row=1,column=0,sticky='nwse')
-        self.txtSelFile = ttk.Entry(frmRA,width=20)
-        self.txtSelFile.grid(row=1,column=1,sticky='ne')
+        self._entSelFile = ttk.Entry(frmRA,width=20)
+        self._entSelFile.grid(row=1,column=1,sticky='ne')
         ttk.Button(frmRA,text='Browse',width=6,command=self.browse).grid(row=1,column=2,sticky='nw')
         ttk.Button(frmRA,text='Clear',width=6,command=self.clearselfile).grid(row=1,column=3,sticky='nw')
         ttk.Label(frmRA,text='Limit To: ').grid(row=2,column=0)
         frmRAL = ttk.Frame(frmRA,border=0)
         frmRAL.grid(row=2,column=1,columnspan=3)
-        self.vlimitto = []
+        self._vlimitto = []
         for i in xrange(4):
-            self.vlimitto.append(tk.IntVar())
-            chk = ttk.Checkbutton(frmRAL,text="ADDR %d" % (i+1),variable=self.vlimitto[i])
+            self._vlimitto.append(tk.IntVar())
+            chk = ttk.Checkbutton(frmRAL,text="ADDR %d" % (i+1),variable=self._vlimitto[i])
             chk.grid(row=0,column=i,sticky='nwse')
         nb.add(frmT,text='Traffic')
 
@@ -875,73 +863,73 @@ class QueryPanel(gui.SlavePanel):
     def widgetreset(self):
         """ clears all user inputed data """
         # time periods
-        for s in self.trSession.selection(): self.trSession.selection_remove(s)
-        self.txtFromDate.delete(0,tk.END)
-        self.txtFromTime.delete(0,tk.END)
-        self.txtToDate.delete(0,tk.END)
-        self.txtToTime.delete(0,tk.END)
-        self.vcollate.set(0)
+        for s in self._trSess.selection(): self._trSess.selection_remove(s)
+        self._entFromDate.delete(0,tk.END)
+        self._entFromTime.delete(0,tk.END)
+        self._entToDate.delete(0,tk.END)
+        self._entToTime.delete(0,tk.END)
+        self._vcollate.set(0)
         # sensor
-        self.txtSensorHost.delete(0,tk.END)
-        self.vnothost.set(0)
-        self.txtSensorNic.delete(0,tk.END)
-        self.vnotnic.set(0)
-        self.txtSensorMac.delete(0,tk.END)
-        self.vnotmac.set(0)
-        self.txtSensorSpoof.delete(0,tk.END)
-        self.vnotspoof.set(0)
-        self.txtSensorStd.delete(0,tk.END)
-        self.vnotstd.set(0)
-        self.txtSensorDriver.delete(0,tk.END)
-        self.vnotdriver.set(0)
-        self.vrecon.set(0)
-        self.vcoll.set(0)
-        self.txtCenterPT.delete(0,tk.END)
-        self.txtRadius.delete(0,tk.END)
+        self._entSensorHost.delete(0,tk.END)
+        self._vnothost.set(0)
+        self._entSensorNic.delete(0,tk.END)
+        self._vnotnic.set(0)
+        self._entSensorMac.delete(0,tk.END)
+        self._vnotmac.set(0)
+        self._entSensorSpoof.delete(0,tk.END)
+        self._vnotspoof.set(0)
+        self._entSensorStd.delete(0,tk.END)
+        self._vnotstd.set(0)
+        self._entSensorDriver.delete(0,tk.END)
+        self._vnotdriver.set(0)
+        self._vrecon.set(0)
+        self._vcoll.set(0)
+        self._entCenterPT.delete(0,tk.END)
+        self._entRadius.delete(0,tk.END)
         self.vfixed.set(0)
-        self.vdynamic.set(0)
+        self._vdynamic.set(0)
         # signal
-        self.txtSignalStd.delete(0,tk.END)
-        self.vnotstd.set(0)
-        self.txtSignalRate.delete(0,tk.END)
-        self.vnotrate.set(0)
-        self.txtSignalCh.delete(0,tk.END)
-        self.vnotch.set(0)
-        for chk in self.vrtflags: chk.set(0)
-        self.vandorrtflags.set(0)
-        for chk in self.vchflags: chk.set(0)
+        self._entSignalStd.delete(0,tk.END)
+        self._vnotstd.set(0)
+        self._entSignalRate.delete(0,tk.END)
+        self._vnotrate.set(0)
+        self._entSignalCh.delete(0,tk.END)
+        self._vnotch.set(0)
+        for chk in self._vrtflags: chk.set(0)
+        self._vandorrtflags.set(0)
+        for chk in self._vchflags: chk.set(0)
         self.vandorchflags.set(0)
-        self.vhtonly.set(0)
-        self.vampdu.set(0)
-        for chk in self.vbws: chk.set(0)
-        for chk in self.vgis: chk.set(0)
-        for chk in self.vformats: chk.set(0)
-        self.txtIndex.delete(0,tk.END)
+        self._vhtonly.set(0)
+        self._vampdu.set(0)
+        for chk in self._vbws: chk.set(0)
+        for chk in self._vgis: chk.set(0)
+        for chk in self._vformats: chk.set(0)
+        self._entIndex.delete(0,tk.END)
         # traffic
-        for s in self.trTypes.selection(): self.trTypes.selection_remove(s)
-        for chk in self.vfcflags: chk.set(0)
+        for s in self._trTypes.selection(): self._trTypes.selection_remove(s)
+        for chk in self._vfcflags: chk.set(0)
         self.vandorfcflags.set(0)
-        self.txtHWAddr.delete(0,tk.END)
-        self.txtSelFile.delete(0,tk.END)
-        for chk in self.vlimitto: chk.set(0)
+        self._entHWAddr.delete(0,tk.END)
+        self._entSelFile.delete(0,tk.END)
+        for chk in self._vlimitto: chk.set(0)
 
     def fromnow(self):
         """assign now() to the from entries """
         d,t = timestamps.ts2iso(time.time()).split('T') # split isoformat on 'T'
         t = t[:8]                                       # drop the microseconds
-        self.txtFromDate.delete(0,tk.END)               # delete from entries
-        self.txtFromDate.insert(0,d)                    # and add now
-        self.txtFromTime.delete(0,tk.END)
-        self.txtFromTime.insert(0,t)
+        self._entFromDate.delete(0,tk.END)               # delete from entries
+        self._entFromDate.insert(0,d)                    # and add now
+        self._entFromTime.delete(0,tk.END)
+        self._entFromTime.insert(0,t)
 
     def tonow(self):
         """ assign now() to the to entries """
         d,t = timestamps.ts2iso(time.time()).split('T') # split isoformat on 'T'
         t = t[:8]                                       # drop the microseconds
-        self.txtToDate.delete(0,tk.END)                 # delete from entries
-        self.txtToDate.insert(0,d)                      # and add now
-        self.txtToTime.delete(0,tk.END)
-        self.txtToTime.insert(0,t)
+        self._entToDate.delete(0,tk.END)                 # delete from entries
+        self._entToDate.insert(0,d)                      # and add now
+        self._entToTime.delete(0,tk.END)
+        self._entToTime.insert(0,t)
 
     def browse(self):
         """ open a file browsing dialog for selector file """
@@ -950,11 +938,11 @@ class QueryPanel(gui.SlavePanel):
                                                 ("Selector Files","*.sel")],
                                      parent=self)
         self.clearselfile()
-        self.txtSelFile.insert(0,fpath)
+        self._entSelFile.insert(0,fpath)
 
     def clearselfile(self):
         """ clear the selection file """
-        self.txtSelFile.delete(0,tk.END)
+        self._entSelFile.delete(0,tk.END)
 
     # private helper functions
 
@@ -965,62 +953,62 @@ class QueryPanel(gui.SlavePanel):
          will never return results
         """
         # period
-        d = self.txtFromDate.get()
+        d = self._entFromDate.get()
         if d and not timestamps.validdate(d):
             self.err("Invalid Input","From date is not valid")
             return False
-        t = self.txtFromTime.get()
+        t = self._entFromTime.get()
         if t and not timestamps.validtime(t):
             return False
-        d = self.txtToDate.get()
+        d = self._entToDate.get()
         if d and not timestamps.validdate(d):
             self.err("Invalid Input","To date is not valid")
             return False
-        t = self.txtToTime.get()
+        t = self._entToTime.get()
         if t and not timestamps.validtime(t):
             return False
 
         # only validate sensor entries if 'enabled'
-        if self.vfilteron[0]:
+        if self._vfilteron[0]:
             # allow all in host, nic, driver
-            mac = self.txtSensorMac.get().upper()
+            mac = self._entSensorMac.get().upper()
             if mac and re.match(MACADDR,mac) is None:
                 self.err("Invalid Input","MAC addr %s is not valid" % mac)
                 return False
-            mac = self.txtSensorSpoof.get().upper()
+            mac = self._entSensorSpoof.get().upper()
             if mac and re.match(MACADDR,mac) is None:
                 self.err("Invalid Input","Spoof addr %s is not valid" % mac)
                 return False
-            stds = self.txtSensorStd.get().split(',')
+            stds = self._entSensorStd.get().split(',')
             if stds and stds != ['']:
                 for std in stds:
                     if not std in ['a','b','g','n','ac']:
                         self.err("Invalid Input","Invalid standard specifier %s" % std)
                         return False
-            cp = self.txtCenterPT.get()
+            cp = self._entCenterPT.get()
             if cp and not landnav.validMGRS(cp):
                 self.err("Invalid Input","Center point is not a valid MGRS location")
                 return False
 
         # # only validate signal entries if 'enabled'
-        if self.vfilteron[1]:
-            stds = self.txtSignalStd.get().split(',')
+        if self._vfilteron[1]:
+            stds = self._entSignalStd.get().split(',')
             if stds and stds != ['']:
                 for std in stds:
                     if not std in ['a','b','g','n','ac']:
                         self.err("Invalid Input","Invalid standard specifier %s" % std)
                         return False
-            rs = self.txtSignalRate.get().split(',')
+            rs = self._entSignalRate.get().split(',')
             if rs and rs != ['']:
                 try:
                     map(float,rs)
                 except ValueError:
                     self.err("Invalid Input","Rate(s) must be numeric")
                     return False
-            if not parsechlist(self.txtSignalCh.get(),'scan'):
+            if not parsechlist(self._entSignalCh.get(),'scan'):
                 self.err("Invalid Input","Invalid channel(s0 specification")
                 return False
-            mis = self.txtIndex.get().split(',')
+            mis = self._entIndex.get().split(',')
             if mis and mis != ['']:
                 try:
                     mis = map(int,mis)
@@ -1034,8 +1022,8 @@ class QueryPanel(gui.SlavePanel):
                             return False
 
         # only validate traffic entries if 'enabled'
-        if self.vfilteron[2]:
-            mac = self.txtHWAddr.get().upper()
+        if self._vfilteron[2]:
+            mac = self._entHWAddr.get().upper()
             if mac and re.match(MACADDR,mac) is None:
                 self.err("Invalid Input","HW Addr %s is not valid" % mac)
                 return False
@@ -1043,7 +1031,7 @@ class QueryPanel(gui.SlavePanel):
             fin = None
             fpath = None
             try:
-                fpath = self.txtSelFile.get()
+                fpath = self._entSelFile.get()
                 fin = open(fpath,'r')
                 ss = fin.read().split(',')
                 for s in ss:
@@ -1066,7 +1054,7 @@ class QueryPanel(gui.SlavePanel):
         for s in ss:
             self._curs.execute(sql2,(s['session_id'],))
             fc = self._curs.fetchone()
-            self.trSession.insert('','end',iid=str(s['session_id']),
+            self._trSess.insert('','end',iid=str(s['session_id']),
                                   values=(s['session_id'],
                                   s['hostname'],
                                   s['lower'].strftime("%d%m%y %H%M%S"),
@@ -1084,68 +1072,64 @@ class NidusConfigPanel(gui.ConfigPanel):
         frmSS = ttk.LabelFrame(frm,text='Storage')
         frmSS.grid(row=0,column=0,sticky='nwse')
         ttk.Label(frmSS,text='Host: ').grid(row=0,column=0,sticky='w')
-        self.txtHost = ttk.Entry(frmSS,width=15)
-        self.txtHost.grid(row=0,column=1,sticky='e')
+        self._entHost = ttk.Entry(frmSS,width=15)
+        self._entHost.grid(row=0,column=1,sticky='e')
         ttk.Label(frmSS,text=' ').grid(row=0,column=2) # separator
         ttk.Label(frmSS,text='Port: ').grid(row=0,column=3,sticky='w')
-        self.txtPort = ttk.Entry(frmSS,width=5)
-        self.txtPort.grid(row=0,column=4,sticky='w')
+        self._entPort = ttk.Entry(frmSS,width=5)
+        self._entPort.grid(row=0,column=4,sticky='w')
         ttk.Label(frmSS,text='DB: ').grid(row=1,column=0,sticky='w')
-        self.txtDB = ttk.Entry(frmSS,width=10)
-        self.txtDB.grid(row=1,column=1,sticky='w')
+        self._entDB = ttk.Entry(frmSS,width=10)
+        self._entDB.grid(row=1,column=1,sticky='w')
         ttk.Label(frmSS,text='User: ').grid(row=1,column=3,sticky='w')
-        self.txtUser = ttk.Entry(frmSS,width=10)
-        self.txtUser.grid(row=1,column=4,sticky='e')
+        self._entUser = ttk.Entry(frmSS,width=10)
+        self._entUser.grid(row=1,column=4,sticky='e')
         ttk.Label(frmSS,text=' ').grid(row=1,column=5) # separator
         ttk.Label(frmSS,text='PWD: ').grid(row=1,column=6,sticky='w')
-        self.txtPWD = ttk.Entry(frmSS,width=10)
-        self.txtPWD.grid(row=1,column=7,sticky='w')
+        self._entPWD = ttk.Entry(frmSS,width=10)
+        self._entPWD.grid(row=1,column=7,sticky='w')
 
         # SSE Configuration
         frmS = ttk.LabelFrame(frm,text='SSE')
         frmS.grid(row=1,column=0,sticky='nwse')
         ttk.Label(frmS,text='Packets: ').grid(row=0,column=0,sticky='w')
-        self.vsave = tk.IntVar()
-        ttk.Checkbutton(frmS,
-                        text="Save",
-                        variable=self.vsave,
-                        command=self.cb).grid(row=0,column=1,sticky='w')
-        self.vprivate = tk.IntVar()
-        self.chkPrivate = ttk.Checkbutton(frmS,text="Private",
-                                          variable=self.vprivate)
-        self.chkPrivate.grid(row=0,column=2,sticky='e')
+        self._vsave = tk.IntVar()
+        ttk.Checkbutton(frmS,text="Save",variable=self._vsave,command=self.cb).grid(row=0,column=1,sticky='w')
+        self._vpriv = tk.IntVar()
+        self._chkPriv = ttk.Checkbutton(frmS,text="Private",variable=self._vpriv)
+        self._chkPriv.grid(row=0,column=2,sticky='e')
         ttk.Label(frmS,text='Path: ').grid(row=0,column=3,sticky='w')
-        self.txtPCAPPath = ttk.Entry(frmS,width=25)
-        self.txtPCAPPath.grid(row=0,column=4)
+        self._entPCAPPath = ttk.Entry(frmS,width=25)
+        self._entPCAPPath.grid(row=0,column=4)
         ttk.Label(frmS,text="Max Size: ").grid(row=1,column=1,sticky='w')
-        self.txtMaxSz = ttk.Entry(frmS,width=4)
-        self.txtMaxSz.grid(row=1,column=2,sticky='w')
+        self._entMaxSz = ttk.Entry(frmS,width=4)
+        self._entMaxSz.grid(row=1,column=2,sticky='w')
         ttk.Label(frmS,text="Max Files: ").grid(row=1,column=3,sticky='w')
-        self.txtMaxFiles = ttk.Entry(frmS,width=4)
-        self.txtMaxFiles.grid(row=1,column=4,columnspan=2,sticky='w')
+        self._entMaxFiles = ttk.Entry(frmS,width=4)
+        self._entMaxFiles.grid(row=1,column=4,columnspan=2,sticky='w')
         ttk.Label(frmS,text='Threads: ').grid(row=2,column=0,sticky='w')
         ttk.Label(frmS,text='Store: ').grid(row=2,column=1,sticky='w')
-        self.txtNumStore = ttk.Entry(frmS,width=2)
-        self.txtNumStore.grid(row=2,column=2,sticky='w')
+        self._entNumStore = ttk.Entry(frmS,width=2)
+        self._entNumStore.grid(row=2,column=2,sticky='w')
         ttk.Label(frmS,text='Extract: ').grid(row=2,column=3,sticky='w')
-        self.txtNumExtract = ttk.Entry(frmS,width=2)
-        self.txtNumExtract.grid(row=2,column=4,sticky='w')
+        self._entNumExtract = ttk.Entry(frmS,width=2)
+        self._entNumExtract.grid(row=2,column=4,sticky='w')
 
         # OUI Configuration
         frmO = ttk.Frame(frm)
         frmO.grid(row=2,column=0,sticky='nwse')
         ttk.Label(frmO,text='OUI Path: ').grid(row=0,column=0,sticky='w')
-        self.txtOUIPath = ttk.Entry(frmO,width=50)
-        self.txtOUIPath.grid(row=0,column=1,sticky='e')
+        self._entOUIPath = ttk.Entry(frmO,width=50)
+        self._entOUIPath.grid(row=0,column=1,sticky='e')
 
     def cb(self):
         """ Save Checkbutton callback: disable/enable Save options as necessary """
-        if self.vsave.get(): state = tk.NORMAL
+        if self._vsave.get(): state = tk.NORMAL
         else: state = tk.DISABLED
-        self.chkPrivate.configure(state=state)
-        self.txtPCAPPath.configure(state=state)
-        self.txtMaxSz.configure(state=state)
-        self.txtMaxFiles.configure(state=state)
+        self._chkPriv.configure(state=state)
+        self._entPCAPPath.configure(state=state)
+        self._entMaxSz.configure(state=state)
+        self._entMaxFiles.configure(state=state)
 
     def _initialize(self):
         """ insert values from config file into entry boxes """
@@ -1156,25 +1140,25 @@ class NidusConfigPanel(gui.ConfigPanel):
 
         # in case the conf file is invalid, set to empty if not present
         # storage server
-        self.txtHost.delete(0,tk.END)
+        self._entHost.delete(0,tk.END)
         if conf.has_option('Storage','host'):
-            self.txtHost.insert(0,conf.get('Storage','host'))
+            self._entHost.insert(0,conf.get('Storage','host'))
 
-        self.txtPort.delete(0,tk.END)
+        self._entPort.delete(0,tk.END)
         if conf.has_option('Storage','port'):
-            self.txtPort.insert(0,conf.get('Storage','port'))
+            self._entPort.insert(0,conf.get('Storage','port'))
 
-        self.txtDB.delete(0,tk.END)
+        self._entDB.delete(0,tk.END)
         if conf.has_option('Storage','db'):
-            self.txtDB.insert(0,conf.get('Storage','db'))
+            self._entDB.insert(0,conf.get('Storage','db'))
 
-        self.txtUser.delete(0,tk.END)
+        self._entUser.delete(0,tk.END)
         if conf.has_option('Storage','user'):
-            self.txtUser.insert(0,conf.get('Storage','user'))
+            self._entUser.insert(0,conf.get('Storage','user'))
 
-        self.txtPWD.delete(0,tk.END)
+        self._entPWD.delete(0,tk.END)
         if conf.has_option('Storage','pwd'):
-            self.txtPWD.insert(0,conf.get('Storage','pwd'))
+            self._entPWD.insert(0,conf.get('Storage','pwd'))
 
         # SSE section
         try:
@@ -1183,87 +1167,87 @@ class NidusConfigPanel(gui.ConfigPanel):
         except:
             save = 0
             private = 0
-        self.txtPCAPPath.delete(0,tk.END)
+        self._entPCAPPath.delete(0,tk.END)
         if conf.has_option('SSE','save_path'):
-            self.txtPCAPPath.insert(0,conf.get('SSE','save_path'))
-        self.txtMaxSz.delete(0,tk.END)
+            self._entPCAPPath.insert(0,conf.get('SSE','save_path'))
+        self._entMaxSz.delete(0,tk.END)
         if conf.has_option('SSE','save_maxsize'):
-            self.txtMaxSz.insert(0,conf.get('SSE','save_maxsize'))
-        self.txtMaxFiles.delete(0,tk.END)
+            self._entMaxSz.insert(0,conf.get('SSE','save_maxsize'))
+        self._entMaxFiles.delete(0,tk.END)
         if conf.has_option('SSE','save_maxfiles'):
-            self.txtMaxFiles.insert(0,conf.get('SSE','save_maxfiles'))
-        self.txtNumStore.delete(0,tk.END)
+            self._entMaxFiles.insert(0,conf.get('SSE','save_maxfiles'))
+        self._entNumStore.delete(0,tk.END)
         if conf.has_option('SSE','store_threads'):
-            self.txtNumStore.insert(0,conf.get('SSE','store_threads'))
-        else: self.txtNumStore.insert(0,'2')
-        self.txtNumExtract.delete(0,tk.END)
+            self._entNumStore.insert(0,conf.get('SSE','store_threads'))
+        else: self._entNumStore.insert(0,'2')
+        self._entNumExtract.delete(0,tk.END)
         if conf.has_option('SSE','extract_threads'):
-            self.txtNumExtract.insert(0,conf.get('SSE','extract_threads'))
-        else: self.txtNumExtract.insert(0,'2')
+            self._entNumExtract.insert(0,conf.get('SSE','extract_threads'))
+        else: self._entNumExtract.insert(0,'2')
 
         # disable/enable as needed
         if save: state = tk.NORMAL
         else: state = tk.DISABLED
-        self.chkPrivate.configure(state=state)
-        self.txtPCAPPath.configure(state=state)
-        self.txtMaxSz.configure(state=state)
-        self.txtMaxFiles.configure(state=state)
+        self._chkPriv.configure(state=state)
+        self._entPCAPPath.configure(state=state)
+        self._entMaxSz.configure(state=state)
+        self._entMaxFiles.configure(state=state)
 
         # OUI section
-        self.txtOUIPath.delete(0,tk.END)
+        self._entOUIPath.delete(0,tk.END)
         if conf.has_option('OUI','path'):
-            self.txtOUIPath.insert(0,conf.get('OUI','Path'))
-        else: self.txtOUIPath.insert(0,'/etc/aircrack-ng/airodump-ng-oui.txt')
+            self._entOUIPath.insert(0,conf.get('OUI','Path'))
+        else: self._entOUIPath.insert(0,'/etc/aircrack-ng/airodump-ng-oui.txt')
 
     def _validate(self):
         """ validate entries """
         # storage server
-        host = self.txtHost.get()
+        host = self._entHost.get()
         if re.match(IPADDR,host) is None and host != 'localhost':
             self.err("Invalid Input","Host %s is not valid" % host)
             return False
-        port = self.txtPort.get()
+        port = self._entPort.get()
         try:
             port = int(port)
             if port < 1024 or port > 65535: raise RuntimeError("")
         except:
             self.err("Invalid Input","Port must be a number between 1024 and 65535")
             return False
-        if len(self.txtDB.get()) < 1 or len(self.txtDB.get()) > 15:
+        if len(self._entDB.get()) < 1 or len(self._entDB.get()) > 15:
             self.err("Invalid Input","DB name must be between 1 and 15 characters")
             return False
-        if len(self.txtUser.get()) < 1 or len(self.txtUser.get()) > 15:
+        if len(self._entUser.get()) < 1 or len(self._entUser.get()) > 15:
             self.err("Invalid Input","User name must be between 1 and 15 characters")
             return False
-        if len(self.txtPWD.get()) < 1 or len(self.txtPWD.get()) > 15:
+        if len(self._entPWD.get()) < 1 or len(self._entPWD.get()) > 15:
             self.err("Invalid Input","Password must be between 1 and 15 characters")
             return False
 
         # if not saving pcaps, we ignore pcap options
-        if self.vsave.get():
+        if self._vsave.get():
             # for the pcap directory, convert to absolute path before checking existence
-            pPCAP = self.txtPCAPPath.get()
+            pPCAP = self._entPCAPPath.get()
             if not os.path.isabs(pPCAP):
                 pPCAP = os.path.abspath(os.path.join('nidus',pPCAP))
             if not os.path.exists(pPCAP):
                 self.err("Invalid Input","PCAP directory %s does not exist" % pPCAP)
                 return False
             try:
-                if int(self.txtMaxSz.get()) < 1:
+                if int(self._entMaxSz.get()) < 1:
                     self.err("Invalid Input","Max Size must be >= 1")
                     return False
             except ValueError:
                 self.err("Invalid Input","Max Size must be an integer")
                 return False
             try:
-                if int(self.txtMaxFiles.get()) < 1:
+                if int(self._entMaxFiles.get()) < 1:
                     self.err("Invalid Input","Max Files must be >= 1")
                     return False
             except ValueError:
                 self.err("Invalid Input","Max files must be an integer")
                 return False
         try:
-            st = int(self.txtNumStore.get())
+            st = int(self._entNumStore.get())
             if st < 1 or st > 10:
                 self.err("Invalid Input","Number of store threads must be between 1 and 10")
                 return False
@@ -1271,15 +1255,15 @@ class NidusConfigPanel(gui.ConfigPanel):
             self.err("Invalid Input","Number of store threads must be an integer")
             return False
         try:
-            et = int(self.txtNumExtract.get())
+            et = int(self._entNumExtract.get())
             if et < 1 or et > 10:
                 self.err("Invalid Input","Number of extract threads must be between 1 and 10")
                 return False
         except ValueError:
             self.err("Invalid Input","Number of extract threads must be an integer")
             return False
-        if not os.path.isfile(self.txtOUIPath.get()):
-            self.err("Invalid Input","OUI file %s is not valid" % self.txtOUIPath.get())
+        if not os.path.isfile(self._entOUIPath.get()):
+            self.err("Invalid Input","OUI file %s is not valid" % self._entOUIPath.get())
             return False
         return True
 
@@ -1289,15 +1273,15 @@ class NidusConfigPanel(gui.ConfigPanel):
         try:
             cp = ConfigParser.ConfigParser()
             cp.add_section('SSE')
-            cp.set('SSE','save','yes' if self.vsave.get() else 'no')
-            cp.set('SSE','save_private','yes' if self.vprivate.get() else 'no')
-            cp.set('SSE','save_path',self.txtPCAPPath.get())
-            cp.set('SSE','save_maxsize',self.txtMaxSz.get())
-            cp.set('SSE','save_maxfiles',self.txtMaxFiles.get())
-            cp.set('SSE','store_threads',self.txtNumStore.get())
-            cp.set('SSE','extract_threads',self.txtNumExtract.get())
+            cp.set('SSE','save','yes' if self._vsave.get() else 'no')
+            cp.set('SSE','save_private','yes' if self._vpriv.get() else 'no')
+            cp.set('SSE','save_path',self._entPCAPPath.get())
+            cp.set('SSE','save_maxsize',self._entMaxSz.get())
+            cp.set('SSE','save_maxfiles',self._entMaxFiles.get())
+            cp.set('SSE','store_threads',self._entNumStore.get())
+            cp.set('SSE','extract_threads',self._entNumExtract.get())
             cp.add_section('OUI')
-            cp.set('OUI','path',self.txtOUIPath.get())
+            cp.set('OUI','path',self._entOUIPath.get())
             fout = open(wraith.NIDUSCONF,'w')
             cp.write(fout)
             fout.close()
@@ -1325,150 +1309,147 @@ class DySKTConfigPanel(gui.ConfigPanel):
         # Recon Tab Configuration
         frmR = ttk.Frame(nb)
         ttk.Label(frmR,text='NIC: ').grid(row=0,column=0,sticky='nw')
-        self.txtReconNic = ttk.Entry(frmR,width=5)
-        self.txtReconNic.grid(row=0,column=1,sticky='nw')
+        self._entReconNic = ttk.Entry(frmR,width=5)
+        self._entReconNic.grid(row=0,column=1,sticky='nw')
         ttk.Label(frmR,text=' ').grid(row=0,column=2,sticky='w')
         ttk.Label(frmR,text='Spoof: ').grid(row=0,column=3,sticky='nw')
-        self.txtReconSpoof = ttk.Entry(frmR,width=17)
-        self.txtReconSpoof.grid(row=0,column=4,sticky='nw')
+        self._entReconSpoof = ttk.Entry(frmR,width=17)
+        self._entReconSpoof.grid(row=0,column=4,sticky='nw')
         ttk.Label(frmR,text='Desc: ').grid(row=1,column=0,sticky='nw')
-        self.txtReconDesc = tk.Text(frmR,width=42,height=3)
-        self.txtReconDesc.grid(row=1,column=1,columnspan=4,sticky='e')
+        self._entReconDesc = tk.Text(frmR,width=42,height=3)
+        self._entReconDesc.grid(row=1,column=1,columnspan=4,sticky='e')
 
         # ANTENNA SUB SECTION
         frmRA = ttk.LabelFrame(frmR,text='Antennas')
         frmRA.grid(row=2,column=0,columnspan=5,sticky='nwse')
         # ANTENNA SUBSECTION
         ttk.Label(frmRA,text="Number: ").grid(row=0,column=0,sticky='w')
-        self.txtReconAntNum = ttk.Entry(frmRA,width=2)
-        self.txtReconAntNum.grid(row=0,column=1,sticky='w')
+        self._entReconAntNum = ttk.Entry(frmRA,width=2)
+        self._entReconAntNum.grid(row=0,column=1,sticky='w')
         ttk.Label(frmRA,text='Gain: ').grid(row=1,column=0,sticky='w')
-        self.txtReconAntGain = ttk.Entry(frmRA,width=7)
-        self.txtReconAntGain.grid(row=1,column=1,sticky='w')
+        self._entReconAntGain = ttk.Entry(frmRA,width=7)
+        self._entReconAntGain.grid(row=1,column=1,sticky='w')
         ttk.Label(frmRA,text=" ").grid(row=1,column=2)
         ttk.Label(frmRA,text="Type: ").grid(row=1,column=3,sticky='e')
-        self.txtReconAntType = ttk.Entry(frmRA,width=15)
-        self.txtReconAntType.grid(row=1,column=4,sticky='e')
+        self._entReconAntType = ttk.Entry(frmRA,width=15)
+        self._entReconAntType.grid(row=1,column=4,sticky='e')
         ttk.Label(frmRA,text='Loss: ').grid(row=2,column=0,sticky='w')
-        self.txtReconAntLoss = ttk.Entry(frmRA,width=7)
-        self.txtReconAntLoss.grid(row=2,column=1,sticky='w')
+        self._entReconAntLoss = ttk.Entry(frmRA,width=7)
+        self._entReconAntLoss.grid(row=2,column=1,sticky='w')
         ttk.Label(frmRA,text=" ").grid(row=2,column=2)
         ttk.Label(frmRA,text="XYZ: ").grid(row=2,column=3,sticky='e')
-        self.txtReconAntXYZ = ttk.Entry(frmRA,width=15)
-        self.txtReconAntXYZ.grid(row=2,column=4,sticky='e')
+        self._entReconAntXYZ = ttk.Entry(frmRA,width=15)
+        self._entReconAntXYZ.grid(row=2,column=4,sticky='e')
         # SCAN PATTERN SUB SECTION
         frmRS = ttk.LabelFrame(frmR,text='Scan Pattern')
         frmRS.grid(row=3,column=0,columnspan=5,sticky='nwse')
         ttk.Label(frmRS,text="Dwell: ").grid(row=0,column=0,sticky='w')
-        self.txtReconScanDwell = ttk.Entry(frmRS,width=5)
-        self.txtReconScanDwell.grid(row=0,column=2,sticky='w')
+        self._entReconScanDwell = ttk.Entry(frmRS,width=5)
+        self._entReconScanDwell.grid(row=0,column=2,sticky='w')
         ttk.Label(frmRS,text=" ").grid(row=0,column=3)
         ttk.Label(frmRS,text="Start: ").grid(row=0,column=4,sticky='e')
-        self.txtReconScanStart = ttk.Entry(frmRS,width=3)
-        self.txtReconScanStart.grid(row=0,column=5,sticky='w')
+        self._entReconScanStart = ttk.Entry(frmRS,width=3)
+        self._entReconScanStart.grid(row=0,column=5,sticky='w')
         ttk.Label(frmRS,text="Scan: ").grid(row=1,column=0,sticky='w')
-        self.txtReconScanScan = ttk.Entry(frmRS,width=12)
-        self.txtReconScanScan.grid(row=1,column=2,sticky='w')
+        self._entReconScanScan = ttk.Entry(frmRS,width=12)
+        self._entReconScanScan.grid(row=1,column=2,sticky='w')
         ttk.Label(frmRS,text=" ").grid(row=1,column=3)
         ttk.Label(frmRS,text="Pass: ").grid(row=1,column=4,sticky='w')
-        self.txtReconScanPass = ttk.Entry(frmRS,width=12)
-        self.txtReconScanPass.grid(row=1,column=5,sticky='e')
+        self._entReconScanPass = ttk.Entry(frmRS,width=12)
+        self._entReconScanPass.grid(row=1,column=5,sticky='e')
         nb.add(frmR,text='Recon')
 
         # Collection Tab Configuration
         frmC = ttk.Frame(nb)
         ttk.Label(frmC,text='NIC: ').grid(row=0,column=0,sticky='nw')
-        self.txtCollectionNic = ttk.Entry(frmC,width=5)
-        self.txtCollectionNic.grid(row=0,column=1,sticky='nw')
+        self._entCollectionNic = ttk.Entry(frmC,width=5)
+        self._entCollectionNic.grid(row=0,column=1,sticky='nw')
         ttk.Label(frmC,text=' ').grid(row=0,column=2,sticky='w')
         ttk.Label(frmC,text='Spoof: ').grid(row=0,column=3,sticky='wn')
-        self.txtCollectionSpoof = ttk.Entry(frmC,width=17)
-        self.txtCollectionSpoof.grid(row=0,column=4,sticky='nw')
+        self._entCollectionSpoof = ttk.Entry(frmC,width=17)
+        self._entCollectionSpoof.grid(row=0,column=4,sticky='nw')
         ttk.Label(frmC,text='Desc: ').grid(row=1,column=0,sticky='nw')
-        self.txtCollectionDesc = tk.Text(frmC,width=42,height=3)
-        self.txtCollectionDesc.grid(row=1,column=1,columnspan=4,sticky='e')
+        self._entCollectionDesc = tk.Text(frmC,width=42,height=3)
+        self._entCollectionDesc.grid(row=1,column=1,columnspan=4,sticky='e')
 
         # ANTENNA SUB SECTION
         frmCA = ttk.LabelFrame(frmC,text='Antennas')
         frmCA.grid(row=2,column=0,columnspan=5,sticky='nwse')
         # ANTENNA SUBSECTION
         ttk.Label(frmCA,text="Number: ").grid(row=0,column=0,sticky='w')
-        self.txtCollectionAntNum = ttk.Entry(frmCA,width=2)
-        self.txtCollectionAntNum.grid(row=0,column=1,sticky='w')
+        self._entCollectionAntNum = ttk.Entry(frmCA,width=2)
+        self._entCollectionAntNum.grid(row=0,column=1,sticky='w')
         ttk.Label(frmCA,text='Gain: ').grid(row=1,column=0,sticky='w')
-        self.txtCollectionAntGain = ttk.Entry(frmCA,width=7)
-        self.txtCollectionAntGain.grid(row=1,column=1,sticky='w')
+        self._entCollectionAntGain = ttk.Entry(frmCA,width=7)
+        self._entCollectionAntGain.grid(row=1,column=1,sticky='w')
         ttk.Label(frmCA,text=" ").grid(row=1,column=2)
         ttk.Label(frmCA,text="Type: ").grid(row=1,column=3,sticky='e')
-        self.txtCollectionAntType = ttk.Entry(frmCA,width=15)
-        self.txtCollectionAntType.grid(row=1,column=4,sticky='e')
+        self._entCollectionAntType = ttk.Entry(frmCA,width=15)
+        self._entCollectionAntType.grid(row=1,column=4,sticky='e')
         ttk.Label(frmCA,text='Loss: ').grid(row=2,column=0,sticky='w')
-        self.txtCollectionAntLoss = ttk.Entry(frmCA,width=7)
-        self.txtCollectionAntLoss.grid(row=2,column=1,sticky='w')
+        self._entCollectionAntLoss = ttk.Entry(frmCA,width=7)
+        self._entCollectionAntLoss.grid(row=2,column=1,sticky='w')
         ttk.Label(frmCA,text=" ").grid(row=2,column=2)
         ttk.Label(frmCA,text="XYZ: ").grid(row=2,column=3,sticky='e')
-        self.txtCollectionAntXYZ = ttk.Entry(frmCA,width=15)
-        self.txtCollectionAntXYZ.grid(row=2,column=4,sticky='e')
+        self._entCollectionAntXYZ = ttk.Entry(frmCA,width=15)
+        self._entCollectionAntXYZ.grid(row=2,column=4,sticky='e')
         # SCAN PATTERN SUB SECTION
         frmCS = ttk.LabelFrame(frmC,text='Scan Pattern')
         frmCS.grid(row=3,column=0,columnspan=5,sticky='nwse')
         ttk.Label(frmCS,text="Dwell: ").grid(row=0,column=0,sticky='w')
-        self.txtCollectionScanDwell = ttk.Entry(frmCS,width=5)
-        self.txtCollectionScanDwell.grid(row=0,column=2,sticky='w')
+        self._entCollectionScanDwell = ttk.Entry(frmCS,width=5)
+        self._entCollectionScanDwell.grid(row=0,column=2,sticky='w')
         ttk.Label(frmCS,text=" ").grid(row=0,column=3)
         ttk.Label(frmCS,text="Start: ").grid(row=0,column=4,sticky='e')
-        self.txtCollectionScanStart = ttk.Entry(frmCS,width=3)
-        self.txtCollectionScanStart.grid(row=0,column=5,sticky='w')
+        self._entCollectionScanStart = ttk.Entry(frmCS,width=3)
+        self._entCollectionScanStart.grid(row=0,column=5,sticky='w')
         ttk.Label(frmCS,text="Scan: ").grid(row=1,column=0,sticky='w')
-        self.txtCollectionScanScan = ttk.Entry(frmCS,width=12)
-        self.txtCollectionScanScan.grid(row=1,column=2,sticky='w')
+        self._entCollectionScanScan = ttk.Entry(frmCS,width=12)
+        self._entCollectionScanScan.grid(row=1,column=2,sticky='w')
         ttk.Label(frmCS,text=" ").grid(row=1,column=3)
         ttk.Label(frmCS,text="Pass: ").grid(row=1,column=4,sticky='w')
-        self.txtCollectionScanPass = ttk.Entry(frmCS,width=12)
-        self.txtCollectionScanPass.grid(row=1,column=5,sticky='e')
+        self._entCollectionScanPass = ttk.Entry(frmCS,width=12)
+        self._entCollectionScanPass.grid(row=1,column=5,sticky='e')
         nb.add(frmC,text='Collection')
 
         # GPS Tab Configuration
         # use a checkbutton & two subframes to differentiate betw/ fixed & dyanmic
         frmG = ttk.Frame(nb)
         self.vfixed = tk.IntVar()
-        ttk.Checkbutton(frmG,
-                        text="Fixed",
-                        variable=self.vfixed,
-                        command=self.gpscb).grid(row=0,column=0,sticky='w')
+        ttk.Checkbutton(frmG,text="Fixed",variable=self.vfixed,command=self.gpscb).grid(row=0,column=0,sticky='w')
 
         # separate dynamic and fixed
         frmGF = ttk.LabelFrame(frmG,text='Fixed')
         frmGF.grid(row=1,column=0,sticky='nw')
         ttk.Label(frmGF,text="Lat: ").grid(row=0,column=0,sticky='w')
-        self.txtLat = ttk.Entry(frmGF,width=10)
-        self.txtLat.grid(row=0,column=1,sticky='w')
+        self._entLat = ttk.Entry(frmGF,width=10)
+        self._entLat.grid(row=0,column=1,sticky='w')
         ttk.Label(frmGF,text="Lon: ").grid(row=1,column=0,sticky='w')
-        self.txtLon = ttk.Entry(frmGF,width=10)
-        self.txtLon.grid(row=1,column=1,sticky='w')
+        self._entLon = ttk.Entry(frmGF,width=10)
+        self._entLon.grid(row=1,column=1,sticky='w')
         ttk.Label(frmGF,text="Alt: ").grid(row=2,column=0,sticky='w')
-        self.txtAlt = ttk.Entry(frmGF,width=5)
-        self.txtAlt.grid(row=2,column=1,sticky='w')
+        self._entAlt = ttk.Entry(frmGF,width=5)
+        self._entAlt.grid(row=2,column=1,sticky='w')
         ttk.Label(frmGF,text="Heading: ").grid(row=3,column=0,sticky='w')
-        self.txtHeading = ttk.Entry(frmGF,width=3)
-        self.txtHeading.grid(row=3,column=1,sticky='w')
+        self._entHeading = ttk.Entry(frmGF,width=3)
+        self._entHeading.grid(row=3,column=1,sticky='w')
         frmGD = ttk.LabelFrame(frmG,text='Dynamic')
         frmGD.grid(row=1,column=2,sticky='ne')
         ttk.Label(frmGD,text="Port: ").grid(row=0,column=0,sticky='w')
-        self.txtGPSPort = ttk.Entry(frmGD,width=5)
-        self.txtGPSPort.grid(row=0,column=1,sticky='w')
+        self._entGPSPort = ttk.Entry(frmGD,width=5)
+        self._entGPSPort.grid(row=0,column=1,sticky='w')
         ttk.Label(frmGD,text="Dev ID: ").grid(row=1,column=0,sticky='w')
-        self.txtDevID = ttk.Entry(frmGD,width=9)
-        self.txtDevID.grid(row=1,column=1,sticky='w')
+        self._entDevID = ttk.Entry(frmGD,width=9)
+        self._entDevID.grid(row=1,column=1,sticky='w')
         ttk.Label(frmGD,text="Poll: ").grid(row=2,column=0,sticky='w')
-        self.txtPoll = ttk.Entry(frmGD,width=5)
-        self.txtPoll.grid(row=2,column=1,sticky='w')
+        self._entPoll = ttk.Entry(frmGD,width=5)
+        self._entPoll.grid(row=2,column=1,sticky='w')
         ttk.Label(frmGD,text="EPX: ").grid(row=3,column=0,sticky='w')
-        self.txtEPX = ttk.Entry(frmGD,width=5)
-        self.txtEPX.grid(row=3,column=1,sticky='w')
+        self._entEPX = ttk.Entry(frmGD,width=5)
+        self._entEPX.grid(row=3,column=1,sticky='w')
         ttk.Label(frmGD,text="EPY: ").grid(row=4,column=0,sticky='w')
-        self.txtEPY = ttk.Entry(frmGD,width=5)
-        self.txtEPY.grid(row=4,column=1,sticky='w')
+        self._entEPY = ttk.Entry(frmGD,width=5)
+        self._entEPY.grid(row=4,column=1,sticky='w')
         nb.add(frmG,text='GPS')
 
         # misc tab
@@ -1476,19 +1457,19 @@ class DySKTConfigPanel(gui.ConfigPanel):
         frmMS = ttk.LabelFrame(frmM,text='Storage')
         frmMS.grid(row=0,column=0,sticky='w')
         ttk.Label(frmMS,text=' Host: ').grid(row=0,column=0)
-        self.txtStoreHost = ttk.Entry(frmMS,width=15)
-        self.txtStoreHost.grid(row=0,column=1)
+        self._entStoreHost = ttk.Entry(frmMS,width=15)
+        self._entStoreHost.grid(row=0,column=1)
         ttk.Label(frmMS,text=' Port: ').grid(row=0,column=2)
-        self.txtStorePort = ttk.Entry(frmMS,width=5)
-        self.txtStorePort.grid(row=0,column=3)
+        self._entStorePort = ttk.Entry(frmMS,width=5)
+        self._entStorePort.grid(row=0,column=3)
         frmML = ttk.LabelFrame(frmM,text='Local')
         frmML.grid(row=1,column=0,sticky='w')
         ttk.Label(frmML,text="Region: ").grid(row=0,column=0,sticky='w')
-        self.txtRegion = ttk.Entry(frmML,width=3)
-        self.txtRegion.grid(row=0,column=1,sticky='w')
+        self._entRegion = ttk.Entry(frmML,width=3)
+        self._entRegion.grid(row=0,column=1,sticky='w')
         ttk.Label(frmML,text=" C2C: ").grid(row=0,column=2,sticky='w')
-        self.txtC2CPort = ttk.Entry(frmML,width=5)
-        self.txtC2CPort.grid(row=0,column=3,sticky='w')
+        self._entC2CPort = ttk.Entry(frmML,width=5)
+        self._entC2CPort.grid(row=0,column=3,sticky='w')
         nb.add(frmM,text='Misc.')
 
     def _initialize(self):
@@ -1499,80 +1480,80 @@ class DySKTConfigPanel(gui.ConfigPanel):
             return
 
         # start by reading the recon radio details
-        self.txtReconNic.delete(0,tk.END)
+        self._entReconNic.delete(0,tk.END)
         if cp.has_option('Recon','nic'):
-            self.txtReconNic.insert(0,cp.get('Recon','nic'))
-        self.txtReconSpoof.delete(0,tk.END)
+            self._entReconNic.insert(0,cp.get('Recon','nic'))
+        self._entReconSpoof.delete(0,tk.END)
         if cp.has_option('Recon','spoof'):
-            self.txtReconSpoof.insert(0,cp.get('Recon','spoof'))
-        self.txtReconDesc.delete(1.0,tk.END)
+            self._entReconSpoof.insert(0,cp.get('Recon','spoof'))
+        self._entReconDesc.delete(1.0,tk.END)
         if cp.has_option('Recon','desc'):
-            self.txtReconDesc.insert(tk.END,cp.get('Recon','desc'))
-        self.txtReconAntNum.delete(0,tk.END)
+            self._entReconDesc.insert(tk.END,cp.get('Recon','desc'))
+        self._entReconAntNum.delete(0,tk.END)
         if cp.has_option('Recon','antennas'):
-            self.txtReconAntNum.insert(0,cp.get('Recon','antennas'))
-        self.txtReconAntGain.delete(0,tk.END)
+            self._entReconAntNum.insert(0,cp.get('Recon','antennas'))
+        self._entReconAntGain.delete(0,tk.END)
         if cp.has_option('Recon','antenna_gain'):
-            self.txtReconAntGain.insert(0,cp.get('Recon','antenna_gain'))
-        self.txtReconAntType.delete(0,tk.END)
+            self._entReconAntGain.insert(0,cp.get('Recon','antenna_gain'))
+        self._entReconAntType.delete(0,tk.END)
         if cp.has_option('Recon','antenna_type'):
-            self.txtReconAntType.insert(0,cp.get('Recon','antenna_type'))
-        self.txtReconAntLoss.delete(0,tk.END)
+            self._entReconAntType.insert(0,cp.get('Recon','antenna_type'))
+        self._entReconAntLoss.delete(0,tk.END)
         if cp.has_option('Recon','antenna_loss'):
-            self.txtReconAntLoss.insert(0,cp.get('Recon','antenna_loss'))
-        self.txtReconAntXYZ.delete(0,tk.END)
+            self._entReconAntLoss.insert(0,cp.get('Recon','antenna_loss'))
+        self._entReconAntXYZ.delete(0,tk.END)
         if cp.has_option('Recon','antenna_xyz'):
-            self.txtReconAntXYZ.insert(0,cp.get('Recon','antenna_xyz'))
-        self.txtReconScanDwell.delete(0,tk.END)
+            self._entReconAntXYZ.insert(0,cp.get('Recon','antenna_xyz'))
+        self._entReconScanDwell.delete(0,tk.END)
         if cp.has_option('Recon','dwell'):
-            self.txtReconScanDwell.insert(0,cp.get('Recon','dwell'))
-        self.txtReconScanStart.delete(0,tk.END)
+            self._entReconScanDwell.insert(0,cp.get('Recon','dwell'))
+        self._entReconScanStart.delete(0,tk.END)
         if cp.has_option('Recon','scan_start'):
-            self.txtReconScanStart.insert(0,cp.get('Recon','scan_start'))
-        self.txtReconScanScan.delete(0,tk.END)
+            self._entReconScanStart.insert(0,cp.get('Recon','scan_start'))
+        self._entReconScanScan.delete(0,tk.END)
         if cp.has_option('Recon','scan'):
-            self.txtReconScanScan.insert(0,cp.get('Recon','scan'))
-        self.txtReconScanPass.delete(0,tk.END)
+            self._entReconScanScan.insert(0,cp.get('Recon','scan'))
+        self._entReconScanPass.delete(0,tk.END)
         if cp.has_option('Recon','pass'):
-            self.txtReconScanPass.insert(0,cp.get('Recon','pass'))
+            self._entReconScanPass.insert(0,cp.get('Recon','pass'))
 
         # then the collection radio details
-        self.txtCollectionNic.delete(0,tk.END)
+        self._entCollectionNic.delete(0,tk.END)
         if cp.has_option('Collection','nic'):
-            self.txtCollectionNic.insert(0,cp.get('Collection','nic'))
-        self.txtCollectionSpoof.delete(0,tk.END)
+            self._entCollectionNic.insert(0,cp.get('Collection','nic'))
+        self._entCollectionSpoof.delete(0,tk.END)
         if cp.has_option('Collection','spoof'):
-            self.txtCollectionSpoof.insert(0,cp.get('Collection','spoof'))
-        self.txtCollectionDesc.delete(1.0,tk.END)
+            self._entCollectionSpoof.insert(0,cp.get('Collection','spoof'))
+        self._entCollectionDesc.delete(1.0,tk.END)
         if cp.has_option('Collection','desc'):
-            self.txtCollectionDesc.insert(tk.END,cp.get('Collection','desc'))
-        self.txtCollectionAntNum.delete(0,tk.END)
+            self._entCollectionDesc.insert(tk.END,cp.get('Collection','desc'))
+        self._entCollectionAntNum.delete(0,tk.END)
         if cp.has_option('Collection','antennas'):
-            self.txtCollectionAntNum.insert(0,cp.get('Collection','antennas'))
-        self.txtCollectionAntGain.delete(0,tk.END)
+            self._entCollectionAntNum.insert(0,cp.get('Collection','antennas'))
+        self._entCollectionAntGain.delete(0,tk.END)
         if cp.has_option('Collection','antenna_gain'):
-            self.txtCollectionAntGain.insert(0,cp.get('Collection','antenna_gain'))
-        self.txtCollectionAntType.delete(0,tk.END)
+            self._entCollectionAntGain.insert(0,cp.get('Collection','antenna_gain'))
+        self._entCollectionAntType.delete(0,tk.END)
         if cp.has_option('Collection','antenna_type'):
-            self.txtCollectionAntType.insert(0,cp.get('Collection','antenna_type'))
-        self.txtCollectionAntLoss.delete(0,tk.END)
+            self._entCollectionAntType.insert(0,cp.get('Collection','antenna_type'))
+        self._entCollectionAntLoss.delete(0,tk.END)
         if cp.has_option('Collection','antenna_loss'):
-            self.txtCollectionAntLoss.insert(0,cp.get('Collection','antenna_loss'))
-        self.txtCollectionAntXYZ.delete(0,tk.END)
+            self._entCollectionAntLoss.insert(0,cp.get('Collection','antenna_loss'))
+        self._entCollectionAntXYZ.delete(0,tk.END)
         if cp.has_option('Collection','antenna_xyz'):
-            self.txtCollectionAntXYZ.insert(0,cp.get('Collection','antenna_xyz'))
-        self.txtCollectionScanDwell.delete(0,tk.END)
+            self._entCollectionAntXYZ.insert(0,cp.get('Collection','antenna_xyz'))
+        self._entCollectionScanDwell.delete(0,tk.END)
         if cp.has_option('Collection','dwell'):
-            self.txtCollectionScanDwell.insert(0,cp.get('Collection','dwell'))
-        self.txtCollectionScanStart.delete(0,tk.END)
+            self._entCollectionScanDwell.insert(0,cp.get('Collection','dwell'))
+        self._entCollectionScanStart.delete(0,tk.END)
         if cp.has_option('Collection','scan_start'):
-            self.txtCollectionScanStart.insert(0,cp.get('Collection','scan_start'))
-        self.txtCollectionScanScan.delete(0,tk.END)
+            self._entCollectionScanStart.insert(0,cp.get('Collection','scan_start'))
+        self._entCollectionScanScan.delete(0,tk.END)
         if cp.has_option('Collection','scan'):
-            self.txtCollectionScanScan.insert(0,cp.get('Collection','scan'))
-        self.txtCollectionScanPass.delete(0,tk.END)
+            self._entCollectionScanScan.insert(0,cp.get('Collection','scan'))
+        self._entCollectionScanPass.delete(0,tk.END)
         if cp.has_option('Collection','pass'):
-            self.txtCollectionScanPass.insert(0,cp.get('Collection','pass'))
+            self._entCollectionScanPass.insert(0,cp.get('Collection','pass'))
 
         # gps entries
         try:
@@ -1580,69 +1561,69 @@ class DySKTConfigPanel(gui.ConfigPanel):
         except:
             fixed = 0
         self.vfixed.set(fixed)
-        self.txtLat.delete(0,tk.END)
-        if cp.has_option('GPS','lat'): self.txtLat.insert(0,cp.get('GPS','lat'))
-        self.txtLon.delete(0,tk.END)
-        if cp.has_option('GPS','lon'): self.txtLon.insert(0,cp.get('GPS','lon'))
-        self.txtAlt.delete(0,tk.END)
-        if cp.has_option('GPS','alt'): self.txtAlt.insert(0,cp.get('GPS','alt'))
-        self.txtHeading.delete(0,tk.END)
-        if cp.has_option('GPS','heading'): self.txtHeading.insert(0,cp.get('GPS','heading'))
-        self.txtGPSPort.delete(0,tk.END)
-        if cp.has_option('GPS','port'): self.txtGPSPort.insert(0,cp.get('GPS','port'))
-        self.txtDevID.delete(0,tk.END)
-        if cp.has_option('GPS','devid'): self.txtDevID.insert(0,cp.get('GPS','devid'))
-        self.txtPoll.delete(0,tk.END)
-        if cp.has_option('GPS','poll'): self.txtPoll.insert(0,cp.get('GPS','poll'))
-        self.txtEPX.delete(0,tk.END)
-        if cp.has_option('GPS','epx'): self.txtEPX.insert(0,cp.get('GPS','epx'))
-        self.txtEPY.delete(0,tk.END)
-        if cp.has_option('GPS','epy'): self.txtEPY.insert(0,cp.get('GPS','epy'))
+        self._entLat.delete(0,tk.END)
+        if cp.has_option('GPS','lat'): self._entLat.insert(0,cp.get('GPS','lat'))
+        self._entLon.delete(0,tk.END)
+        if cp.has_option('GPS','lon'): self._entLon.insert(0,cp.get('GPS','lon'))
+        self._entAlt.delete(0,tk.END)
+        if cp.has_option('GPS','alt'): self._entAlt.insert(0,cp.get('GPS','alt'))
+        self._entHeading.delete(0,tk.END)
+        if cp.has_option('GPS','heading'): self._entHeading.insert(0,cp.get('GPS','heading'))
+        self._entGPSPort.delete(0,tk.END)
+        if cp.has_option('GPS','port'): self._entGPSPort.insert(0,cp.get('GPS','port'))
+        self._entDevID.delete(0,tk.END)
+        if cp.has_option('GPS','devid'): self._entDevID.insert(0,cp.get('GPS','devid'))
+        self._entPoll.delete(0,tk.END)
+        if cp.has_option('GPS','poll'): self._entPoll.insert(0,cp.get('GPS','poll'))
+        self._entEPX.delete(0,tk.END)
+        if cp.has_option('GPS','epx'): self._entEPX.insert(0,cp.get('GPS','epx'))
+        self._entEPY.delete(0,tk.END)
+        if cp.has_option('GPS','epy'): self._entEPY.insert(0,cp.get('GPS','epy'))
         self.gpscb() # enable/disable entries
 
         # misc entries
-        self.txtStoreHost.delete(0,tk.END)
-        if cp.has_option('Storage','host'): self.txtStoreHost.insert(0,cp.get('Storage','host'))
-        self.txtStorePort.delete(0,tk.END)
-        if cp.has_option('Storage','port'): self.txtStorePort.insert(0,cp.get('Storage','port'))
-        self.txtRegion.delete(0,tk.END)
-        if cp.has_option('Local','region'): self.txtRegion.insert(0,cp.get('Local','region'))
-        self.txtC2CPort.delete(0,tk.END)
-        if cp.has_option('Local','C2C'): self.txtC2CPort.insert(0,cp.get('Local','C2C'))
+        self._entStoreHost.delete(0,tk.END)
+        if cp.has_option('Storage','host'): self._entStoreHost.insert(0,cp.get('Storage','host'))
+        self._entStorePort.delete(0,tk.END)
+        if cp.has_option('Storage','port'): self._entStorePort.insert(0,cp.get('Storage','port'))
+        self._entRegion.delete(0,tk.END)
+        if cp.has_option('Local','region'): self._entRegion.insert(0,cp.get('Local','region'))
+        self._entC2CPort.delete(0,tk.END)
+        if cp.has_option('Local','C2C'): self._entC2CPort.insert(0,cp.get('Local','C2C'))
 
     def _validate(self):
         """ validate entries """
         # start with the recon radio details
-        nic = self.txtReconNic.get()
+        nic = self._entReconNic.get()
         if not nic:
             self.err("Invalid Recon Input","Radio nic must be specified")
             return False
         elif not nic in iwt.wifaces():
             self.warn("Not Found","Recon radio may not be wireless")
-        spoof = self.txtReconSpoof.get().upper()
+        spoof = self._entReconSpoof.get().upper()
         if spoof and re.match(MACADDR,spoof) is None:
             self.err("Invalid Recon Input","Spoofed MAC addr %s is not valid")
             return False
 
         # process antennas, if # > 0 then force validation of all antenna widgets
-        if self.txtReconAntNum.get():
+        if self._entReconAntNum.get():
             try:
-                nA = int(self.txtReconAntNum.get())
+                nA = int(self._entReconAntNum.get())
                 if nA:
                     try:
-                        if len(map(float,self.txtReconAntGain.get().split(','))) != nA:
+                        if len(map(float,self._entReconAntGain.get().split(','))) != nA:
                             raise DySKTConfigException("Number of gain is invalid")
                     except ValueError:
                         raise DySKTConfigException("Gain must be float or list of floats")
-                    if len(self.txtReconAntType.get().split(',')) != nA:
+                    if len(self._entReconAntType.get().split(',')) != nA:
                         raise DySKTConfigException("Number of types is invalid")
                     try:
-                        if len(map(float,self.txtReconAntLoss.get().split(','))) != nA:
+                        if len(map(float,self._entReconAntLoss.get().split(','))) != nA:
                             raise DySKTConfigException("Number of loss is invalid")
                     except:
                         raise DySKTConfigException("Loss must be float or list of floats")
                     try:
-                        xyzs = self.txtReconAntXYZ.get().split(',')
+                        xyzs = self._entReconAntXYZ.get().split(',')
                         if len(xyzs) != nA:
                             raise DySKTConfigException("Number of xyz is invalid")
                         for xyz in xyzs:
@@ -1661,11 +1642,11 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
         # process scan patterns
         try:
-            float(self.txtReconScanDwell.get())
+            float(self._entReconScanDwell.get())
         except:
             self.err("Invalid Recon Input","Scan dwell must be float")
             return False
-        start = self.txtReconScanStart.get()
+        start = self._entReconScanStart.get()
         try:
             if start:
                 if ':' in start: ch,chw = start.split(':')
@@ -1682,41 +1663,41 @@ class DySKTConfigPanel(gui.ConfigPanel):
             self.err("Invalid Recon Input",e)
             return False
         try:
-            parsechlist(self.txtReconScanScan.get(),'scan')
-            parsechlist(self.txtReconScanPass.get(),'pass')
+            parsechlist(self._entReconScanScan.get(),'scan')
+            parsechlist(self._entReconScanPass.get(),'pass')
         except ValueError as e:
             self.err("Invalid Recon Input",e)
             return False
 
         # then collection radio details
-        nic = self.txtCollectionNic.get()
+        nic = self._entCollectionNic.get()
         if nic:
             if not nic in iwt.wifaces(): self.warn("Not Found","Radio may not be wireless")
-            spoof = self.txtCollectionSpoof.get().upper()
+            spoof = self._entCollectionSpoof.get().upper()
             if spoof and re.match(MACADDR,spoof) is None:
                 self.err("Invalid Colleciton Input","Spoofed MAC address is not valid")
                 return False
 
             # process the antennas - if antenna number is > 0 then force validation of
             # all antenna widgets
-            if self.txtCollectionAntNum.get():
+            if self._entCollectionAntNum.get():
                 try:
-                    nA = int(self.txtCollectionAntNum.get())
+                    nA = int(self._entCollectionAntNum.get())
                     if nA:
                         try:
-                            if len(map(float,self.txtCollectionAntGain.get().split(','))) != nA:
+                            if len(map(float,self._entCollectionAntGain.get().split(','))) != nA:
                                 raise DySKTConfigException("Number of gain is invalid")
                         except ValueError:
                             raise DySKTConfigException("Gain must be float or list of floats")
-                        if len(self.txtCollectionAntType.get().split(',')) != nA:
+                        if len(self._entCollectionAntType.get().split(',')) != nA:
                             raise DySKTConfigException("Number of types is invalid")
                         try:
-                            if len(map(float,self.txtCollectionAntLoss.get().split(','))) != nA:
+                            if len(map(float,self._entCollectionAntLoss.get().split(','))) != nA:
                                 raise DySKTConfigException("Number of loss is invalid")
                         except:
                             raise DySKTConfigException("Loss must be float or list of floats")
                         try:
-                            xyzs = self.txtCollectionAntXYZ.get().split(',')
+                            xyzs = self._entCollectionAntXYZ.get().split(',')
                             if len(xyzs) != nA:
                                 raise DySKTConfigException("Number of xyz is invalid")
                             for xyz in xyzs:
@@ -1735,11 +1716,11 @@ class DySKTConfigPanel(gui.ConfigPanel):
 
             # process scan patterns
             try:
-                float(self.txtCollectionScanDwell.get())
+                float(self._entCollectionScanDwell.get())
             except:
                 self.err("Invalid Collection Input", "Scan dwell must be float")
                 return False
-            start = self.txtCollectionScanStart.get()
+            start = self._entCollectionScanStart.get()
             try:
                 if start:
                     if ':' in start: ch,chw = start.split(':')
@@ -1756,8 +1737,8 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 self.err("Invalid Collection Input",e)
                 return False
             try:
-                parsechlist(self.txtCollectionScanScan.get(),'scan')
-                parsechlist(self.txtCollectionScanPass.get(),'pass')
+                parsechlist(self._entCollectionScanScan.get(),'scan')
+                parsechlist(self._entCollectionScanPass.get(),'pass')
             except ValueError as e:
                 self.err("Invalid Collection Input",e)
                 return False
@@ -1766,17 +1747,17 @@ class DySKTConfigPanel(gui.ConfigPanel):
         if self.vfixed.get():
             # fixed is set
             try:
-                float(self.txtLat.get())
-                float(self.txtLon.get())
+                float(self._entLat.get())
+                float(self._entLon.get())
             except:
                 self.err("Invalid GPS Input","Lat/Lon must be floats")
                 return False
             try:
-                float(self.txtAlt.get())
+                float(self._entAlt.get())
             except:
                 self.err("Invalid GPS Input","Altitude must be a float")
                 return False
-            hdg = self.txtHeading.get()
+            hdg = self._entHeading.get()
             try:
                 hdg = int(hdg)
                 if hdg < 0 or hdg > 360: raise RuntimeError("")
@@ -1785,44 +1766,44 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 return False
         else:
             # dynamic is set
-            port = self.txtGPSPort.get()
+            port = self._entGPSPort.get()
             try:
                 port = int(port)
                 if port < 1024 or port > 65535: raise RuntimeError("")
             except:
                 self.err("Invalid GPS Input","Device port must be a number between 1024 and 65535")
                 return False
-            if re.match(GPSDID,self.txtDevID.get().upper()) is None:
+            if re.match(GPSDID,self._entDevID.get().upper()) is None:
                 self.err("Invalid GPS Input","GPS Dev ID is invalid")
                 return False
             try:
-                if float(self.txtPoll.get()) < 0: raise RuntimeError("")
+                if float(self._entPoll.get()) < 0: raise RuntimeError("")
             except:
                 self.err("Invalid GPS Input","Poll must be numeric and greater than 0")
                 return False
             try:
-                float(self.txtEPX.get())
-                float(self.txtEPY.get())
+                float(self._entEPX.get())
+                float(self._entEPY.get())
             except:
                 self.err("Invalid GPS Input","EPX/EPY must be numeric or 'inf'")
                 return False
 
         # misc entries
-        host = self.txtStoreHost.get()
+        host = self._entStoreHost.get()
         if re.match(IPADDR,host) is None and host != 'localhost':
             self.err("Invalid Storage Input","Host is not a valid address")
-        port = self.txtStorePort.get()
+        port = self._entStorePort.get()
         try:
             port = int(port)
             if port < 1024 or port > 65535: raise RuntimeError("")
         except ValueError:
             self.err("Invalid Storage Input","Host Port must be a number between 1024 and 65535")
             return False
-        region = self.txtRegion.get()
+        region = self._entRegion.get()
         if region and len(region) != 2:
             self.err("Invalid Local Input","Region must be 2 characters")
             return False
-        port = self.txtC2CPort.get()
+        port = self._entC2CPort.get()
         try:
             port = int(port)
             if port < 1024 or port > 65535: raise RuntimeError("")
@@ -1838,58 +1819,58 @@ class DySKTConfigPanel(gui.ConfigPanel):
         try:
             cp = ConfigParser.ConfigParser()
             cp.add_section('Recon')
-            cp.set('Recon','nic',self.txtReconNic.get())
-            if self.txtReconSpoof.get(): cp.set('Recon','spoof',self.txtReconSpoof.get())
-            nA = self.txtReconAntNum.get()
+            cp.set('Recon','nic',self._entReconNic.get())
+            if self._entReconSpoof.get(): cp.set('Recon','spoof',self._entReconSpoof.get())
+            nA = self._entReconAntNum.get()
             if nA:
-                cp.set('Recon','antennas',self.txtReconAntNum.get())
-                cp.set('Recon','antenna_gain',self.txtReconAntGain.get())
-                cp.set('Recon','antenna_loss',self.txtReconAntLoss.get())
-                cp.set('Recon','antenna_type',self.txtReconAntType.get())
-                cp.set('Recon','antenna_xyz',self.txtReconAntXYZ.get())
-            desc = self.txtReconDesc.get(1.0,tk.END).strip()
+                cp.set('Recon','antennas',self._entReconAntNum.get())
+                cp.set('Recon','antenna_gain',self._entReconAntGain.get())
+                cp.set('Recon','antenna_loss',self._entReconAntLoss.get())
+                cp.set('Recon','antenna_type',self._entReconAntType.get())
+                cp.set('Recon','antenna_xyz',self._entReconAntXYZ.get())
+            desc = self._entReconDesc.get(1.0,tk.END).strip()
             if desc: cp.set('Recon','desc',desc)
-            cp.set('Recon','dwell',self.txtReconScanDwell.get())
-            cp.set('Recon','scan',self.txtReconScanScan.get())
-            cp.set('Recon','pass',self.txtReconScanPass.get())
-            cp.set('Recon','scan_start',self.txtReconScanStart.get())
-            if self.txtCollectionNic.get():
+            cp.set('Recon','dwell',self._entReconScanDwell.get())
+            cp.set('Recon','scan',self._entReconScanScan.get())
+            cp.set('Recon','pass',self._entReconScanPass.get())
+            cp.set('Recon','scan_start',self._entReconScanStart.get())
+            if self._entCollectionNic.get():
                 cp.add_section('Collection')
-                cp.set('Collection','nic',self.txtCollectionNic.get())
-                if self.txtCollectionSpoof.get():
-                    cp.set('Collection','spoof',self.txtCollectionSpoof.get())
-                nA = self.txtCollectionAntNum.get()
+                cp.set('Collection','nic',self._entCollectionNic.get())
+                if self._entCollectionSpoof.get():
+                    cp.set('Collection','spoof',self._entCollectionSpoof.get())
+                nA = self._entCollectionAntNum.get()
                 if nA:
-                    cp.set('Collection','antennas',self.txtCollectionAntNum.get())
-                    cp.set('Collection','antenna_gain',self.txtCollectionAntGain.get())
-                    cp.set('Collection','antenna_loss',self.txtCollectionAntLoss.get())
-                    cp.set('Collection','antenna_type',self.txtCollectionAntType.get())
-                    cp.set('Collection','antenna_xyz',self.txtCollectionAntXYZ.get())
-                desc = self.txtCollectionDesc.get(1.0,tk.END).strip()
+                    cp.set('Collection','antennas',self._entCollectionAntNum.get())
+                    cp.set('Collection','antenna_gain',self._entCollectionAntGain.get())
+                    cp.set('Collection','antenna_loss',self._entCollectionAntLoss.get())
+                    cp.set('Collection','antenna_type',self._entCollectionAntType.get())
+                    cp.set('Collection','antenna_xyz',self._entCollectionAntXYZ.get())
+                desc = self._entCollectionDesc.get(1.0,tk.END).strip()
                 if desc: cp.set('Collection','desc',desc)
-                cp.set('Collection','dwell',self.txtCollectionScanDwell.get())
-                cp.set('Collection','scan',self.txtCollectionScanScan.get())
-                cp.set('Collection','pass',self.txtCollectionScanPass.get())
-                cp.set('Collection','scan_start',self.txtCollectionScanStart.get())
+                cp.set('Collection','dwell',self._entCollectionScanDwell.get())
+                cp.set('Collection','scan',self._entCollectionScanScan.get())
+                cp.set('Collection','pass',self._entCollectionScanPass.get())
+                cp.set('Collection','scan_start',self._entCollectionScanStart.get())
             cp.add_section('GPS')
             fixed = self.vfixed.get()
             cp.set('GPS','fixed','yes' if fixed else 'no')
             if fixed:
-                cp.set('GPS','lat',self.txtLat.get())
-                cp.set('GPS','lon',self.txtLon.get())
-                cp.set('GPS','alt',self.txtAlt.get())
-                cp.set('GPS','heading',self.txtHeading.get())
+                cp.set('GPS','lat',self._entLat.get())
+                cp.set('GPS','lon',self._entLon.get())
+                cp.set('GPS','alt',self._entAlt.get())
+                cp.set('GPS','heading',self._entHeading.get())
             else:
-                cp.set('GPS','port',self.txtGPSPort.get())
-                cp.set('GPS','devid',self.txtDevID.get())
-                cp.set('GPS','poll',self.txtPoll.get())
-                cp.set('GPS','epx',self.txtEPX.get())
-                cp.set('GPS','epy',self.txtEPY.get())
+                cp.set('GPS','port',self._entGPSPort.get())
+                cp.set('GPS','devid',self._entDevID.get())
+                cp.set('GPS','poll',self._entPoll.get())
+                cp.set('GPS','epx',self._entEPX.get())
+                cp.set('GPS','epy',self._entEPY.get())
             cp.add_section('Storage')
-            cp.set('Storage','host',self.txtStoreHost.get())
-            cp.set('Storage','port',self.txtStorePort.get())
-            region = self.txtRegion.get()
-            c2cport = self.txtC2CPort.get()
+            cp.set('Storage','host',self._entStoreHost.get())
+            cp.set('Storage','port',self._entStorePort.get())
+            region = self._entRegion.get()
+            c2cport = self._entC2CPort.get()
             if region or c2cport:
                 cp.add_section('Local')
                 if region: cp.set('Local','region',region)
@@ -1910,26 +1891,26 @@ class DySKTConfigPanel(gui.ConfigPanel):
         """ enable/disable gps entries as necessary """
         if self.vfixed.get():
             # fixed is on enable only fixed entries
-            self.txtLat.configure(state=tk.NORMAL)
-            self.txtLon.configure(state=tk.NORMAL)
-            self.txtAlt.configure(state=tk.NORMAL)
-            self.txtHeading.configure(state=tk.NORMAL)
-            self.txtGPSPort.configure(state=tk.DISABLED)
-            self.txtDevID.configure(state=tk.DISABLED)
-            self.txtPoll.configure(state=tk.DISABLED)
-            self.txtEPX.configure(state=tk.DISABLED)
-            self.txtEPY.configure(state=tk.DISABLED)
+            self._entLat.configure(state=tk.NORMAL)
+            self._entLon.configure(state=tk.NORMAL)
+            self._entAlt.configure(state=tk.NORMAL)
+            self._entHeading.configure(state=tk.NORMAL)
+            self._entGPSPort.configure(state=tk.DISABLED)
+            self._entDevID.configure(state=tk.DISABLED)
+            self._entPoll.configure(state=tk.DISABLED)
+            self._entEPX.configure(state=tk.DISABLED)
+            self._entEPY.configure(state=tk.DISABLED)
         else:
             # fixed is off enable only dynamic entries
-            self.txtLat.configure(state=tk.DISABLED)
-            self.txtLon.configure(state=tk.DISABLED)
-            self.txtAlt.configure(state=tk.DISABLED)
-            self.txtHeading.configure(state=tk.DISABLED)
-            self.txtGPSPort.configure(state=tk.NORMAL)
-            self.txtDevID.configure(state=tk.NORMAL)
-            self.txtPoll.configure(state=tk.NORMAL)
-            self.txtEPX.configure(state=tk.NORMAL)
-            self.txtEPY.configure(state=tk.NORMAL)
+            self._entLat.configure(state=tk.DISABLED)
+            self._entLon.configure(state=tk.DISABLED)
+            self._entAlt.configure(state=tk.DISABLED)
+            self._entHeading.configure(state=tk.DISABLED)
+            self._entGPSPort.configure(state=tk.NORMAL)
+            self._entDevID.configure(state=tk.NORMAL)
+            self._entPoll.configure(state=tk.NORMAL)
+            self._entEPX.configure(state=tk.NORMAL)
+            self._entEPY.configure(state=tk.NORMAL)
 
 # Help-->About
 class AboutPanel(gui.SimplePanel):

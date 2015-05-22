@@ -69,20 +69,20 @@ class PasswordDialog(tkSD.Dialog):
     """ PasswordDialog - (Modal) prompts user for password, hiding input """
     def __init__(self,parent):
         tkSD.Dialog.__init__(self,parent)
-        self.entPWD = None
-        self.canceled = False
+        self._entPWD = None
+        self._canceled = False
     def body(self,master):
         self.title('sudo Password')
         ttk.Label(master,text='Password: ').grid(row=0,column=1)
-        self.entPWD = ttk.Entry(master,show='*')
-        self.entPWD.grid(row=0,column=1)
-        return self.entPWD
+        self._entPWD = ttk.Entry(master,show='*')
+        self._entPWD.grid(row=0,column=1)
+        return self._entPWD
     def validate(self):
-        if self.entPWD.get() == '': return 0
+        if self._entPWD.get() == '': return 0
         return 1
     def apply(self):
         # noinspection PyAttributeOutsideInit
-        self.pwd = self.entPWD.get()
+        self.pwd = self._entPWD.get()
 
 #### SUPER GUI CLASSES ####
 
@@ -109,16 +109,16 @@ class Panel(ttk.Frame):
       notifyclose if the derived class needs to process closing slaves
     """
     # noinspection PyProtectedMember
-    def __init__(self,tl,iconPath=None,resize=False):
+    def __init__(self,tl,ipath=None,resize=False):
         """
          tl - this is the Toplevel widget for this panel (managed directly
           by the window manger)
-         iconPath - path of icon (if one) to display the title bar
+         ipath - path of icon (if one) to display the title bar
          resize - allow resize of Panel ornot
         """
         ttk.Frame.__init__(self,tl)
-        self.appicon = ImageTk.PhotoImage(Image.open(iconPath)) if iconPath else None
-        if self.appicon: self.tk.call('wm','iconphoto',self.master._w,self.appicon)
+        self._appicon = ImageTk.PhotoImage(Image.open(ipath)) if ipath else None
+        if self._appicon: self.tk.call('wm','iconphoto',self.master._w,self._appicon)
         self.master.protocol("WM_DELETE_WINDOW",self.delete)
         self._panels = {}
         self.grid(row=0,column=0,sticky='nwse')
@@ -181,10 +181,8 @@ class Panel(ttk.Frame):
         opened = []
         for name in self._panels:
             if self._panels[name].desc == desc:
-                if pnlOnly:
-                    opened.append(self._panels[name].pnl)
-                else:
-                    opened.append(self._panels[name])
+                if pnlOnly: opened.append(self._panels[name].pnl)
+                else: opened.append(self._panels[name])
         return opened
 
     def haspanel(self,desc):
@@ -282,8 +280,6 @@ class SimplePanel(SlavePanel):
     """
     def __init__(self,tl,chief,title,iconpath=None,resize=False):
         SlavePanel.__init__(self,tl,chief,title,iconpath,resize)
-        #frm = ttk.Frame(self)
-        #frm.grid(row=0,column=0,sticky='nwse')
         self.grid(row=0,column=0,sticky='nwse')
         self._body()
     def _body(self): raise NotImplementedError("SimplePanel::_body")
@@ -403,29 +399,29 @@ class TabularPanel(SlavePanel):
         frmM.grid(row=1,column=0,sticky='nwse')
 
         # create a multi-column Tree
-        self.tree = ttk.Treeview(frmM)
-        self.tree.grid(row=0,column=0,sticky='nwse')
-        self.tree.config(height=h)
-        self.tree.config(selectmode='none')
+        self._tree = ttk.Treeview(frmM)
+        self._tree.grid(row=0,column=0,sticky='nwse')
+        self._tree.config(height=h)
+        self._tree.config(selectmode='none')
 
         # with attached horizontal/vertical scrollbars
-        vscroll = ttk.Scrollbar(frmM,orient=tk.VERTICAL,command=self.tree.yview)
+        vscroll = ttk.Scrollbar(frmM,orient=tk.VERTICAL,command=self._tree.yview)
         vscroll.grid(row=0,column=1,sticky='ns')
-        self.tree['yscrollcommand'] = vscroll.set
-        hscroll = ttk.Scrollbar(frmM,orient=tk.HORIZONTAL,command=self.tree.xview)
+        self._tree['yscrollcommand'] = vscroll.set
+        hscroll = ttk.Scrollbar(frmM,orient=tk.HORIZONTAL,command=self._tree.xview)
         hscroll.grid(row=1,column=0,sticky='ew')
-        self.tree['xscrollcommand'] = hscroll.set
+        self._tree['xscrollcommand'] = hscroll.set
 
         # configure the headers
-        self.tree['columns'] = [t[0] for t in cols]
+        self._tree['columns'] = [t[0] for t in cols]
         for i in xrange(len(cols)):
             try:
                 w = max(lenpix(cols[i][0]),cols[i][1])
                 if w is None: w = 0
             except:
                 w = 0
-            self.tree.column(i,width=w,anchor=tk.CENTER)
-            if cols[i][0] != '': self.tree.heading(i,text=cols[i][0])
+            self._tree.column(i,width=w,anchor=tk.CENTER)
+            if cols[i][0] != '': self._tree.heading(i,text=cols[i][0])
 
         # allow a bottom frame
         frmB = ttk.Frame(self)
@@ -437,6 +433,22 @@ class TabularPanel(SlavePanel):
     # noinspection PyMethodMayBeStatic
     def bottomframe(self,frm): return None # override to add widgets to bottomframe
 
+class MenuTabPanel(TabularPanel):
+    """
+     MenuTabPanel - a TabularPanel with with (optional) File menu including close,
+     and a rightclick binding on the Treeview. MenuTabPanel implements a finer
+     control mechanism for the Treeview, maintaining a data dictionary reflecting
+     the data in the Treeview and a order list of keys reflecting the order of
+     the data as shown in the Treeview. It also implements shell methods for
+     adding, deleting and updating entries IOT derived classes are not
+     concerned with maintaining the internal list and data dict synchonized
+     Derivied classes must implement
+      writenew - write data to the Treeview
+      writeupdate - modified data in the list
+     Derived classes can implement
+      rclist to display a context menu on Treeview right mouse clicks
+    """
+
 #### LOG MESSAGE TYPES ####
 LOG_NOERR = 0
 LOG_WARN  = 1
@@ -445,8 +457,8 @@ LOG_NOTE  = 3
 
 class LogPanel(TabularPanel):
     """
-     a singular panel which display information pertaining to the "program",
-     cannot be closed by the user only by the MasterPanel
+     LogPanel -  a singular panel which displays information pertaining to the
+     "program", cannot be closed by the user only by the MasterPanel
     """
     def __init__(self,tl,chief):
         TabularPanel.__init__(self,tl,chief,"Log",5,
@@ -457,19 +469,19 @@ class LogPanel(TabularPanel):
 
         # configure the tree to left justify the message column, hide icon/headers
         # and use a darkgray background to better highlight the colored text
-        self.tree.column(2,anchor='w')
-        self.tree['show'] = ''
+        self._tree.column(2,anchor='w')
+        self._tree['show'] = ''
         ttk.Style().configure('Log.Treeview',
                               fieldbackground="darkgray",
                               background='darkgray')
-        self.tree['style'] = 'Log.Treeview'
+        self._tree['style'] = 'Log.Treeview'
 
         # set symbols for message types and tags for colored text
         self._symbol = ['[+]','[?]','[-]','[!]']
-        self.tree.tag_configure(LOG_NOERR,foreground='green')
-        self.tree.tag_configure(LOG_WARN,foreground='yellow')
-        self.tree.tag_configure(LOG_ERR,foreground='red')
-        self.tree.tag_configure(LOG_NOTE,foreground='blue')
+        self._tree.tag_configure(LOG_NOERR,foreground='green')
+        self._tree.tag_configure(LOG_WARN,foreground='yellow')
+        self._tree.tag_configure(LOG_ERR,foreground='red')
+        self._tree.tag_configure(LOG_NOTE,foreground='blue')
 
     def delete(self): pass    # user can never close only the primary chief
     def reset(self): pass     # nothing needs to be reset
@@ -479,11 +491,11 @@ class LogPanel(TabularPanel):
         """ writes message msg of type mtype to the log """
         self._l.acquire()
         try:
-            self.tree.insert('','end',iid=str(self._n),
+            self._tree.insert('','end',iid=str(self._n),
                              values=(self._symbol[mtype],time.strftime('%H:%M:%S'),msg),
                              tags=(mtype,))
             self._n += 1
-            self.tree.yview('moveto',1.0)
+            self._tree.yview('moveto',1.0)
         except:
             pass
         finally:
@@ -498,11 +510,11 @@ class LogPanel(TabularPanel):
         self._l.acquire()
         try:
             for m in ms:
-                self.tree.insert('','end',iid=str(self._n),
+                self._tree.insert('','end',iid=str(self._n),
                                  values=(self._symbol[m[2]],m[0],m[1]),
                                  tag=(m[2],))
                 self._n += 1
-                self.tree.yview('moveto',1.0)
+                self._tree.yview('moveto',1.0)
         except Exception as e:
             print e
         finally:
@@ -539,8 +551,8 @@ class TailLogPanel(TabularPanel):
         self._offset = None
 
         # configure tree to hide icon/headers and left-justify message column
-        self.tree['show'] = ''
-        self.tree.column(0,anchor='w')
+        self._tree['show'] = ''
+        self._tree.column(0,anchor='w')
 
         # run our polling function
         self.tail()
@@ -587,7 +599,7 @@ class TailLogPanel(TabularPanel):
             self._n = 0
             self._ctime = None
             self._offset = None
-            self.tree.delete(*self.tree.get_children())
+            self._tree.delete(*self._tree.get_children())
 
     def update(self): pass    # no need to implement
     def _shutdown(self): pass # no need to implement
@@ -597,9 +609,9 @@ class TailLogPanel(TabularPanel):
         """ writes new lines to panel """
         for line in lines:
             #print line
-            self.tree.insert('','end',iid=str(self._n),values=(line.strip(),))
+            self._tree.insert('','end',iid=str(self._n),values=(line.strip(),))
             self._n += 1
-            self.tree.yview('moveto',1.0)
+            self._tree.yview('moveto',1.0)
 
 class MasterPanel(Panel):
     """
@@ -621,25 +633,26 @@ class MasterPanel(Panel):
     """
     def __init__(self,tl,ttl,datatypes=None,iconPath=None,resize=False):
         """
-         ttl - title of the window/panel
-         datatypes - list of strings for data bins, etc
-         logpanel - if True, will initiate a logpanel
-         iconPath - path of image to show as icon for this panel
+         ttl: title of the window/panel
+         tl: the toplevel of this panel
+         datatypes: list of strings for data bins, etc
+         logpanel: if True, will initiate a logpanel
+         iconPath: path of image to show as icon for this panel
         """
         Panel.__init__(self,tl,iconPath,resize)
         self.tk = tl
-        self.menubar = None
+        self._menubar = None
         
         # data bins, registered panels, and what data is hidden, selected
-        self.audit_registered = {} # panels auditing for notification
-        self.bin = {}              # data dictionaries
-        self.hidden = {}           # keys of hidden data in bin
-        self.selected = {}         # keys of selected data in bin
+        self._audit_registered = {} # panels auditing for notification
+        self._bin = {}              # data dictionaries
+        self._hidden = {}           # keys of hidden data in bin
+        self._selected = {}         # keys of selected data in bin
         for datatype in datatypes:
-            self.audit_registered[datatype] = []
-            self.bin[datatype] = {}
-            self.hidden[datatype] = []
-            self.selected[datatype] = []   
+            self._audit_registered[datatype] = []
+            self._bin[datatype] = {}
+            self._hidden[datatype] = []
+            self._selected[datatype] = []   
 
         # set the title
         self.master.title(ttl)
@@ -647,11 +660,11 @@ class MasterPanel(Panel):
         
         # try and make the menu
         self._makemenu()
-        if self.menubar:
+        if self._menubar:
             try:
-                self.master.config(menu=self.menubar)
+                self.master.config(menu=self._menubar)
             except AttributeError:
-                self.master.tk.call(self.master,"config","-menu",self.menubar)
+                self.master.tk.call(self.master,"config","-menu",self._menubar)
 
         # initialiez
         self._initialize()
@@ -772,23 +785,23 @@ class MasterPanel(Panel):
 
     def audit_register(self,dtype,name):
         """ register panel for dtype audits """
-        self.audit_registered[dtype].append(name)
+        self._audit_registered[dtype].append(name)
 
     def audit_deregister(self,name):
         """
          deregister panel from all audits
         """
-        for registered in self.audit_registered:
-            if name in self.audit_registered[registered]:
-                self.audit_registered[registered].remove(name)
+        for registered in self._audit_registered:
+            if name in self._audit_registered[registered]:
+                self._audit_registered[registered].remove(name)
 
     def hideentries(self,dtype,name,ids):
         """
          notification that the panel name is hiding ids - will notify all audit 
          registered panels that these ids are hidden
         """
-        self.hidden[dtype].extend(ids)
-        for panel in self.audit_registered[dtype]:
+        self._hidden[dtype].extend(ids)
+        for panel in self._audit_registered[dtype]:
             if panel != name:
                 self._panels[panel].pnl.notifyhiddencb(dtype,ids)
 
@@ -797,8 +810,8 @@ class MasterPanel(Panel):
          notification that the panel name has selected ids - will notify all audit
          registered panels that these ids are selected
         """
-        self.selected[dtype] = ids
-        for panel in self.audit_registered[dtype]:
+        self._selected[dtype] = ids
+        for panel in self._audit_registered[dtype]:
             if panel != name: 
                 self._panels[panel].pnl.notifyselectcb(dtype,ids)
         
@@ -807,9 +820,9 @@ class MasterPanel(Panel):
          notification that the panel name is restoring ids - will notify all audit
         registered panels that all ids are being restored
         """
-        h = self.hidden[dtype]
-        self.hidden[dtype] = []
-        for panel in self.audit_registered[dtype]:
+        h = self._hidden[dtype]
+        self._hidden[dtype] = []
+        for panel in self._audit_registered[dtype]:
             if panel != name:
                 self._panels[panel].pnl.notifyrestorecb(dtype,h)
 

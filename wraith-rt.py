@@ -30,10 +30,7 @@ from wraith.utils import cmdline           # command line stuff
 # server/services functions shared by splash and main panel
 
 def startpsql(pwd):
-    """
-     start postgresl server
-      pwd: the sudo password
-    """
+    """ start postgresl server. pwd: the sudo password """
     try:
         cmdline.service('postgresql',pwd)
         time.sleep(0.5)
@@ -44,10 +41,7 @@ def startpsql(pwd):
         return True
 
 def stoppsql(pwd):
-    """
-     shut down posgresql.
-     pwd: the sudo password
-    """
+    """ shut down posgresql. pwd: the sudo password """
     try:
         cmdline.service('postgresql',pwd,False)
         while cmdline.runningprocess('postgres'): time.sleep(0.5)
@@ -57,10 +51,7 @@ def stoppsql(pwd):
         return True
 
 def startnidus(pwd):
-    """
-     start nidus server
-     pwd: the sudo password
-    """
+    """ start nidus server. pwd: the sudo password """
     try:
         cmdline.service('nidusd',pwd)
         time.sleep(0.5)
@@ -71,10 +62,7 @@ def startnidus(pwd):
         return True
 
 def stopnidus(pwd):
-    """
-     stop nidus storage manager.
-     pwd: Sudo password
-    """
+    """ stop nidus storage manager. pwd: Sudo password """
     try:
         cmdline.service('nidusd',pwd,False)
         while cmdline.nidusrunning(wraith.NIDUSPID): time.sleep(1.0)
@@ -84,10 +72,7 @@ def stopnidus(pwd):
         return True
 
 def startdyskt(pwd):
-    """
-     start dyskt sensor
-     pwd: the sudo password
-    """
+    """ start dyskt sensor. pwd: the sudo password """
     try:
         cmdline.service('dysktd',pwd)
         time.sleep(1.0)
@@ -98,10 +83,7 @@ def startdyskt(pwd):
         return True
 
 def stopdyskt(pwd):
-    """
-     stop dyskt sensor
-     pwd: Sudo password
-    """
+    """ stop dyskt sensor. pwd: Sudo password """
     try:
         cmdline.service('dysktd',pwd,False)
         while cmdline.nidusrunning(wraith.DYSKTPID): time.sleep(1.0)
@@ -113,6 +95,7 @@ def stopdyskt(pwd):
 def psqlconnect(connect):
     """
      connect to postgresql db with connect string
+     connect: a dict
      returns a tuple (conn,msg) where conn = None and msg = error string
      on failure otherwise conn = psql connection and msg = ''
     """
@@ -256,51 +239,33 @@ class WraithPanel(gui.MasterPanel):
         # determine if postgresql is running
         if cmdline.runningprocess('postgres'):
             # update self, msg and connect
-            msgs.append((time.strftime('%H:%M:%S'),
-                         'PostgreSQL is running',
-                         gui.LOG_NOERR))
+            msgs.append((time.strftime('%H:%M:%S'),'PostgreSQL running',gui.LOG_NOERR))
             if not self._pwd: self._bSQL = True
             self._setstate(_STATE_STORE_)
             (self._conn,ret) = psqlconnect(self._conf['store'])
             if not self._conn is None:
                 self._setstate(_STATE_CONN_)
-                msgs.append((time.strftime('%H:%M:%S'),
-                             'Connected to database',
-                             gui.LOG_NOERR))
+                msgs.append((time.strftime('%H:%M:%S'),'Connected to DB',gui.LOG_NOERR))
             else:
-                msgs.append((time.strftime('%H:%M:%S'),
-                             "Error connecting to PostgreSQL: %s" % ret,
-                             gui.LOG_ERR))
+                msgs.append((time.strftime('%H:%M:%S'),"Connect to DB failed: %s" % ret,gui.LOG_ERR))
                 return
         else:
-            msgs.append((time.strftime('%H:%M:%S'),
-                         "PostgreSQL is not running",
-                         gui.LOG_WARN))
-            msgs.append((time.strftime('%H:%M:%S'),
-                         "Not connected to database",
-                         gui.LOG_WARN))
+            msgs.append((time.strftime('%H:%M:%S'),"PostgreSQL not running",gui.LOG_WARN))
+            msgs.append((time.strftime('%H:%M:%S'),"Not connected to DB",gui.LOG_WARN))
 
         # nidus running?
         if cmdline.nidusrunning(wraith.NIDUSPID):
-            msgs.append((time.strftime('%H:%M:%S'),
-                         "Nidus is running",
-                         gui.LOG_NOERR))
+            msgs.append((time.strftime('%H:%M:%S'),"Nidus running",gui.LOG_NOERR))
             self._setstate(_STATE_NIDUS_)
         else:
-            msgs.append((time.strftime('%H:%M:%S'),
-                         "Nidus is not running",
-                         gui.LOG_WARN))
+            msgs.append((time.strftime('%H:%M:%S'),"Nidus not running",gui.LOG_WARN))
 
         # dyskt running?
         if cmdline.dysktrunning(wraith.DYSKTPID):
-            msgs.append((time.strftime('%H:%M:%S'),
-                         "DySKT is running",
-                         gui.LOG_NOERR))
+            msgs.append((time.strftime('%H:%M:%S'),"DySKT running",gui.LOG_NOERR))
             self._setstate(_STATE_DYSKT_)
         else:
-            msgs.append((time.strftime('%H:%M:%S'),
-                         "DySKt is not running",
-                         gui.LOG_WARN))
+            msgs.append((time.strftime('%H:%M:%S'),"DySKt not running",gui.LOG_WARN))
 
         # set initial state to initialized
         self._setstate(_STATE_INIT_)
@@ -326,98 +291,98 @@ class WraithPanel(gui.MasterPanel):
 
     def _makemenu(self):
         """ make the menu """
-        self.menubar = tk.Menu(self)
+        self._menubar = tk.Menu(self)
 
         # Wraith Menu
         # all options will always be enabled
-        self.mnuWraith = tk.Menu(self.menubar,tearoff=0)
-        self.mnuWraithGui = tk.Menu(self.mnuWraith,tearoff=0)
-        self.mnuWraithGui.add_command(label='Save',command=self.guisave)
-        self.mnuWraithGui.add_command(label='Load',command=self.guiload)
-        self.mnuWraith.add_cascade(label='Gui',menu=self.mnuWraithGui)
-        self.mnuWraith.add_separator()
-        self.mnuWraith.add_command(label='Configure',command=self.configwraith)
-        self.mnuWraith.add_separator()
-        self.mnuWraith.add_command(label='Exit',command=self.delete)
+        self._mnuWraith = tk.Menu(self._menubar,tearoff=0)
+        self._mnuWraithGui = tk.Menu(self._mnuWraith,tearoff=0)
+        self._mnuWraithGui.add_command(label='Save',command=self.guisave)
+        self._mnuWraithGui.add_command(label='Load',command=self.guiload)
+        self._mnuWraith.add_cascade(label='Gui',menu=self._mnuWraithGui)
+        self._mnuWraith.add_separator()
+        self._mnuWraith.add_command(label='Configure',command=self.configwraith)
+        self._mnuWraith.add_separator()
+        self._mnuWraith.add_command(label='Exit',command=self.delete)
 
         # Tools Menu
         # all options will always be enabled
-        self.mnuTools = tk.Menu(self.menubar,tearoff=0)
-        self.mnuTools.add_command(label='Convert',command=self.viewconvert)
-        self.mnuToolsCalcs = tk.Menu(self.mnuTools,tearoff=0)
-        self.mnuToolsCalcs.add_command(label='EIRP',command=lambda:self.calc('EIRP'))
-        self.mnuToolsCalcs.add_command(label='FSPL',command=lambda:self.calc('FSPL'))
-        self.mnuToolsCalcs.add_command(label='Link Budget',command=lambda:self.calc('Link Budget'))
-        self.mnuToolsCalcs.add_command(label="Fresnel Zone",command=lambda:self.calc('Fresnel Zone'))
-        self.mnuToolsCalcs.add_separator()
-        self.mnuToolsCalcs.add_command(label='Distance',command=lambda:self.calc('Distance'))
-        self.mnuToolsCalcs.add_command(label='Terminus',command=lambda:self.calc('Terminus'))
-        self.mnuToolsCalcs.add_command(label='Cut',command=lambda:self.calc('Cut'))
-        self.mnuTools.add_cascade(label='Calcuators',menu=self.mnuToolsCalcs)
-        self.mnuTools.add_separator()
-        self.mnuTools.add_command(label='Interfaces',command=self.viewinterfaces)
+        self._mnuTools = tk.Menu(self._menubar,tearoff=0)
+        self._mnuTools.add_command(label='Convert',command=self.viewconvert)
+        self._mnuToolsCalcs = tk.Menu(self._mnuTools,tearoff=0)
+        self._mnuToolsCalcs.add_command(label='EIRP',command=lambda:self.calc('EIRP'))
+        self._mnuToolsCalcs.add_command(label='FSPL',command=lambda:self.calc('FSPL'))
+        self._mnuToolsCalcs.add_command(label='Link Budget',command=lambda:self.calc('Link Budget'))
+        self._mnuToolsCalcs.add_command(label="Fresnel Zone",command=lambda:self.calc('Fresnel Zone'))
+        self._mnuToolsCalcs.add_separator()
+        self._mnuToolsCalcs.add_command(label='Distance',command=lambda:self.calc('Distance'))
+        self._mnuToolsCalcs.add_command(label='Terminus',command=lambda:self.calc('Terminus'))
+        self._mnuToolsCalcs.add_command(label='Cut',command=lambda:self.calc('Cut'))
+        self._mnuTools.add_cascade(label='Calcuators',menu=self._mnuToolsCalcs)
+        self._mnuTools.add_separator()
+        self._mnuTools.add_command(label='Interfaces',command=self.viewinterfaces)
 
         # Data Menu
         # all options will always be enabled
-        self.mnuData = tk.Menu(self.menubar,tearoff=0)
-        self.mnuData.add_command(label='Data Bins',command=self.viewdatabins)
-        self.mnuData.add_separator()
-        self.mnuData.add_command(label='Data',command=self.viewdata)
-        #self.mnuData.add_separator()
+        self._mnuData = tk.Menu(self._menubar,tearoff=0)
+        self._mnuData.add_command(label='Data Bins',command=self.viewdatabins)
+        self._mnuData.add_separator()
+        self._mnuData.add_command(label='Data',command=self.viewdata)
+        #self._mnuData.add_separator()
 
         # Storage Menu
-        self.mnuStorage = tk.Menu(self.menubar,tearoff=0)
-        self.mnuStorage.add_command(label="Start All",command=self.storagestart)  # 0
-        self.mnuStorage.add_command(label="Stop All",command=self.storagestop)    # 1
-        self.mnuStorage.add_separator()                                           # 2
-        self.mnuStoragePSQL = tk.Menu(self.mnuStorage,tearoff=0)
-        self.mnuStoragePSQL.add_command(label='Start',command=self.psqlstart)       # 0
-        self.mnuStoragePSQL.add_command(label='Stop',command=self.psqlstop)         # 1
-        self.mnuStoragePSQL.add_separator()                                         # 2
-        self.mnuStoragePSQL.add_command(label='Connect',command=self.connect)       # 3
-        self.mnuStoragePSQL.add_command(label='Disconnect',command=self.disconnect) # 4      # 1
-        self.mnuStoragePSQL.add_separator()                                         # 5
-        self.mnuStoragePSQL.add_command(label='Fix',command=self.psqlfix)           # 6
-        self.mnuStoragePSQL.add_command(label='Delete All',command=self.psqldelall) # 7
-        self.mnuStorage.add_cascade(label='PostgreSQL',menu=self.mnuStoragePSQL)  # 3
-        self.mnuStorageNidus = tk.Menu(self.mnuStorage,tearoff=0)
-        self.mnuStorageNidus.add_command(label='Start',command=self.nidusstart)     # 0
-        self.mnuStorageNidus.add_command(label='Stop',command=self.nidusstop)       # 1
-        self.mnuStorageNidus.add_separator()                                        # 2
-        self.mnuNidusLog = tk.Menu(self.mnuStorageNidus,tearoff=0)
-        self.mnuNidusLog.add_command(label='View',command=self.viewniduslog)         # 0
-        self.mnuNidusLog.add_command(label='Clear',command=self.clearniduslog)       # 1
-        self.mnuStorageNidus.add_cascade(label='Log',menu=self.mnuNidusLog)         # 3
-        self.mnuStorageNidus.add_separator()                                        # 4
-        self.mnuStorageNidus.add_command(label='Config',command=self.confignidus)   # 5
-        self.mnuStorage.add_cascade(label='Nidus',menu=self.mnuStorageNidus)      # 4
+        self._mnuStorage = tk.Menu(self._menubar,tearoff=0)
+        self._mnuStorage.add_command(label="Start All",command=self.storagestart)  # 0
+        self._mnuStorage.add_command(label="Stop All",command=self.storagestop)    # 1
+        self._mnuStorage.add_separator()                                           # 2
+        self._mnuStoragePSQL = tk.Menu(self._mnuStorage,tearoff=0)
+        self._mnuStoragePSQL.add_command(label='Start',command=self.psqlstart)       # 0
+        self._mnuStoragePSQL.add_command(label='Stop',command=self.psqlstop)         # 1
+        self._mnuStoragePSQL.add_separator()                                         # 2
+        self._mnuStoragePSQL.add_command(label='Connect',command=self.connect)       # 3
+        self._mnuStoragePSQL.add_command(label='Disconnect',command=self.disconnect) # 4      # 1
+        self._mnuStoragePSQL.add_separator()                                         # 5
+        self._mnuStoragePSQL.add_command(label='Fix',command=self.psqlfix)           # 6
+        self._mnuStoragePSQL.add_command(label='Delete All',command=self.psqldelall) # 7
+        self._mnuStorage.add_cascade(label='PostgreSQL',menu=self._mnuStoragePSQL)  # 3
+        self._mnuStorageNidus = tk.Menu(self._mnuStorage,tearoff=0)
+        self._mnuStorageNidus.add_command(label='Start',command=self.nidusstart)     # 0
+        self._mnuStorageNidus.add_command(label='Stop',command=self.nidusstop)       # 1
+        self._mnuStorageNidus.add_separator()                                        # 2
+        self._mnuNidusLog = tk.Menu(self._mnuStorageNidus,tearoff=0)
+        self._mnuNidusLog.add_command(label='View',command=self.viewniduslog)         # 0
+        self._mnuNidusLog.add_command(label='Clear',command=self.clearniduslog)       # 1
+        self._mnuStorageNidus.add_cascade(label='Log',menu=self._mnuNidusLog)         # 3
+        self._mnuStorageNidus.add_separator()                                        # 4
+        self._mnuStorageNidus.add_command(label='Config',command=self.confignidus)   # 5
+        self._mnuStorage.add_cascade(label='Nidus',menu=self._mnuStorageNidus)      # 4
 
         # DySKT Menu
-        self.mnuDySKT = tk.Menu(self.menubar,tearoff=0)
-        self.mnuDySKT.add_command(label='Start',command=self.dysktstart)   # 0
-        self.mnuDySKT.add_command(label='Stop',command=self.dysktstop)     # 1
-        self.mnuDySKT.add_separator()                                      # 2
-        self.mnuDySKT.add_command(label='Control',command=self.dysktctrl)  # 3
-        self.mnuDySKT.add_separator()                                      # 4
-        self.mnuDySKTLog = tk.Menu(self.mnuDySKT,tearoff=0)
-        self.mnuDySKTLog.add_command(label='View',command=self.viewdysktlog)   # 0
-        self.mnuDySKTLog.add_command(label='Clear',command=self.cleardysktlog) # 1
-        self.mnuDySKT.add_cascade(label='Log',menu=self.mnuDySKTLog)       # 5
-        self.mnuDySKT.add_separator()                                      # 6
-        self.mnuDySKT.add_command(label='Config',command=self.configdyskt) # 7
+        self._mnuDySKT = tk.Menu(self._menubar,tearoff=0)
+        self._mnuDySKT.add_command(label='Start',command=self.dysktstart)   # 0
+        self._mnuDySKT.add_command(label='Stop',command=self.dysktstop)     # 1
+        self._mnuDySKT.add_separator()                                      # 2
+        self._mnuDySKT.add_command(label='Control',command=self.dysktctrl)  # 3
+        self._mnuDySKT.add_separator()                                      # 4
+        self._mnuDySKTLog = tk.Menu(self._mnuDySKT,tearoff=0)
+        self._mnuDySKTLog.add_command(label='View',command=self.viewdysktlog)   # 0
+        self._mnuDySKTLog.add_command(label='Clear',command=self.cleardysktlog) # 1
+        self._mnuDySKT.add_cascade(label='Log',menu=self._mnuDySKTLog)       # 5
+        self._mnuDySKT.add_separator()                                      # 6
+        self._mnuDySKT.add_command(label='Config',command=self.configdyskt) # 7
 
         # Help Menu
-        self.mnuHelp = tk.Menu(self.menubar,tearoff=0)
-        self.mnuHelp.add_command(label='About',command=self.about)
-        self.mnuHelp.add_command(label='Help',command=self.help)
+        self._mnuHelp = tk.Menu(self._menubar,tearoff=0)
+        self._mnuHelp.add_command(label='About',command=self.about)
+        self._mnuHelp.add_command(label='Help',command=self.help)
 
         # add the menus
-        self.menubar.add_cascade(label='Wraith',menu=self.mnuWraith)
-        self.menubar.add_cascade(label="Tools",menu=self.mnuTools)
-        self.menubar.add_cascade(label='Data',menu=self.mnuData)
-        self.menubar.add_cascade(label='Storage',menu=self.mnuStorage)
-        self.menubar.add_cascade(label='DySKT',menu=self.mnuDySKT)
-        self.menubar.add_cascade(label='Help',menu=self.mnuHelp)
+        self._menubar.add_cascade(label='Wraith',menu=self._mnuWraith)
+        self._menubar.add_cascade(label="Tools",menu=self._mnuTools)
+        self._menubar.add_cascade(label='Data',menu=self._mnuData)
+        self._menubar.add_cascade(label='Storage',menu=self._mnuStorage)
+        self._menubar.add_cascade(label='DySKT',menu=self._mnuDySKT)
+        self._menubar.add_cascade(label='Help',menu=self._mnuHelp)
 
 #### MENU CALLBACKS
 
@@ -809,75 +774,75 @@ class WraithPanel(gui.MasterPanel):
         # adjust storage menu
         # easiest for storage is to disable all and then only enable relevant
         # always allow Nidus->config, Nidus->View Log
-        self.mnuStorage.entryconfig(0,state=tk.DISABLED)      # all start
-        self.mnuStorage.entryconfig(1,state=tk.DISABLED)      # all stop
-        self.mnuStoragePSQL.entryconfig(0,state=tk.DISABLED)  # psql start
-        self.mnuStoragePSQL.entryconfig(1,state=tk.DISABLED)  # psql stop
-        self.mnuStoragePSQL.entryconfig(3,state=tk.DISABLED)  # connect 2 psql
-        self.mnuStoragePSQL.entryconfig(4,state=tk.DISABLED)  # disconnect from psql
-        self.mnuStoragePSQL.entryconfig(6,state=tk.DISABLED)  # psql fix
-        self.mnuStoragePSQL.entryconfig(7,state=tk.DISABLED)  # psql delete all
-        self.mnuStorageNidus.entryconfig(0,state=tk.DISABLED) # nidus start
-        self.mnuStorageNidus.entryconfig(1,state=tk.DISABLED) # nidus stop
-        self.mnuNidusLog.entryconfig(1,state=tk.DISABLED)     # nidus log clear
+        self._mnuStorage.entryconfig(0,state=tk.DISABLED)      # all start
+        self._mnuStorage.entryconfig(1,state=tk.DISABLED)      # all stop
+        self._mnuStoragePSQL.entryconfig(0,state=tk.DISABLED)  # psql start
+        self._mnuStoragePSQL.entryconfig(1,state=tk.DISABLED)  # psql stop
+        self._mnuStoragePSQL.entryconfig(3,state=tk.DISABLED)  # connect 2 psql
+        self._mnuStoragePSQL.entryconfig(4,state=tk.DISABLED)  # disconnect from psql
+        self._mnuStoragePSQL.entryconfig(6,state=tk.DISABLED)  # psql fix
+        self._mnuStoragePSQL.entryconfig(7,state=tk.DISABLED)  # psql delete all
+        self._mnuStorageNidus.entryconfig(0,state=tk.DISABLED) # nidus start
+        self._mnuStorageNidus.entryconfig(1,state=tk.DISABLED) # nidus stop
+        self._mnuNidusLog.entryconfig(1,state=tk.DISABLED)     # nidus log clear
 
         if flags['store']:
             # storage is running enable stop all, stop postgresql (if dyskt is
             # not running)
-            self.mnuStorage.entryconfig(1,state=tk.NORMAL)
-            if not flags['dyskt']: self.mnuStoragePSQL.entryconfig(1,state=tk.NORMAL)
+            self._mnuStorage.entryconfig(1,state=tk.NORMAL)
+            if not flags['dyskt']: self._mnuStoragePSQL.entryconfig(1,state=tk.NORMAL)
         else:
             # storage is not running, enable start all, start postgresql
-            self.mnuStorage.entryconfig(0,state=tk.NORMAL)
-            self.mnuStoragePSQL.entryconfig(0,state=tk.NORMAL)
+            self._mnuStorage.entryconfig(0,state=tk.NORMAL)
+            self._mnuStoragePSQL.entryconfig(0,state=tk.NORMAL)
 
         if flags['nidus']:
             # nidus is running, enable stop all, stop nidus
-            self.mnuStorage.entryconfig(1,state=tk.NORMAL)
-            self.mnuStorageNidus.entryconfig(1,state=tk.NORMAL)
+            self._mnuStorage.entryconfig(1,state=tk.NORMAL)
+            self._mnuStorageNidus.entryconfig(1,state=tk.NORMAL)
         else:
             # nidus is not running, enable start all & clear nidus log
             # enable start nidus only if postgres is running
-            self.mnuStorage.entryconfig(0,state=tk.NORMAL)
-            self.mnuStorageNidus.entryconfig(0,state=tk.NORMAL)
-            self.mnuNidusLog.entryconfig(1,state=tk.NORMAL)
+            self._mnuStorage.entryconfig(0,state=tk.NORMAL)
+            self._mnuStorageNidus.entryconfig(0,state=tk.NORMAL)
+            self._mnuNidusLog.entryconfig(1,state=tk.NORMAL)
 
         if flags['conn']:
             # connected to psql, enable stop all and disconnect
             # if no DysKT is running, enable fix psql and delete all
-            self.mnuStorage.entryconfig(1,state=tk.NORMAL)
-            self.mnuStoragePSQL.entryconfig(4,state=tk.NORMAL)
+            self._mnuStorage.entryconfig(1,state=tk.NORMAL)
+            self._mnuStoragePSQL.entryconfig(4,state=tk.NORMAL)
             if not flags['dyskt']:
-                self.mnuStoragePSQL.entryconfig(6,state=tk.NORMAL)  # psql fix
-                self.mnuStoragePSQL.entryconfig(7,state=tk.NORMAL)  # psql delete all
+                self._mnuStoragePSQL.entryconfig(6,state=tk.NORMAL)  # psql fix
+                self._mnuStoragePSQL.entryconfig(7,state=tk.NORMAL)  # psql delete all
         else:
             # disconnected, enable start all, enable connect if postgres is running
-            self.mnuStorage.entryconfig(0,state=tk.NORMAL)
-            if flags['store']: self.mnuStoragePSQL.entryconfig(3,state=tk.NORMAL)
+            self._mnuStorage.entryconfig(0,state=tk.NORMAL)
+            if flags['store']: self._mnuStoragePSQL.entryconfig(3,state=tk.NORMAL)
 
         # adjust dyskt menu
         if not flags['store'] and not flags['nidus']:
             # cannot start/stop/control dyskt unless nidus & postgres is running
-            self.mnuDySKT.entryconfig(0,state=tk.DISABLED)  # start
-            self.mnuDySKT.entryconfig(1,state=tk.DISABLED)  # stop
-            self.mnuDySKT.entryconfig(3,state=tk.DISABLED)  # ctrl panel
-            self.mnuDySKTLog.entryconfig(1,state=tk.NORMAL) # clear log
-            self.mnuDySKT.entryconfig(7,state=tk.NORMAL)    # configure
+            self._mnuDySKT.entryconfig(0,state=tk.DISABLED)  # start
+            self._mnuDySKT.entryconfig(1,state=tk.DISABLED)  # stop
+            self._mnuDySKT.entryconfig(3,state=tk.DISABLED)  # ctrl panel
+            self._mnuDySKTLog.entryconfig(1,state=tk.NORMAL) # clear log
+            self._mnuDySKT.entryconfig(7,state=tk.NORMAL)    # configure
         else:
             if flags['dyskt']:
                 # DySKT sensor is running
-                self.mnuDySKT.entryconfig(0,state=tk.DISABLED)    # start
-                self.mnuDySKT.entryconfig(1,state=tk.NORMAL)      # stop
-                self.mnuDySKT.entryconfig(3,state=tk.NORMAL)      # ctrl panel
-                self.mnuDySKTLog.entryconfig(1,state=tk.DISABLED) # clear log
-                self.mnuDySKT.entryconfig(7,state=tk.NORMAL)      # configure
+                self._mnuDySKT.entryconfig(0,state=tk.DISABLED)    # start
+                self._mnuDySKT.entryconfig(1,state=tk.NORMAL)      # stop
+                self._mnuDySKT.entryconfig(3,state=tk.NORMAL)      # ctrl panel
+                self._mnuDySKTLog.entryconfig(1,state=tk.DISABLED) # clear log
+                self._mnuDySKT.entryconfig(7,state=tk.NORMAL)      # configure
             else:
                 # DySKT sensor is not running
-                self.mnuDySKT.entryconfig(0,state=tk.NORMAL)    # start
-                self.mnuDySKT.entryconfig(1,state=tk.DISABLED)  # stop
-                self.mnuDySKT.entryconfig(3,state=tk.DISABLED)  # ctrl panel
-                self.mnuDySKTLog.entryconfig(1,state=tk.NORMAL) # clear log
-                self.mnuDySKT.entryconfig(7,state=tk.NORMAL)    # configure
+                self._mnuDySKT.entryconfig(0,state=tk.NORMAL)    # start
+                self._mnuDySKT.entryconfig(1,state=tk.DISABLED)  # stop
+                self._mnuDySKT.entryconfig(3,state=tk.DISABLED)  # ctrl panel
+                self._mnuDySKTLog.entryconfig(1,state=tk.NORMAL) # clear log
+                self._mnuDySKT.entryconfig(7,state=tk.NORMAL)    # configure
 
     def _startstorage(self):
         """ start postgresql db and nidus storage manager & connect to db """
