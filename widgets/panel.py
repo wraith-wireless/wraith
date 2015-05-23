@@ -230,9 +230,9 @@ class SlavePanel(Panel):
      NOTE: The SlavePanel itself has no methods to define gui widgets, i.e.
       menu, main frame etc
     """
-    def __init__(self,tl,chief,title,iconPath=None,resize=False):
+    def __init__(self,tl,chief,title,ipath=None,resize=False):
         """ chief is the controlling (Master) panel """
-        Panel.__init__(self,tl,iconPath,resize)
+        Panel.__init__(self,tl,ipath,resize)
         self._chief = chief
         self.master.title(title)
 
@@ -247,6 +247,10 @@ class SlavePanel(Panel):
     def update(self):
         """ something has changed, update ourselve """
         raise NotImplementedError("SlavePanel::update")
+
+    def logwrite(self,msg,mtype=LOG_NOERR):
+        """ write messages to primary log """
+        self._chief.logwrite(msg,mtype)
 
     def delete(self):
         """user initiated - notify master of request to close """
@@ -368,6 +372,8 @@ class TabularPanel(SlavePanel):
      Derived classes should implement:
       topframe if any widgets need to be added to the top frame
       bottomframe if any widgets need to be added to the bottom frame
+      str2key if there is a desired 'mapping' from the tree's internal id
+       type of str
 
      Derived classes can also manipulate the style of the tree as desired
 
@@ -375,7 +381,7 @@ class TabularPanel(SlavePanel):
       derived classes can change selection mode and display of icon, headers
       as desired
     """
-    def __init__(self,tl,chief,ttl,h,cols=None,iconPath=None,resize=False):
+    def __init__(self,tl,chief,ttl,h,cols=None,ipath=None,resize=False):
         """
          initialize
          tl: the Toplevel of this panel
@@ -385,10 +391,10 @@ class TabularPanel(SlavePanel):
          cols: a list of tuples t =(l,w) where:
            l is the text to display in the header
            w is the desired width of the column in pixels
-         iconPath: path of appicon
+         ipath: path of appicon
          resize: allow Panel to be resized by user
         """
-        SlavePanel.__init__(self,tl,chief,ttl,iconPath,resize)
+        SlavePanel.__init__(self,tl,chief,ttl,ipath,resize)
 
         # create and allow derived classes to setup top frame
         frmT = ttk.Frame(self)
@@ -427,15 +433,18 @@ class TabularPanel(SlavePanel):
         frmB = ttk.Frame(self)
         if self.bottomframe(frmB): frmB.grid(row=2,column=0,sticky='nwse')
 
+    def str2key(self,s): return s
+    def key2str(self,k): return str(k)
+
     # noinspection PyMethodMayBeStatic
     def topframe(self,frm): return None # override to add widgets to topframe
 
     # noinspection PyMethodMayBeStatic
     def bottomframe(self,frm): return None # override to add widgets to bottomframe
 
-class MenuTabPanel(TabularPanel):
+class TabularPanelEx(TabularPanel):
     """
-     MenuTabPanel - a TabularPanel with with (optional) File menu including close,
+     TabPanelEx - a TabularPanel with with (optional) File menu including close,
      and a rightclick binding on the Treeview. MenuTabPanel implements a finer
      control mechanism for the Treeview, maintaining a data dictionary reflecting
      the data in the Treeview and a order list of keys reflecting the order of
@@ -443,11 +452,93 @@ class MenuTabPanel(TabularPanel):
      adding, deleting and updating entries IOT derived classes are not
      concerned with maintaining the internal list and data dict synchonized
      Derivied classes must implement
-      writenew - write data to the Treeview
-      writeupdate - modified data in the list
+      _writenew - write data to the Treeview
+      _writeupdate - modified data in the list
      Derived classes can implement
-      rclist to display a context menu on Treeview right mouse clicks
+      _rclist to display a context menu on Treeview right mouse clicks
     """
+    def __init__(self,tl,chief,ttl,h,cols=None,ipath=None,resize=False,bmenu=True):
+        """
+         initializes TabularPanelEx
+         tl: the Toplevel of this panel
+         chief: the master/controlling panel
+         ttl: title to display
+         h: # of lines to configure the treeview's height
+         cols: a list of tuples t =(l,w) where:
+           l is the text to display in the header
+           w is the desired width of the column in pixels
+         ipath: path of appicon
+         resize: allow Panel to be resized by user
+         bmenu: include menu with close
+        """
+        TabularPanel.__init__(self,tl,chief,ttl,h,cols,ipath,resize)
+        self._data = {}  # dict of shown data
+        self._order = [] # order data is shown in
+
+        # include the menu?
+        if bmenu:
+            self._menubar = tk.Menu(self)
+            self._mnuFile = tk.Menu(self._menubar,tearoff=0)
+            self._mnuFile.add_command(label='Close',command=self.delete)
+            self._menubar.add_cascade(label='File',menu=self._mnuFile)
+            try:
+                self.master.config(menu=self._menubar)
+            except AttributeError:
+                self.master.tk.call(self.master,"config","-menu",self._menubar)
+
+        # bind rightclick to the treeview
+        self._tree.bind('<Button-3>',self._rclist)
+
+    # Treeview entry manipulation
+
+    def insertentry(self,key,data):
+        """
+         inserts data with id key into the internal data dict and appended to
+         as the last item. _writenew is used to insert the data into the treeview
+        """
+        try:
+            self._data[key] = data
+            self._order.append(key)
+            self._writenew(key)
+        except tk.TclError as e:
+            del self._data[key]
+            self._order.remove(key)
+            self.logwrite("Error inserting data",LOG_ERR)
+
+    def updateentry(self,key,data):
+        """ updates the existing entry with key to reflect the new data """
+        try:
+            self._data[key] = data
+            self._writeupdate(key)
+        except tk.TclError as e:
+            del self._data[key]
+            self.logwrite("Error inserting data",LOG_ERR)
+
+    def deleteentry(self,key):
+        """ delete the entry corresponding to key """
+        try:
+            self._order.remove(key)
+            del self._data[key]
+            self._tree.delete(self.key2str(key))
+        except tk.TclError as e:
+            self.logwrite("Error removing entry",LOG_ERR)
+
+    def deleteall(self):
+        """ delete entries in tree view and internal data structures """
+        try:
+            self._order = []
+            self._data = {}
+            self._tree.delete(*self._tree.get_children())
+        except Exception as e:
+            self.logwrite("Reset error: %s" % e)
+
+    def reset(self):
+        """ reset the panel """
+        self.deleteall()
+
+    def _rclist(self,event): pass
+    def _writenew(self,key): raise NotImplementedError('TabularPanelEx::_writenew')
+    def _writeupdate(self,key): raise NotImplementedError('TabularPanelEx::_writeupdate')
 
 #### LOG MESSAGE TYPES ####
 LOG_NOERR = 0
@@ -461,8 +552,15 @@ class LogPanel(TabularPanel):
      "program", cannot be closed by the user only by the MasterPanel
     """
     def __init__(self,tl,chief):
+        """
+         initialzie LogPanel
+         tl: the Toplevel
+         chief: the master panel
+        """
         TabularPanel.__init__(self,tl,chief,"Log",5,
-                              [('',lenpix('[+] ')),('',lenpix('00:00:00')),('',lenpix('w')*20)],
+                              [('',lenpix('[+] ')),
+                               ('',lenpix('00:00:00')),
+                               ('',lenpix('w')*20)],
                               "widgets/icons/log.png")
         self._l = threading.Lock() # lock for writing
         self._n = 0                # current entry number
@@ -495,7 +593,7 @@ class LogPanel(TabularPanel):
                              values=(self._symbol[mtype],time.strftime('%H:%M:%S'),msg),
                              tags=(mtype,))
             self._n += 1
-            self._tree.yview('moveto',1.0)
+            self._tree.yview('moveto',tk.END)
         except:
             pass
         finally:
@@ -514,7 +612,7 @@ class LogPanel(TabularPanel):
                                  values=(self._symbol[m[2]],m[0],m[1]),
                                  tag=(m[2],))
                 self._n += 1
-                self._tree.yview('moveto',1.0)
+                self._tree.yview('moveto',tk.END)
         except Exception as e:
             print e
         finally:
@@ -611,7 +709,7 @@ class TailLogPanel(TabularPanel):
             #print line
             self._tree.insert('','end',iid=str(self._n),values=(line.strip(),))
             self._n += 1
-            self._tree.yview('moveto',1.0)
+            self._tree.yview('moveto',tk.END)
 
 class MasterPanel(Panel):
     """
@@ -631,15 +729,15 @@ class MasterPanel(Panel):
      Derived classes can:
       call guiload, _makemenu in initialization function as needed
     """
-    def __init__(self,tl,ttl,datatypes=None,iconPath=None,resize=False):
+    def __init__(self,tl,ttl,datatypes=None,ipath=None,resize=False):
         """
          ttl: title of the window/panel
          tl: the toplevel of this panel
          datatypes: list of strings for data bins, etc
          logpanel: if True, will initiate a logpanel
-         iconPath: path of image to show as icon for this panel
+         ipath: path of image to show as icon for this panel
         """
-        Panel.__init__(self,tl,iconPath,resize)
+        Panel.__init__(self,tl,ipath,resize)
         self.tk = tl
         self._menubar = None
         
