@@ -38,10 +38,19 @@ import tkFileDialog as tkFD       # file gui dialogs
 import tkSimpleDialog as tkSD     # input dialogs
 from PIL import Image,ImageTk     # image input & support
 
+#### LOG MESSAGE TYPES ####
+LOG_NOERR = 0
+LOG_WARN  = 1
+LOG_ERR   = 2
+LOG_NOTE  = 3
+
 # HELPER FUNCTIONS
 
-# return the width in pixels of the string s
-def lenpix(s): return tkFont.Font().measure(s)
+# return the width in pixels of the string s or if s is an integer, the length
+# of s '0's
+def lenpix(s):
+    if type(s) == type(''): return tkFont.Font().measure(s)
+    else: return tkFont.Font().measure('0') * s
 
 #### PANEL EXCEPTIONS ####
 class PanelException(Exception): pass # TopLevel generic error
@@ -220,8 +229,8 @@ class SlavePanel(Panel):
 
      Derived classes must implement:
       _shutdown: perform necessary cleanup functionality
-      reset: Master panel is requesting the panel to reset itself
-      update: Master panel is requesting the panel to update itself
+      reset: master panel is requesting the panel to reset itself
+      update: master panel is requesting the panel to update itself
 
     Derived classes should override:
      delete if they want to dissallow user from closing the panel
@@ -287,9 +296,7 @@ class SimplePanel(SlavePanel):
         self.grid(row=0,column=0,sticky='nwse')
         self._body()
     def _body(self): raise NotImplementedError("SimplePanel::_body")
-    def reset(self): pass
-    def update(self): pass
-    def _shutdown(self): pass
+    #def _shutdown(self): pass
 
 class ConfigPanel(SlavePanel):
     """
@@ -335,9 +342,9 @@ class ConfigPanel(SlavePanel):
     def _write(self): raise NotImplementedError("ConfigPanel::_write")
 
     # Slave Panel abstract methods we do not need for this class
-    def reset(self): pass
-    def update(self): pass
     def _shutdown(self): pass
+    def update(self): pass
+    def reset(self): pass
 
     def ok(self):
         """ validate entries and if good write to file then close """
@@ -353,7 +360,6 @@ class ConfigPanel(SlavePanel):
         """ reset entries to orginal configuration file """
         self._initialize()
 
-# noinspection PyAbstractClass
 class TabularPanel(SlavePanel):
     """
      TabularPanel - A simple SlavePanel to display tabular information and the
@@ -433,14 +439,47 @@ class TabularPanel(SlavePanel):
         frmB = ttk.Frame(self)
         if self.bottomframe(frmB): frmB.grid(row=2,column=0,sticky='nwse')
 
-    def str2key(self,s): return s
-    def key2str(self,k): return str(k)
+    @staticmethod
+    def str2key(s): return s
+    @staticmethod
+    def key2str(k): return str(k)
 
     # noinspection PyMethodMayBeStatic
     def topframe(self,frm): return None # override to add widgets to topframe
 
     # noinspection PyMethodMayBeStatic
     def bottomframe(self,frm): return None # override to add widgets to bottomframe
+
+class PollingTabularPanel(TabularPanel):
+    """
+     PollingTabularPanel - a TabularPanel that updates itself periodically
+     through the after function
+     Derived classes must implment the update function which is used by the
+      polling functionaity
+    """
+    def __init__(self,tl,chief,ttl,h,cols=None,ipath=None,resize=False,polltime=500):
+        """
+         initialize the PollingTabularPanel
+         tl: the Toplevel of this panel
+         chief: the master/controlling panel
+         ttl: title to display
+         h: # of lines to configure the treeview's height
+         cols: a list of tuples t =(l,w) where:
+           l is the text to display in the header
+           w is the desired width of the column in pixels
+         ipath: path of appicon
+         resize: allow Panel to be resized by user
+         polltime: time in microseconds betw/ after calls
+        """
+        TabularPanel.__init__(self,tl,chief,ttl,h,cols,ipath,resize)
+        self._polltime = polltime
+        self.update()
+        self.after(self._polltime,self.poll)
+    def _shutdown(self): pass
+    def reset(self): pass
+    def poll(self):
+        self.update()
+        self.after(self._polltime,self.poll)
 
 class TabularPanelEx(TabularPanel):
     """
@@ -540,12 +579,6 @@ class TabularPanelEx(TabularPanel):
     def _writenew(self,key): raise NotImplementedError('TabularPanelEx::_writenew')
     def _writeupdate(self,key): raise NotImplementedError('TabularPanelEx::_writeupdate')
 
-#### LOG MESSAGE TYPES ####
-LOG_NOERR = 0
-LOG_WARN  = 1
-LOG_ERR   = 2
-LOG_NOTE  = 3
-
 class LogPanel(TabularPanel):
     """
      LogPanel -  a singular panel which displays information pertaining to the
@@ -560,7 +593,7 @@ class LogPanel(TabularPanel):
         TabularPanel.__init__(self,tl,chief,"Log",5,
                               [('',lenpix('[+] ')),
                                ('',lenpix('00:00:00')),
-                               ('',lenpix('w')*20)],
+                               ('',lenpix(20))],
                               "widgets/icons/log.png")
         self._l = threading.Lock() # lock for writing
         self._n = 0                # current entry number
@@ -593,7 +626,7 @@ class LogPanel(TabularPanel):
                              values=(self._symbol[mtype],time.strftime('%H:%M:%S'),msg),
                              tags=(mtype,))
             self._n += 1
-            self._tree.yview('moveto',tk.END)
+            self._tree.yview('moveto',1.0)
         except:
             pass
         finally:
@@ -612,7 +645,7 @@ class LogPanel(TabularPanel):
                                  values=(self._symbol[m[2]],m[0],m[1]),
                                  tag=(m[2],))
                 self._n += 1
-                self._tree.yview('moveto',tk.END)
+                self._tree.yview('moveto',1.0)
         except Exception as e:
             print e
         finally:
@@ -634,7 +667,7 @@ class TailLogPanel(TabularPanel):
          width: width of the display (in characters
          resize: allow resize
         """
-        TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix('w')*w)],
+        TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix(w))],
                               "widgets/icons/log.png",resize)
         # check validity of logfile first
         if not os.path.exists(logfile) and not os.path.isfile(logfile):
@@ -709,7 +742,7 @@ class TailLogPanel(TabularPanel):
             #print line
             self._tree.insert('','end',iid=str(self._n),values=(line.strip(),))
             self._n += 1
-            self._tree.yview('moveto',tk.END)
+            self._tree.yview('moveto',1.0)
 
 class MasterPanel(Panel):
     """

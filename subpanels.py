@@ -390,48 +390,44 @@ class CalculatePanel(gui.SimplePanel):
         for entry in self._entries: entry.delete(0,tk.END)
         self._ans.set('')
 
-class InterfacePanel(gui.TabularPanel):
+class InterfacePanel(gui.PollingTabularPanel):
     """
      a singular panel which display information pertaining to the "program",
      cannot be closed by the user only by the MasterPanel
     """
     def __init__(self,tl,chief):
-        gui.TabularPanel.__init__(self,tl,chief,"Interfaces",5,
-                                  [('PHY',gui.lenpix('w')*5),
-                                   ('NIC',gui.lenpix('w')*5),
-                                   ('MAC',gui.lenpix('w')*15),
-                                   ('Mode',gui.lenpix('managed')),
-                                   ('Driver',gui.lenpix('w')*10),
-                                   ('Chipset',gui.lenpix('w')*15)],
-                                  "widgets/icons/sensor.png",False)
+        gui.PollingTabularPanel.__init__(self,tl,chief,"Interfaces",5,
+                                         [('PHY',gui.lenpix(6)),
+                                          ('NIC',gui.lenpix(5)),
+                                          ('MAC',gui.lenpix(15)),
+                                          ('Mode',gui.lenpix(7)),
+                                          ('Driver',gui.lenpix(10)),
+                                          ('Chipset',gui.lenpix(15))],
+                                         "widgets/icons/sensor.png",False)
 
         # configure tree to show headings but not 0th column
         self._tree['show'] = 'headings'
 
-        # start our poll function
-        self.update()
-        self.after(500,self.poll)
-
     def update(self):
         """ lists interfaces """
-        # delete any entries
-        self._tree.delete(*self._tree.get_children())
+        # get list of current wifaces on system & list of wifaces in tree
+        nics = iwt.wifaces()
+        ns = self._tree.get_children()
 
-        # then get all entries
-        for nic in iwt.wifaces():
-            (phy,w) = iw.dev(nic)
-            d = iwt.getdriver(nic)
-            c = iwt.getchipset(d)
-            self._tree.insert('','end',iid=nic,values=(phy,nic,w[0]['addr'],w[0]['type'],d,c))
+        # add new system nics
+        for nic in nics:
+            if not nic in ns:
+                (phy,w) = iw.dev(nic)
+                a = w[0]['addr']
+                m = w[0]['type']
+                d = iwt.getdriver(nic)
+                c = iwt.getchipset(d)
+                self._tree.insert('','end',iid=nic,values=(phy,nic,a,m,d,c))
 
-    def _shutdown(self): pass
-    def reset(self): pass
-
-    def poll(self):
-        """ checks for new interfaces """
-        self.update()
-        self.after(500,self.poll)
-
+        # remove nics that are no longer present
+        for nic in ns:
+            if not nic in nics:
+                self._tree.delete(nic)
 # View->DataBin
 class DatabinPanel(gui.SimplePanel):
     """ DatabinPanel - displays a set of data bins for retrieved data storage """

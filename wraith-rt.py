@@ -327,8 +327,9 @@ class WraithPanel(gui.MasterPanel):
         self._mnuData = tk.Menu(self._menubar,tearoff=0)
         self._mnuData.add_command(label='Data Bins',command=self.viewdatabins)
         self._mnuData.add_separator()
-        self._mnuData.add_command(label='Data',command=self.viewdata)
-        #self._mnuData.add_separator()
+        self._mnuData.add_command(label='View Data',command=self.viewdata)
+        self._mnuData.add_separator()
+        self._mnuData.add_command(label='Sessions',command=self.viewsessions)
 
         # Storage Menu
         self._mnuStorage = tk.Menu(self._menubar,tearoff=0)
@@ -451,6 +452,10 @@ class WraithPanel(gui.MasterPanel):
 
     def viewdata(self):
         """ display data panel """
+        self.unimplemented()
+
+    def viewsessions(self):
+        """ display data sessions panel """
         self.unimplemented()
 
 #### Storage Menu
