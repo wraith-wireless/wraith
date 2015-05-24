@@ -245,24 +245,17 @@ class SlavePanel(Panel):
         self._chief = chief
         self.master.title(title)
 
-    def _shutdown(self):
-        """ cleanup functionality prior to quitting """
-        raise NotImplementedError("SlavePanel::_shutdown")
-
-    def reset(self):
-        """ reset to original/default setup """
-        raise NotImplementedError("SlavePanel::reset")
-
-    def update(self):
-        """ something has changed, update ourselve """
-        raise NotImplementedError("SlavePanel::update")
+    # abstract methods must be implemented
+    def _shutdown(self): raise NotImplementedError("SlavePanel::_shutdown")
+    def reset(self): raise NotImplementedError("SlavePanel::reset")
+    def update(self): raise NotImplementedError("SlavePanel::update")
 
     def logwrite(self,msg,mtype=LOG_NOERR):
         """ write messages to primary log """
         self._chief.logwrite(msg,mtype)
 
     def delete(self):
-        """user initiated - notify master of request to close """
+        """ user initiated - notify master of request to close """
         self._chief.notifyclose(self.name)
         self.close()
 
@@ -296,7 +289,6 @@ class SimplePanel(SlavePanel):
         self.grid(row=0,column=0,sticky='nwse')
         self._body()
     def _body(self): raise NotImplementedError("SimplePanel::_body")
-    #def _shutdown(self): pass
 
 class ConfigPanel(SlavePanel):
     """
@@ -481,104 +473,6 @@ class PollingTabularPanel(TabularPanel):
         self.update()
         self.after(self._polltime,self.poll)
 
-class TabularPanelEx(TabularPanel):
-    """
-     TabPanelEx - a TabularPanel with with (optional) File menu including close,
-     and a rightclick binding on the Treeview. MenuTabPanel implements a finer
-     control mechanism for the Treeview, maintaining a data dictionary reflecting
-     the data in the Treeview and a order list of keys reflecting the order of
-     the data as shown in the Treeview. It also implements shell methods for
-     adding, deleting and updating entries IOT derived classes are not
-     concerned with maintaining the internal list and data dict synchonized
-     Derivied classes must implement
-      _writenew - write data to the Treeview
-      _writeupdate - modified data in the list
-     Derived classes can implement
-      _rclist to display a context menu on Treeview right mouse clicks
-    """
-    def __init__(self,tl,chief,ttl,h,cols=None,ipath=None,resize=False,bmenu=True):
-        """
-         initializes TabularPanelEx
-         tl: the Toplevel of this panel
-         chief: the master/controlling panel
-         ttl: title to display
-         h: # of lines to configure the treeview's height
-         cols: a list of tuples t =(l,w) where:
-           l is the text to display in the header
-           w is the desired width of the column in pixels
-         ipath: path of appicon
-         resize: allow Panel to be resized by user
-         bmenu: include menu with close
-        """
-        TabularPanel.__init__(self,tl,chief,ttl,h,cols,ipath,resize)
-        self._data = {}  # dict of shown data
-        self._order = [] # order data is shown in
-
-        # include the menu?
-        if bmenu:
-            self._menubar = tk.Menu(self)
-            self._mnuFile = tk.Menu(self._menubar,tearoff=0)
-            self._mnuFile.add_command(label='Close',command=self.delete)
-            self._menubar.add_cascade(label='File',menu=self._mnuFile)
-            try:
-                self.master.config(menu=self._menubar)
-            except AttributeError:
-                self.master.tk.call(self.master,"config","-menu",self._menubar)
-
-        # bind rightclick to the treeview
-        self._tree.bind('<Button-3>',self._rclist)
-
-    # Treeview entry manipulation
-
-    def insertentry(self,key,data):
-        """
-         inserts data with id key into the internal data dict and appended to
-         as the last item. _writenew is used to insert the data into the treeview
-        """
-        try:
-            self._data[key] = data
-            self._order.append(key)
-            self._writenew(key)
-        except tk.TclError as e:
-            del self._data[key]
-            self._order.remove(key)
-            self.logwrite("Error inserting data",LOG_ERR)
-
-    def updateentry(self,key,data):
-        """ updates the existing entry with key to reflect the new data """
-        try:
-            self._data[key] = data
-            self._writeupdate(key)
-        except tk.TclError as e:
-            del self._data[key]
-            self.logwrite("Error inserting data",LOG_ERR)
-
-    def deleteentry(self,key):
-        """ delete the entry corresponding to key """
-        try:
-            self._order.remove(key)
-            del self._data[key]
-            self._tree.delete(self.key2str(key))
-        except tk.TclError as e:
-            self.logwrite("Error removing entry",LOG_ERR)
-
-    def deleteall(self):
-        """ delete entries in tree view and internal data structures """
-        try:
-            self._order = []
-            self._data = {}
-            self._tree.delete(*self._tree.get_children())
-        except Exception as e:
-            self.logwrite("Reset error: %s" % e)
-
-    def reset(self):
-        """ reset the panel """
-        self.deleteall()
-
-    def _rclist(self,event): pass
-    def _writenew(self,key): raise NotImplementedError('TabularPanelEx::_writenew')
-    def _writeupdate(self,key): raise NotImplementedError('TabularPanelEx::_writeupdate')
-
 class LogPanel(TabularPanel):
     """
      LogPanel -  a singular panel which displays information pertaining to the
@@ -593,7 +487,7 @@ class LogPanel(TabularPanel):
         TabularPanel.__init__(self,tl,chief,"Log",5,
                               [('',lenpix('[+] ')),
                                ('',lenpix('00:00:00')),
-                               ('',lenpix(20))],
+                               ('',lenpix(30))],
                               "widgets/icons/log.png")
         self._l = threading.Lock() # lock for writing
         self._n = 0                # current entry number
@@ -801,7 +695,6 @@ class MasterPanel(Panel):
         self._initialize()
 
         # is there a default toolset saved?
-        #if os.path.exists('default.ts'): self.guiload('default.ts')
         self.update_idletasks()
 
     # Panel overrides

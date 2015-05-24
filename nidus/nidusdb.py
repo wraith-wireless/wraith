@@ -302,19 +302,18 @@ class NidusDB(object):
 
             # insert epochal
             sql = """
-                   insert into radio_properties (mac,role,description,spoofed,txpwr,ts)
-                   values (%s,%s,%s,%s,%s,%s);
+                   insert into radio_properties (mac,description,spoofed,txpwr,ts)
+                   values (%s,%s,%s,%s,%s);
                   """
-            self._curs.execute(sql,(ds['mac'],ds['role'],ds['desc'],
-                                    ds['spoofed'],ds['txpwr'],ds['ts']))
+            self._curs.execute(sql,(ds['mac'],ds['desc'],ds['spoofed'],ds['txpwr'],ds['ts']))
 
             # insert using_radio
             sql = """
-                   insert into using_radio (sid,mac,phy,nic,vnic,period)
-                   values (%s,%s,%s,%s,%s,tstzrange(%s,NULL,'[]'));
+                   insert into using_radio (sid,mac,phy,nic,vnic,role,period)
+                   values (%s,%s,%s,%s,%s,%s,tstzrange(%s,NULL,'[]'));
                   """
             self._curs.execute(sql,(self._sid,ds['mac'],ds['phy'],ds['nic'],
-                                    ds['vnic'],ds['ts']))
+                                    ds['vnic'],ds['role'],ds['ts']))
 
             # start save thread if save is enabled
             if self._raw['save']:

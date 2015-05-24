@@ -177,16 +177,11 @@ CREATE TABLE antenna(
 );
 CREATE INDEX antenna_ts_idx ON antenna(ts);
 
--- radio role type enumeration
-DROP TYPE IF EXISTS ROLE;
-CREATE TYPE ROLE AS ENUM ('recon','collection');
-
 -- radio_properties
 -- properties of a radio at a given timestamp
 DROP TABLE IF EXISTS radio_properties;
 CREATE TABLE radio_properties(
    mac macaddr NOT NULL,       -- foreign key to radio mac addr
-   role ROLE NOT NULL,         -- what role is radio playing now
    description VARCHAR(200),   -- brief description of radio
    spoofed VARCHAR(17),        -- virtual (spoofed) mac address
    txpwr SMALLINT DEFAULT 15,  -- transmit power in dBm
@@ -212,6 +207,10 @@ CREATE TABLE radio_event(
 );
 CREATE INDEX radio_event_ts_idx on radio_event(ts);
 
+-- radio role type enumeration
+DROP TYPE IF EXISTS ROLE;
+CREATE TYPE ROLE AS ENUM ('recon','collection');
+
 -- using_radio table
 DROP TABLE IF EXISTS using_radio;
 CREATE TABLE using_radio(
@@ -220,6 +219,7 @@ CREATE TABLE using_radio(
    phy VARCHAR(5) NOT NULL,   -- the phy of radio
    nic VARCHAR(5) NOT NULL,   -- actual nic of radio
    vnic VARCHAR(6) NOT NULL,  -- virtual nic of radio
+   role ROLE NOT NULL,        -- what role radio is playing now
    period TSTZRANGE NOT NULL, -- timerange sensor is using mac
    CONSTRAINT ch_sid CHECK (sid > 0),
    FOREIGN KEY (sid) REFERENCES sensor(session_id) ON DELETE CASCADE,
@@ -976,10 +976,26 @@ CREATE TABLE action(
 --   FOREIGN KEY(staid) REFERENCES sta(sta_id)
 --);
 
+#### PERMANENT VIEWS
+
+DROP VIEW IF EXISTS sessions;
+CREATE VIEW sessions AS
+    SELECT s.session_id,s.hostname,lower(s.period) AS start,upper(s.period) AS stop,
+           p.kernel,
+           g.devid,
+           (SELECT ur.mac FROM using_radio ur WHERE ur.sid = s.session_id AND ur.role = 'recon') as recon,
+           (SELECT ur.mac FROM using_radio ur WHERE ur.sid = s.session_id AND ur.role = 'collection') as collection,
+           (SELECT count(f.frame_id) FROM frame f WHERE f.sid = s.session_id) as fcnt
+    FROM sensor s, platform p, using_gpsd ug, gpsd g
+    WHERE s.session_id = p.sid AND
+          s.session_id = ug.sid AND
+          g.gpsd_id = ug.gid
+    ORDER BY start;
+
 #### STORED PROCEDURES
 
 -- store procedure for deleting all content from all tables
-DROP FUNCTIOON IF EXISTS delete_all();
+DROP FUNCTION IF EXISTS delete_all();
 CREATE FUNCTION delete_all()
     RETURNS void as $$
     BEGIN

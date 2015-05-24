@@ -226,9 +226,7 @@ class WraithPanel(gui.MasterPanel):
 
     def _create(self):
         # read in conf file, exit on error
-        msgs = [(time.strftime('%H:%M:%S'),
-                 "Wraith v%s" % wraith.__version__,
-                 gui.LOG_NOERR)]
+        msgs = [(time.strftime('%H:%M:%S'),"Wraith v%s" % wraith.__version__,gui.LOG_NOERR)]
         self._conf = readconf()
         if 'err' in self._conf:
             msgs.append((time.strftime('%H:%M:%S'),
@@ -456,7 +454,14 @@ class WraithPanel(gui.MasterPanel):
 
     def viewsessions(self):
         """ display data sessions panel """
-        self.unimplemented()
+        panel = self.getpanels('sessions',False)
+        if not panel:
+            t = tk.Toplevel()
+            pnl = subgui.SessionsPanel(t,self)
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'sessions'))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
 
 #### Storage Menu
 
@@ -623,7 +628,7 @@ class WraithPanel(gui.MasterPanel):
         panel = self.getpanels('niduslog',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = gui.TailLogPanel(t,self,"Nidus Log",200,wraith.NIDUSLOG,40)
+            pnl = gui.TailLogPanel(t,self,"Nidus Log",200,wraith.NIDUSLOG,50)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'niduslog'))
         else:
             panel[0].tk.deiconify()
@@ -674,7 +679,7 @@ class WraithPanel(gui.MasterPanel):
         panel = self.getpanels('dysktlog',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = gui.TailLogPanel(t,self,"DySKT Log",200,wraith.DYSKTLOG,40)
+            pnl = gui.TailLogPanel(t,self,"DySKT Log",200,wraith.DYSKTLOG,50)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'dysktlog'))
         else:
             panel[0].tk.deiconify()
@@ -1112,7 +1117,7 @@ class WraithSplash(object):
         self._pb.step(2.0)
         if not cmdline.dysktrunning(wraith.DYSKTPID):
             self._sv.set("Starting DySKT")
-            if not startpsql(pwd):
+            if not startdyskt(pwd):
                 # because DySKT can sometimes take a while, we will run
                 # this several times
                 i = 5

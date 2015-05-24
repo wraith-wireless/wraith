@@ -391,10 +391,7 @@ class CalculatePanel(gui.SimplePanel):
         self._ans.set('')
 
 class InterfacePanel(gui.PollingTabularPanel):
-    """
-     a singular panel which display information pertaining to the "program",
-     cannot be closed by the user only by the MasterPanel
-    """
+    """ a singular panel which display information pertaining to the "program" """
     def __init__(self,tl,chief):
         gui.PollingTabularPanel.__init__(self,tl,chief,"Interfaces",5,
                                          [('PHY',gui.lenpix(6)),
@@ -412,26 +409,40 @@ class InterfacePanel(gui.PollingTabularPanel):
         """ lists interfaces """
         # get list of current wifaces on system & list of wifaces in tree
         nics = iwt.wifaces()
-        ns = self._tree.get_children()
+        ls = self._tree.get_children()
+
+        # remove nics that are no longer present
+        for nic in ls:
+            if not nic in nics: self._tree.delete(nic)
 
         # add new system nics
         for nic in nics:
-            if not nic in ns:
-                (phy,w) = iw.dev(nic)
-                a = w[0]['addr']
-                m = w[0]['type']
-                d = iwt.getdriver(nic)
-                c = iwt.getchipset(d)
+            (phy,w) = iw.dev(nic)
+            a = w[0]['addr']
+            m = w[0]['type']
+            d = iwt.getdriver(nic)
+            c = iwt.getchipset(d)
+            if nic in ls: # nic is already listed
+                # check if data has changed -
+                cur = self._tree.set(nic)
+                if cur['PHY'] != phy: self._tree.set(nic,'PHY',phy)
+                if cur['MAC'] != a: self._tree.set(nic,'MAC',a)
+                if cur['Mode'] != m: self._tree.set(nic,'Mode',m)
+                if cur['Driver'] != d: self._tree.set(nic,'Driver',d)
+                if cur['Chipset'] != c: self._tree.set(nic,'Chipset',c)
+            else:         # nic is new
                 self._tree.insert('','end',iid=nic,values=(phy,nic,a,m,d,c))
 
-        # remove nics that are no longer present
-        for nic in ns:
-            if not nic in nics:
-                self._tree.delete(nic)
 # View->DataBin
 class DatabinPanel(gui.SimplePanel):
     """ DatabinPanel - displays a set of data bins for retrieved data storage """
     def __init__(self,tl,chief,conn):
+        """
+         initialization
+         tl: the Toplevel
+         chief: master panel
+         conn: the db connection
+        """
         self._bins = {}
         self._curs = {}
         self._conn = conn
@@ -569,8 +580,7 @@ class QueryPanel(gui.SlavePanel):
         self._trSess['yscrollcommand'] = vscroll.set
         # configure session tree's headers
         hdrs = ['ID','Host','Start','Frames']
-        hdrlens = [gui.lenpix('000'),gui.lenpix('HOST'),
-                   gui.lenpix('DDMMYY HHMM'),gui.lenpix('0000')]
+        hdrlens = [gui.lenpix(3),gui.lenpix(4),gui.lenpix(13),gui.lenpix(6)]
         self._trSess['columns'] = hdrs
         for i in xrange(len(hdrs)):
             self._trSess.column(i,width=hdrlens[i],anchor=tk.CENTER)
@@ -1055,6 +1065,29 @@ class QueryPanel(gui.SlavePanel):
                                   s['hostname'],
                                   s['lower'].strftime("%d%m%y %H%M%S"),
                                   fc['count']))
+
+# Data->Sessions
+class SessionsPanel(gui.PollingTabularPanel):
+    """ a singular panel which display information pertaining to sessions """
+    def __init__(self,tl,chief):
+        gui.PollingTabularPanel.__init__(self,tl,chief,"Sessions",10,
+                                         [('ID',gui.lenpix(4)),
+                                          ('Host',gui.lenpix(5)),
+                                          ('Kernel',gui.lenpix(5)),
+                                          ('Start',gui.lenpix(13)),
+                                          ('Stop',gui.lenpix(13)),
+                                          ('GPSD',gui.lenpix(9)),
+                                          ('Recon',gui.lenpix(17)),
+                                          ('Collection',gui.lenpix(17)),
+                                          ('Frames',gui.lenpix(6))],
+                                         "widgets/icons/sessions.png",False)
+
+        # configure tree to show headings but not 0th column
+        self._tree['show'] = 'headings'
+
+    def update(self):
+        """ lists sessions """
+        pass
 
 # Storage->Nidus-->Config
 class NidusConfigPanel(gui.ConfigPanel):
