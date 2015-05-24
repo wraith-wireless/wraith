@@ -633,16 +633,21 @@ class TailLogPanel(TabularPanel):
     def _newlines(self,lines):
         """ writes new lines to panel """
         for line in lines:
-            #print line
             self._tree.insert('','end',iid=str(self._n),values=(line.strip(),))
             self._n += 1
             self._tree.yview('moveto',1.0)
 
 class MasterPanel(Panel):
     """
-     the MasterPanel is the primary panel which controls the flow of the overall
+     The MasterPanel is the primary panel which controls the flow of the overall
      program. The MasterPanel defines a class meant to handle the primary data,
      opening, closing children panels etc.
+
+     The MasterPanel assumes a database backend but does not assume what database
+     is used and only provides basic database access methods:
+      - commit: commit transaction through main connection
+      - rollback: rollback transaction through main connection
+     Derived class must implemented any other desired db functionality
      
      Derived classes should implement:
       _initialize -> if there is functionality that should be started
@@ -669,6 +674,7 @@ class MasterPanel(Panel):
         self._menubar = None
         
         # data bins, registered panels, and what data is hidden, selected
+        self._conn = None           # the connection (if any) to the backend db)
         self._audit_registered = {} # panels auditing for notification
         self._bin = {}              # data dictionaries
         self._hidden = {}           # keys of hidden data in bin
@@ -710,7 +716,6 @@ class MasterPanel(Panel):
             return
         else:
             self.logwrite('Quitting...')
-            #self.closepanels()
             self._shutdown()
             self.quit()
 
@@ -727,9 +732,6 @@ class MasterPanel(Panel):
     def _shutdown(self): pass
     def _makemenu(self): pass
     def showpanel(self,t): raise NotImplementedError("MasterPanel::showpanel")
-
-    @property
-    def getstate(self): return None
 
     def viewlog(self):
         """ displays the log panel """
@@ -805,7 +807,19 @@ class MasterPanel(Panel):
         elif mtype == LOG_ERR:
              self.err('Error',msg)
 
-    # Panel/date update functionality
+    # Panel accessors
+
+    def dbcommit(self):
+        """ commit transaction """
+        if self._conn: self._conn.commit()
+
+    def dbrollback(self):
+        if self._conn: self._conn.rollback()
+
+    @property
+    def getstate(self): return None
+
+    # Panel/data update functionality
 
     def audit_register(self,dtype,name):
         """ register panel for dtype audits """

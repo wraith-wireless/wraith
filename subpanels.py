@@ -19,6 +19,7 @@ import mgrs                                # for mgrs2latlon conversions etc
 import math                                # for conversions, calculations
 import time                                # for timestamps
 from PIL import Image,ImageTk              # image input & support
+import psycopg2 as psql                    # postgresql api
 import psycopg2.extras as pextras          # cursors and such
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
@@ -1069,7 +1070,8 @@ class QueryPanel(gui.SlavePanel):
 # Data->Sessions
 class SessionsPanel(gui.PollingTabularPanel):
     """ a singular panel which display information pertaining to sessions """
-    def __init__(self,tl,chief):
+    def __init__(self,tl,chief,curs):
+        self._curs = curs
         gui.PollingTabularPanel.__init__(self,tl,chief,"Sessions",10,
                                          [('ID',gui.lenpix(4)),
                                           ('Host',gui.lenpix(5)),
@@ -1087,7 +1089,48 @@ class SessionsPanel(gui.PollingTabularPanel):
 
     def update(self):
         """ lists sessions """
-        pass
+        # get current sessions in db and list of sessions in tree
+        try:
+            sql = "select * from sessions;"
+            self._curs.execute(sql)
+        except psql.Error as e:
+            self._chief.rollback()
+            self.logwrite(e,gui.LOG_NOERR)
+            return
+
+        # TODO: could this get extremely large?
+        ss = self._curs.fetchall()            # get all rows
+        sids = [s['session_id'] for s in ss]  # pull out ids
+        ls = self._tree.get_children()        # & all ids from tree
+
+        # remove sessions from tree that are no longer in db
+        for sid in ls:
+            if not int(sid) in sids: self._tree.delete(sid)
+
+        # add new sessions (& modify any changed sessions)
+        for s in ss:
+            sid = str(s['session_id'])
+            host = s['hostname']
+            start = s['start']
+            stop = s['stop']
+            kern = s['kernel']
+            devid = s['devid']
+            recon = s['recon']
+            coll = s['collection']
+            nF = s['fcnt']
+            if sid in ls: # session is present
+                # check for changes (id and start are not checked0
+                cur = self._tree.set(str(sid))
+                if cur['Host'] != host: self._tree.set(sid,'Host',host)
+                if cur['Kernel'] != kern: self._tree.set(sid,'Kernel',kern)
+                if cur['Stop'] != stop: self._tree.set(sid,'Stop',stop)
+                if cur['GPSD'] != devid: self._tree.set(sid,'GPSD',devid)
+                if cur['Recon'] != recon: self._tree.set(sid,'Recon',recon)
+                if cur['Collection'] != coll: self._tree.set(sid,'Collection',coll)
+                if cur['Frames'] != nF: self._tree.set(sid,'Frames',nF)
+            else:         # session not present
+                self._tree.insert('','end',iid=sid,values=(sid,host,start,stop,kern,
+                                                           devid,recon,coll,nF))
 
 # Storage->Nidus-->Config
 class NidusConfigPanel(gui.ConfigPanel):

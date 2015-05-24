@@ -15,6 +15,7 @@ import os                                  # file info etc
 import sys                                 # for exit
 import time                                # sleeping, timestamps
 import psycopg2 as psql                    # postgresql api
+import psycopg2.extras as pextras          # cursors and such
 import Tkinter as tk                       # gui constructs
 import ttk                                 # ttk widgets
 from PIL import Image,ImageTk              # image input & support
@@ -174,12 +175,12 @@ class WraithPanel(gui.MasterPanel):
         """
          set up, initialize parent and then initialize the gui
          our variables
-         tl: tk's topleve
+         tl: tk's toplevel
          pwd: sudo password
         """
         self._conf = None   # configuration
         self._state = 0     # bitmask state
-        self._conn = None   # connection to data storage
+        #self._conn = None   # connection to data storage
         self._bSQL = False  # postgresql was running on startup
         self._pwd = pwd     # sudo password (should we not save it?)
 
@@ -219,7 +220,7 @@ class WraithPanel(gui.MasterPanel):
         """ initialize gui, determine initial state """
         # configure panel & write initial message
         # have to manually enter the desired size, as the menu does not expand
-        # the visibile portion automatically
+        # the visible portion automatically
         self.tk.wm_geometry("300x1+0+0") # our desired size
         self.update_idletasks()          # force update -> should put the log panel 2nd
         if self._pwd is None: self._create()
@@ -323,11 +324,11 @@ class WraithPanel(gui.MasterPanel):
         # Data Menu
         # all options will always be enabled
         self._mnuData = tk.Menu(self._menubar,tearoff=0)
-        self._mnuData.add_command(label='Data Bins',command=self.viewdatabins)
-        self._mnuData.add_separator()
-        self._mnuData.add_command(label='View Data',command=self.viewdata)
-        self._mnuData.add_separator()
-        self._mnuData.add_command(label='Sessions',command=self.viewsessions)
+        self._mnuData.add_command(label='Data Bins',command=self.viewdatabins)     # 0
+        self._mnuData.add_separator()                                              # 1
+        self._mnuData.add_command(label='View Data',command=self.viewdata)         # 2
+        self._mnuData.add_separator()                                              # 3
+        self._mnuData.add_command(label='Sessions',command=self.viewsessions)      # 4
 
         # Storage Menu
         self._mnuStorage = tk.Menu(self._menubar,tearoff=0)
@@ -382,6 +383,20 @@ class WraithPanel(gui.MasterPanel):
         self._menubar.add_cascade(label='Storage',menu=self._mnuStorage)
         self._menubar.add_cascade(label='DySKT',menu=self._mnuDySKT)
         self._menubar.add_cascade(label='Help',menu=self._mnuHelp)
+
+    def showpanel(self,desc):
+        """ opens a panel of type desc """
+        if desc == 'log': self.viewlog()
+        elif desc == 'databin': self.viewdatabins()
+        elif desc == 'interfaces': self.viewinterfaces()
+        elif desc == 'sessions': self.viewsessions()
+        elif desc == 'preferences': self.configwraith()
+        elif desc == 'niduslog': self.viewniduslog()
+        elif desc == 'nidusprefs': self.confignidus()
+        elif desc == 'dysktlog': self.viewdysktlog()
+        elif desc == 'dysktprefs': self.configdyskt()
+        elif desc == 'about': self.about()
+        else: raise RuntimeError, "WTF Cannot open %s" % desc
 
 #### MENU CALLBACKS
 
@@ -456,9 +471,15 @@ class WraithPanel(gui.MasterPanel):
         """ display data sessions panel """
         panel = self.getpanels('sessions',False)
         if not panel:
-            t = tk.Toplevel()
-            pnl = subgui.SessionsPanel(t,self)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'sessions'))
+            curs = None
+            try:
+                curs = self._conn.cursor(cursor_factory=pextras.DictCursor)
+            except:
+                self.logwrite("Error in DB connection",gui.LOG_ERR)
+            else:
+                t = tk.Toplevel()
+                pnl = subgui.SessionsPanel(t,self,curs)
+                self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'sessions'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -724,20 +745,6 @@ class WraithPanel(gui.MasterPanel):
         """ display the help panel """
         self.unimplemented()
 
-#### MINION METHODS
-
-    def showpanel(self,desc):
-        """ opens a panel of type desc """
-        if desc == 'log': self.viewlog()
-        elif desc == 'databin': self.viewdatabins()
-        elif desc == 'preferences': self.configwraith()
-        elif desc == 'niduslog': self.viewniduslog()
-        elif desc == 'nidusprefs': self.confignidus()
-        elif desc == 'dysktlog': self.viewdysktlog()
-        elif desc == 'dysktprefs': self.configdyskt()
-        elif desc == 'about': self.about()
-        else: raise RuntimeError, "WTF Cannot open %s" % desc
-
 #### HELPER FUNCTIONS
 
     def _poll(self):
@@ -778,6 +785,7 @@ class WraithPanel(gui.MasterPanel):
 
     def _menuenable(self):
         """ enable/disable menus as necessary """
+        # TODO: enable/disable view sessions as necessary
         # get all flags
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
 
