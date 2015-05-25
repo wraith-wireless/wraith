@@ -30,6 +30,7 @@ from wraith.radio import mpdu              # for 802.11 types/subtypes
 from wraith.dyskt.dyskt import parsechlist # channelist validity check
 from wraith.utils import timestamps        # valid data/time
 from wraith.utils import landnav           # lang nav utilities
+from wraith.utils import cmdline           # cmdline functionality
 
 # Validation reg. exp.
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr
@@ -405,7 +406,8 @@ class InterfacePanel(gui.PollingTabularPanel):
 
         # configure tree to show headings but not 0th column
         self._tree['show'] = 'headings'
-
+    def reset(self): pass
+    def _shutdown(self): pass
     def update(self):
         """ lists interfaces """
         # get list of current wifaces on system & list of wifaces in tree
@@ -480,21 +482,13 @@ class DatabinPanel(gui.SimplePanel):
         """ shows query panel for bin b """
         # notify user if not connected to database
         if not self._chief.isconnected:
-            self.warn("Disconnected","Cannot retrieve any records. Connect and try again")
+            self.warn("Disconnected","Connect and try again")
             return
 
         panel = self.getpanels('query%s' % b,False)
         if not panel:
-            curs = None
-            try:
-                curs = self._conn.cursor(cursor_factory=pextras.DictCursor)
-            except:
-                self.err("Unspecified Error","Cannot connect to database")
-            else:
-                t = tk.Toplevel()
-                pnl = QueryPanel(t,self,"Query [bin %s]" % b,b,curs)
-                self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'query%s' % b))
-                self._curs[pnl.name] = curs
+            t = tk.Toplevel()
+            pnl = QueryPanel(t,self,"Query [bin %s]" % b,b,self._chief.connectstring)
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -542,17 +536,17 @@ FC_FLAGS_ORDERED   = 7
 
 class QueryPanel(gui.SlavePanel):
     """Display query for data panel """
-    def __init__(self,tl,parent,ttl,b,curs):
+    def __init__(self,tl,parent,ttl,b,connstr):
         """
          tl: Toplevel
          parent: our master panel
          ttl: title
          b: databin querying for
-         curs: cursor for our queries
+         connstr: connection string dict
         """
-        gui.SlavePanel.__init__(self,tl,parent,ttl,'widgets/icons/bin%s.png'%b,False)
+        gui.SlavePanel.__init__(self,tl,parent,ttl,'widgets/icons/bin%s.png'%b)
         self._bin = b
-        self._curs = curs
+        self._connstr = connstr
         self._makegui()
         self._makemenu()
 
@@ -1054,33 +1048,47 @@ class QueryPanel(gui.SlavePanel):
 
     def _getsessions(self):
         """ retrieve all sessions and add to tree """
-        sql1 = "SELECT session_id,hostname,ip,lower(period) FROM sensor;"
-        sql2 = "SELECT count(frame_id) FROM frame WHERE sid=%s;"
-        self._curs.execute(sql1)
-        ss = self._curs.fetchall()
-        for s in ss:
-            self._curs.execute(sql2,(s['session_id'],))
-            fc = self._curs.fetchone()
-            self._trSess.insert('','end',iid=str(s['session_id']),
-                                  values=(s['session_id'],
-                                  s['hostname'],
-                                  s['lower'].strftime("%d%m%y %H%M%S"),
-                                  fc['count']))
+        conn = curs = None
+        try:
+            conn,err = cmdline.psqlconnect(self._connstr)
+            if conn is None:
+                self.err('Connect Error',err)
+                return
+            curs = conn.cursor(cursor_factory=pextras.DictCursor)
+
+            sql1 = "SELECT session_id,hostname,ip,lower(period) FROM sensor;"
+            sql2 = "SELECT count(frame_id) FROM frame WHERE sid=%s;"
+            curs.execute(sql1)
+            ss = curs.fetchall()
+            for s in ss:
+                curs.execute(sql2,(s['session_id'],))
+                fc = curs.fetchone()
+                self._trSess.insert('','end',iid=str(s['session_id']),
+                                    values=(s['session_id'],
+                                    s['hostname'],
+                                    s['lower'].strftime("%d%m%y %H%M%S"),
+                                    fc['count']))
+        except Exception as e:
+            if conn: conn.rollback()
+            self.err("Error Retrieving Sessions",e)
+        finally:
+            if curs: curs.close()
+            if conn: conn.close()
 
 # Data->Sessions
 class SessionsPanel(gui.PollingTabularPanel):
     """ a singular panel which display information pertaining to sessions """
     def __init__(self,tl,chief,curs):
         self._curs = curs
-        gui.PollingTabularPanel.__init__(self,tl,chief,"Sessions",10,
-                                         [('ID',gui.lenpix(4)),
+        gui.PollingTabularPanel.__init__(self,tl,chief,"Sessions",5,
+                                         [('ID',gui.lenpix(3)),
                                           ('Host',gui.lenpix(5)),
-                                          ('Kernel',gui.lenpix(5)),
+                                          ('Kernel',gui.lenpix(8)),
                                           ('Start',gui.lenpix(13)),
                                           ('Stop',gui.lenpix(13)),
-                                          ('GPSD',gui.lenpix(9)),
-                                          ('Recon',gui.lenpix(17)),
-                                          ('Collection',gui.lenpix(17)),
+                                          ('GPSD',gui.lenpix(8)),
+                                          ('Recon',gui.lenpix(12)),
+                                          ('Collection',gui.lenpix(12)),
                                           ('Frames',gui.lenpix(6))],
                                          "widgets/icons/sessions.png",False)
 
@@ -1111,9 +1119,9 @@ class SessionsPanel(gui.PollingTabularPanel):
         for s in ss:
             sid = str(s['session_id'])
             host = s['hostname']
-            start = s['start']
-            stop = s['stop']
-            kern = s['kernel']
+            start = s['start'].strftime("%d/%m/%y %H:%M:%S")
+            stop = s['stop'].strftime("%d/%m/%y %H:%M:%S")
+            kern = s['kernel'].replace('-generic','') # save some space
             devid = s['devid']
             recon = s['recon']
             coll = s['collection']
@@ -1129,7 +1137,7 @@ class SessionsPanel(gui.PollingTabularPanel):
                 if cur['Collection'] != coll: self._tree.set(sid,'Collection',coll)
                 if cur['Frames'] != nF: self._tree.set(sid,'Frames',nF)
             else:         # session not present
-                self._tree.insert('','end',iid=sid,values=(sid,host,start,stop,kern,
+                self._tree.insert('','end',iid=sid,values=(sid,host,kern,start,stop,
                                                            devid,recon,coll,nF))
 
 # Storage->Nidus-->Config

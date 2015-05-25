@@ -85,7 +85,6 @@ and editing of configuration files, some manipulation of backened storage.
     - timestamps.py     timestamp conversion functions
     - landnav.py        land navigation utilities
     - cmdline.py        various cmdline utilities for testing processes
-    - services.py       services functions shared by gui components
     - simplepcap.py     pcap writer
  *  radio               subpackage for radio/radiotap
      - \_\_init\_\_.py  initialize radio subpackage

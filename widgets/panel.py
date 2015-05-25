@@ -3,9 +3,28 @@
 
 Defines a graphic suite based on Tix where a set of non-modal panels operate under
 the control of a master panel and execute tasks, display information independently
-of (or in conjuction with) this panel and other panels. (Think undocked windows)
+of or in conjuction with this panel and other panels. (Think undocked windows)
 Panels can be configured so that they can be opened, closed, "raised", minimized
 by the user or only by a calling panel.
+
+Conventions: As there are several conventions used to differentiate between Tk/Tcl
+ master/child attributes and these are sometimes conflicting in their use throughout
+ the comments, they are listed below
+ Panel: (a window) a frame with a title bar
+ Master: not to be confused with Tcl/Tk master attribute. The Master (capitalized)
+  refers to the main gui panel controlling all other gui subpanels
+ master: (uncapitalized) not to be confused with Tcl/Tk master attribute. A panel
+  that controls another panel
+ slave: a panel that is controlled by another panel. Every panel but the Master
+  is a slave panel.
+ _chief: a panels controlling panel
+ _panels: a slave/child panel
+ data: when refering to data that a panel shows, "singular" identifies data
+  that is not referenced/used elsewhere in the program and "static" identifies
+  data that does not change (or changes only seldomly). If not decorated, then
+  data is assumed to be shared among multiple panels - changes to data in one panel
+  is reflected in other panels
+
 NOTE:
  - a panel may be a master panel and a slave panel.
  - one and only panel will be "The Master" Panel
@@ -239,11 +258,11 @@ class SlavePanel(Panel):
      NOTE: The SlavePanel itself has no methods to define gui widgets, i.e.
       menu, main frame etc
     """
-    def __init__(self,tl,chief,title,ipath=None,resize=False):
-        """ chief is the controlling (Master) panel """
+    def __init__(self,tl,chief,ttl,ipath=None,resize=False):
+        """ chief is the controlling (master) panel """
         Panel.__init__(self,tl,ipath,resize)
         self._chief = chief
-        self.master.title(title)
+        self.master.title(ttl)
 
     # abstract methods must be implemented
     def _shutdown(self): raise NotImplementedError("SlavePanel::_shutdown")
@@ -272,9 +291,9 @@ class SimplePanel(SlavePanel):
     """
      Defines a simple panel with body. Should be used to define simple description
      panels with minimal user interaction displaying static data. SimplePanels are
-     not expected to have any slave panels. Additionally, showing static data,
-     SimplePanels are not expected to display information that needs to be
-     updated or reset.
+     not expected to have any slave panels. Additionally since they show singular
+     static data, SimplePanels are not expected to display information that needs
+     to be updated or reset.
 
      Derived class must implement:
       _body: define gui widgets
@@ -284,11 +303,14 @@ class SimplePanel(SlavePanel):
       reset,update if dynamic data is being displayed
       _shutdown if any cleanup needs to be performed prior to closing
     """
-    def __init__(self,tl,chief,title,iconpath=None,resize=False):
-        SlavePanel.__init__(self,tl,chief,title,iconpath,resize)
+    def __init__(self,tl,chief,ttl,iconpath=None,resize=False):
+        SlavePanel.__init__(self,tl,chief,ttl,iconpath,resize)
         self.grid(row=0,column=0,sticky='nwse')
         self._body()
     def _body(self): raise NotImplementedError("SimplePanel::_body")
+    def reset(self): pass
+    def update(self): pass
+    def _shutdown(self): pass
 
 class ConfigPanel(SlavePanel):
     """
@@ -308,9 +330,9 @@ class ConfigPanel(SlavePanel):
        are valid, False otherwise
       _write writes the values of the entries into the config file
     """
-    def __init__(self,tl,chief,title,resize=False):
+    def __init__(self,tl,chief,ttl,resize=False):
         """ initialize configuration panel """
-        SlavePanel.__init__(self,tl,chief,"widgets/icons/config.png",resize)
+        SlavePanel.__init__(self,tl,chief,ttl,"widgets/icons/config.png",resize)
 
         # set up the input widget frame
         frmConfs = ttk.Frame(self)
@@ -467,11 +489,42 @@ class PollingTabularPanel(TabularPanel):
         self._polltime = polltime
         self.update()
         self.after(self._polltime,self.poll)
-    def _shutdown(self): pass
-    def reset(self): pass
     def poll(self):
         self.update()
         self.after(self._polltime,self.poll)
+
+class DBPollingTabularPanel(PollingTabularPanel):
+    """
+     DBPollingTabularPanel - a TabularPanel that updates itself periodically
+     through the after function using data from a db connection
+     Derived classes must implment:
+      update: (from PollingTabularPanel) which is used by the polling functionaity
+      _connect: connect to backend database
+      _cursor: get a cursor
+    """
+    def __init__(self,tl,chief,connect,ttl,h,cols=None,ipath=None,resize=False,polltime=500):
+        """
+         initialize the PollingTabularPanel
+         tl: the Toplevel of this panel
+         chief: the master/controlling panel
+         connect: connect string to get a db connection
+         ttl: title to display
+         h: # of lines to configure the treeview's height
+         cols: a list of tuples t =(l,w) where:
+           l is the text to display in the header
+           w is the desired width of the column in pixels
+         ipath: path of appicon
+         resize: allow Panel to be resized by user
+         polltime: time in microseconds betw/ after calls
+        """
+        self._conn = self._connect(connect)
+        self._curs = self._cursor()
+        PollingTabularPanel.__init__(self,tl,chief,ttl,h,cols,ipath,resize,polltime)
+    def _shutdown(self):
+        if self._curs: self._curs.close()
+        if self._conn: self._conn.close()
+    def _connect(self,c): raise NotImplementedError("DBPolling::_connect")
+    def _cursor(self): raise NotImplementedError("DBPolling::_cursor")
 
 class LogPanel(TabularPanel):
     """
