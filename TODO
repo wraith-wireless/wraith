@@ -4,16 +4,17 @@ Overall:
      of pid file but then, the pidfile is not removed (ubuntu does not have
      --remove-pid flag
   2) run dyskt as root - requires too many workarounds otherwise
-   o currently have dyskt set to <user>. Have to have the daemon sleep prior
-     to disable raw socket capture
-   o if daemon is run as root, will have to modify cmdline.dysktrunning to
-     use sudo
+     o if daemon is run as root, will have to modify cmdline.dysktrunning to
+     use sudo pwd
   3) Need a way to identify when nidus is processing data from a closed dyskt
-   o use an open session in database?
+     o use an open session in database?
   5) enable delete by session
   6) After setting up bulk submissions, there is still a delay (smaller) in time
     betw/ DySKT quit and time Nidus gets last submissions. Test if processes for
     SSE helps (and is it worth it)
+     o See Nidus # 12: during this delay when data from the closed sensor is
+      still being processed, if the sensor reinitiates it will cause duplicate
+      key issues
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -32,6 +33,13 @@ GUI:
      o get rid of border around progressbar and progressbar.pbar
      o many statements are not even seen, remove them
  28) rework polling for service status
+ 29) icons or status bar to show what state services are in
+ 30) What is the best way to handle child panels and db connections?
+     o psycopg2 claims excellent threaded cursors - do we use the main connection
+       in WraithPanel and pass created cursors to children? -> have to trust the
+       children to rollback on any errors
+     o or do we create a new connection for each child that needs it?
+     o or do we force children to use callbacks in WraithPanel to query etc
 DySKT:
   3) implement adaptive scan pattern
  26) gps device handling
@@ -39,9 +47,9 @@ DySKT:
      o uniquely identify with a permanent id w/out hardcoding in conf file
      o allow no gps (fixed or otherwise)
  31) Better define hold, listen, pause
-       - hold stop scanning on current channel
-       - listen stop scanning on specified channel
-       - pause stop scanning and recording
+      o hold stop scanning on current channel
+      o listen stop scanning on specified channel
+      o pause stop scanning and recording
  41) need to handle tuner thread failure in rdoctl
  43) allow sensor to start in paused mode
  44) implement control socket
@@ -55,17 +63,17 @@ Nidus:
   8) secured (hashed) username/password from to datastore
  10) how/when to partition table to offload older records
  12) nidusdb.py
-    o ensure only one radio submit per radio is allowed
-    o during setsensor ensure a new session for a sensor is not created if one already
-      exists
-      - additionally we have to make sure that if a sensor's data is still being
-        processed, that sensor cannot resign on
-    o Save thread does not save last n frames to file
-    o in SSE Threads handle errors in some way to notify nidusdb why
-      - have started using a err variable in SSEThread class, must extend that
-        to allow nidusdb to see the error
-    o look into processes over threads for SSE
-    o should we use nidusdb's connection or continue to create in the thread
+     o ensure only one radio submit per radio is allowed
+     o during setsensor ensure a new session for a sensor is not created if one already
+       exists
+       - additionally we have to make sure that if a sensor's data is still being
+         processed, that sensor cannot resign on
+     o Save thread does not save last n frames to file
+     o in SSE Threads handle errors in some way to notify nidusdb why
+       - have started using a err variable in SSEThread class, must extend that
+         to allow nidusdb to see the error
+     o look into processes over threads for SSE
+     o should we use nidusdb's connection or continue to create in the thread
  13) move to pcap-ng format?
  15) should we commit individual statements in long functions i.e. _setradio
  16) add radiotap mcs stbc streams and extensions spatial streams
@@ -73,12 +81,12 @@ Radio:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)
  3) in mpdu, fully parse
-    - control wrapper
-    - +htc
-    - info-elements
-     o RSN Std 8.4.2.27, #48
-     o TIM Info-Element #5 from beacons could be useful
-     o parse timing advance
+    o control wrapper
+    o +htc
+    o info-elements
+     - RSN Std 8.4.2.27, #48
+     - TIM Info-Element #5 from beacons could be useful
+     - parse timing advance
  5) how to support a-msdu etc
  6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
  7) compile/use own oui file, not relying aircrack-ng

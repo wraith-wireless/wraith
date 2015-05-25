@@ -22,111 +22,15 @@ from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import argparse                            # cmd line arguments
 import getpass                             # get sudo password
-import wraith                              # version info
+import wraith                              # version info/wraith constants
 import wraith.widgets.panel as gui         # graphics suite
 import wraith.subpanels as subgui          # our subpanels
 from wraith.utils import bits              # bitmask functions
 from wraith.utils import cmdline           # command line stuff
-
-# server/services functions shared by splash and main panel
-
-def startpsql(pwd):
-    """ start postgresl server. pwd: the sudo password """
-    try:
-        cmdline.service('postgresql',pwd)
-        time.sleep(0.5)
-        if not cmdline.runningprocess('postgres'): raise RuntimeError
-    except RuntimeError:
-        return False
-    else:
-        return True
-
-def stoppsql(pwd):
-    """ shut down posgresql. pwd: the sudo password """
-    try:
-        cmdline.service('postgresql',pwd,False)
-        while cmdline.runningprocess('postgres'): time.sleep(0.5)
-    except RuntimeError:
-        return False
-    else:
-        return True
-
-def startnidus(pwd):
-    """ start nidus server. pwd: the sudo password """
-    try:
-        cmdline.service('nidusd',pwd)
-        time.sleep(0.5)
-        if not cmdline.nidusrunning(wraith.NIDUSPID): raise RuntimeError
-    except RuntimeError:
-        return False
-    else:
-        return True
-
-def stopnidus(pwd):
-    """ stop nidus storage manager. pwd: Sudo password """
-    try:
-        cmdline.service('nidusd',pwd,False)
-        while cmdline.nidusrunning(wraith.NIDUSPID): time.sleep(1.0)
-    except RuntimeError as e:
-        return False
-    else:
-        return True
-
-def startdyskt(pwd):
-    """ start dyskt sensor. pwd: the sudo password """
-    try:
-        cmdline.service('dysktd',pwd)
-        time.sleep(1.0)
-        if not cmdline.dysktrunning(wraith.DYSKTPID): raise RuntimeError
-    except RuntimeError:
-        return False
-    else:
-        return True
-
-def stopdyskt(pwd):
-    """ stop dyskt sensor. pwd: Sudo password """
-    try:
-        cmdline.service('dysktd',pwd,False)
-        while cmdline.nidusrunning(wraith.DYSKTPID): time.sleep(1.0)
-    except RuntimeError as e:
-        return False
-    else:
-        return True
-
-def psqlconnect(connect):
-    """
-     connect to postgresql db with connect string
-     connect: a dict
-     returns a tuple (conn,msg) where conn = None and msg = error string
-     on failure otherwise conn = psql connection and msg = ''
-    """
-    conn = None
-    curs = None
-    try:
-        conn = psql.connect(host=connect['host'],port=connect['port'],
-                            dbname=connect['db'],user=connect['user'],
-                            password=connect['pwd'])
-
-        # set to use UTC
-        curs = conn.cursor()
-        curs.execute("set time zone 'UTC';")
-    except psql.OperationalError as e:
-        if e.__str__().find('connect') > 0:
-            err = "PostgreSQL is not running"
-        elif e.__str__().find('authentication') > 0:
-            err = "Authentication string is invalid"
-        else:
-            err = "Unspecified DB error occurred"
-            conn.rollback()
-        return None,err
-    else:
-        conn.commit()
-        return conn,''
-    finally:
-        if curs: curs.close()
+from wraith.utils import services          # services shared by splash & wraith
 
 def readconf():
-    """ read in configuration file """
+    """ read in wraith configuration file """
     cp = ConfigParser.RawConfigParser()
     if not cp.read("wraith.conf"): return "wraith.conf does not exist"
 
@@ -179,50 +83,51 @@ class WraithPanel(gui.MasterPanel):
          pwd: sudo password
         """
         self._conf = None   # configuration
-        self._state = 0     # bitmask state
-        #self._conn = None   # connection to data storage
         self._bSQL = False  # postgresql was running on startup
         self._pwd = pwd     # sudo password (should we not save it?)
 
         # set up super
         gui.MasterPanel.__init__(self,tl,"Wraith  v%s" % wraith.__version__,
                                  [],"widgets/icons/wraith3.png",False)
+        self._menuenable()
 
 #### PROPS
 
-    @property
-    def getstate(self): return self._state
-
-    @property
+    @property # return the state as a dict of flag->values
     def getstateflags(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)
 
-    @property
+    @property # return {True: is initialized|False: is not intialized}
     def isinitialized(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['init']
 
-    @property
+    @property # return {True: Posqtgre is running|False: Postgre is not running)
     def psqlisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['store']
 
-    @property
+    @property # return {True: connected to backend|False: Not connected to backend}
     def isconnected(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['conn']
 
-    @property
+    @property # return {True: Nidus is running|False: Nidus is not running}
     def nidusisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['nidus']
 
-    @property
+    @property # return {True: DySKT is running|False: DySKT is not running|
     def dysktisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['dyskt']
 
-    @property
+    @property # return {True: Wraith is exiting|False: Wraith is not exiting}
     def isexiting(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['exit']
+
+    @property # return DB connect dict w/ keys 'host','port','db','user','pwd'
+    def getconnectstring(self): return self._conf['store']
 
 #### OVERRIDES
 
     def _initialize(self):
         """ initialize gui, determine initial state """
-        # configure panel & write initial message
-        # have to manually enter the desired size, as the menu does not expand
-        # the visible portion automatically
+        # configure panel & write initial message have to manually enter the
+        # desired size, as the menu does not expand the visible portion automatically
         self.tk.wm_geometry("300x1+0+0") # our desired size
         self.update_idletasks()          # force update -> should put the log panel 2nd
+
+        # if a pwd was given, the wraith will be created during the splash screen
+        # if not, we have to create here
         if self._pwd is None: self._create()
 
     def _create(self):
@@ -241,7 +146,7 @@ class WraithPanel(gui.MasterPanel):
             msgs.append((time.strftime('%H:%M:%S'),'PostgreSQL running',gui.LOG_NOERR))
             if not self._pwd: self._bSQL = True
             self._setstate(_STATE_STORE_)
-            (self._conn,ret) = psqlconnect(self._conf['store'])
+            self._conn,ret = services.psqlconnect(self._conf['store'])
             if not self._conn is None:
                 self._setstate(_STATE_CONN_)
                 msgs.append((time.strftime('%H:%M:%S'),'Connected to DB',gui.LOG_NOERR))
@@ -340,7 +245,7 @@ class WraithPanel(gui.MasterPanel):
         self._mnuStoragePSQL.add_command(label='Stop',command=self.psqlstop)         # 1
         self._mnuStoragePSQL.add_separator()                                         # 2
         self._mnuStoragePSQL.add_command(label='Connect',command=self.connect)       # 3
-        self._mnuStoragePSQL.add_command(label='Disconnect',command=self.disconnect) # 4      # 1
+        self._mnuStoragePSQL.add_command(label='Disconnect',command=self.disconnect) # 4
         self._mnuStoragePSQL.add_separator()                                         # 5
         self._mnuStoragePSQL.add_command(label='Fix',command=self.psqlfix)           # 6
         self._mnuStoragePSQL.add_command(label='Delete All',command=self.psqldelall) # 7
@@ -504,7 +409,7 @@ class WraithPanel(gui.MasterPanel):
         # not connected, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if not flags['conn']:
-            psqlconnect(self._conf['store'])
+            services.psqlconnect(self._conf['store'])
             self._updatestate()
             self._menuenable()
 
@@ -532,7 +437,7 @@ class WraithPanel(gui.MasterPanel):
                     return
                 self._pwd = pwd
             self.logwrite("Starting Postgresql...",gui.LOG_NOTE)
-            if startpsql(self._pwd):
+            if services.startpsql(self._pwd):
                 self.logwrite('Postgresql started')
                 self._updatestate()
                 self._menuenable()
@@ -552,7 +457,7 @@ class WraithPanel(gui.MasterPanel):
                                   gui.LOG_WARN)
                     return
                 self._pwd = pwd
-            if stoppsql(self._pwd):
+            if services.stoppsql(self._pwd):
                 self._updatestate()
                 self._menuenable()
             else:
@@ -617,7 +522,7 @@ class WraithPanel(gui.MasterPanel):
                                   gui.LOG_WARN)
                     return
                 self._pwd = pwd
-            if startnidus(self._pwd):
+            if services.startnidus(self._pwd):
                 self._updatestate()
                 self._menuenable()
             else:
@@ -638,7 +543,7 @@ class WraithPanel(gui.MasterPanel):
                 self._pwd = pwd
 
             self.logwrite("Stopping Nidus...",gui.LOG_NOTE)
-            if stopnidus(self._pwd):
+            if services.stopnidus(self._pwd):
                 self._updatestate()
                 self._menuenable()
             else:
@@ -792,6 +697,7 @@ class WraithPanel(gui.MasterPanel):
         # adjust storage menu
         # easiest for storage is to disable all and then only enable relevant
         # always allow Nidus->config, Nidus->View Log
+        self._mnuData.entryconfig(4,state=tk.DISABLED)         # view sessions
         self._mnuStorage.entryconfig(0,state=tk.DISABLED)      # all start
         self._mnuStorage.entryconfig(1,state=tk.DISABLED)      # all stop
         self._mnuStoragePSQL.entryconfig(0,state=tk.DISABLED)  # psql start
@@ -826,10 +732,11 @@ class WraithPanel(gui.MasterPanel):
             self._mnuNidusLog.entryconfig(1,state=tk.NORMAL)
 
         if flags['conn']:
-            # connected to psql, enable stop all and disconnect
+            # connected to psql, enable stop all and disconnect and sessions
             # if no DysKT is running, enable fix psql and delete all
             self._mnuStorage.entryconfig(1,state=tk.NORMAL)
             self._mnuStoragePSQL.entryconfig(4,state=tk.NORMAL)
+            self._mnuData.entryconfig(4,state=tk.NORMAL)
             if not flags['dyskt']:
                 self._mnuStoragePSQL.entryconfig(6,state=tk.NORMAL)  # psql fix
                 self._mnuStoragePSQL.entryconfig(7,state=tk.NORMAL)  # psql delete all
@@ -876,7 +783,7 @@ class WraithPanel(gui.MasterPanel):
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if not flags['store']:
             self.logwrite("Starting PostgreSQL...",gui.LOG_NOTE)
-            if not startpsql(self._pwd):
+            if not services.startpsql(self._pwd):
                 self.logwrite("Failed to start PostgreSQL",gui.LOG_ERR)
                 return
             else:
@@ -886,7 +793,7 @@ class WraithPanel(gui.MasterPanel):
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if not flags['nidus'] and flags['store']:
             self.logwrite("Starting Nidus...",gui.LOG_NOTE)
-            if not startnidus(self._pwd):
+            if not services.startnidus(self._pwd):
                 self.logwrite("Failed to start Nidus",gui.LOG_ERR)
                 return
             else:
@@ -896,7 +803,7 @@ class WraithPanel(gui.MasterPanel):
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if not flags['conn'] and flags['store']:
             self.logwrite("Connected to database...",gui.LOG_NOTE)
-            self._conn,msg = psqlconnect(self._conf['strore'])
+            self._conn,msg = services.psqlconnect(self._conf['strore'])
             if self._conn is None:
                 self.logwrite(msg,gui.LOG_ERR)
                 return
@@ -935,7 +842,7 @@ class WraithPanel(gui.MasterPanel):
                 self._pwd = pwd
 
             self.logwrite("Stopping Nidus...",gui.LOG_NOTE)
-            if not stopnidus(self._pwd):
+            if not services.stopnidus(self._pwd):
                 self.logwrite("Failed to stop Nidus",gui.LOG_WARN)
             else: self.logwrite("Nidus stopped")
 
@@ -952,7 +859,7 @@ class WraithPanel(gui.MasterPanel):
                 self._pwd = pwd
 
             self.logwrite("Stopping PostgreSQL...",gui.LOG_NOTE)
-            if not stoppsql(self._pwd):
+            if not services.stoppsql(self._pwd):
                 self.logwrite("Failed to stop PostgreSQL",gui.LOG_WARN)
             else: self.logwrite("PostgreSQL stopped")
 
@@ -1101,7 +1008,7 @@ class WraithSplash(object):
         self._pb.step(0.5)
         if not cmdline.runningprocess('postgres'):
             self._sv.set("Starting PostgreSQL")
-            if startpsql(pwd): self._sv.set("PostgreSQL started")
+            if services.startpsql(pwd): self._sv.set("PostgreSQL started")
             else: self._sv.set("Failed to start PostgreSQL")
         else:
             self._sv.set("PostgreSQL already running")
@@ -1113,7 +1020,7 @@ class WraithSplash(object):
         self._pb.step(0.5)
         if not cmdline.nidusrunning(wraith.NIDUSPID):
             self._sv.set("Starting Nidus")
-            if startnidus(pwd): self._sv.set("Nidus started")
+            if services.startnidus(pwd): self._sv.set("Nidus started")
             else: self._sv.set("Failed to start Nidus")
         else:
             self._sv.set("Nidus already running")
@@ -1125,7 +1032,7 @@ class WraithSplash(object):
         self._pb.step(2.0)
         if not cmdline.dysktrunning(wraith.DYSKTPID):
             self._sv.set("Starting DySKT")
-            if not startdyskt(pwd):
+            if not services.startdyskt(pwd):
                 # because DySKT can sometimes take a while, we will run
                 # this several times
                 i = 5
@@ -1169,15 +1076,15 @@ if __name__ == '__main__':
         # stop DySKT, then Nidus, then PostgreSQL
         sd = sn = sp = True
         if cmdline.dysktrunning(wraith.DYSKTPID):
-            ret = 'ok' if stopdyskt(pwd) else 'fail'
+            ret = 'ok' if services.stopdyskt(pwd) else 'fail'
             print "Stopping DySKT\t\t\t\t[%s]" % ret
         else: print "DySKT not running"
         if cmdline.nidusrunning(wraith.NIDUSPID):
-            ret = 'ok' if stopnidus(pwd) else 'fail'
+            ret = 'ok' if services.stopnidus(pwd) else 'fail'
             print "Stopping Nidus\t\t\t\t[%s]" % ret
         else: print "Nidus not running"
         if cmdline.runningprocess('postgres') and not exclude:
-            ret = 'ok' if stoppsql(pwd) else 'fail'
+            ret = 'ok' if services.stoppsql(pwd) else 'fail'
             print "Stopping PostgreSQL\t\t\t[%s]" % ret
         else: print "PostgreSQL not running"
         sys.exit(0)
@@ -1194,17 +1101,17 @@ if __name__ == '__main__':
 
         # start postgresql (if needed), nidus and dyskt
         if not cmdline.runningprocess('postgres'):
-            ret = 'ok' if startpsql(pwd) else 'fail'
+            ret = 'ok' if services.startpsql(pwd) else 'fail'
             print "Starting PostgreSQL\t\t\t[%s]" % ret
         else:
             print "PostgreSQL already running"
         if not cmdline.nidusrunning(wraith.NIDUSPID):
-            ret = 'ok' if startnidus(pwd) else 'fail'
+            ret = 'ok' if services.startnidus(pwd) else 'fail'
             print "Starting Nidus\t\t\t\t[%s]" % ret
         else:
             print "Nidus already running"
         if not cmdline.dysktrunning(wraith.DYSKTPID):
-            ret = 'ok' if startdyskt(pwd) else 'fail'
+            ret = 'ok' if services.startdyskt(pwd) else 'fail'
             print "Starting DySKT\t\t\t\t[%s]" % ret
         else:
             print "DySKT already Running"
@@ -1223,7 +1130,6 @@ if __name__ == '__main__':
         t = tk.Tk()     # call our main program root first or Style() will do so
         s = ttk.Style()
         if 'alt' in s.theme_names(): s.theme_use('alt')
-        # figure out how to remove the progressbar relief/border
         s.configure("splash.Horizontal.TProgressbar",foreground='green',
                     background='green',troughcolor='black',
                     troughrelief='black',borderwidth=0)
@@ -1233,11 +1139,14 @@ if __name__ == '__main__':
 
         # WraithPanel will start everything if pwd is present otherwise just the gui
         try:
-            wp = WraithPanel(t,pwd)                     # create main program
+            # create the main program, if services are being started, hide the
+            # main while splash initializes everything & start the main loop
+            # Once complete Splash will show the main programe
+            wp = WraithPanel(t,pwd)
             if sopts == 'all':
-                t.withdraw()                                # hide main programe
-                splash = WraithSplash(tk.Toplevel(),wp,pwd) # show the splash
-            wp.mainloop()                                   # start the main program
+                t.withdraw()
+                splash = WraithSplash(tk.Toplevel(),wp,pwd)
+            wp.mainloop()
             sys.exit(0)
         except Exception as e:
             fout = open('wraith.log','a')

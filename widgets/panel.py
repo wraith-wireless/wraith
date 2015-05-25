@@ -7,8 +7,8 @@ of (or in conjuction with) this panel and other panels. (Think undocked windows)
 Panels can be configured so that they can be opened, closed, "raised", minimized
 by the user or only by a calling panel.
 NOTE:
- a panel may be a master panel and a slave panel.
- one and only panel will be "The Master" Panel
+ - a panel may be a master panel and a slave panel.
+ - one and only panel will be "The Master" Panel
 
 This was originally written in 2009 but was forgotten after two deployments.
 Dragging it back out IOT to use a subset for the LOBster program, I noticed that
@@ -641,14 +641,11 @@ class MasterPanel(Panel):
     """
      The MasterPanel is the primary panel which controls the flow of the overall
      program. The MasterPanel defines a class meant to handle the primary data,
-     opening, closing children panels etc.
+     opening, closing children panels etc. he MasterPanel assumes a database
+     backend but due to implementations varying across DBs and APIS, does not
+     assume what database is used and therefore leaves majority of DB functionality
+     to the derived class.
 
-     The MasterPanel assumes a database backend but does not assume what database
-     is used and only provides basic database access methods:
-      - commit: commit transaction through main connection
-      - rollback: rollback transaction through main connection
-     Derived class must implemented any other desired db functionality
-     
      Derived classes should implement:
       _initialize -> if there is functionality that should be started
       _shutdown -> if there is functionality that should be cleanly stopped
@@ -671,10 +668,13 @@ class MasterPanel(Panel):
         """
         Panel.__init__(self,tl,ipath,resize)
         self.tk = tl
-        self._menubar = None
-        
+
+        # internal members
+        self._menubar = None        # the panel's menu 9if any)
+        self._state = 0             # bitmask state (define in derived class)
+        self._conn = None           # the main connection (if any) to the backend db)
+
         # data bins, registered panels, and what data is hidden, selected
-        self._conn = None           # the connection (if any) to the backend db)
         self._audit_registered = {} # panels auditing for notification
         self._bin = {}              # data dictionaries
         self._hidden = {}           # keys of hidden data in bin
@@ -809,15 +809,8 @@ class MasterPanel(Panel):
 
     # Panel accessors
 
-    def dbcommit(self):
-        """ commit transaction """
-        if self._conn: self._conn.commit()
-
-    def dbrollback(self):
-        if self._conn: self._conn.rollback()
-
     @property
-    def getstate(self): return None
+    def getstate(self): return self._state
 
     # Panel/data update functionality
 

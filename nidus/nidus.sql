@@ -310,7 +310,7 @@ CREATE TYPE MCS_BW AS ENUM ('20','40','20L','20U');
 
 -- signal table
 -- defines data as captured in the frame header
--- TODO add radiotap mcs stbc streams & extensions spatial streams
+-- TODO add radiotap extensions spatial streams
 DROP TABLE IF EXISTS signal;
 CREATE TABLE signal(
    fid bigint NOT NULL,        -- foreign key to frame
