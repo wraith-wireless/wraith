@@ -1090,7 +1090,6 @@ class QueryPanel(gui.SlavePanel):
 class SessionsPanel(gui.DBPollingTabularPanel):
     """ a singular panel which display information pertaining to sessions """
     def __init__(self,tl,chief,connect):
-        # TODO: make fct for start stop to return datetime obj
         gui.DBPollingTabularPanel.__init__(self,tl,chief,connect,"Sessions",5,
                                          [('ID',gui.lenpix(3),int),
                                           ('Host',gui.lenpix(5),str),
@@ -1105,8 +1104,6 @@ class SessionsPanel(gui.DBPollingTabularPanel):
 
         # configure tree to show headings but not 0th column
         self._tree['show'] = 'headings'
-
-    def str2key(self,s): return int(s)
 
     def update(self):
         """ lists sessions """
@@ -1156,25 +1153,41 @@ class SessionsPanel(gui.DBPollingTabularPanel):
 
     def treerc(self,event):
         """ show delete context menu for the specified item """
-        # get selected item(s) and count
-        iids = self._tree.selection()
-        n = len(iids)
-        if n == 0:
-            iids = (self._tree.identify_row(event.y),)
-            n = 1
+        # get selected item(s) and item where right click occurred
+        # if right click occurred outside selected items, select it
+        sids = self._tree.selection()
+        rcsid = self._tree.identify_row(event.y)
+        if rcsid and not rcsid in sids:
+            self._tree.selection_set(rcsid)
+            sids = (rcsid,)
 
-        if n > 0:
+        # show a context menu with delete (disable if iid is active)
+        if sids:
             mnu = tk.Menu(None,tearoff=0)
-            mnu.add_command(label='Delete',command=self.mdkp)
+            mnu.add_command(label='Delete',command=lambda:self.mdkp(sids))
 
-            if n == 1:
-                # if there is no stop, assume the session is still active
-                # and dissallow
-                if self._tree.set(iids[0],'Stop') == '':
+            if len(sids) == 1:
+                # if this row has no stop, assume session is still active
+                if self._tree.set(sids[0],'Stop') == '':
                     mnu.entryconfig(0,state=tk.DISABLED)
             mnu.tk_popup(event.x_root,event.y_root)
 
-    def mdkp(self): pass
+    def mdkp(self,sids): self.dkp(sids)
+    def dkp(self,sids=None):
+        """ delete specified entry(s) """
+        sql = "delete from sensor where session_id = %s;"
+        if sids is None: sids = self._tree.selection()
+        for sid in sids:
+            # ensure session is not active
+            if self._tree.set(sid,'Stop') == '': continue
+            try:
+                self._curs.execute(sql,(int(sid),))
+                self._tree.delete(sid)
+            except psql.Error as e:
+                self.logwrite("Failed to delete session %s: %s" % (sid,e),gui.LOG_ERR)
+                self._conn.rollback()
+            else:
+                self._conn.commit()
 
     def _connect(self,connect):
         """ get and return a connection object """
