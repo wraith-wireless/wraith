@@ -41,6 +41,7 @@ GUI:
      o or do we create a new connection for each child that needs it?
      o or do we force children to use callbacks in WraithPanel to query etc
  31) use postgresql listen/notify for updating data from tables
+ 32) use a busy cursor icon when necessary
 DySKT:
   3) implement adaptive scan pattern
  26) gps device handling
