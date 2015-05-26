@@ -396,12 +396,12 @@ class InterfacePanel(gui.PollingTabularPanel):
     """ a singular panel which display information pertaining to the "program" """
     def __init__(self,tl,chief):
         gui.PollingTabularPanel.__init__(self,tl,chief,"Interfaces",5,
-                                         [('PHY',gui.lenpix(6)),
-                                          ('NIC',gui.lenpix(5)),
-                                          ('MAC',gui.lenpix(15)),
-                                          ('Mode',gui.lenpix(7)),
-                                          ('Driver',gui.lenpix(10)),
-                                          ('Chipset',gui.lenpix(15))],
+                                         [('PHY',gui.lenpix(6),str),
+                                          ('NIC',gui.lenpix(5),str),
+                                          ('MAC',gui.lenpix(15),str),
+                                          ('Mode',gui.lenpix(7),str),
+                                          ('Driver',gui.lenpix(10),str),
+                                          ('Chipset',gui.lenpix(15),str)],
                                          "widgets/icons/sensor.png",False)
 
         # configure tree to show headings but not 0th column
@@ -468,9 +468,11 @@ class DatabinPanel(gui.SimplePanel):
             self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
         except:
             self._bins[b] = {'img':None}
-            self._bins[b]['btn'] = ttk.Button(frm,text=b,command=self.donothing)
+            self._bins[b]['btn'] = ttk.Button(frm,text=b,
+                                              command=lambda:self.viewquery(b))
         else:
-            self._bins[b]['btn'] = ttk.Button(frm,image=self._bins[b]['img'],command=lambda:self.viewquery(b))
+            self._bins[b]['btn'] = ttk.Button(frm,image=self._bins[b]['img'],
+                                              command=lambda:self.viewquery(b))
         self._bins[b]['btn'].grid(row=0,column=wraith.BINS.index(b),sticky='w')
 
     def notifyclose(self,name):
@@ -1088,16 +1090,17 @@ class QueryPanel(gui.SlavePanel):
 class SessionsPanel(gui.DBPollingTabularPanel):
     """ a singular panel which display information pertaining to sessions """
     def __init__(self,tl,chief,connect):
+        # TODO: make fct for start stop to return datetime obj
         gui.DBPollingTabularPanel.__init__(self,tl,chief,connect,"Sessions",5,
-                                         [('ID',gui.lenpix(3)),
-                                          ('Host',gui.lenpix(5)),
-                                          ('Kernel',gui.lenpix(8)),
-                                          ('Start',gui.lenpix(13)),
-                                          ('Stop',gui.lenpix(13)),
-                                          ('GPSD',gui.lenpix(8)),
-                                          ('Recon',gui.lenpix(12)),
-                                          ('Collection',gui.lenpix(12)),
-                                          ('Frames',gui.lenpix(6))],
+                                         [('ID',gui.lenpix(3),int),
+                                          ('Host',gui.lenpix(5),str),
+                                          ('Kernel',gui.lenpix(8),str),
+                                          ('Start',gui.lenpix(13),str),
+                                          ('Stop',gui.lenpix(13),str),
+                                          ('GPSD',gui.lenpix(8),str),
+                                          ('Recon',gui.lenpix(12),str),
+                                          ('Collection',gui.lenpix(12),str),
+                                          ('Frames',gui.lenpix(6),int)],
                                          "widgets/icons/sessions.png",False)
 
         # configure tree to show headings but not 0th column
@@ -1117,20 +1120,21 @@ class SessionsPanel(gui.DBPollingTabularPanel):
             return
 
         # TODO: could this get extremely large?
+        #       use difference (ls,sids) to remove items no longer in the table
         ss = self._curs.fetchall()            # get all rows
-        sids = [s['session_id'] for s in ss]  # pull out ids
         ls = self._tree.get_children()        # & all ids from tree
 
         # remove sessions from tree that are no longer in db
-        for sid in ls:
-            if not int(sid) in sids: self._tree.delete(sid)
+        sids = set([str(s['session_id']) for s in ss])  # make set of str ids
+        diff = [sid for sid in ls if sid not in sids]   # get the difference
+        for sid in diff: self._tree.delete(sid)         # & remove
 
         # add new sessions (& modify any changed sessions)
         for s in ss:
             sid = str(s['session_id'])
             host = s['hostname']
             start = s['start'].strftime("%d/%m/%y %H:%M:%S")
-            stop = s['stop'].strftime("%d/%m/%y %H:%M:%S")
+            stop = s['stop'].strftime("%d/%m/%y %H:%M:%S") if s['stop'] else ''
             kern = s['kernel'].replace('-generic','') # save some space
             devid = s['devid']
             recon = s['recon']
@@ -1138,7 +1142,7 @@ class SessionsPanel(gui.DBPollingTabularPanel):
             nF = s['fcnt']
             if sid in ls: # session is present
                 # check for changes (id and start are not checked0
-                cur = self._tree.set(str(sid))
+                cur = self._tree.set(sid)
                 if cur['Host'] != host: self._tree.set(sid,'Host',host)
                 if cur['Kernel'] != kern: self._tree.set(sid,'Kernel',kern)
                 if cur['Stop'] != stop: self._tree.set(sid,'Stop',stop)

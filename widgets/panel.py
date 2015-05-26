@@ -379,7 +379,8 @@ class TabularPanel(SlavePanel):
      TabularPanel - A simple SlavePanel to display tabular information and the
      option to add widgets to a topframe and/or bottom frame. Derived classes can
      configure the ScrolledHList's number of columns, and whether or not to
-     include headers for the columns.
+     include headers for the columns. If headers are present, sorting (on the
+     column header) will be included
 
      NOTE: this class does not define any methods to insert/remove/delete from
       this list
@@ -408,9 +409,10 @@ class TabularPanel(SlavePanel):
          chief: the master/controlling panel
          ttl: title to display
          h: # of lines to configure the treeview's height
-         cols: a list of tuples t =(l,w) where:
+         cols: a list of tuples col<i> =(l,w,t) where:
            l is the text to display in the header
            w is the desired width of the column in pixels
+           t is the type of data in the column
          ipath: path of appicon
          resize: allow Panel to be resized by user
         """
@@ -439,28 +441,43 @@ class TabularPanel(SlavePanel):
         self._tree['xscrollcommand'] = hscroll.set
 
         # configure the headers
+        self._ctypes = [] # the type in this column
         self._tree['columns'] = [t[0] for t in cols]
         for i in xrange(len(cols)):
+            # for each one set the column to the use specified width (or 0)
+            # and set the text for each header if present as well as the sort
+            # functionality (the sort functionality is set in a separate fct)
+            self._ctypes.append(cols[i][2])
             try:
                 w = max(lenpix(cols[i][0]),cols[i][1])
                 if w is None: w = 0
             except:
                 w = 0
             self._tree.column(i,width=w,anchor=tk.CENTER)
-            if cols[i][0] != '': self._tree.heading(i,text=cols[i][0])
+            if cols[i][0] != '': self._makesort(i,cols[i][0])
 
         # allow a bottom frame
         frmB = ttk.Frame(self)
         if self.bottomframe(frmB): frmB.grid(row=2,column=0,sticky='nwse')
+
+    def sortbycol(self,col,asc):
+        """ sorts the col in ascending order if asc or descending otherwise """
+        vs = [(self._tree.set(k,col),k) for k in self._tree.get_children('')]
+        vs.sort(key=lambda t: self._ctypes[col](t[0]),reverse=not asc)
+        for i, (_,k) in enumerate(vs): self._tree.move(k,'',i)
+        self._tree.heading(col,command=lambda:self.sortbycol(col,not asc))
 
     def str2key(self,s): return s
     def key2str(self,k): return str(k)
 
     # noinspection PyMethodMayBeStatic
     def topframe(self,frm): return None # override to add widgets to topframe
-
     # noinspection PyMethodMayBeStatic
     def bottomframe(self,frm): return None # override to add widgets to bottomframe
+
+    def _makesort(self,col,text):
+        """ add column header with label text at col index col (w/ sort fct) """
+        self._tree.heading(col,text=text,command=lambda: self.sortbycol(col,True))
 
 class PollingTabularPanel(TabularPanel):
     """
@@ -476,9 +493,10 @@ class PollingTabularPanel(TabularPanel):
          chief: the master/controlling panel
          ttl: title to display
          h: # of lines to configure the treeview's height
-         cols: a list of tuples t =(l,w) where:
+         cols: a list of tuples col<i> =(l,w,t) where:
            l is the text to display in the header
            w is the desired width of the column in pixels
+           t is the type of data in the column
          ipath: path of appicon
          resize: allow Panel to be resized by user
          polltime: time in microseconds betw/ after calls
@@ -507,13 +525,15 @@ class DBPollingTabularPanel(PollingTabularPanel):
          connect: connect string to get a db connection
          ttl: title to display
          h: # of lines to configure the treeview's height
-         cols: a list of tuples t =(l,w) where:
+         cols: a list of tuples col<i> =(l,w,t) where:
            l is the text to display in the header
            w is the desired width of the column in pixels
+           t is the type of data in the column
          ipath: path of appicon
          resize: allow Panel to be resized by user
          polltime: time in microseconds betw/ after calls
         """
+        self._conn = self._curs = None
         self._connect(connect)
         PollingTabularPanel.__init__(self,tl,chief,ttl,h,cols,ipath,resize,polltime)
     def _shutdown(self):
@@ -533,9 +553,9 @@ class LogPanel(TabularPanel):
          chief: the master panel
         """
         TabularPanel.__init__(self,tl,chief,"Log",5,
-                              [('',lenpix('[+] ')),
-                               ('',lenpix('00:00:00')),
-                               ('',lenpix(30))],
+                              [('',lenpix('[+] '),str),
+                               ('',lenpix('00:00:00'),str),
+                               ('',lenpix(30),str)],
                               "widgets/icons/log.png")
         self._l = threading.Lock() # lock for writing
         self._n = 0                # current entry number
@@ -609,7 +629,7 @@ class TailLogPanel(TabularPanel):
          width: width of the display (in characters
          resize: allow resize
         """
-        TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix(w))],
+        TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix(w),str)],
                               "widgets/icons/log.png",resize)
         # check validity of logfile first
         if not os.path.exists(logfile) and not os.path.isfile(logfile):

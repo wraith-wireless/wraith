@@ -11,6 +11,7 @@ widgets 0.0.3
   - scrubbed and removed circular, redundant, confusing code
   - stopped using pack and grid geometry managers
   - migrated to ttk
+  - added sorting functionality to Treeview column headers for TabularPanels
 """
 __name__ = 'utils'
 __license__ = 'GPL v3.0'
