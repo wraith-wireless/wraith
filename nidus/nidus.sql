@@ -1021,6 +1021,8 @@ CREATE FUNCTION delete_all()
       DELETE FROM sta_activity;
       DELETE FROM sta;
       ALTER SEQUENCE sta_sta_id_seq restart;
+      DELETE FROM traffic;
+      DELETE FROM frame_path;
       DELETE FROM frame;
       ALTER SEQUENCE frame_frame_id_seq RESTART;
       DELETE FROM platform;
@@ -1054,7 +1056,7 @@ CREATE OR REPLACE FUNCTION fix_nullperiod()
 -- BELOW is for admin purposes only
 
 -- delete data from all tables
--- TODO: look into truncate
+-- TODO: look into truncate sessions should be deleted with corresponding tables
 DELETE FROM ampdu;
 DELETE FROM ccmpcrypt;
 DELETE FROM qosctrl;
@@ -1077,6 +1079,7 @@ DELETE FROM action;
 DELETE FROM sta_activity;
 DELETE FROM sta;
 ALTER SEQUENCE sta_sta_id_seq restart;
+DELETE FROM traffic;
 DELETE FROM frame;
 ALTER SEQUENCE frame_frame_id_seq RESTART;
 DELETE FROM platform;
@@ -1113,6 +1116,7 @@ DROP TABLE auth;
 DROP TABLE action;
 DROP TABLE sta_activity;
 DROP TABLE sta;
+DROP TABLE traffic;
 DROP TABLE frame;
 DROP TABLE platform;
 DROP TABLE using_gpsd;

@@ -453,10 +453,8 @@ class TabularPanel(SlavePanel):
         frmB = ttk.Frame(self)
         if self.bottomframe(frmB): frmB.grid(row=2,column=0,sticky='nwse')
 
-    @staticmethod
-    def str2key(s): return s
-    @staticmethod
-    def key2str(k): return str(k)
+    def str2key(self,s): return s
+    def key2str(self,k): return str(k)
 
     # noinspection PyMethodMayBeStatic
     def topframe(self,frm): return None # override to add widgets to topframe
@@ -499,8 +497,7 @@ class DBPollingTabularPanel(PollingTabularPanel):
      through the after function using data from a db connection
      Derived classes must implment:
       update: (from PollingTabularPanel) which is used by the polling functionaity
-      _connect: connect to backend database
-      _cursor: get a cursor
+      _dbconnect: connect to backend database & get a cursor
     """
     def __init__(self,tl,chief,connect,ttl,h,cols=None,ipath=None,resize=False,polltime=500):
         """
@@ -517,14 +514,12 @@ class DBPollingTabularPanel(PollingTabularPanel):
          resize: allow Panel to be resized by user
          polltime: time in microseconds betw/ after calls
         """
-        self._conn = self._connect(connect)
-        self._curs = self._cursor()
+        self._connect(connect)
         PollingTabularPanel.__init__(self,tl,chief,ttl,h,cols,ipath,resize,polltime)
     def _shutdown(self):
         if self._curs: self._curs.close()
         if self._conn: self._conn.close()
     def _connect(self,c): raise NotImplementedError("DBPolling::_connect")
-    def _cursor(self): raise NotImplementedError("DBPolling::_cursor")
 
 class LogPanel(TabularPanel):
     """

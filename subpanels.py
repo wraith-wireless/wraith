@@ -1048,6 +1048,7 @@ class QueryPanel(gui.SlavePanel):
 
     def _getsessions(self):
         """ retrieve all sessions and add to tree """
+        # get a connection and cursor executing intial query
         conn = curs = None
         try:
             conn,err = cmdline.psqlconnect(self._connstr)
@@ -1055,7 +1056,15 @@ class QueryPanel(gui.SlavePanel):
                 self.err('Connect Error',err)
                 return
             curs = conn.cursor(cursor_factory=pextras.DictCursor)
+            curs.execute("SET TIME ZONE 'UTC';")
+        except psql.Error as e:
+            conn.rollback()
+            conn.close()
+            self.err('Query Error',e)
+            return
 
+        # pull out all sessions and insert into tree
+        try:
             sql1 = "SELECT session_id,hostname,ip,lower(period) FROM sensor;"
             sql2 = "SELECT count(frame_id) FROM frame WHERE sid=%s;"
             curs.execute(sql1)
@@ -1076,11 +1085,10 @@ class QueryPanel(gui.SlavePanel):
             if conn: conn.close()
 
 # Data->Sessions
-class SessionsPanel(gui.PollingTabularPanel):
+class SessionsPanel(gui.DBPollingTabularPanel):
     """ a singular panel which display information pertaining to sessions """
-    def __init__(self,tl,chief,curs):
-        self._curs = curs
-        gui.PollingTabularPanel.__init__(self,tl,chief,"Sessions",5,
+    def __init__(self,tl,chief,connect):
+        gui.DBPollingTabularPanel.__init__(self,tl,chief,connect,"Sessions",5,
                                          [('ID',gui.lenpix(3)),
                                           ('Host',gui.lenpix(5)),
                                           ('Kernel',gui.lenpix(8)),
@@ -1095,6 +1103,8 @@ class SessionsPanel(gui.PollingTabularPanel):
         # configure tree to show headings but not 0th column
         self._tree['show'] = 'headings'
 
+    def str2key(self,s): return int(s)
+
     def update(self):
         """ lists sessions """
         # get current sessions in db and list of sessions in tree
@@ -1102,8 +1112,8 @@ class SessionsPanel(gui.PollingTabularPanel):
             sql = "select * from sessions;"
             self._curs.execute(sql)
         except psql.Error as e:
-            self._chief.rollback()
-            self.logwrite(e,gui.LOG_NOERR)
+            self._conn.rollback()
+            self.logwrite("Sessions failed: %s" % e,gui.LOG_NOERR)
             return
 
         # TODO: could this get extremely large?
@@ -1139,6 +1149,18 @@ class SessionsPanel(gui.PollingTabularPanel):
             else:         # session not present
                 self._tree.insert('','end',iid=sid,values=(sid,host,kern,start,stop,
                                                            devid,recon,coll,nF))
+
+    def _connect(self,connect):
+        """ get and return a connection object """
+        self._conn,err = cmdline.psqlconnect(connect)
+        if not err:
+            try:
+                self._curs = self._conn.cursor(cursor_factory=pextras.DictCursor)
+                self._curs.execute("SET TIME ZONE 'UTC';")
+            except psql.Error as e:
+                self.err("Query Error",e)
+        else:
+            self.err("Connect Error",err)
 
 # Storage->Nidus-->Config
 class NidusConfigPanel(gui.ConfigPanel):

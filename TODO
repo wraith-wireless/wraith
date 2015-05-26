@@ -40,6 +40,7 @@ GUI:
        children to rollback on any errors
      o or do we create a new connection for each child that needs it?
      o or do we force children to use callbacks in WraithPanel to query etc
+ 31) use postgresql listen/notify for updating data from tables
 DySKT:
   3) implement adaptive scan pattern
  26) gps device handling

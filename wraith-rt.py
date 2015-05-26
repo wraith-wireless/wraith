@@ -444,15 +444,9 @@ class WraithPanel(gui.MasterPanel):
         """ display data sessions panel """
         panel = self.getpanels('sessions',False)
         if not panel:
-            curs = None
-            try:
-                curs = self._conn.cursor(cursor_factory=pextras.DictCursor)
-            except:
-                self.logwrite("Error in DB connection",gui.LOG_ERR)
-            else:
-                t = tk.Toplevel()
-                pnl = subgui.SessionsPanel(t,self,curs)
-                self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'sessions'))
+           t = tk.Toplevel()
+           pnl = subgui.SessionsPanel(t,self,self._conf['store'])
+           self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'sessions'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
