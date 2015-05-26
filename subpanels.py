@@ -1177,17 +1177,22 @@ class SessionsPanel(gui.DBPollingTabularPanel):
         """ delete specified entry(s) """
         sql = "delete from sensor where session_id = %s;"
         if sids is None: sids = self._tree.selection()
+        i = 0
         for sid in sids:
             # ensure session is not active
-            if self._tree.set(sid,'Stop') == '': continue
+            if self._tree.set(sid,'Stop') == '':
+                self.logwrite("Cannot delete active session %s" % sid,gui.LOG_WARN)
+                continue
             try:
                 self._curs.execute(sql,(int(sid),))
                 self._tree.delete(sid)
+                i += 1
             except psql.Error as e:
                 self.logwrite("Failed to delete session %s: %s" % (sid,e),gui.LOG_ERR)
                 self._conn.rollback()
             else:
                 self._conn.commit()
+        self.logwrite("Deleted %d sessions" % i,gui.LOG_NOTE)
 
     def _connect(self,connect):
         """ get and return a connection object """
