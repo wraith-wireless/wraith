@@ -1154,6 +1154,28 @@ class SessionsPanel(gui.DBPollingTabularPanel):
                 self._tree.insert('','end',iid=sid,values=(sid,host,kern,start,stop,
                                                            devid,recon,coll,nF))
 
+    def treerc(self,event):
+        """ show delete context menu for the specified item """
+        # get selected item(s) and count
+        iids = self._tree.selection()
+        n = len(iids)
+        if n == 0:
+            iids = (self._tree.identify_row(event.y),)
+            n = 1
+
+        if n > 0:
+            mnu = tk.Menu(None,tearoff=0)
+            mnu.add_command(label='Delete',command=self.mdkp)
+
+            if n == 1:
+                # if there is no stop, assume the session is still active
+                # and dissallow
+                if self._tree.set(iids[0],'Stop') == '':
+                    mnu.entryconfig(0,state=tk.DISABLED)
+            mnu.tk_popup(event.x_root,event.y_root)
+
+    def mdkp(self): pass
+
     def _connect(self,connect):
         """ get and return a connection object """
         self._conn,err = cmdline.psqlconnect(connect)

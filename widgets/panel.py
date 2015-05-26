@@ -380,7 +380,7 @@ class TabularPanel(SlavePanel):
      option to add widgets to a topframe and/or bottom frame. Derived classes can
      configure the ScrolledHList's number of columns, and whether or not to
      include headers for the columns. If headers are present, sorting (on the
-     column header) will be included
+     column header) will be included.
 
      NOTE: this class does not define any methods to insert/remove/delete from
       this list
@@ -395,6 +395,7 @@ class TabularPanel(SlavePanel):
       bottomframe if any widgets need to be added to the bottom frame
       str2key if there is a desired 'mapping' from the tree's internal id
        type of str
+      treerc to implement any right click on the tree
 
      Derived classes can also manipulate the style of the tree as desired
 
@@ -430,7 +431,7 @@ class TabularPanel(SlavePanel):
         self._tree = ttk.Treeview(frmM)
         self._tree.grid(row=0,column=0,sticky='nwse')
         self._tree.config(height=h)
-        self._tree.config(selectmode='none')
+        self._tree.config(selectmode='extended')
 
         # with attached horizontal/vertical scrollbars
         vscroll = ttk.Scrollbar(frmM,orient=tk.VERTICAL,command=self._tree.yview)
@@ -456,6 +457,9 @@ class TabularPanel(SlavePanel):
             self._tree.column(i,width=w,anchor=tk.CENTER)
             if cols[i][0] != '': self._makesort(i,cols[i][0])
 
+        # bind right click on the tree
+        self._tree.bind('<Button-3>',self.treerc)
+
         # allow a bottom frame
         frmB = ttk.Frame(self)
         if self.bottomframe(frmB): frmB.grid(row=2,column=0,sticky='nwse')
@@ -469,6 +473,7 @@ class TabularPanel(SlavePanel):
 
     def str2key(self,s): return s
     def key2str(self,k): return str(k)
+    def treerc(self,event): pass
 
     # noinspection PyMethodMayBeStatic
     def topframe(self,frm): return None # override to add widgets to topframe
@@ -515,7 +520,7 @@ class DBPollingTabularPanel(PollingTabularPanel):
      through the after function using data from a db connection
      Derived classes must implment:
       update: (from PollingTabularPanel) which is used by the polling functionaity
-      _dbconnect: connect to backend database & get a cursor
+      _connect: connect to backend database & get a cursor
     """
     def __init__(self,tl,chief,connect,ttl,h,cols=None,ipath=None,resize=False,polltime=500):
         """
@@ -568,6 +573,7 @@ class LogPanel(TabularPanel):
                               fieldbackground="darkgray",
                               background='darkgray')
         self._tree['style'] = 'Log.Treeview'
+        self._tree.config(selectmode='none')
 
         # set symbols for message types and tags for colored text
         self._symbol = ['[+]','[?]','[-]','[!]']
