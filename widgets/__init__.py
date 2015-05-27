@@ -9,9 +9,13 @@ widgets 0.0.3
  includes: icons folder, panel 0.13.7
  changes:
   - scrubbed and removed circular, redundant, confusing code
-  - stopped using pack and grid geometry managers
+  - removed instances of pack gepmetry manager so only grid geometry is used
   - migrated to ttk
-  - added sorting functionality to Treeview column headers for TabularPanels
+  - added sorting functionality to the internal treeview column headers at the
+    TabularPanel class
+  - added right mouse button binding to the internal treeview at the TabularPanel class
+  - added critical section support at the DBPollingPanel
+  - added busy/normal cursor display at the Panel class
 """
 __name__ = 'utils'
 __license__ = 'GPL v3.0'

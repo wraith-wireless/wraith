@@ -26,6 +26,10 @@ Conventions: As there are several conventions used to differentiate between Tk/T
   is reflected in other panels
 
 NOTE:
+ - Assumes a database backend (although could be used with any type of data i.e
+   xml or csv) but due to implementations varying across DBs and APIS, does not
+     assume what database is used and therefore leaves majority of DB functionality
+     to the derived class(es).
  - a panel may be a master panel and a slave panel.
  - one and only panel will be "The Master" Panel
 
@@ -116,8 +120,8 @@ class PasswordDialog(tkSD.Dialog):
 
 class Panel(ttk.Frame):
     """
-     Panel: This is the base class from which which all non-modal gui classes are
-      derived
+     Panel: This is the base class from which which all (non-modal) gui classes
+     are derived
       1) traps the exit from the title bar and passes it to delete()
       2) maintains a dictionary of opened slave panels
         self._panels[panelname] => panelrecord where:
@@ -125,9 +129,9 @@ class Panel(ttk.Frame):
          panelrec is a PanelRecord tuple
         NOTE: there may be multiple panels with the same desc but all panels
         can be uniquely identified by the self.name
-      3) provides functionality to handle storage/retrieval/deletion of slave
-         panels
+      3) provides functionality to maintain/manipulate the slave panel dict
       4) allows for the setting/display of an icon
+      5) provides for setting/unsetting a busy cursor on the panel
         
      Derived classes must implement
       delete - user exit trap
@@ -159,6 +163,13 @@ class Panel(ttk.Frame):
     # virtual methods
     def delete(self): raise NotImplementedError("Panel::delete") # user initiated
     def close(self): raise NotImplementedError("Panel::close") # self/master initiated
+
+    ### busy/notbusy
+
+    def setbusy(self,on=True):
+        """ set busy cursor on this panel if on is True, otherwise set normal """
+        if on: self.master.config(cursor='watch')
+        else: self.master.config(cursor='')
 
     #### slave panel storage functions
 
@@ -378,9 +389,9 @@ class TabularPanel(SlavePanel):
     """
      TabularPanel - A simple SlavePanel to display tabular information and the
      option to add widgets to a topframe and/or bottom frame. Derived classes can
-     configure the ScrolledHList's number of columns, and whether or not to
-     include headers for the columns. If headers are present, sorting (on the
-     column header) will be included.
+     configure the number of columns, and whether or not to include headers for
+     the columns. If headers are present, sorting (on the column header) will also
+     be included.
 
      NOTE: this class does not define any methods to insert/remove/delete from
       this list
@@ -395,13 +406,10 @@ class TabularPanel(SlavePanel):
       bottomframe if any widgets need to be added to the bottom frame
       str2key if there is a desired 'mapping' from the tree's internal id
        type of str
-      treerc to implement any right click on the tree
+      treerc to implement any right click actions on the tree
 
-     Derived classes can also manipulate the style of the tree as desired
-
-     NOTE:
-      derived classes can change selection mode and display of icon, headers
-      as desired
+     Derived classes can also manipulate the style of the tree as desired i.e.
+      change selection mode, display of icons, headers etc
     """
     def __init__(self,tl,chief,ttl,h,cols=None,ipath=None,resize=False):
         """
@@ -517,10 +525,18 @@ class PollingTabularPanel(TabularPanel):
 class DBPollingTabularPanel(PollingTabularPanel):
     """
      DBPollingTabularPanel - a TabularPanel that updates itself periodically
-     through the after function using data from a db connection
-     Derived classes must implment:
-      update: (from PollingTabularPanel) which is used by the polling functionaity
+     through the after function using data from a db connection. This panel
+     has an internal locking mechanism to ensure that the data being displayed
+     is not modified by separate functions simultaenously. Methods update and
+     sortbycol are wrapped by lock aquisitions/release to ensure integrity.
+
+     Derived classes must implement:
+      _update_: update data (this function is wrapped by locking mechanism)
       _connect: connect to backend database & get a cursor
+
+     Derived class should implement:
+      the locking mechanism for any functions that change the data displayed
+      in the treeview
     """
     def __init__(self,tl,chief,connect,ttl,h,cols=None,ipath=None,resize=False,polltime=500):
         """
@@ -538,9 +554,27 @@ class DBPollingTabularPanel(PollingTabularPanel):
          resize: allow Panel to be resized by user
          polltime: time in microseconds betw/ after calls
         """
+        self._l = threading.Lock()
         self._conn = self._curs = None
         self._connect(connect)
         PollingTabularPanel.__init__(self,tl,chief,ttl,h,cols,ipath,resize,polltime)
+    def update(self):
+        """ wraps updating with locking """
+        self._l.acquire()
+        try:
+            self._update_()
+        except: pass
+        finally:
+            self._l.release()
+    def _update_(self): raise NotImplementedError("DBPolling::_connect")
+    def sortbycol(self,col,asc):
+        """wrap parent sortbycol with thread safety"""
+        self._l.acquire()
+        try:
+            PollingTabularPanel.sortbycol(self,col,asc)
+        except: pass
+        finally:
+            self._l.acquire()
     def _shutdown(self):
         if self._curs: self._curs.close()
         if self._conn: self._conn.close()
@@ -615,7 +649,7 @@ class LogPanel(TabularPanel):
                 self._n += 1
                 self._tree.yview('moveto',1.0)
         except Exception as e:
-            print e
+            pass
         finally:
             self._l.release()
 
@@ -715,10 +749,7 @@ class MasterPanel(Panel):
     """
      The MasterPanel is the primary panel which controls the flow of the overall
      program. The MasterPanel defines a class meant to handle the primary data,
-     opening, closing children panels etc. he MasterPanel assumes a database
-     backend but due to implementations varying across DBs and APIS, does not
-     assume what database is used and therefore leaves majority of DB functionality
-     to the derived class.
+     opening, closing children panels etc.
 
      Derived classes should implement:
       _initialize -> if there is functionality that should be started

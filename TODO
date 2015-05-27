@@ -12,9 +12,7 @@ Overall:
   6) After setting up bulk submissions, there is still a delay (smaller) in time
     betw/ DySKT quit and time Nidus gets last submissions. Test if processes for
     SSE helps (and is it worth it)
-     o See Nidus # 12: during this delay when data from the closed sensor is
-      still being processed, if the sensor reinitiates it will cause duplicate
-      key issues
+  7) save geo as lat/lon (especially if we use PPI in the pcap files)
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -41,7 +39,8 @@ GUI:
      o or do we create a new connection for each child that needs it?
      o or do we force children to use callbacks in WraithPanel to query etc
  31) use postgresql listen/notify for updating data from tables
- 32) use a busy cursor icon when necessary
+ 32) how to ensure menu(s) etc are not left showing (i.e. context menu in
+     SessionsPanel)
 DySKT:
   3) implement adaptive scan pattern
  26) gps device handling
@@ -65,11 +64,6 @@ Nidus:
   8) secured (hashed) username/password from to datastore
  10) how/when to partition table to offload older records
  12) nidusdb.py
-     o ensure only one radio submit per radio is allowed
-     o during setsensor ensure a new session for a sensor is not created if one already
-       exists
-       - additionally we have to make sure that if a sensor's data is still being
-         processed, that sensor cannot resign on
      o Save thread does not save last n frames to file
      o in SSE Threads handle errors in some way to notify nidusdb why
        - have started using a err variable in SSEThread class, must extend that
@@ -79,6 +73,7 @@ Nidus:
  13) move to pcap-ng format?
  15) should we commit individual statements in long functions i.e. _setradio
  16) add radiotap mcs stbc streams and extensions spatial streams
+ 17) look into PPI (per packet information)
 Radio:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)

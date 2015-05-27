@@ -72,8 +72,9 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 else:
                     logging.info("Sensor %s:%d exited...",caddr,cport)
                     connected = False
-            except RuntimeError:
+            except RuntimeError as e:
                 # nidus server shutdown, close out the db
+                logging.warn("NidusDB from Sensor %s:%d shutting down: %s",caddr,cport,e)
                 db.submitdropped()
                 connected = False
             except Exception as e:

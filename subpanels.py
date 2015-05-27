@@ -861,7 +861,8 @@ class QueryPanel(gui.SlavePanel):
     def query(self):
         """ queries db for specified data """
         if self._validate():
-            pass
+            self.setbusy()
+            self.setbusy(False)
 
     def widgetreset(self):
         """ clears all user inputed data """
@@ -1105,7 +1106,7 @@ class SessionsPanel(gui.DBPollingTabularPanel):
         # configure tree to show headings but not 0th column
         self._tree['show'] = 'headings'
 
-    def update(self):
+    def _update_(self):
         """ lists sessions """
         # get current sessions in db and list of sessions in tree
         try:
@@ -1177,21 +1178,30 @@ class SessionsPanel(gui.DBPollingTabularPanel):
         """ delete specified entry(s) """
         sql = "delete from sensor where session_id = %s;"
         if sids is None: sids = self._tree.selection()
+
+        # wrap the entire process in the critical section
         i = 0
-        for sid in sids:
-            # ensure session is not active
-            if self._tree.set(sid,'Stop') == '':
-                self.logwrite("Cannot delete active session %s" % sid,gui.LOG_WARN)
-                continue
-            try:
-                self._curs.execute(sql,(int(sid),))
-                self._tree.delete(sid)
-                i += 1
-            except psql.Error as e:
-                self.logwrite("Failed to delete session %s: %s" % (sid,e),gui.LOG_ERR)
-                self._conn.rollback()
-            else:
-                self._conn.commit()
+        self.setbusy()
+        self._l.acquire()
+        try:
+            for sid in sids:
+                # ensure session is not active
+                if self._tree.set(sid,'Stop') == '':
+                    self.logwrite("Cannot delete active session %s" % sid,gui.LOG_WARN)
+                    continue
+                try:
+                    self._curs.execute(sql,(int(sid),))
+                    self._tree.delete(sid)
+                    i += 1
+                except psql.Error as e:
+                    self.logwrite("Failed to delete session %s: %s" % (sid,e),gui.LOG_ERR)
+                    self._conn.rollback()
+                else:
+                    self._conn.commit()
+        except: pass
+        finally:
+            self._l.release()
+        self.setbusy(False)
         self.logwrite("Deleted %d sessions" % i,gui.LOG_NOTE)
 
     def _connect(self,connect):

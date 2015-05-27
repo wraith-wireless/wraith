@@ -6,7 +6,8 @@ Provides a common interface and access methods from Nidus request handlers to th
 underlying storage system, serving a two-fold service:
  1) remove necessity for request handler to 'understand' underlying storage system
     protocols (of course, will have to code a new nidusdb to handle different db)
- 2) remove necessity for data provider to 'understand' underlying storage system
+ 2) remove necessity for data provider i.e. a sensor to 'understand' underlying
+    storage system
 """
 __name__ = 'nidusdb'
 __license__ = 'GPL v3.0'
@@ -148,9 +149,8 @@ class NidusDB(object):
             pass
         finally:
             # close out database
-            if self._conn and not self._conn.closed:
-                self._curs.close()
-                self._conn.close()
+            if self._curs: self._curs.close()
+            if self._conn: self._conn.close()
 
     def submitdevice(self,f,ip=None):
         """ submitdevice - submit the string fields to the database """
@@ -158,20 +158,27 @@ class NidusDB(object):
             # tokenize the string f, convert to dict
             ds = nmp.data2dict(nmp.tokenize(f),'DEVICE')
 
-            # what type of device
+            # what type of device -> note: radio and gpsd are set 'up
+            # in submitradio and submitgpsd
             if not ds['type'] in ['sensor','radio','gpsd']:
-                raise NidusDBSubmitParamException("Invalid Device type %s" % ds['type'])
+                raise NidusDBSubmitParamException("Invalid Device type")
             if ds['type'] == 'sensor':
                 try:
                     self._setsensor(ds['ts'],ds['id'],ds['state'],ip)
-                except NidusDBException:
-                    # one of our threads failed to connect to database - reraise
+                except sse.SSEDBException as e:
+                    # a thread failed to connect - reraise as dbsubmitexception
                     self._conn.rollback()
-                    raise
-            elif ds['type'] == 'radio':
-                self._setradio(ds['ts'],ds['id'],ds['state'])
-            elif ds['type'] == 'gpsd':
-                self._setgpsd(ds['ts'],ds['state'])
+                    raise NidusDBSubmitException(e.__repr__())
+                except psql.Error as e:
+                    # most likely a sensor attempting to log in when it is
+                    # data from it's most recent connect is still being processed
+                    # NOTE: a runtimeerror will result in the nidus responehandler
+                    #  attempting to submitdropped(). Since no sid was attained
+                    #  this->submitdropped() will return without effect
+                    self._conn.rollback()
+                    raise RuntimeError("%s: %s" % (e.pgcode,e.pgerror))
+            elif ds['type'] == 'radio': self._setradio(ds['ts'],ds['id'],ds['state'])
+            elif ds['type'] == 'gpsd': self._setgpsd(ds['ts'],ds['state'])
         except nmp.NMPException as e:
             raise NidusDBSubmitParseException(e)
         except psql.Error as e:

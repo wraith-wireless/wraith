@@ -44,16 +44,17 @@ nidus 0.0.6
   - added nidusd daemon file to start nidus server
   - added support for platform table
   - added support for antenna data storage
-  - modified database
-    o condensed some of the radio tables
-    o using timestamp rather than periods for radio tables (exluding using_radio)
   - added encrypted comms via ssl library
   - added support for bulk frames
   - moved sse thread definitions to separate file sse.py
   - made changes to nidus.sql
    o minor semantic/naming convention changes
    o added ON DELETE CASCADE to tables referencing session_id, frame_id and mac
-   o added indexing on timestamp and periods
+   o using timestamp rather than periods for radio tables (exluding using_radio) &
+     added indexing on the timestamps and periods
+   o condensed some of the radio tables
+  - handles errors with allowing sensors to connect when data from the same
+    host is still being processed
 """
 __name__ = 'nidus'
 __license__ = 'GPL v3.0'

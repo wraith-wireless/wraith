@@ -15,7 +15,7 @@ import os                                  # file info etc
 import sys                                 # for exit
 import time                                # sleeping, timestamps
 import psycopg2 as psql                    # postgresql api
-import psycopg2.extras as pextras          # cursors and such
+#import psycopg2.extras as pextras          # cursors and such
 import Tkinter as tk                       # gui constructs
 import ttk                                 # ttk widgets
 from PIL import Image,ImageTk              # image input & support
@@ -252,14 +252,11 @@ class WraithPanel(gui.MasterPanel):
 
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
-        # set the state
-        self._setstate(_STATE_EXIT_)
-
-        # shutdown dyskt
-        self._stopsensor()
-
-        # shutdown storage
-        self._stopstorage()
+        self.setbusy()               # we're busy
+        self._setstate(_STATE_EXIT_) # set the state
+        self._stopsensor()           # shutdown dyskt
+        self._stopstorage()          # shutdown storage
+        self.setbusy(False)          # we're done
 
     def _makemenu(self):
         """ make the menu """
