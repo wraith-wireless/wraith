@@ -575,14 +575,16 @@ class QueryPanel(gui.SlavePanel):
         vscroll = ttk.Scrollbar(frmLS,orient=tk.VERTICAL,command=self._trSess.yview)
         vscroll.grid(row=0,column=1,sticky='ns')
         self._trSess['yscrollcommand'] = vscroll.set
-        # configure session tree's headers
+        # configure session tree's headers & fill the tree w/ current sessions
         hdrs = ['ID','Host','Start','Frames']
         hdrlens = [gui.lenpix(3),gui.lenpix(4),gui.lenpix(13),gui.lenpix(6)]
         self._trSess['columns'] = hdrs
         for i in xrange(len(hdrs)):
             self._trSess.column(i,width=hdrlens[i],anchor=tk.CENTER)
             self._trSess.heading(i,text=hdrs[i])
-        self._getsessions() # fill the session tree
+        self._getsessions()
+        # enable ctrl-a (select all) on the tree
+        self._trSess.bind('<Control-a>',self.trsessca)
         frmRP = ttk.LabelFrame(frmR,text='Period')
         frmRP.grid(row=0,column=0,sticky='nwse')
         ttk.Label(frmRP,text='YYYY-MM-DD').grid(row=0,column=1,sticky='ne')
@@ -836,13 +838,16 @@ class QueryPanel(gui.SlavePanel):
         self.mnuFile = tk.Menu(self.menubar,tearoff=0)
         self.mnuFile.add_command(label='Open',command=self.qrysave)
         self.mnuFile.add_command(label='Save',command=self.qryload)
-        self.menubar.add_separator()
-        self.menubar.add_command(label='Quit',command=self.close)
+        self.mnuFile.add_separator()
+        self.mnuFile.add_command(label='Quit',command=self.close)
         self.menubar.add_cascade(label='File',menu=self.mnuFile)
         try:
             self.master.config(menu=self.menubar)
         except AttributeError:
             self.master.tk.call(self.master,"config","-menu",self.menubar)
+
+    # bindings
+    def trsessca(self,event): self._trSess.selection_set(self._trSess.get_children(''))
 
     # virtual implementations
 
