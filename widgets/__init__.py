@@ -16,6 +16,7 @@ widgets 0.0.3
   - added right mouse button binding to the internal treeview at the TabularPanel class
   - added critical section support at the DBPollingPanel
   - added busy/normal cursor display at the Panel class
+  - added ctrl-a to select all items at the TabularPanel class
 """
 __name__ = 'utils'
 __license__ = 'GPL v3.0'

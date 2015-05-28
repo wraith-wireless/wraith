@@ -40,7 +40,10 @@ GUI:
      o or do we force children to use callbacks in WraithPanel to query etc
  31) use postgresql listen/notify for updating data from tables
  32) how to ensure menu(s) etc are not left showing (i.e. context menu in
-     SessionsPanel)
+     SessionsPanel) tried self.after, time.sleep but does not work
+ 33) add ctrl-a to treeviews (that allow selection)
+ 34) look into Treeview virtual events Select,Open,Close to see if it is anything
+     we can use
 DySKT:
   3) implement adaptive scan pattern
  26) gps device handling
@@ -74,6 +77,7 @@ Nidus:
  15) should we commit individual statements in long functions i.e. _setradio
  16) add radiotap mcs stbc streams and extensions spatial streams
  17) look into PPI (per packet information)
+ 18) got a 'flags' error, have to determine where this is coming from
 Radio:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)

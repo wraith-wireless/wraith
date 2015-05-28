@@ -63,8 +63,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
         while connected:
             try:
                 # if server has quit, shut down everything
-                if self.server.quit:
-                    raise RuntimeError("Nidus Server shut down early")
+                if self.server.quit: raise RuntimeError("Nidus shut down early")
 
                 # get data and parse
                 data = self._recv()

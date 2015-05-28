@@ -408,6 +408,9 @@ class TabularPanel(SlavePanel):
        type of str
       treerc to implement any right click actions on the tree
 
+     Derived classes should override
+      treeca: set to pass to dissallow select all
+
      Derived classes can also manipulate the style of the tree as desired i.e.
       change selection mode, display of icons, headers etc
     """
@@ -467,6 +470,7 @@ class TabularPanel(SlavePanel):
 
         # bind right click on the tree
         self._tree.bind('<Button-3>',self.treerc)
+        self._tree.bind('<Control-a>',self.treeca)
 
         # allow a bottom frame
         frmB = ttk.Frame(self)
@@ -482,6 +486,7 @@ class TabularPanel(SlavePanel):
     def str2key(self,s): return s
     def key2str(self,k): return str(k)
     def treerc(self,event): pass
+    def treeca(self,event): self._tree.selection_set(self._tree.get_children(''))
 
     # noinspection PyMethodMayBeStatic
     def topframe(self,frm): return None # override to add widgets to topframe

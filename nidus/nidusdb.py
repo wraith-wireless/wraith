@@ -168,7 +168,7 @@ class NidusDB(object):
                 except sse.SSEDBException as e:
                     # a thread failed to connect - reraise as dbsubmitexception
                     self._conn.rollback()
-                    raise NidusDBSubmitException(e.__repr__())
+                    raise NidusDBSubmitException("submit device %s" % e.__repr__())
                 except psql.Error as e:
                     # most likely a sensor attempting to log in when it is
                     # data from it's most recent connect is still being processed
@@ -176,7 +176,7 @@ class NidusDB(object):
                     #  attempting to submitdropped(). Since no sid was attained
                     #  this->submitdropped() will return without effect
                     self._conn.rollback()
-                    raise RuntimeError("%s: %s" % (e.pgcode,e.pgerror))
+                    raise RuntimeError("submit device %s: %s" % (e.pgcode,e.pgerror))
             elif ds['type'] == 'radio': self._setradio(ds['ts'],ds['id'],ds['state'])
             elif ds['type'] == 'gpsd': self._setgpsd(ds['ts'],ds['state'])
         except nmp.NMPException as e:
@@ -184,7 +184,11 @@ class NidusDB(object):
         except psql.Error as e:
             # rollback so postgresql is not left in error state
             self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+            raise NidusDBSubmitException("submit device %s: %s" % (e.pgcode,e.pgerror))
+        except Exception as e:
+            # blanket except
+            self._conn.rollback()
+            raise NidusDBSubmitException("submit device type(%s) %s" % (type(e),e.__repr__()))
         else:
             self._conn.commit()
 
@@ -205,11 +209,15 @@ class NidusDB(object):
                                     ds['compiler'],ds['libcv'],ds['bits'],ds['link'],
                                     ds['regdom']))
         except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
+            raise NidusDBSubmitParseException("submit platform %s" % e)
         except psql.Error as e:
             # roll back
             self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+            raise NidusDBSubmitException("submit platform %s: %s" % (e.pgcode,e.pgerror))
+        except Exception as e:
+            # blanket exception
+            self._conn.rollback()
+            raise NidusDBSubmitException("submit platform type(%s) %s" % (type(e),e.__repr__()))
         else:
             self._conn.commit()
 
@@ -246,7 +254,7 @@ class NidusDB(object):
                    where sid=%s;
                   """
             self._curs.execute(sql,(ts,self._sid))
-        except psql.Error:
+        except:
             # don't raise an exception here, nidus is already exiting
             self._conn.rollback()
         else:
@@ -280,11 +288,11 @@ class NidusDB(object):
                 """
             self._curs.execute(sql,(self._sid,self._gid,ds['ts']))
         except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
+            raise NidusDBSubmitParseException("submit gspd %s" % e)
         except psql.Error as e:
             # rollback so postgresql is not left in error state
             self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+            raise NidusDBSubmitException("submit gpsde %s: %s" % (e.pgcode,e.pgerror))
         else:
             self._conn.commit()
 
@@ -337,15 +345,19 @@ class NidusDB(object):
                 self._tSave[ds['mac']].start()
 
         except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
+            raise NidusDBSubmitParseException("submit radio %s" % e)
         except psql.Error as e:
             # rollback so postgresql is not left in error state
             self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+            raise NidusDBSubmitException("submit radio %s: %s" % (e.pgcode,e.pgerror))
         except NidusDBException:
-            # our thread failed to connect to database - reraise
+            # our save thread failed to connect to database - reraise
             self._conn.rollback()
-            raise
+            raise NidusDBSubmitException("submit radio connect error")
+        except Exception as e:
+            # blanket exception
+             self._conn.rollback()
+             raise NidusDBException("submit radio type(%s) %s" % (type(e),e.__repr__()))
         else:
             self._conn.commit()
 
@@ -361,10 +373,14 @@ class NidusDB(object):
             self._curs.execute(sql,(ds['mac'],ds['index'],ds['gain'],ds['loss'],
                                     ds['x'],ds['y'],ds['z'],ds['type'],ds['ts']))
         except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
+            raise NidusDBSubmitParseException("submit antenna %s" % e)
         except psql.Error as e:
             self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+            raise NidusDBSubmitException("submit antenna %s: %s" % (e.pgcode,e.pgerror))
+        except Exception as e:
+            # blannket
+            self._conn.rollback()
+            raise NidusDBSubmitException("submit antenna type(%s) %s" % (type(e),e.__repr__()))
         else:
             self._conn.commit()
 
@@ -376,10 +392,14 @@ class NidusDB(object):
             sql = "insert into radio_event (mac,state,params,ts) values (%s,%s,%s,%s);"
             self._curs.execute(sql,(ds['mac'],ds['event'],ds['params'],ds['ts']))
         except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
+            raise NidusDBSubmitParseException("submit radio event" % e)
         except psql.Error as e:
             self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+            raise NidusDBSubmitException("submit radio event %s: %s" % (e.pgcode,e.pgerror))
+        except Exception as e:
+            # blannket
+            self._conn.rollback()
+            raise NidusDBSubmitException("submit radio event type(%s) %s" % (type(e),e.__repr__()))
         else:
             self._conn.commit()
 
@@ -389,18 +409,20 @@ class NidusDB(object):
         try:
             ds = nmp.data2dict(nmp.tokenize(f),'BULK')
             frames = zlib.decompress(ds['frames'])
+            mac = ds['mac']
+            fs = frames.split('\x1FFE\x1E') # split by end delimiter
+            for f in fs:
+                if not f: continue
+                f = f.split('\x1EFB\x1F')
+                self._submitframe(mac,f[0].strip(),f[1])
         except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
+            raise NidusDBSubmitParseException("submit bulk %s" % e)
         except zlib.error as e:
-            raise NidusDBSubmitParseException(e)
-
-        # submit the bulked frames
-        mac = ds['mac']
-        fs = frames.split('\x1FFE\x1E') # split by end delimiter
-        for f in fs:
-            if not f: continue
-            f = f.split('\x1EFB\x1F')
-            self._submitframe(mac,f[0].strip(),f[1])
+            raise NidusDBSubmitParseException("submit bulk zip error %s" % e)
+        except Exception as e:
+            # blanket
+            self._conn.rollback()
+            raise NidusDBSubmitException("submit bulk type(%s) %s" % (type(e),e.__repr__()))
 
     # depecrated
     def submitsingle(self,f):
@@ -428,10 +450,14 @@ class NidusDB(object):
                                     ds['spd'],ds['dir'],ds['fix'],ds['xdop'],
                                     ds['ydop'],ds['pdop'],ds['epx'],ds['epy']))
         except nmp.NMPException as e:
-            raise NidusDBSubmitParseException(e)
+            raise NidusDBSubmitParseException("submit geo %s" % e)
         except psql.Error as e:
             self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+            raise NidusDBSubmitException("submit geo %s: %s" % (e.pgcode,e.pgerror))
+        except Exception as e:
+            # blanket
+            self._conn.rollback()
+            raise NidusDBSubmitException("submit geo type(%s) %s" % (type(e),e.__repr__()))
         else:
             self._conn.commit()
 
@@ -520,6 +546,9 @@ class NidusDB(object):
             validMPDU = False
             vs = (self._sid,ts,lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
                   int('a-mpdu' in dR['present']),rtap.flags_get(dR['flags'],'fcs'))
+        except Exception as e:
+            # catch all
+            raise NidusDBSubmitException("submit frame type<%s> %s" % (type(e),e.__repr__()))
         else:
             vs = (self._sid,ts,lF,dR['sz'],dM.offset,
                   [(dR['sz']+dM.offset),(lF-dM.stripped)],dR['flags'],
@@ -535,7 +564,7 @@ class NidusDB(object):
             fid = self._curs.fetchone()[0]
         except psql.Error as e:
             self._conn.rollback()
-            raise NidusDBSubmitException("%s: %s" % (e.pgcode,e.pgerror))
+            raise NidusDBSubmitException("submit frame %s: %s" % (e.pgcode,e.pgerror))
         else:
             self._conn.commit()
 
