@@ -9,10 +9,6 @@ Overall:
   3) Need a way to identify when nidus is processing data from a closed dyskt
      o use an open session in database?
   5) enable delete by session
-  6) After setting up bulk submissions, there is still a delay (smaller) in time
-    betw/ DySKT quit and time Nidus gets last submissions. Test if processes for
-    SSE helps (and is it worth it)
-  7) save geo as lat/lon (especially if we use PPI in the pcap files)
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -61,7 +57,7 @@ Nidus:
    the corresponding sensor
   3) Optimize postgresql database, storage, retrieval, indexing etc
   4) identify postgresql server not running prior to request handler
-  8) secured (hashed) username/password from to datastore
+  8) secured (hashed) username/password from/to datastore
  10) how/when to partition table to offload older records
  12) nidusdb.py
      o Save thread does not save last n frames to file
@@ -70,11 +66,10 @@ Nidus:
          to allow nidusdb to see the error
      o look into processes over threads for SSE
      o should we use nidusdb's connection or continue to create in the thread
- 13) move to pcap-ng format?
  15) should we commit individual statements in long functions i.e. _setradio
- 16) add radiotap mcs stbc streams and extensions spatial streams
+ 16) add radiotap extensions spatial streams
  17) look into PPI (per packet information)
- 18) got a 'flags' error, have to determine where this is coming from
+ 18) add trigger to reset sequences when tables are emptied
 Radio:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)
@@ -87,4 +82,4 @@ Radio:
      - parse timing advance
  5) how to support a-msdu etc
  6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
- 7) compile/use own oui file, not relying aircrack-ng
+ 7) compile/use own oui file, not relying on aircrack-ng

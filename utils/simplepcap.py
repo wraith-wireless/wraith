@@ -2,7 +2,7 @@
 
 """ simplepcap.py: pcap writer (802.11 packets)
 
-provides a pythonic pcap writer for 802.11 frames w/o requiring additional libraries
+Provides a pythonic pcap writer for 802.11 frames w/o requiring additional libraries.
 see http://wiki.wireshark.org/Development/LibpcapFileFormat
 """
 __name__ = 'simplepcap'
