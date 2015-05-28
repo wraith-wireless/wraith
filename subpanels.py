@@ -406,9 +406,9 @@ class InterfacePanel(gui.PollingTabularPanel):
 
         # configure tree to show headings but not 0th column
         self._tree['show'] = 'headings'
-    def reset(self): pass
+    def pnlreset(self): pass
     def _shutdown(self): pass
-    def update(self):
+    def pnlupdate(self):
         """ lists interfaces """
         # get list of current wifaces on system & list of wifaces in tree
         nics = iwt.wifaces()
@@ -847,8 +847,8 @@ class QueryPanel(gui.SlavePanel):
     # virtual implementations
 
     def _shutdown(self): pass
-    def reset(self): pass
-    def update(self): pass
+    def pnlreset(self): pass
+    def pnlupdate(self): pass
 
     # menu callbacks
 
@@ -941,6 +941,7 @@ class QueryPanel(gui.SlavePanel):
                                      filetypes=[("Text Files","*.txt"),
                                                 ("Selector Files","*.sel")],
                                      parent=self)
+        self.update()
         self.clearselfile()
         self._entSelFile.insert(0,fpath)
 
@@ -1173,7 +1174,11 @@ class SessionsPanel(gui.DBPollingTabularPanel):
                     mnu.entryconfig(0,state=tk.DISABLED)
             mnu.tk_popup(event.x_root,event.y_root)
 
-    def mdkp(self,sids): self.dkp(sids)
+    def mdkp(self,sids):
+        self.update()
+        self.setbusy()
+        self.dkp(sids)
+        self.setbusy(False)
     def dkp(self,sids=None):
         """ delete specified entry(s) """
         sql = "delete from sensor where session_id = %s;"
@@ -1181,7 +1186,6 @@ class SessionsPanel(gui.DBPollingTabularPanel):
 
         # wrap the entire process in the critical section
         i = 0
-        self.setbusy()
         self._l.acquire()
         try:
             for sid in sids:
@@ -1201,7 +1205,6 @@ class SessionsPanel(gui.DBPollingTabularPanel):
         except: pass
         finally:
             self._l.release()
-        self.setbusy(False)
         self.logwrite("Deleted %d sessions" % i,gui.LOG_NOTE)
 
     def _connect(self,connect):

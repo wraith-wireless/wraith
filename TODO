@@ -39,9 +39,6 @@ GUI:
      o or do we create a new connection for each child that needs it?
      o or do we force children to use callbacks in WraithPanel to query etc
  31) use postgresql listen/notify for updating data from tables
- 32) how to ensure menu(s) etc are not left showing (i.e. context menu in
-     SessionsPanel) tried self.after, time.sleep but does not work
- 33) add ctrl-a to treeviews (that allow selection)
  34) look into Treeview virtual events Select,Open,Close to see if it is anything
      we can use
 DySKT:

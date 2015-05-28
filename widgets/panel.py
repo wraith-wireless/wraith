@@ -259,8 +259,8 @@ class SlavePanel(Panel):
 
      Derived classes must implement:
       _shutdown: perform necessary cleanup functionality
-      reset: master panel is requesting the panel to reset itself
-      update: master panel is requesting the panel to update itself
+      pnlreset: master panel is requesting the panel to reset itself
+      pnlupdate: master panel is requesting the panel to update itself
 
     Derived classes should override:
      delete if they want to dissallow user from closing the panel
@@ -277,8 +277,8 @@ class SlavePanel(Panel):
 
     # abstract methods must be implemented
     def _shutdown(self): raise NotImplementedError("SlavePanel::_shutdown")
-    def reset(self): raise NotImplementedError("SlavePanel::reset")
-    def update(self): raise NotImplementedError("SlavePanel::update")
+    def pnlreset(self): raise NotImplementedError("SlavePanel::pmlreset")
+    def pnlupdate(self): raise NotImplementedError("SlavePanel::pnlupdate")
 
     def logwrite(self,msg,mtype=LOG_NOERR):
         """ write messages to primary log """
@@ -308,10 +308,10 @@ class SimplePanel(SlavePanel):
 
      Derived class must implement:
       _body: define gui widgets
-      in addition to SlavePanel::_shutdown, SlavePanel::reset, SlavePanel::update
+      _shutdown, pnlreset, pnlupdate from SlavePanel
 
      Derived class should override:
-      reset,update if dynamic data is being displayed
+      pnlreset,pnlupdate if dynamic data is being displayed
       _shutdown if any cleanup needs to be performed prior to closing
     """
     def __init__(self,tl,chief,ttl,iconpath=None,resize=False):
@@ -319,8 +319,8 @@ class SimplePanel(SlavePanel):
         self.grid(row=0,column=0,sticky='nwse')
         self._body()
     def _body(self): raise NotImplementedError("SimplePanel::_body")
-    def reset(self): pass
-    def update(self): pass
+    def pnlreset(self): pass
+    def pnlupdate(self): pass
     def _shutdown(self): pass
 
 class ConfigPanel(SlavePanel):
@@ -368,8 +368,8 @@ class ConfigPanel(SlavePanel):
 
     # Slave Panel abstract methods we do not need for this class
     def _shutdown(self): pass
-    def update(self): pass
-    def reset(self): pass
+    def pnlupdate(self): pass
+    def pnlreset(self): pass
 
     def ok(self):
         """ validate entries and if good write to file then close """
@@ -398,8 +398,8 @@ class TabularPanel(SlavePanel):
 
      Derived class must implement:
       _shutdown: perform necessary cleanup functionality
-      reset: Master panel is requesting the panel to reset itself
-      update: Master panel is requesting the panel to update itself
+      pnlreset: Master panel is requesting the panel to reset itself
+      pnlupdate: Master panel is requesting the panel to update itself
 
      Derived classes should implement:
       topframe if any widgets need to be added to the top frame
@@ -501,7 +501,7 @@ class PollingTabularPanel(TabularPanel):
     """
      PollingTabularPanel - a TabularPanel that updates itself periodically
      through the after function
-     Derived classes must implment the update function which is used by the
+     Derived classes must implment the pnlupdate function which is used by the
       polling functionaity
     """
     def __init__(self,tl,chief,ttl,h,cols=None,ipath=None,resize=False,polltime=500):
@@ -521,10 +521,10 @@ class PollingTabularPanel(TabularPanel):
         """
         TabularPanel.__init__(self,tl,chief,ttl,h,cols,ipath,resize)
         self._polltime = polltime
-        self.update()
+        self.pnlupdate()
         self.after(self._polltime,self.poll)
     def poll(self):
-        self.update()
+        self.pnlupdate()
         self.after(self._polltime,self.poll)
 
 class DBPollingTabularPanel(PollingTabularPanel):
@@ -532,7 +532,7 @@ class DBPollingTabularPanel(PollingTabularPanel):
      DBPollingTabularPanel - a TabularPanel that updates itself periodically
      through the after function using data from a db connection. This panel
      has an internal locking mechanism to ensure that the data being displayed
-     is not modified by separate functions simultaenously. Methods update and
+     is not modified by separate functions simultaenously. Methods pnlupdate and
      sortbycol are wrapped by lock aquisitions/release to ensure integrity.
 
      Derived classes must implement:
@@ -563,7 +563,7 @@ class DBPollingTabularPanel(PollingTabularPanel):
         self._conn = self._curs = None
         self._connect(connect)
         PollingTabularPanel.__init__(self,tl,chief,ttl,h,cols,ipath,resize,polltime)
-    def update(self):
+    def pnlupdate(self):
         """ wraps updating with locking """
         self._l.acquire()
         try:
@@ -622,8 +622,8 @@ class LogPanel(TabularPanel):
         self._tree.tag_configure(LOG_NOTE,foreground='blue')
 
     def delete(self): pass    # user can never close only the primary chief
-    def reset(self): pass     # nothing needs to be reset
-    def update(self): pass    # nothing needs to be updated
+    def pnlreset(self): pass     # nothing needs to be reset
+    def pnlupdate(self): pass    # nothing needs to be updated
     def _shutdown(self): pass # nothing needs to be cleaned up
     def logwrite(self,msg,mtype=LOG_NOERR):
         """ writes message msg of type mtype to the log """
@@ -730,7 +730,7 @@ class TailLogPanel(TabularPanel):
 
     # VIRTUAL METHOD OVERRIDES
 
-    def reset(self):
+    def pnlreset(self):
         """ resets the log panel """
         # reset internal structures and clear the list
         if self._n:
@@ -739,7 +739,7 @@ class TailLogPanel(TabularPanel):
             self._offset = None
             self._tree.delete(*self._tree.get_children())
 
-    def update(self): pass    # no need to implement
+    def pnlupdate(self): pass    # no need to implement
     def _shutdown(self): pass # no need to implement
 
     # PRIVATE HELPER
@@ -825,6 +825,7 @@ class MasterPanel(Panel):
         if ans == 'no':
             return
         else:
+            self.update()
             self.logwrite('Quitting...')
             self._shutdown()
             self.quit()
@@ -967,11 +968,11 @@ class MasterPanel(Panel):
             if panel != name:
                 self._panels[panel].pnl.notifyrestorecb(dtype,h)
 
-    def updatepanels(self):
+    def pnlupdatepanels(self):
         """ notify open panels something has changed """
         # use keys() to handle event where a panel may close itself
-        for name in self._panels: self._panels[name].pnl.update()
+        for name in self._panels: self._panels[name].pnl.pnlupdate()
 
-    def resetpanels(self):
+    def pnlresetpanels(self):
         """ notify open panels everything is reset """
-        for name in self._panels: self._panels[name].pnl.reset()
+        for name in self._panels: self._panels[name].pnl.pnlreset()

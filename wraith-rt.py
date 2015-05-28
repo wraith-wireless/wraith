@@ -553,6 +553,7 @@ class WraithPanel(gui.MasterPanel):
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if flags['store'] and flags['conn'] and not flags['dyskt']:
             ans = self.ask('Delete Records','Delete all DB records?')
+            self.update()
             if ans == 'no': return
             curs = None
             try:
@@ -625,6 +626,7 @@ class WraithPanel(gui.MasterPanel):
         finfo = os.stat(wraith.NIDUSLOG)
         if finfo.st_size > 0:
             ans = self.ask("Clear Log","Clear contents of Nidus log?")
+            self.update()
             if ans == 'no': return
             lv = self.getpanel('niduslog')
             with open(wraith.NIDUSLOG,'w'): os.utime(wraith.NIDUSLOG,None)
@@ -676,6 +678,7 @@ class WraithPanel(gui.MasterPanel):
         finfo = os.stat(wraith.DYSKTLOG)
         if finfo.st_size > 0:
             ans = self.ask("Clear Log","Clear contents of DySKT log?")
+            self.update()
             if ans == 'no': return
             with open(wraith.DYSKTLOG,'w'): pass
             lv = self.getpanel('dysktlog')
@@ -878,6 +881,7 @@ class WraithPanel(gui.MasterPanel):
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if flags['dyskt']:
             ans = self.ask('DySKT Running','Quit and lose queued data?')
+            self.update()
             if ans == 'no': return
 
         # return if no storage component is running
