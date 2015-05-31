@@ -41,8 +41,10 @@ wraith 0.0.4
   - added TLS support for encrypted comms betw/ Nidus & DySKT
   - added bulk frame submission
   - added Sessions panel
-   o view sessions
-   o delete session(s)
+   o able to view a list of sessions
+   o able delete session(s)
+  - added polling to check if service states have changed and updates menus
+    accordingly
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

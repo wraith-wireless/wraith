@@ -483,7 +483,7 @@ class NidusDB(object):
             # started in the submitradio function
             # store threads
             self._qStore = Queue.Queue()
-            for i in xrange(self._nStore):
+            for _ in xrange(self._nStore):
                 thread = sse.StoreThread(self._qStore,self._sid,(self._storage['host'],
                                                                  self._storage['port'],
                                                                  self._storage['db'],
@@ -495,7 +495,7 @@ class NidusDB(object):
             # extract threads
             self._lSta = threading.Lock()
             self._qExtract = Queue.Queue()
-            for i in xrange(self._nExtract):
+            for _ in xrange(self._nExtract):
                 thread = sse.ExtractThread(self._qExtract,self._lSta,self._sid,
                                            self._oui,(self._storage['host'],
                                                       self._storage['port'],

@@ -499,14 +499,20 @@ class ExtractThread(SSEThread):
         # extract unique addresses of stas in the mpdu into the addr dict having
         # the form <hwaddr>->{'loc:[<i..n>],'id':<sta_id>} where i=1 through 4
         addrs = {}
-        locations = ['addr1','addr2','addr3','addr4']
-        for i in xrange(len(locations)):
-            a = locations[i]
-            if not a in l2: break         # no more stas to process
+        for i,a in enumerate(['addr1','addr2','addr3','addr4']):
+            if not a in l2: break
             if l2[a] in addrs:
                 addrs[l2[a]]['loc'].append(i+1)
             else:
-                addrs[l2[a]] = {'loc':[i+1],'id':None}
+                addrs[l2[a]]['loc'] = {'locl':[i+1],'id':None}
+        #locations = ['addr1','addr2','addr3','addr4']
+        #for i in xrange(len(locations)):
+        #    a = locations[i]
+        #    if not a in l2: break         # no more stas to process
+        #    if l2[a] in addrs:
+        #        addrs[l2[a]]['loc'].append(i+1)
+        #    else:
+        #        addrs[l2[a]] = {'loc':[i+1],'id':None}
 
         # each _insert function will reraise psql related errors after
         # setting the internal err tuple

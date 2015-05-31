@@ -247,8 +247,8 @@ class WraithPanel(gui.MasterPanel):
         self.getpanel("log",True).delayedwrite(msgs)
         if os.path.exists('default.ts'): self.guiload('default.ts')
 
-        # this causes the menu to refresh itself, have to figure out another way
-        #self.after(500,self._poll)
+        # check if something outside this program stopped a service
+        self.after(500,self._poll)
 
     def _shutdown(self):
         """ if connected to datastorage, closes connection """
@@ -582,9 +582,11 @@ class WraithPanel(gui.MasterPanel):
                                   gui.LOG_WARN)
                     return
                 self._pwd = pwd
+            self.logwrite('Starting Nidus...',gui.LOG_NOTE)
             if startnidus(self._pwd):
                 self._updatestate()
                 self._menuenable()
+                self.logwrite('Nidus Started')
             else:
                 self.logwrite("Failed to start Nidus",gui.LOG_ERR)
 
@@ -606,6 +608,7 @@ class WraithPanel(gui.MasterPanel):
             if stopnidus(self._pwd):
                 self._updatestate()
                 self._menuenable()
+                self.logwrite("Nidus Stopped")
             else:
                 self.logwrite("Failed to stop Nidus",gui.LOG_ERR)
 
@@ -716,8 +719,10 @@ class WraithPanel(gui.MasterPanel):
 
     def _poll(self):
         """ periodically recheck state """
-        self._updatestate()
-        self._menuenable()
+        # check our current state
+        oldstate = self._state # save the current state
+        self._updatestate()    # update it
+        if oldstate != self._state: self._menuenable()
         self.after(500,self._poll)
 
     def _updatestate(self):
@@ -752,62 +757,71 @@ class WraithPanel(gui.MasterPanel):
 
     def _menuenable(self):
         """ enable/disable menus as necessary """
-        # TODO: enable/disable view sessions as necessary
         # get all flags
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
 
-        # adjust storage menu
-        # easiest for storage is to disable all and then only enable relevant
-        # always allow Nidus->config, Nidus->View Log
-        self._mnuData.entryconfig(4,state=tk.DISABLED)         # view sessions
-        self._mnuStorage.entryconfig(0,state=tk.DISABLED)      # all start
-        self._mnuStorage.entryconfig(1,state=tk.DISABLED)      # all stop
-        self._mnuStoragePSQL.entryconfig(0,state=tk.DISABLED)  # psql start
-        self._mnuStoragePSQL.entryconfig(1,state=tk.DISABLED)  # psql stop
-        self._mnuStoragePSQL.entryconfig(3,state=tk.DISABLED)  # connect 2 psql
-        self._mnuStoragePSQL.entryconfig(4,state=tk.DISABLED)  # disconnect from psql
-        self._mnuStoragePSQL.entryconfig(6,state=tk.DISABLED)  # psql fix
-        self._mnuStoragePSQL.entryconfig(7,state=tk.DISABLED)  # psql delete all
-        self._mnuStorageNidus.entryconfig(0,state=tk.DISABLED) # nidus start
-        self._mnuStorageNidus.entryconfig(1,state=tk.DISABLED) # nidus stop
-        self._mnuNidusLog.entryconfig(1,state=tk.DISABLED)     # nidus log clear
+        # we'll 'enumerate' each menu option and enable/disable as necessary
+        # view sessions
+        if flags['conn']: self._mnuData.entryconfig(4,state=tk.NORMAL)
+        else: self._mnuData.entryconfig(4,state=tk.DISABLED)
 
+        # start all
+        if flags['store'] and flags['nidus'] and flags['dyskt']:
+            self._mnuData.entryconfig(4,state=tk.DISABLED)
+        else: self._mnuData.entryconfig(4,state=tk.NORMAL)
+
+        # stop all
+        if not flags['store'] and not flags['nidus'] and not flags['dyskt']:
+            self._mnuStorage.entryconfig(1,state=tk.DISABLED)
+        else: self._mnuStorage.entryconfig(1,state=tk.NORMAL)
+
+        # start/stop postgres
         if flags['store']:
-            # storage is running enable stop all, stop postgresql (if dyskt is
-            # not running)
-            self._mnuStorage.entryconfig(1,state=tk.NORMAL)
+            # disable start, enable stop (if dyskt is not running)
+            self._mnuStoragePSQL.entryconfig(0,state=tk.DISABLED)
             if not flags['dyskt']: self._mnuStoragePSQL.entryconfig(1,state=tk.NORMAL)
         else:
-            # storage is not running, enable start all, start postgresql
-            self._mnuStorage.entryconfig(0,state=tk.NORMAL)
+            # enable start and disable stop
             self._mnuStoragePSQL.entryconfig(0,state=tk.NORMAL)
+            self._mnuStoragePSQL.entryconfig(1,state=tk.DISABLED)
 
+        # connect/disconnect 2 postgres
+        if flags['conn']:
+            # disable connect and enable disconnect
+            self._mnuStoragePSQL.entryconfig(3,state=tk.DISABLED)
+            self._mnuStoragePSQL.entryconfig(4,state=tk.NORMAL)
+        else:
+            # enable connect and disable disconnect
+            self._mnuStoragePSQL.entryconfig(3,state=tk.NORMAL)
+            self._mnuStoragePSQL.entryconfig(4,state=tk.DISABLED)
+
+        # fix db and delete all (only allowed if connected and dyskt is not running)
+        if flags['conn']:
+            if flags['dyskt']:
+                self._mnuStoragePSQL.entryconfig(6,state=tk.DISABLED)
+                self._mnuStoragePSQL.entryconfig(7,state=tk.DISABLED)
+            else:
+                self._mnuStoragePSQL.entryconfig(6,state=tk.NORMAL)
+                self._mnuStoragePSQL.entryconfig(7,state=tk.NORMAL)
+        else:
+            self._mnuStoragePSQL.entryconfig(6,state=tk.DISABLED)
+            self._mnuStoragePSQL.entryconfig(7,state=tk.DISABLED)
+
+        # nidus start/stop & clear log NOTE: unlike psql, we allow nidus to stop
+        # even in cases where dyskt may be running as dyskt will handle nidus
+        # closing the comms socket)
         if flags['nidus']:
-            # nidus is running, enable stop all, stop nidus
-            self._mnuStorage.entryconfig(1,state=tk.NORMAL)
+            # disable start and clear log and enable stop
+            self._mnuStorageNidus.entryconfig(0,state=tk.DISABLED)
+            self._mnuNidusLog.entryconfig(1,state=tk.DISABLED)
             self._mnuStorageNidus.entryconfig(1,state=tk.NORMAL)
         else:
-            # nidus is not running, enable start all & clear nidus log
-            # enable start nidus only if postgres is running
-            self._mnuStorage.entryconfig(0,state=tk.NORMAL)
+            # enable start clear log and disable stop
             self._mnuStorageNidus.entryconfig(0,state=tk.NORMAL)
             self._mnuNidusLog.entryconfig(1,state=tk.NORMAL)
+            self._mnuStorageNidus.entryconfig(1,state=tk.DISABLED)
 
-        if flags['conn']:
-            # connected to psql, enable stop all and disconnect and sessions
-            # if no DysKT is running, enable fix psql and delete all
-            self._mnuStorage.entryconfig(1,state=tk.NORMAL)
-            self._mnuStoragePSQL.entryconfig(4,state=tk.NORMAL)
-            self._mnuData.entryconfig(4,state=tk.NORMAL)
-            if not flags['dyskt']:
-                self._mnuStoragePSQL.entryconfig(6,state=tk.NORMAL)  # psql fix
-                self._mnuStoragePSQL.entryconfig(7,state=tk.NORMAL)  # psql delete all
-        else:
-            # disconnected, enable start all, enable connect if postgres is running
-            self._mnuStorage.entryconfig(0,state=tk.NORMAL)
-            if flags['store']: self._mnuStoragePSQL.entryconfig(3,state=tk.NORMAL)
-
-        # adjust dyskt menu
+        # dyskt
         if not flags['store'] and not flags['nidus']:
             # cannot start/stop/control dyskt unless nidus & postgres is running
             self._mnuDySKT.entryconfig(0,state=tk.DISABLED)  # start
