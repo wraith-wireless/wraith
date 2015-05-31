@@ -760,7 +760,6 @@ class WraithPanel(gui.MasterPanel):
         # get all flags
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
 
-        # we'll 'enumerate' each menu option and enable/disable as necessary
         # view sessions
         if flags['conn']: self._mnuData.entryconfig(4,state=tk.NORMAL)
         else: self._mnuData.entryconfig(4,state=tk.DISABLED)

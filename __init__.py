@@ -45,6 +45,7 @@ wraith 0.0.4
    o able delete session(s)
   - added polling to check if service states have changed and updates menus
     accordingly
+
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
