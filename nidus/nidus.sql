@@ -144,6 +144,7 @@ CREATE TABLE radio(
    chipset VARCHAR(20) DEFAULT 'UNKNOWN',     -- nic chipset
    channels SMALLINT[] NOT NULL,              -- list of channels supported by nic 
    standards VARCHAR(20) DEFAULT '802.11b/g', -- list of standards supported by nic
+   description VARCHAR(100),                  -- brief description of radio
    PRIMARY KEY(mac)
 );
 
@@ -177,33 +178,18 @@ CREATE TABLE antenna(
 );
 CREATE INDEX antenna_ts_idx ON antenna(ts);
 
--- radio_properties
--- properties of a radio at a given timestamp
-DROP TABLE IF EXISTS radio_properties;
-CREATE TABLE radio_properties(
-   mac macaddr NOT NULL,       -- foreign key to radio mac addr
-   description VARCHAR(200),   -- brief description of radio
-   spoofed VARCHAR(17),        -- virtual (spoofed) mac address
-   txpwr SMALLINT DEFAULT 15,  -- transmit power in dBm
-   ts TIMESTAMPTZ NOT NULL,    -- timestamp properties became true
-   FOREIGN KEY (mac) REFERENCES radio(mac) ON DELETE CASCADE,
-   PRIMARY KEY(mac,ts)
-);
-CREATE INDEX radio_properties_ts_idx on radio_properties(ts);
-
 -- radio state enumerations
 DROP TYPE IF EXISTS RADIOSTATE;
-CREATE TYPE RADIOSTATE AS ENUM ('hold','scan','listen','fail');
+CREATE TYPE RADIOSTATE AS ENUM ('hold','scan','listen','spoof','txpwr','fail');
 
 -- radio_event table
 DROP TABLE IF EXISTS radio_event;
 CREATE TABLE radio_event(
    mac macaddr NOT NULL,            -- foreign key to radio mac addr
-   state RADIOSTATE DEFAULT 'scan', -- radio event at timestamp ts 
+   state RADIOSTATE DEFAULT 'scan', -- radio event at timestamp ts
    params TEXT DEFAULT '',          -- free-form params of event
    ts TIMESTAMPTZ NOT NULL,         -- timestamp for event
-   FOREIGN KEY (mac) REFERENCES radio(mac) ON DELETE CASCADE,
-   PRIMARY KEY(mac,ts)
+   FOREIGN KEY (mac) REFERENCES radio(mac) ON DELETE CASCADE
 );
 CREATE INDEX radio_event_ts_idx on radio_event(ts);
 
@@ -1007,7 +993,6 @@ CREATE FUNCTION delete_all()
       DELETE FROM wepcrypt;
       DELETE FROM signal;
       DELETE FROM source;
-      DELETE FROM frame_path;
       DELETE FROM assocreq;
       DELETE FROM reassocreq;
       DELETE FROM assocresp;
@@ -1020,7 +1005,7 @@ CREATE FUNCTION delete_all()
       DELETE FROM action;
       DELETE FROM sta_activity;
       DELETE FROM sta;
-      ALTER SEQUENCE sta_sta_id_seq restart;
+      ALTER SEQUENCE sta_sta_id_seq RESTART;
       DELETE FROM traffic;
       DELETE FROM frame_path;
       DELETE FROM frame;
@@ -1031,7 +1016,6 @@ CREATE FUNCTION delete_all()
       DELETE FROM gpsd;
       ALTER SEQUENCE gpsd_gpsd_id_seq RESTART;
       DELETE FROM using_radio;
-      DELETE FROM radio_properties;
       DELETE FROM radio_event;
       DELETE FROM antenna;
       DELETE FROM radio;
@@ -1065,7 +1049,6 @@ DELETE FROM traffic;
 DELETE FROM wepcrypt;
 DELETE FROM signal;
 DELETE FROM source;
-DELETE FROM frame_path;
 DELETE FROM assocreq;
 DELETE FROM reassocreq;
 DELETE FROM assocresp;
@@ -1080,6 +1063,7 @@ DELETE FROM sta_activity;
 DELETE FROM sta;
 ALTER SEQUENCE sta_sta_id_seq restart;
 DELETE FROM traffic;
+DELETE FROM frame_path;
 DELETE FROM frame;
 ALTER SEQUENCE frame_frame_id_seq RESTART;
 DELETE FROM platform;
@@ -1088,13 +1072,13 @@ DELETE FROM geo;
 DELETE FROM gpsd;
 ALTER SEQUENCE gpsd_gpsd_id_seq RESTART;
 DELETE FROM using_radio;
-DELETE FROM radio_properties;
 DELETE FROM radio_event;
 DELETE FROM antenna;
 DELETE FROM radio;
 DELETE FROM sensor;
 ALTER SEQUENCE sensor_session_id_seq RESTART;
 
+DROP VIEW  sessions;
 DROP TABLE ampdu;
 DROP TABLE ccmpcrypt;
 DROP TABLE qosctrl;
@@ -1103,7 +1087,6 @@ DROP TABLE traffic;
 DROP TABLE wepcrypt;
 DROP TABLE signal;
 DROP TABLE source;
-DROP TABLE frame_path;
 DROP TABLE assocreq;
 DROP TABLE reassocreq;
 DROP TABLE assocresp;
@@ -1117,13 +1100,13 @@ DROP TABLE action;
 DROP TABLE sta_activity;
 DROP TABLE sta;
 DROP TABLE traffic;
+DROP TABLE frame_path;
 DROP TABLE frame;
 DROP TABLE platform;
 DROP TABLE using_gpsd;
 DROP TABLE geo;
 DROP TABLE gpsd;
 DROP TABLE using_radio;
-DROP TABLE radio_properties;
 DROP TABLE radio_event;
 DROP TABLE antenna;
 DROP TABLE radio;

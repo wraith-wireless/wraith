@@ -308,19 +308,12 @@ class NidusDB(object):
             if not self._curs.fetchone():
                 # truncate the strings to max length 20
                 sql = """
-                       insert into radio (mac,driver,chipset,channels,standards)
-                       values (%s,%s,%s,%s,%s);
+                       insert into radio (mac,driver,chipset,channels,standards,description)
+                       values (%s,%s,%s,%s,%s,%s);
                       """
                 self._curs.execute(sql,(ds['mac'],ds['driver'][0:20],
                                         ds['chipset'][0:20],ds['channels'],
-                                        ds['standards'][0:20]))
-
-            # insert epochal
-            sql = """
-                   insert into radio_properties (mac,description,spoofed,txpwr,ts)
-                   values (%s,%s,%s,%s,%s);
-                  """
-            self._curs.execute(sql,(ds['mac'],ds['desc'],ds['spoofed'],ds['txpwr'],ds['ts']))
+                                        ds['standards'][0:20],ds['desc'][0:100]))
 
             # insert using_radio
             sql = """
@@ -329,6 +322,14 @@ class NidusDB(object):
                   """
             self._curs.execute(sql,(self._sid,ds['mac'],ds['phy'],ds['nic'],
                                     ds['vnic'],ds['role'],ds['ts']))
+
+            sql = "insert into radio_event (mac,state,params,ts) values (%s,%s,%s,%s);"
+            # insert initial events (spoof if any, and txpwr
+            print 'spoofed: ', ds['spoofed']
+            print 'txpwr: ', ds['txpwr']
+            if ds['spoofed']:# and ds['spoofed'] != 'None':
+                self._curs.execute(sql,(ds['mac'],'spoof',ds['spoofed'],ds['ts']))
+            self._curs.execute(sql,(ds['mac'],'txpwr',ds['txpwr'],ds['ts']))
 
             # start save thread if save is enabled
             if self._raw['save']:
@@ -389,7 +390,10 @@ class NidusDB(object):
         try:
             # tokenize the string f and convert to dict and insert into db
             ds = nmp.data2dict(nmp.tokenize(f),'RADIO_EVENT')
-            sql = "insert into radio_event (mac,state,params,ts) values (%s,%s,%s,%s);"
+            sql = """
+                   insert into radio_event (mac,state,params,ts)
+                   values (%s,%s,%s,%s);
+                  """
             self._curs.execute(sql,(ds['mac'],ds['event'],ds['params'],ds['ts']))
         except nmp.NMPException as e:
             raise NidusDBSubmitParseException("submit radio event" % e)

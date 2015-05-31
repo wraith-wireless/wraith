@@ -151,7 +151,7 @@ RADIO_EVENT_WFIELDS = [('ts',str),('mac',str),('event',str),('params',str)]
 RADIO_EVENT_TIMESTAMP = 0 # timestamp of event
 RADIO_EVENT_MAC       = 1 # mac address of radio
 RADIO_EVENT_EVENT     = 2 # the event one of {'scan','hold','listen','fail'}
-RADIO_EVENT_PARAMS    = 3 # free-form parameters of event
+RADIO_EVENT_PARAMS    = 3 # parameters of event i.e. scanlist, txpwr, spoof etc
 
 #### ANTENNA ####
 ANTENNA_FIELDS = ['ts','mac','index','type','gain','loss','x','y','z']

@@ -52,7 +52,7 @@ nidus 0.0.6
    o added ON DELETE CASCADE to tables referencing session_id, frame_id and mac
    o using timestamp rather than periods for radio tables (exluding using_radio) &
      added indexing on the timestamps and periods
-   o condensed some of the radio tables
+   o condensed/removed some of the radio tables
   - handles errors with sensors attemptiong to connect when data from the same
     host is still being processed
   - added error handling in nidusdb to send more in-depth messages: method name

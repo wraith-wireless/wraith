@@ -250,7 +250,8 @@ class RTO(mp.Process):
                 if cs == 'dyskt': continue
                 if ev == '!UP!': # should be the 1st message we get from radio(s)
                     # NOTE: send the radio, nidus will take care of setting the
-                    # radio device to up. Send each antenna separately
+                    # radio device status, initial radio events and using_radio.
+                    # Send each antenna separately
                     rmap[cs] = msg['mac']
                     bulk[cs] = {'cob':None,       # zlib compressobj
                                 'mac':msg['mac'], # mac address of collecting radio
@@ -291,6 +292,12 @@ class RTO(mp.Process):
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'hold',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!PAUSE!': pass
+                elif ev == '!SPOOF!':
+                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'spoof',msg])
+                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                elif ev == '!TXPWR!':
+                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'txpwr',msg])
+                    if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!FRAME!':
                     # save the frame and update bulk details
                     if bulk[cs]['cnt'] == 0:
@@ -442,8 +449,8 @@ class RTO(mp.Process):
 
     @staticmethod
     def _craftradio(ts,d):
-        """ creates radio message body (d[0] is the radio and r its role """
-        return "%s %s %s %s %s %s %s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E %s %s %s \x1EFB\x1F%s\x1FFE\x1E"  % \
+        """ creates radio message body """
+        return "%s %s %s \x1EFB\x1F%s\x1FFE\x1E %s %s %s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E %s %s %s \x1EFB\x1F%s\x1FFE\x1E"  % \
                (ts,d['mac'],d['role'],d['spoofed'],d['phy'],d['nic'],d['vnic'],
                 d['driver'],d['chipset'],d['standards'],','.join(d['channels']),
                 d['txpwr'],d['desc'])
