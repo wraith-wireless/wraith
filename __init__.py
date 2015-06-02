@@ -45,7 +45,8 @@ wraith 0.0.4
    o able delete session(s)
   - added polling to check if service states have changed and updates menus
     accordingly
-
+  - added context menu to right-click on databin buttons (option do nothing as of
+    yet
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

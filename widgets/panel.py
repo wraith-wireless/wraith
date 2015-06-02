@@ -250,6 +250,7 @@ class Panel(ttk.Frame):
         elif opts == 'yesno': return tkMB.askyesno(t,m,parent=self)
         elif opts == 'okcancel': return tkMB.askokcancel(t,m,parent=self)
         else: return tkMB.askquestion(t,m,parent=self)
+    def unimplemented(self): self.warn('Note',"This function not currently implemented")
 
 class SlavePanel(Panel):
     """
@@ -857,10 +858,6 @@ class MasterPanel(Panel):
             panel[0].tk.deiconify()
             panel[0].tk.lift()
 
-    def unimplemented(self):
-        """ displays info dialog with not implmented message """
-        self.info('Not Implemented',"This function not currently implemented")
-        
     def guisave(self):
         """ saves current toolset configuration """
         fpath = tkFD.asksaveasfilename(title='Save Toolset',

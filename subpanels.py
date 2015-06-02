@@ -464,6 +464,8 @@ class DatabinPanel(gui.SimplePanel):
 
     def _makebin(self,frm,b):
         """ makes a button for bin b """
+        # attempt to load the icon if it fails use text, save the name of this
+        # button, then grid the button
         try:
             self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
         except:
@@ -473,7 +475,11 @@ class DatabinPanel(gui.SimplePanel):
         else:
             self._bins[b]['btn'] = ttk.Button(frm,image=self._bins[b]['img'],
                                               command=lambda:self.viewquery(b))
+        self._bins[b]['name'] = self._bins[b]['btn']._name
         self._bins[b]['btn'].grid(row=0,column=wraith.BINS.index(b),sticky='w')
+
+        # bind the right click to this button to show a context menu
+        self._bins[b]['btn'].bind('<Button-3>',self.binrc)
 
     def notifyclose(self,name):
         """ close the associated bin's cursor """
@@ -494,6 +500,24 @@ class DatabinPanel(gui.SimplePanel):
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
+
+    def binrc(self,event):
+        """ on right click, show context menu for this button """
+        # determine which bin
+        bin = None
+        for b in self._bins:
+            if self._bins[b]['name'] == event.widget._name: bin = b
+
+        # and show context menu
+        mnu = tk.Menu(None,tearoff=0)
+        mnu.add_command(label='Delete',command=self.unimplemented)
+        mnu.add_command(label='Copy To',command=self.unimplemented)
+        mnu.add_command(label='Move To',command=self.unimplemented)
+        mnu.add_command(label='Export As',command=self.unimplemented)
+        mnu.add_separator()
+        mnu.add_command(label='Save',command=self.unimplemented)
+        mnu.add_command(label='Open',command=self.unimplemented)
+        mnu.tk_popup(event.x_root,event.y_root)
 
 # Databin->Query
 
@@ -847,7 +871,9 @@ class QueryPanel(gui.SlavePanel):
             self.master.tk.call(self.master,"config","-menu",self.menubar)
 
     # bindings
-    def trsessca(self,event): self._trSess.selection_set(self._trSess.get_children(''))
+    def trsessca(self,event):
+        """ sessions tree ctrl-a -> selects all """
+        self._trSess.selection_set(self._trSess.get_children(''))
 
     # virtual implementations
 
