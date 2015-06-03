@@ -31,30 +31,33 @@
     <!-- MAIN CONTENT -->
     <div id="main_content_wrap" class="outer">
       <section id="main_content" class="inner">
-        <h1>
-<a id="-wraith-wireless-assault-reconnaissance-collection-and-exploitation-toolkit" class="anchor" href="#-wraith-wireless-assault-reconnaissance-collection-and-exploitation-toolkit" aria-hidden="true"><span class="octicon octicon-link"></span></a>
-<img src="https://raw.githubusercontent.com/wraith-wireless/wraith/master/widgets/icons/wraith-banner.png" alt=""> 
-<hr>
-WRAITH: Wireless assault, reconnaissance, collection and exploitation toolkit.</h1>
+        <p><img src="widgets/icons/wraith-banner.png?raw=true" alt=""></p>
+
+<h1>
+<a id="wraith-wireless-assault-reconnaissance-collection-and-exploitation-toolkit" class="anchor" href="#wraith-wireless-assault-reconnaissance-collection-and-exploitation-toolkit" aria-hidden="true"><span class="octicon octicon-link"></span></a>WRAITH: Wireless assault, reconnaissance, collection and exploitation toolkit.</h1>
 
 <blockquote>
-<p>"You knew that I reap where I have not sown and gather where I scattered no seed?"</p>
+<p>"You knew that I reap where I have not sown and gather where I scattered no seed."</p>
 </blockquote>
 
 <h2>
 <a id="1-description" class="anchor" href="#1-description" aria-hidden="true"><span class="octicon octicon-link"></span></a>1 DESCRIPTION:</h2>
 
-<p>Attack vectors, rogue devices, interfering networks are best visualized and identified over time. 
-Current tools i.e. Kismet, Aircrack-ng and Wireshark are excellent tools but none are completely 
-suitable for collecting and analyzing the 802.11 environment over a period of time (without implementing a 
-custom interface). </p>
+<p>Attack vectors, rogue devices, interfering networks are best visualized and identified
+over time. Current tools i.e. Kismet, Aircrack-ng and Wireshark are excellent tools
+but none are completely suitable for collecting and analyzing the 802.11 environment
+over a period of time without that is, implementing a custom interface.</p>
 
-<p>Wraith is an attempt to develop a toolsuite that eases the collection, collation and analysis of temporal 
-802.11 data in order to provide administrators with the ability to view their networks from a bird's eye 
-view and drill down as necessary to a single device.</p>
+<p>While originally intending to develop such a custom interface to one or more Kismet
+based sensors, Wraith evolved. Kismet did not offer enough information, Wireshark
+offered too much. Wraith is an attempt to develop a toolsuite that eases the
+collection, collation and analysis of temporal 802.11 data in order to provide
+administrators with the ability to view their network(s) from a bird's eye view and
+drill down as necessary to a single device. Wraith allows the user to decide what
+data to view, how to view it and 'when' to view it.</p>
 
-<p>Once the reconnaissance and collection development is stable, assault plug-ins will be developed to aid
-WLAN administrators in the security testing of their networks. </p>
+<p>Once the reconnaissance and collection development is stable, assault plug-ins will
+be developed to aid WLAN administrators in the security testing of their networks.</p>
 
 <h2>
 <a id="2-requirements" class="anchor" href="#2-requirements" aria-hidden="true"><span class="octicon octicon-link"></span></a>2. REQUIREMENTS:</h2>
@@ -70,15 +73,17 @@ on earlier kernels</li>
 <li>Python 2.7</li>
 <li>iw 3.17</li>
 <li>postgresql 9.x (tested on 9.3.5)</li>
-<li>pyscopg 2.5.3</li>
+<li>pyscopg 2.6</li>
 <li>mgrs 1.1</li>
+<li>macchanger 1.7.0</li>
+<li>lxml 3.4.4</li>
 </ul>
 
 <h2>
 <a id="3-modules-currently-consists-of-four-componentsmodules" class="anchor" href="#3-modules-currently-consists-of-four-componentsmodules" aria-hidden="true"><span class="octicon octicon-link"></span></a>3. MODULES: Currently consists of four components/modules</h2>
 
 <h3>
-<a id="a-radio-80211-network-interface-objects-and-functions" class="anchor" href="#a-radio-80211-network-interface-objects-and-functions" aria-hidden="true"><span class="octicon octicon-link"></span></a>a. Radio: 802.11 network interface objects and functions</h3>
+<a id="a-radio-v-004-80211-network-interface-objects-and-functions" class="anchor" href="#a-radio-v-004-80211-network-interface-objects-and-functions" aria-hidden="true"><span class="octicon octicon-link"></span></a>a. Radio (v 0.0.4): 802.11 network interface objects and functions</h3>
 
 <p>Objects/functions to manipulate wireless nics and parse 802.11 captures.
 Partial support of 802.11-2012</p>
@@ -93,87 +98,102 @@ Partial support of 802.11-2012</p>
 </ul>
 
 <h3>
-<a id="b-suckt-small-unit-capturekill-team-wraith-sensor" class="anchor" href="#b-suckt-small-unit-capturekill-team-wraith-sensor" aria-hidden="true"><span class="octicon octicon-link"></span></a>b. Suckt: Small Unit Capture/Kill Team (Wraith Sensor)</h3>
+<a id="b-dyskt-v-015--dynamic-small-kill-team-wraith-sensor" class="anchor" href="#b-dyskt-v-015--dynamic-small-kill-team-wraith-sensor" aria-hidden="true"><span class="octicon octicon-link"></span></a>b. DySKT (v 0.1.5) : Dynamic Small Kill Team (Wraith Sensor)</h3>
 
-<p>Suckt is a 802.11 sensor consisting of an optional collection radio (i.e.
-spotter), a mandatory reconnaissance radio (i.e. shooter) and an RTO which relays
-collected data to Nidus, the data storage system (i.e. HQ). Suckt collects data
-in the form of raw 802.11 packets with the reconnaissance (and collection if present)
-radios, forwarding that date along with any geolocational data (if a gps device
-is present) to higher. The reconnaissance radio will also partake in assaults in
-directed to.</p>
+<p>An 802.11 sensor consisting of an optional collection radio (i.e. spotter), a
+mandatory reconnaissance radio (i.e. shooter) and an RTO which relays collected
+data to Nidus, the data storage system (i.e. HQ). DySKT collects data in the form
+of raw 802.11 packets with the reconnaissance (and collection if present) radios,
+forwarding that data along with any geolocational data (if a gps device is present)
+to higher.</p>
 
 <h3>
-<a id="c-nidus-data-storage-manager" class="anchor" href="#c-nidus-data-storage-manager" aria-hidden="true"><span class="octicon octicon-link"></span></a>c. Nidus: Data Storage Manager</h3>
+<a id="c-nidus-v-006-data-storage-manager" class="anchor" href="#c-nidus-v-006-data-storage-manager" aria-hidden="true"><span class="octicon octicon-link"></span></a>c. Nidus (v 0.0.6): Data Storage Manager</h3>
 
-<p>Nidus is the Data Storage manager processing data received from Suckt. Nidus is the 
+<p>Nidus is the Data Storage manager processing data received from DySKT. Nidus is the
 interface to the backend Postgresql database, processing data in terms of raw 802.11
 frames, gps location, and 'device' details/status. </p>
 
 <h3>
-<a id="d-gui-non-operational-gui" class="anchor" href="#d-gui-non-operational-gui" aria-hidden="true"><span class="octicon octicon-link"></span></a>d. GUI: non-operational gui</h3>
+<a id="d-wraith-rt-gui" class="anchor" href="#d-wraith-rt-gui" aria-hidden="true"><span class="octicon octicon-link"></span></a>d. wraith-rt: GUI</h3>
+
+<p>In progress gui. Currently configured to provide start/stop of services, display
+and editing of configuration files, some manipulation of backened storage.</p>
 
 <h2>
 <a id="4-architectureheirarchy-brief-overview-of-the-project-file-structure" class="anchor" href="#4-architectureheirarchy-brief-overview-of-the-project-file-structure" aria-hidden="true"><span class="octicon octicon-link"></span></a>4. ARCHITECTURE/HEIRARCHY: Brief Overview of the project file structure</h2>
 
 <ul>
-<li>wraith/                Top-level package
+<li>wraith/               Top-level package
 
 <ul>
-<li>__init__.py          this file - initialize the top-level (includes misc functions)</li>
-<li>wraith-rt.py         the gui</li>
-<li>   LICENSE              software license</li>
-<li>   README.txt           details</li>
-<li>   CONFIGURE.txt        setup details</li>
-<li>   widgets              gui subpackage
+<li>__init__.py      initialize the top-level</li>
+<li>wraith-rt.py         the main Panel gui</li>
+<li>subpanels.py         child panels</li>
+<li>wraith.conf          gui configuration file</li>
+<li>LICENSE              software license</li>
+<li>README.md            this file</li>
+<li>CONFIGURE.txt        setup details</li>
+<li>TODO                 todos for each subpackage</li>
+<li>widgets              gui subpackage
 
 <ul>
-<li> icons            icons folder</li>
-<li> __init__.py      initialize widgets subpackage</li>
-<li> panel.py         defines Panel and subclasses for gui</li>
+<li> icons           icons folder</li>
+<li> __init__.py initialize widgets subpackage</li>
+<li> panel.py        defines Panel and subclasses for gui</li>
 </ul>
 </li>
-</ul>
-</li>
-<li> radio                subpackage for radio/radiotap
+<li>utils                utility functions
 
 <ul>
-<li>__init__.py      initialize radio subpackage</li>
-<li>bits.py          bitmask related funcs, bit extraction functions</li>
+<li> __init__.py  initialize utils subpackage</li>
+<li>bits.py           bitmask functions</li>
+<li>timestamps.py     timestamp conversion functions</li>
+<li>landnav.py        land navigation utilities</li>
+<li>cmdline.py        various cmdline utilities for testing processes</li>
+<li>simplepcap.py     pcap writer</li>
+</ul>
+</li>
+<li> radio               subpackage for radio/radiotap
+
+<ul>
+<li>__init__.py  initialize radio subpackage</li>
 <li>iwtools.py       iwconfig, ifconfig interface and nic utilities</li>
 <li>iw.py            iw 3.17 interface</li>
 <li>radiotap.py      radiotap parsing</li>
 <li>mpdu.py          IEEE 802.11 MAC (MPDU) parsing</li>
-<li>infoelement.py   contstants for mgmt frames</li>
+<li>dott1u.py        contstants for 802.11u (not currently used)</li>
 <li>channels.py      802.11 channel, freq utilities</li>
 <li>mcs.py           mcs index functions</li>
 <li>oui.py           oui/manuf related functions</li>
 </ul>
 </li>
-<li> suckt                subpackage for wraith sensor
+<li> dyskt               subpackage for wraith sensor
 
 <ul>
-<li>__init__.py      initialize suckt package</li>
-<li>suckt.conf       configuration file for wasp</li>
-<li>suckt.log.conf   configuration file for wasp logging</li>
-<li>suckt.py         primary module</li>
-<li>internal.py      defines the Report class</li>
+<li>__init__.py  initialize dyskt package</li>
+<li>dyskt.conf       configuration file for dyskt</li>
+<li>dyskt.log.conf   configuration file for dyskt logging</li>
+<li>dyskt.py         primary module</li>
 <li>rdoctl.py        radio controler with tuner, sniffer</li>
 <li>rto.py           data collation and forwarding</li>
-<li>sucktd           sucktd daemon</li>
+<li>dysktd           dyskt daemon</li>
 </ul>
 </li>
-<li> nidus                subpackage for datamanager
+<li> nidus               subpackage for datamanager
 
 <ul>
-<li>__init__.py      initialize nidus package</li>
+<li>__init__.py  initialize nidus package</li>
 <li>nidus.conf       nidus configuration</li>
 <li>nidus.log.conf   nidus logging configuration</li>
 <li>nidus.py         nidus server</li>
 <li>nmp.py           nidus protocol definition</li>
 <li>nidusdb.py       interface to storage system</li>
-<li>simplepcap.py    pcap writer</li>
+<li>sse.py           frame/metaframe processing</li>
 <li>nidus.sql        sql tables definition</li>
+<li>nidusd           nidus daemon</li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -184,7 +204,7 @@ frames, gps location, and 'device' details/status. </p>
     <div id="footer_wrap" class="outer">
       <footer class="inner">
         <p class="copyright">Wraith maintained by <a href="https://github.com/wraith-wireless">wraith-wireless</a></p>
-        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+        <p>Published with <a href="https://pages.github.com">GitHub Pages</a></p>
       </footer>
     </div>
 
