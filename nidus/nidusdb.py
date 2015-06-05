@@ -438,15 +438,15 @@ class NidusDB(object):
             raise NidusDBSubmitParseException(e)
         self._submitframe(ds['mac'],ds['ts'],ds['frame'])
 
-    def submitgeo(self,f):
-        """ submitgeo - submit the string fields to the database """
+    def submitflt(self,f):
+        """ submitflt - submit the string fields to the database """
         try:
             # tokenize the string f and convert to dict, convert lat/lon to mgrs
-            ds = nmp.data2dict(nmp.tokenize(f),'GPS')
+            ds = nmp.data2dict(nmp.tokenize(f),'FLT')
 
             # submit to db
             sql = """
-                   insert into geo (sid,ts,coord,alt,spd,dir,
+                   insert into flt (sid,ts,coord,alt,spd,dir,
                                     fix,xdop,ydop,pdop,epx,epy)
                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
                   """
@@ -454,14 +454,14 @@ class NidusDB(object):
                                     ds['spd'],ds['dir'],ds['fix'],ds['xdop'],
                                     ds['ydop'],ds['pdop'],ds['epx'],ds['epy']))
         except nmp.NMPException as e:
-            raise NidusDBSubmitParseException("submit geo %s" % e)
+            raise NidusDBSubmitParseException("submit flt %s" % e)
         except psql.Error as e:
             self._conn.rollback()
-            raise NidusDBSubmitException("submit geo %s: %s" % (e.pgcode,e.pgerror))
+            raise NidusDBSubmitException("submit flt %s: %s" % (e.pgcode,e.pgerror))
         except Exception as e:
             # blanket
             self._conn.rollback()
-            raise NidusDBSubmitException("submit geo type(%s) %s" % (type(e),e.__repr__()))
+            raise NidusDBSubmitException("submit flt type(%s) %s" % (type(e),e.__repr__()))
         else:
             self._conn.commit()
 

@@ -4,14 +4,14 @@
 
 A simple definition of the nidus message protocol:
 
-Nidus expects six major message types Radio, GPSD, Frame, GPS, Status and Sensor
+Nidus expects six major message types Radio, GPSD, Frame, FLT, Status and Sensor
  DEVICE: state of given device has changed 
  RADIO: details about an wireless network interface card
  ANTENNA: antenna details
  RADIO_EVENT: details of radio changing 'state'
  GPSD: details about a gps device
  FRAME: a raw 802.11 frame
- GPS: gps location data
+ FLT: front-line trace data
 
 Briefly, each message will follow  the below format: (NOTE: There cannot be a
 space betw/ the colons and the data, control character)
@@ -20,7 +20,7 @@ space betw/ the colons and the data, control character)
 or
  \x01*TYPE:\x02FIELDS\x03\x12\x15\x04 
 
-where TYPE is oneof {STATUS,SENSOR,RADIO,GPDS,BULK,FRAME,GPS} and FIELDS is a space
+where TYPE is oneof {STATUS,SENSOR,RADIO,GPDS,BULK,FRAME,FLT} and FIELDS is a space
 delimited string as defined (for TYPE) below. Fields are defined in three 
 variables:
  TYPE_FIELDS - list of each expected field name at expected index
@@ -199,21 +199,21 @@ FRAME_TIMESTAMP = 0 # timestamp of frame
 FRAME_RID       = 1 # mac address of collecting radio
 FRAME_FRAME     = 2 # the frame
 
-#### GPS ####
-GPS_FIELDS = ['ts','id','fix','coord','alt','dir',
+#### FLT ####
+FLT_FIELDS = ['ts','id','fix','coord','alt','dir',
               'spd','exp','epy','xdop','ydop','pdop']
-GPS_WFIELDS = [('ts',str),('id',str),('fix',int),('coord',str),('alt',str2float),
+FLT_WFIELDS = [('ts',str),('id',str),('fix',int),('coord',str),('alt',str2float),
                ('dir',str2float),('spd',str2float),('epx',float),('epy',float),
                ('xdop',float),('ydop',float),('pdop',float)]
-GPS_TIMESTAMP =  0 # timestamp of geolocation
-GPS_ID        =  1 # id of device collecting this
-GPS_FIX       =  2 # 'quality' of the fix, -1 = fixed
-GPS_COORD     =  3 # MGRS grid coordinate
-GPS_ALT       =  4 # altitude
-GPS_DIR       =  5 # heading/direction
-GPS_SPD       =  6 # speed
-GPS_EPX       =  7 # error in latitude
-GPS_EPY       =  8 # error in longitude
-GPS_XDOP      =  9 # cross-track dilution of precision
-GPS_YDOP      = 10 # cross-track dilution of precision
-GPS_PDOP      = 11 # positon dilution of precision
+FLT_TIMESTAMP =  0 # timestamp of flt
+FLT_ID        =  1 # id of device collecting this
+FLT_FIX       =  2 # 'quality' of the fix, -1 = fixed
+FLT_COORD     =  3 # MGRS grid coordinate
+FLT_ALT       =  4 # altitude
+FLT_DIR       =  5 # heading/direction
+FLT_SPD       =  6 # speed
+FLT_EPX       =  7 # error in latitude
+FLT_EPY       =  8 # error in longitude
+FLT_XDOP      =  9 # cross-track dilution of precision
+FLT_YDOP      = 10 # cross-track dilution of precision
+FLT_PDOP      = 11 # positon dilution of precision

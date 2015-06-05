@@ -94,10 +94,10 @@ CREATE TABLE using_gpsd(
 );
 CREATE INDEX using_gpsd_period_idx ON using_gpsd USING GIST (period);
 
--- geo table
+-- flt (front-line trace) table
 -- locational data of sensor NOTE: we use the sensor id over a gps device id
--- due to the fact that the geo may be staticly defined
--- how do we define a constraint such that the geo must have a sid that 
+-- due to the fact that the flt may be staticly defined
+-- how do we define a constraint such that the flt must have a sid that
 -- is in sensor and the ts falls within that sensor's current period
 -- *dop values:
 -- 1	 Ideal	    highest possible confidence level
@@ -106,11 +106,11 @@ CREATE INDEX using_gpsd_period_idx ON using_gpsd USING GIST (period);
 -- 5-10	 Moderate	can be used for calculations, but fix quality could be improved, more open view of sky is recommended.
 -- 10-20 Fair	    low confidence level discard or used only to indicate rough estimate of current loc
 -- >20	 Poor	    measurements are inaccurate and should be discard
-DROP TABLE IF EXISTS geo;
-CREATE TABLE geo(
+DROP TABLE IF EXISTS flt;
+CREATE TABLE flt(
    sid integer NOT NULL,        -- FOREIGN KEY to sensor
-   ts TIMESTAMPTZ NOT NULL,     -- timestamp of geolocation
-   coord VARCHAR(15) NOT NULL,  -- geolocation in mgrs
+   ts TIMESTAMPTZ NOT NULL,     -- timestamp of flt
+   coord VARCHAR(15) NOT NULL,  -- location in mgrs of sensor
    alt REAL,                    -- altitude
    spd REAL,                    -- speed
    dir REAL,                    -- heading
@@ -132,7 +132,7 @@ CREATE TABLE geo(
    FOREIGN KEY (sid) REFERENCES sensor(session_id) ON DELETE CASCADE,
    PRIMARY KEY(sid,ts)
 );
-CREATE INDEX geo_ts_idx ON geo(ts);
+CREATE INDEX flt_ts_idx ON flt(ts);
 
 -- radio table
 -- static properties of a radio i.e. a wireless nic
@@ -1012,7 +1012,7 @@ CREATE FUNCTION delete_all()
       ALTER SEQUENCE frame_frame_id_seq RESTART;
       DELETE FROM platform;
       DELETE FROM using_gpsd;
-      DELETE FROM geo;
+      DELETE FROM flt;
       DELETE FROM gpsd;
       ALTER SEQUENCE gpsd_gpsd_id_seq RESTART;
       DELETE FROM using_radio;
@@ -1068,7 +1068,7 @@ DELETE FROM frame;
 ALTER SEQUENCE frame_frame_id_seq RESTART;
 DELETE FROM platform;
 DELETE FROM using_gpsd;
-DELETE FROM geo;
+DELETE FROM flt;
 DELETE FROM gpsd;
 ALTER SEQUENCE gpsd_gpsd_id_seq RESTART;
 DELETE FROM using_radio;
@@ -1104,7 +1104,7 @@ DROP TABLE frame_path;
 DROP TABLE frame;
 DROP TABLE platform;
 DROP TABLE using_gpsd;
-DROP TABLE geo;
+DROP TABLE flt;
 DROP TABLE gpsd;
 DROP TABLE using_radio;
 DROP TABLE radio_event;

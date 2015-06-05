@@ -43,10 +43,11 @@ wraith 0.0.4
   - added Sessions panel
    o able to view a list of sessions
    o able delete session(s)
-  - added polling to check if service states have changed and updates menus
+  - added polling to check if service's states have changed and updates menus
     accordingly
   - added context menu to right-click on databin buttons (option do nothing as of
     yet
+  - semantic change: made geo flt (front-line trace) as it better describes the data
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

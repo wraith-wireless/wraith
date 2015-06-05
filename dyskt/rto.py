@@ -130,18 +130,18 @@ class GPSPoller(threading.Thread):
                         if rpt['epx'] > qpx or rpt['epy'] > qpy: continue
                         else:
                             # get all values
-                            geo = {}
-                            geo['id'] = dd['id']
-                            geo['fix'] = rpt['mode']
-                            geo['lat'] = (rpt['lat'],rpt['epy'])
-                            geo['lon'] = (rpt['lon'],rpt['epx'])
-                            geo['alt'] = rpt['alt'] if 'alt' in rpt else float("nan")
-                            geo['dir'] = rpt['track'] if 'track' in rpt else float("nan")
-                            geo['spd'] = rpt['spd'] if 'spd' in rpt else float("nan")
-                            geo['dop'] = {'xdop':self._gpsd.xdop,
+                            flt = {}
+                            flt['id'] = dd['id']
+                            flt['fix'] = rpt['mode']
+                            flt['lat'] = (rpt['lat'],rpt['epy'])
+                            flt['lon'] = (rpt['lon'],rpt['epx'])
+                            flt['alt'] = rpt['alt'] if 'alt' in rpt else float("nan")
+                            flt['dir'] = rpt['track'] if 'track' in rpt else float("nan")
+                            flt['spd'] = rpt['spd'] if 'spd' in rpt else float("nan")
+                            flt['dop'] = {'xdop':self._gpsd.xdop,
                                           'ydop':self._gpsd.ydop,
                                           'pdop':self._gpsd.pdop}
-                            self._eQ.put(('!GEO',time.time(),geo))
+                            self._eQ.put(('!GEO',time.time(),flt))
                             break
                     except (KeyError,AttributeError): # not all values present
                         # a KeyError means not all values are present, an
@@ -169,7 +169,7 @@ class RTO(mp.Process):
         self._mgrs = None                  # lat/lon to mgrs conversion
         self._conf = conf['gps']           # configuration for gps/datastore
         self._nidus = None                 # nidus server
-        self._flt = None                   # geo thread for front line traces
+        self._flt = None                   # polling thread for front line traces
         self._q = None                     # internal queue for gps poller
         self._setup(conf['store']['host'], # nidus storage manager connection
                     conf['store']['port'])
@@ -236,7 +236,7 @@ class RTO(mp.Process):
                     ret = self._send('GPSD',ts,msg)
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif t == '!GEO!': # frontline trace
-                    ret = self._send('GPS',ts,msg)
+                    ret = self._send('FLT',ts,msg)
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
 
             # 3. queued data from radios (possibly DySKT)
@@ -374,7 +374,7 @@ class RTO(mp.Process):
         try:
             self._flt = GPSPoller(self._q,self._conf)
         except RuntimeError as e:
-            self._conn.send(('warn','RTO','GPS',"Failed to connnect %s" %e))
+            self._conn.send(('warn','RTO','FLT',"Failed to connnect %s" %e))
             self._flt = None
         else:
             self._flt.start()
@@ -425,7 +425,7 @@ class RTO(mp.Process):
             elif t == 'GPSD': send += self._craftgpsd(ts,d)
             elif t == 'FRAME': send += self._craftframe(ts,d)
             elif t == 'BULK': send += self._craftbulk(ts,d)
-            elif t == 'GPS': send += self._craftflt(ts,d,self._mgrs)
+            elif t == 'FLT': send += self._craftflt(ts,d,self._mgrs)
             elif t == 'RADIO_EVENT': send += self._craftradioevent(ts,d)
             send += "\x03\x12\x15\04"
             if not self._nidus.send(send): return "Nidus socket closed unexpectantly"

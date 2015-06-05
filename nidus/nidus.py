@@ -117,7 +117,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 elif t == 'GPSD': db.submitgpsd(f)
                 elif t == 'FRAME': db.submitsingle(f) # deprecated
                 elif t == 'BULK': db.submitbulk(f)
-                elif t == 'GPS': db.submitgeo(f)
+                elif t == 'FLT': db.submitflt(f)
                 else:
                     logging.warning("Sensor %s:%d sent data with invalid header %s",
                                     self.client_address[0],
