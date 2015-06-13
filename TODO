@@ -6,9 +6,8 @@ Overall:
   2) run dyskt as root - requires too many workarounds otherwise
      o if daemon is run as root, will have to modify cmdline.dysktrunning to
      use sudo pwd
-  3) Need a way to identify when nidus is processing data from a closed dyskt
-     o use an open session in database?
-  5) enable delete by session
+  3) use getboolean for config file instead of as currently used by checking
+     string values
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -20,12 +19,11 @@ GUI:
      o Column widths are off a little (wider than desired)
  21) Have to work on resize of widgets etc with row/column configure
  22) use Tk validatecommand on widgets
- 24) guisave/guiload only works on first sublevel i.e. children of the master pane
+ 24) guisave/guiload only works on first sublevel i.e. children of the master panel
      should we extend to every panel or leave as is
  27) Splash panel
      o get rid of border around progressbar and progressbar.pbar
      o many statements are not even seen, remove them
- 28) rework polling for service status
  29) icons or status bar to show what state services are in
  30) What is the best way to handle child panels and db connections?
      o psycopg2 claims excellent threaded cursors - do we use the main connection

@@ -286,7 +286,6 @@ class RadioController(mp.Process):
                 iwt.ifconfig(self._nic,'up')
             except (iw.IWException,iwt.IWToolsException):
                 pass
-            if self._s: self._s.close()
             raise RuntimeError("%s:iw.chset:Failed to set channel: %s" % (self._role,e))
         except (ValueError,TypeError) as e:
             try:
@@ -295,7 +294,6 @@ class RadioController(mp.Process):
                 iwt.ifconfig(self._nic,'up')
             except (iw.IWException,iwt.IWToolsException):
                 pass
-            if self._s: self._s.close()
             raise RuntimeError("%s:config:%s" % (self._role,e))
         except Exception as e:
             # blanket exception
@@ -305,8 +303,11 @@ class RadioController(mp.Process):
                 iwt.ifconfig(self._nic,'up')
             except (iw.IWException,iwt.IWToolsException):
                 pass
-            if self._s: self._s.close()
             raise RuntimeError("%s:Unknown:%s" % (self._role,e))
+        finally:
+            if self._s:
+                self._s.shutdown()
+                self._s.close()
 
     def terminate(self): pass
 
@@ -396,7 +397,9 @@ class RadioController(mp.Process):
                 clean = False
 
             # close socket and connection
-            if self._s: self._s.close()
+            if self._s:
+                self._s.shutdown()
+                self._s.close()
             self._conn.close()
         except:
             clean = False

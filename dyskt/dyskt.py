@@ -23,6 +23,7 @@ import logging.config                           # log configuration
 import logging.handlers                         # handlers for log
 import multiprocessing as mp                    # multiprocessing process, events etc
 import ConfigParser                             # reading configuration files
+import socket                                   # for the c2c server
 from wraith import dyskt                        # for rev number, author
 from wraith.dyskt.rto import RTO                # the rto
 from wraith.dyskt.rdoctl import RadioController # Radio object etc
@@ -116,6 +117,7 @@ class DySKT(object):
         self._rr = None             # recon radio
         self._cr = None             # collection radio
         self._rd = None             # regulatory domain
+        self._c2c = None            # our c2c socket
     
     def _create(self):
         """ create DySKT and member processes """
@@ -165,6 +167,19 @@ class DySKT(object):
                 except RuntimeError as e:
                     # continue without collector, but log it
                     logging.warning("Collection Radio (%s), continuing without",e)
+
+            # start c2c socket - if it fails write to log but continue
+            if self._conf['local']['c2c'] is not None:
+                logging.info("Starting C2C")
+                self._c2c = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+                try:
+                    self._c2c.bind(('localhost',self._conf['local']['c2c']))
+                    self._c2c.listen(1)
+                except socket.error as e:
+                    self._c2c = None
+                    logging.warning("C2C not started: %s" % e)
+                else:
+                    logging.info("C2C listening on %d" % self._conf['local']['c2c'])
         except RuntimeError as e:
             # e should have the form "Major:Minor:Description"
             ms = e.message.split(':')
@@ -185,6 +200,11 @@ class DySKT(object):
         """ destroy DySKT cleanly """
         # change our state
         self._state = DYSKT_EXITING
+
+        # close our c2c if it is running
+        if self._c2c:
+            logging.info("Shutting down C2C")
+            self._c2c.close()
 
         # reset regulatory domain if necessary
         if self._rd:
@@ -235,7 +255,23 @@ class DySKT(object):
 
         # execution loop
         while not self._halt.is_set():
+            # check c2c to see if it is running and start if it isn't
+            if self._c2c is None and self._conf['local']['c2c'] is not None:
+                logging.info("Starting C2C")
+                self._c2c = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+                try:
+                    self._c2c.bind(('localhost',self._conf['local']['c2c']))
+                    self._c2c.listen(1)
+                except socket.error as e:
+                    self._c2c = None
+                    logging.warning("C2C not started: %s" % e)
+                else:
+                    logging.info("C2C listening on %d" % self._conf['local']['c2c'])
+
+            # check for any commands from c2c
+
             # get message a tuple: (level,originator,type,message)
+            # TODO: move to select? socket.fileno()
             for key in self._pConns:
                 try:
                     if self._pConns[key].poll():
@@ -312,7 +348,7 @@ class DySKT(object):
 
             # Local section
             self._conf['local'] = {'region':None,'c2c':None}
-            if conf.has_option('Lcoal','C2C'):
+            if conf.has_option('Local','C2C'):
                 self._conf['local']['c2c'] = conf.getint('Local','C2C')
             if conf.has_option('Local','region'):
                 reg = conf.get('Local','region')
@@ -334,6 +370,7 @@ class DySKT(object):
 
         # get nic and set role setting default antenna config
         r = {'nic':conf.get(rtype,'nic'),
+             'paused':False,
              'spoofed':None,
              'ant_gain':0.0,
              'ant_loss':0.0,
@@ -347,6 +384,8 @@ class DySKT(object):
         # get optional properties
         if conf.has_option(rtype,'spoof'): r['spoofed'] = conf.get(rtype,'spoof')
         if conf.has_option(rtype,'desc'):  r['desc'] = conf.get(rtype,'desc')
+        if conf.has_option(rtype,'paused'):
+            if conf.get(rtype,'paused').lower() == 'on': r['paused'] = True
 
         # process antennas - get the number first
         try:

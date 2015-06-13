@@ -92,7 +92,10 @@ class NidusRequestHandler(ss.BaseRequestHandler):
         while len(msg) == 0 or msg[-4:] != "\x03\x12\x15\x04":
             try:
                 data = self.request.recv(1024)
-                if data == '': return None
+                if data == '':
+                    # TODO what about the data already in message
+                    print msg
+                    return None
                 msg += data
             except socket.error as e:
                 raise RuntimeError(e)

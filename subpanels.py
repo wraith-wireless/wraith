@@ -1531,7 +1531,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self._entReconAntXYZ = ttk.Entry(frmRA,width=15)
         self._entReconAntXYZ.grid(row=2,column=4,sticky='e')
         # SCAN PATTERN SUB SECTION
-        frmRS = ttk.LabelFrame(frmR,text='Scan Pattern')
+        frmRS = ttk.LabelFrame(frmR,text='Scan')
         frmRS.grid(row=3,column=0,columnspan=5,sticky='nwse')
         ttk.Label(frmRS,text="Dwell: ").grid(row=0,column=0,sticky='w')
         self._entReconScanDwell = ttk.Entry(frmRS,width=5)
@@ -1547,6 +1547,8 @@ class DySKTConfigPanel(gui.ConfigPanel):
         ttk.Label(frmRS,text="Pass: ").grid(row=1,column=4,sticky='w')
         self._entReconScanPass = ttk.Entry(frmRS,width=12)
         self._entReconScanPass.grid(row=1,column=5,sticky='e')
+        self._vrpause = tk.IntVar()
+        ttk.Checkbutton(frmRS,text="Paused",variable=self._vrpause).grid(row=2,column=0,columnspan=2)
         nb.add(frmR,text='Recon')
 
         # Collection Tab Configuration
@@ -1600,6 +1602,8 @@ class DySKTConfigPanel(gui.ConfigPanel):
         ttk.Label(frmCS,text="Pass: ").grid(row=1,column=4,sticky='w')
         self._entCollectionScanPass = ttk.Entry(frmCS,width=12)
         self._entCollectionScanPass.grid(row=1,column=5,sticky='e')
+        self._vcpause = tk.IntVar()
+        ttk.Checkbutton(frmCS,text="Paused",variable=self._vcpause).grid(row=2,column=0,columnspan=2)
         nb.add(frmC,text='Collection')
 
         # GPS Tab Configuration
@@ -1706,6 +1710,9 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self._entReconScanPass.delete(0,tk.END)
         if cp.has_option('Recon','pass'):
             self._entReconScanPass.insert(0,cp.get('Recon','pass'))
+        self._vrpause.set(0)
+        if cp.has_option('Recon','paused'):
+            if cp.getboolean('Recon','paused'): self._vrpause.set(1)
 
         # then the collection radio details
         self._entCollectionNic.delete(0,tk.END)
@@ -1744,6 +1751,9 @@ class DySKTConfigPanel(gui.ConfigPanel):
         self._entCollectionScanPass.delete(0,tk.END)
         if cp.has_option('Collection','pass'):
             self._entCollectionScanPass.insert(0,cp.get('Collection','pass'))
+        self._vcpause.set(0)
+        if cp.has_option('Collection','paused'):
+            if cp.getboolean('Collection','paused'): self._vcpause.set(1)
 
         # gps entries
         try:
@@ -2010,7 +2020,9 @@ class DySKTConfigPanel(gui.ConfigPanel):
             cp = ConfigParser.ConfigParser()
             cp.add_section('Recon')
             cp.set('Recon','nic',self._entReconNic.get())
+            cp.set('Recon','paused','on' if self._vrpause.get() else 'off')
             if self._entReconSpoof.get(): cp.set('Recon','spoof',self._entReconSpoof.get())
+
             nA = self._entReconAntNum.get()
             if nA:
                 cp.set('Recon','antennas',self._entReconAntNum.get())
@@ -2027,6 +2039,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
             if self._entCollectionNic.get():
                 cp.add_section('Collection')
                 cp.set('Collection','nic',self._entCollectionNic.get())
+                cp.set('Collection','paused','on' if self._vcpause.get() else 'off')
                 if self._entCollectionSpoof.get():
                     cp.set('Collection','spoof',self._entCollectionSpoof.get())
                 nA = self._entCollectionAntNum.get()

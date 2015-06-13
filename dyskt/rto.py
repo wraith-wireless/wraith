@@ -198,7 +198,7 @@ class RTO(mp.Process):
         """ run execution loop """
         # ignore signals being used by main program
         signal.signal(signal.SIGINT,signal.SIG_IGN)
-        signal.signal(signal.SIGTERM,signal.SIG_IGN) 
+        signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
         rmap = {}    # radio map: maps callsigns to mac addr
         bulk = {}    # stored frames
