@@ -8,7 +8,7 @@ by an external process.
 
 #__name__ = 'dyskt'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.10'
+__version__ = '0.0.11'
 __date__ = 'November 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -31,18 +31,8 @@ from wraith.radio import channels               # channel specifications
 from wraith.radio import iw                     # channel widths and region set/get
 from wraith.radio.iwtools import wifaces        # check for interface presents
 
-#### set up log
-# have to configure absolute path
-GPATH = os.path.dirname(os.path.abspath(__file__))
-logpath = os.path.join(GPATH,'dyskt.log.conf')
-logging.config.fileConfig(logpath)
-
-#### OUR EXCEPTIONS
-class DySKTException(Exception): pass
-class DySKTConfException(DySKTException): pass
-class DySKTParamException(DySKTException): pass
-class DySKTRuntimeException(DySKTException): pass
-
+# auxiliary function - pulled out of DySKT class so it can be used elsewhhere
+# with minimal hassle
 def parsechlist(pattern,ptype):
     """
       parse channel list pattern of type ptype = oneof {'scan','pass'} and return
@@ -89,6 +79,18 @@ def parsechlist(pattern,ptype):
         return [(ch,chw) for chw in ws for ch in chs]
 
     return [],[]
+
+#### set up log
+# have to configure absolute path
+GPATH = os.path.dirname(os.path.abspath(__file__))
+logpath = os.path.join(GPATH,'dyskt.log.conf')
+logging.config.fileConfig(logpath)
+
+#### DySKT EXCEPTIONS
+class DySKTException(Exception): pass
+class DySKTConfException(DySKTException): pass
+class DySKTParamException(DySKTException): pass
+class DySKTRuntimeException(DySKTException): pass
 
 # WASP STATES
 DYSKT_INVALID         = -1 # dyskt is unuseable
@@ -152,7 +154,8 @@ class DySKT(object):
                     logging.info("Regulatory domain set to %s",rd)
 
             # recon radio is mandatory
-            logging.info("Starting Reconnaissance Radio")
+            mode = 'paused' if self._conf['recon']['paused'] else 'scan'
+            logging.info("Starting Reconnaissance Radio in %s mode" % mode)
             (conn1,conn2) = mp.Pipe()
             self._pConns['recon'] = conn1
             self._rr = RadioController(self._ic,conn2,self._conf['recon'])
@@ -160,6 +163,7 @@ class DySKT(object):
             # collection if present
             if self._conf['collection']:
                 try:
+                    mode = 'paused' if self._conf['collection']['paused'] else 'scan'
                     logging.info("Starting Collection Radio")
                     (conn1,conn2) = mp.Pipe()
                     self._pConns['collection'] = conn1
@@ -169,17 +173,17 @@ class DySKT(object):
                     logging.warning("Collection Radio (%s), continuing without",e)
 
             # start c2c socket - if it fails write to log but continue
-            if self._conf['local']['c2c'] is not None:
-                logging.info("Starting C2C")
-                self._c2c = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-                try:
-                    self._c2c.bind(('localhost',self._conf['local']['c2c']))
-                    self._c2c.listen(1)
-                except socket.error as e:
-                    self._c2c = None
-                    logging.warning("C2C not started: %s" % e)
-                else:
-                    logging.info("C2C listening on %d" % self._conf['local']['c2c'])
+            #if self._conf['local']['c2c'] is not None:
+            #    logging.info("Starting C2C")
+            #    self._c2c = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            #    try:
+            #        self._c2c.bind(('localhost',self._conf['local']['c2c']))
+            #        self._c2c.listen(1)
+            #    except socket.error as e:
+            #        self._c2c = None
+            #        logging.warning("C2C not started: %s" % e)
+            #    else:
+            #        logging.info("C2C listening on %d" % self._conf['local']['c2c'])
         except RuntimeError as e:
             # e should have the form "Major:Minor:Description"
             ms = e.message.split(':')
@@ -255,23 +259,8 @@ class DySKT(object):
 
         # execution loop
         while not self._halt.is_set():
-            # check c2c to see if it is running and start if it isn't
-            if self._c2c is None and self._conf['local']['c2c'] is not None:
-                logging.info("Starting C2C")
-                self._c2c = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-                try:
-                    self._c2c.bind(('localhost',self._conf['local']['c2c']))
-                    self._c2c.listen(1)
-                except socket.error as e:
-                    self._c2c = None
-                    logging.warning("C2C not started: %s" % e)
-                else:
-                    logging.info("C2C listening on %d" % self._conf['local']['c2c'])
-
-            # check for any commands from c2c
-
             # get message a tuple: (level,originator,type,message)
-            # TODO: move to select? socket.fileno()
+            # TODO: move to select?
             for key in self._pConns:
                 try:
                     if self._pConns[key].poll():
@@ -289,7 +278,10 @@ class DySKT(object):
                                 else:
                                     logging.error("%s failed. (%s) %s",o,t,m)
                                     self.stop()
-                        elif l == "warn": logging.warning("%s: (%s) %s",o,t,m)
+                        elif l == "warn":
+                            # TODO: have to handle situations where this from a
+                            # bad command from the user
+                            logging.warning("%s: (%s) %s",o,t,m)
                         elif l == "info": logging.info("%s: (%s) %s",o,t,m)
                 except Exception as e:
                     # blanke exception
@@ -384,8 +376,7 @@ class DySKT(object):
         # get optional properties
         if conf.has_option(rtype,'spoof'): r['spoofed'] = conf.get(rtype,'spoof')
         if conf.has_option(rtype,'desc'):  r['desc'] = conf.get(rtype,'desc')
-        if conf.has_option(rtype,'paused'):
-            if conf.get(rtype,'paused').lower() == 'on': r['paused'] = True
+        if conf.has_option(rtype,'paused'): r['paused'] = conf.getboolean(rtype,'paused')
 
         # process antennas - get the number first
         try:

@@ -195,22 +195,20 @@ class SaveThread(SSEThread):
                     self._fout = pcap.pcapopen(fname)
                 except pcap.PCAPException as e:
                     raise SSEConsumeException('Save: ' + e.__repr__())
-
             self._writepkts()
 
     def _writepkts(self):
         """ write stored packets to file """
-        curs = None
         try:
             # we'll catch db errors in the internal loop and attempt to
             # continue writing
+            curs = None
             curs = self._conn.cursor()
-            for pkt in self._pkts:
-                sql = "insert into frame_path (fid,filepath) values (%s,%s);"
+            for i,pkt in enumerate(self._pkts):
+                sql = "insert into frame_path (fid,filepath,n) values (%s,%s,%s);"
                 try:
-                    curs.execute(sql,(pkt[1],os.path.split(self._fout.name)[1]))
+                    curs.execute(sql,(pkt[1],os.path.split(self._fout.name)[1],i+1))
                 except psql.Error as e:
-                    #print 'error writing frame_path', e
                     self._conn.rollback()
                 else:
                     self._conn.commit()

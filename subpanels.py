@@ -162,7 +162,6 @@ class WraithConfigPanel(gui.ConfigPanel):
             cp.set('Policy','shutdown','auto' if self._vstop else 'manual')
             fout = open(wraith.WRAITHCONF,'w')
             cp.write(fout)
-            fout.close()
         except IOError as e:
             self.err("File Error","Error <%s> writing to config file" % e)
         except ConfigParser.Error as e:
@@ -1474,7 +1473,6 @@ class NidusConfigPanel(gui.ConfigPanel):
             cp.set('OUI','path',self._entOUIPath.get())
             fout = open(wraith.NIDUSCONF,'w')
             cp.write(fout)
-            fout.close()
         except IOError as e:
             self.err("File Error","Error <%s> writing to config file" % e)
         except ConfigParser.Error as e:
@@ -2080,7 +2078,6 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 if c2cport: cp.set('Local','C2C',c2cport)
             fout = open(wraith.DYSKTCONF,'w')
             cp.write(fout)
-            fout.close()
         except IOError as e:
             self.err("File Error","Error <%s> writing to config file" % e)
         except ConfigParser.Error as e:

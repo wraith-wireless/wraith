@@ -252,10 +252,13 @@ CREATE INDEX frame_ts_idx ON frame(ts);
 -- case the different threads processing thsee are out of sync
 DROP TABLE IF EXISTS frame_path;
 CREATE TABLE frame_path(
-   fid bigint NOT NULL,      -- foreign key to frame id
-   filepath TEXT NOT NULL,   -- file path of this frame
+   fid bigint NOT NULL,    -- foreign key to frame id
+   filepath TEXT NOT NULL, -- file path of this frame
+   n bigint NOT NULL,      -- # of this packet in the file
    CONSTRAINT ch_fid CHECK (fid > 0),
-   FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE
+   CONSTRAINT ch_n CHECK (n > 0),
+   FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+   PRIMARY KEY(filepath,n)
 );
 
 -- ampdu table

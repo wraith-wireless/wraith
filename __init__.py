@@ -27,7 +27,7 @@ wraith 0.0.2
 
 wraith 0.0.3
  desc: non-data panels are completed (excluding Help)
- includes:  wraith-rt. py,subpanels.py and wraith.conf (also all subdirectories etc)
+ includes:  wraith-rt.py,subpanels.py and wraith.conf (also all subdirectories etc)
  changes:
   GUI:
    - migrated from Tix to ttk

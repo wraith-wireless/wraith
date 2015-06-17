@@ -6,7 +6,7 @@ A "consolidated" radio with tuning , sniffing and reporting capabilities
 """
 __name__ = 'rdoctl'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.5'
+__version__ = '0.0.6'
 __date__ = 'December 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -23,46 +23,93 @@ from wraith.radio import iw            # iw command line interface
 import wraith.radio.iwtools as iwt     # nic command line interaces
 from wraith.radio.mpdu import MAX_MPDU # maximum size of frame
 
+# tuner states
+TUNE_SCAN   = 0
+TUNE_HOLD   = 1
+TUNE_PAUSE  = 2
+TUNE_LISTEN = 3
+TUNE_STOP   = 4
+
 class Tuner(threading.Thread):
     """ 'tunes' the radio's current channel and width """
-    def __init__(self,ev,tC,iface,scan,dwell,i):
+    def __init__(self,ev,tC,iface,scan,dwell,i,pause=False):
         """
-         ev - event queue between radio and this Thread
-         tC - dyskt token connnection
-         iface - interface name of card
-         scan - scan list of channel tuples (ch,chw)
-         dwell - dwell list each stay on scan[i] for dwell[i]
-         i - initial channel index
+         ev: event queue between radio and this Thread
+         tC: dyskt token connnection
+         iface: interface name of card
+         scan: scan list of channel tuples (ch,chw)
+         dwell: dwell list each stay on scan[i] for dwell[i]
+         i: initial channel index
+         pause: start paused?
         """
         threading.Thread.__init__(self)
-        self._done = threading.Event()
-        self._eQ = ev      # event queue from radio controller
-        self._tC = tC      # connection from DySKT to tuner
-        self._vnic = iface # this radio's vnic
-        self._chs = scan   # scan list
-        self._ds = dwell   # corresponding dwell times
-        self._i = i        # initial/current index into scan/dwell
+        self._done = threading.Event() # the stop event
+        self._eQ = ev                  # event queue from radio controller
+        self._tC = tC                  # connection from DySKT to tuner
+        self._vnic = iface             # this radio's vnic
+        self._chs = scan               # scan list
+        self._ds = dwell               # corresponding dwell times
+        self._i = i                    # initial/current index into scan/dwell
+        self._state = TUNE_PAUSE if pause else TUNE_SCAN # initial state
 
     def shutdown(self): self._done.set()
 
     def run(self):
         """ switch channels based on associted dwell times """
+        # starting paused or scanning?
+        if self._state == TUNE_PAUSE:
+            # notify rdoctl we are paused then hold on dyskt token q
+            self._eQ.put(('!PAUSE!',time.time(),' '))
+            self._tC.poll(None)
+        else:
+            self._eQ.put(('!SCAN!',time.time(),self._chs))
+
+        # execution loop
         while not self._done.is_set():
             # wait on connection for channel's dwell time. If no token, switch
-            # to next channel. If token & it is a hold, block on the connection
-            # until we get another token (assumes dyskt will not send consecutive
-            # holds) which should be a resme or stop
+            # to next channel.
             if self._tC.poll(self._ds[self._i]):
-                token = self._tC.recv()
-                if token == '!STOP!':
-                    self._eQ.put(('!STOP!',time.time(),' '))
-                elif token == '!HOLD!':
-                    self._eQ.put(('!HOLD!',time.time(),' '))
-                    token = self._tC.recv()
-                    if token == '!RESUME!':
-                        self._eQ.put(('!RESUME!',time.time(),' '))
-                    elif token == '!STOP!':
-                        self._eQ.put(('!STOP!',time.time(),' '))
+                # get token and timestamp
+                tkn = self._tC.recv()
+                ts = time.time()
+                if tkn == '!STOP!': self._eQ.put(('!STOP!',ts,' '))
+                elif tkn == '!SCAN!':
+                    if self._state != TUNE_SCAN:
+                        self._state = TUNE_SCAN
+                        self._eQ.put(('!SCAN!',ts,self._chs))
+                    else:
+                        self._eQ.put(('!ERR!',ts,'redundant command'))
+                else:
+                    # a hold, pause or listen, notify rdoctl & block on the conn
+                    # until we get another token (assumes dyskt wont send consecutive
+                    # holds, etc.)
+                    if tkn == '!HOLD!':
+                        if self._state != TUNE_HOLD:
+                            self._state = TUNE_HOLD
+                            self._eQ.put(('!HOLD!',ts,'%d:%s' % (self._chs[self._i][0],
+                                                                 self._chs[self._i][1])))
+                        else:
+                            self._eQ.put(('!ERR!',ts,'redundant command'))
+                    elif tkn == '!PAUSE!':
+                        if self._state != TUNE_PAUSE:
+                            self._state = TUNE_PAUSE
+                            self._eQ.put(('!PAUSE!',ts,' '))
+                        else:
+                            self._eQ.put(('!ERR!',ts,'redundant command'))
+                    else:
+                        # this should be a listen which will have the form !ch:chw!
+                        if self._state != TUNE_LISTEN:
+                            try:
+                                ch,chw = tkn.split(':')[1:-1]
+                                iw.chset(self._vnic,ch,chw)
+                            except:
+                                self._eQ.put(('!ERR!',ts,'bad channel'))
+                            else:
+                                self._state = TUNE_LISTEN
+                                self._eQ.put(('!LISTEN!',ts,'%d:%s' % (ch,chw)))
+                        else:
+                            self._eQ.put(('!ERR!',ts,'redundant command'))
+                    self._tC.poll(None) # block until a new token
             else:
                 # no token, go to next channel
                 try:
@@ -96,7 +143,7 @@ class RadioController(mp.Process):
         self._q = None        # queue between tuner and us
         
         # _setup() sets the following
-        self._role = None            # role this radio plays one of {RECON|COLLECTION}
+        self._role = None             # role this radio plays
         self._nic = None              # radio network interface controller name
         self._mac = None              # real mac address
         self._phy = None              # the phy of the device
@@ -109,9 +156,9 @@ class RadioController(mp.Process):
         self._chipset = None          # the chipset
         self._spoofed = ""            # spoofed mac address
         self._desc = None             # optional description
-        self._scan = []               # the scan pattern: list of tuples (ch,chw)
-        self._ds = []                 # dwell times (stay on scan[i] for time ds[i]
         self._tuner = None            # tuner thread
+        self._stuner = None           # tuner state
+        self._ev = None               # event queue for thread
         self._antenna = {'num':0,     # antenna details
                          'gain':None,
                          'type':None,
@@ -119,9 +166,6 @@ class RadioController(mp.Process):
                          'x':None,
                          'y':None,
                          'z':None}
-        self._hop = None              # averaged hop time
-        self._interval = None         # interval time for a complete scan
-        self._ev = None               # event queue for thread
 
         # set up
         self._setup(conf)
@@ -228,46 +272,43 @@ class RadioController(mp.Process):
             # sum hop times with side effect of removing any invalid channel tuples
             # i.e. Ch 14, Width HT40+ and channels the card cannot tune to
             i = 0
-            self._hop = 0
+            hop = 0
             while scan:
                 try:
                     t = time.time()
                     iw.chset(self._vnic,str(scan[i][0]),scan[i][1])
-                    self._hop += (time.time() - t)
+                    hop += (time.time() - t)
                     i += 1
                 except iw.IWException as e:
+                    # if invalid argument, drop the channel otherwise reraise error
                     if iw.ecode(str(e)) == iw.IW_INVALIDARG:
-                        # error code is invalid argument, drop the channel
                         del scan[i]
                     else:
                         raise
                 except IndexError:
                     # all channels checked
                     break
+            if not scan: raise ValueError("Empty scan pattern")
 
-            if not scan:
-                raise ValueError("Empty scan pattern")
-            else:
-                self._scan = scan
 
             # calculate avg hop time, and interval time
-            self._hop /= len(self._scan)
-            self._interval = len(self._scan) * conf['dwell'] +\
-                             len(self._scan) * self._hop
+            # NOTE: these are not currently used but may be useful later
+            hop /= len(scan)
+            interval = len(scan) * conf['dwell'] + len(scan) * hop
 
             # create list of dwell times
-            self._ds = [conf['dwell']] * len(self._scan)
+            ds = [conf['dwell']] * len(scan)
 
             # get start ch & set the initial channel
             try:
-                ch_i = self._scan.index(conf['scan_start'])
+                ch_i = scan.index(conf['scan_start'])
             except ValueError:
                 ch_i = 0
-            iw.chset(self._vnic,str(self._scan[ch_i][0]),self._scan[ch_i][1])
+            iw.chset(self._vnic,str(scan[ch_i][0]),scan[ch_i][1])
 
             # initialize tuner thread
             self._q = Queue()
-            self._tuner = Tuner(self._q,self._conn,self._vnic,self._scan,self._ds,ch_i)
+            self._tuner = Tuner(self._q,self._conn,self._vnic,scan,ds,ch_i,conf['paused'])
 
             # notify RTO we are good
             self._comms.put((self._vnic,uptime,'!UP!',self.radio))
@@ -278,6 +319,9 @@ class RadioController(mp.Process):
                 iwt.ifconfig(self._nic,'up')
             except (iw.IWException,iwt.IWToolsException):
                 pass
+            if self._s:
+                self._s.shutdown(socket.SHUT_RD)
+                self._s.close()
             raise RuntimeError("%s:Raw Socket:%s" % (self._role,e))
         except iw.IWException as e:
             try:
@@ -286,6 +330,9 @@ class RadioController(mp.Process):
                 iwt.ifconfig(self._nic,'up')
             except (iw.IWException,iwt.IWToolsException):
                 pass
+            if self._s:
+                self._s.shutdown(socket.SHUT_RD)
+                self._s.close()
             raise RuntimeError("%s:iw.chset:Failed to set channel: %s" % (self._role,e))
         except (ValueError,TypeError) as e:
             try:
@@ -294,6 +341,9 @@ class RadioController(mp.Process):
                 iwt.ifconfig(self._nic,'up')
             except (iw.IWException,iwt.IWToolsException):
                 pass
+            if self._s:
+                self._s.shutdown(socket.SHUT_RD)
+                self._s.close()
             raise RuntimeError("%s:config:%s" % (self._role,e))
         except Exception as e:
             # blanket exception
@@ -303,11 +353,10 @@ class RadioController(mp.Process):
                 iwt.ifconfig(self._nic,'up')
             except (iw.IWException,iwt.IWToolsException):
                 pass
-            raise RuntimeError("%s:Unknown:%s" % (self._role,e))
-        finally:
             if self._s:
-                self._s.shutdown()
+                self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
+            raise RuntimeError("%s:Unknown:%s" % (self._role,e))
 
     def terminate(self): pass
 
@@ -319,7 +368,6 @@ class RadioController(mp.Process):
 
         # start tuner thread
         self._tuner.start()
-        self._comms.put((self._vnic,time.time(),'!SCAN!',self._scan))
 
         # execute sniffing loop
         while True:
@@ -327,36 +375,42 @@ class RadioController(mp.Process):
                 # check for any notifications from tuner thread
                 (event,ts,msg) = self._q.get_nowait()
             except Empty:
-                # no notices from tuner thread, pull off the next frame
+                # no notices from tuner thread
                 try:
                     # pull the frame off and pass it on
                     frame = self._s.recv(MAX_MPDU)
+                    if self._stuner == TUNE_PAUSE: continue # don't forward
                     self._comms.put((self._vnic,time.time(),'!FRAME!',frame))
                 except socket.error as e:
                     self._comms.put((self._vnic,time.time(),'!FAIL!',e))
-                    self._conn.send(('err',"%s" % self._role,'Socket',e,))
+                    self._conn.send(('err',self._role,'Socket',e,))
                     break
                 except Exception as e:
                     # blanket 'don't know what happend' exception
                     self._comms.put((self._vnic,time.time(),'!FAIL!',e))
-                    self._conn.send(('err',"%s" % self._role,'Unknown',e))
+                    self._conn.send(('err',self._role,'Unknown',e))
                     break
             else:
                 # process the notification
+                if event == '!ERR!':
+                    # bad command from user, notify DySKT
+                    self._conn.send(('warn',self._role,msg))
                 if event == '!FAIL!':
                     self._comms.put((self._vnic,ts,'!FAIL!',msg))
                 elif event == '!HOLD!':
-                    #self._comms.put((self._vnic,ts,'!HOLD!',' '))
-                    pass
-                elif event == '!RESUME!':
-                    self._comms.put((self._vnic,time.time(),'!SCAN!',self._scan))
+                    self._stuner = TUNE_HOLD
+                    self._comms.put((self._vnic,ts,'!HOLD!',msg))
+                elif event == '!SCAN!':
+                    self._stuner = TUNE_SCAN
+                    self._comms.put((self._vnic,time.time(),'!SCAN!',msg))
                 elif event == '!LISTEN':
-                    #self._comms.put((self._vnic,time.time(),'!LISTEN!',' '))
-                    pass
+                    self._stuner = TUNE_LISTEN
+                    self._comms.put((self._vnic,time.time(),'!LISTEN!',msg))
                 elif event == '!PAUSE!':
-                    #self._comms.put((self._vnic,time.time(),'!SCAN!',' '))
-                    pass
+                    self._stuner = TUNE_PAUSE
+                    self._comms.put((self._vnic,time.time(),'!PAUSE!',' '))
                 elif event == '!STOP!':
+                    self._stuner = TUNE_STOP
                     break
 
         # shut down
@@ -379,7 +433,7 @@ class RadioController(mp.Process):
             try:
                 # call shutdown and join timing out if necessary
                 self._tuner.shutdown()
-                self._tuner.join(max(self._ds)*2)
+                self._tuner.join()
             except:
                 clean = False
             else:
@@ -398,7 +452,7 @@ class RadioController(mp.Process):
 
             # close socket and connection
             if self._s:
-                self._s.shutdown()
+                self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
             self._conn.close()
         except:

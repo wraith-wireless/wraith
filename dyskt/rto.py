@@ -7,7 +7,7 @@ by a pf and 3) messages from tuner(s) and sniffer(s0
 """
 __name__ = 'rto'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.11'
+__version__ = '0.0.12'
 __date__ = 'March 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -181,8 +181,8 @@ class RTO(mp.Process):
             self._mgrs = mgrs.MGRS()
 
             # connect to data store
-            sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            self._nidus = ssl.wrap_socket(sock,
+            self._nidus = ssl.wrap_socket(socket.socket(socket.AF_INET,
+                                                        socket.SOCK_STREAM),
                                           ca_certs=wraith.NIDUSCERT,
                                           cert_reqs=ssl.CERT_REQUIRED,
                                           ssl_version=ssl.PROTOCOL_TLSv1)
@@ -276,28 +276,31 @@ class RTO(mp.Process):
                             if ret:
                                 self._conn.send(('err','RTO','Nidus',ret))
                                 break
-                elif ev == '!DOWN!': pass
                 elif ev == '!FAIL!':
                     # send fail to nidus, notify DySKT & delete cs from rmap
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'fail',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                     del rmap[cs]
                 elif ev == '!SCAN!':
-                    # compile the scan list into a string
+                    # compile the scan list into a string before sending
                     sl = ",".join(["%d:%s" % (c,w) for (c,w) in msg])
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'scan',sl])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
-                elif ev == '!LISTEN!': pass
+                elif ev == '!LISTEN!':
+                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'listen',msg])
+                    if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!HOLD!':
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'hold',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
-                elif ev == '!PAUSE!': pass
-                elif ev == '!SPOOF!':
-                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'spoof',msg])
+                elif ev == '!PAUSE!':
+                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'pause',' '])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
-                elif ev == '!TXPWR!':
-                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'txpwr',msg])
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                #elif ev == '!SPOOF!':
+                #    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'spoof',msg])
+                #    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                #elif ev == '!TXPWR!':
+                #    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'txpwr',msg])
+                #    if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!FRAME!':
                     # save the frame and update bulk details
                     if bulk[cs]['cnt'] == 0:
@@ -323,8 +326,6 @@ class RTO(mp.Process):
                             bulk[cs]['cnt'] = 0
                             bulk[cs]['sz'] = 0
                             bulk[cs]['frames'] = ''
-                    #ret = self._send('FRAME',ts,[rmap[cs],msg])
-                    #if ret: self._conn.send(('err','RTO','Nidus',ret))
                 else: # unidentified event type, notify leader
                     self._conn.send(('warn','RTO','Radio',
                                      "unidentified event %s" % ev))

@@ -6,8 +6,6 @@ Overall:
   2) run dyskt as root - requires too many workarounds otherwise
      o if daemon is run as root, will have to modify cmdline.dysktrunning to
      use sudo pwd
-  3) use getboolean for config file instead of as currently used by checking
-     string values
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -42,10 +40,6 @@ DySKT:
      o identify/handle device failing or being removed
      o uniquely identify with a permanent id w/out hardcoding in conf file
      o allow no gps (fixed or otherwise)
- 31) Better define hold, listen, pause
-      o hold stop scanning on current channel
-      o listen stop scanning on specified channel
-      o pause stop scanning and recording
  41) need to handle tuner thread failure in rdoctl
  43) allow sensor to start in paused mode
  44) implement control socket

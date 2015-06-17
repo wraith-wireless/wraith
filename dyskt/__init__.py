@@ -53,10 +53,16 @@ dyskt 0.1.5
    o uses secure socket layer to send data to Nidus
    o zlib library to compress frames (hardcoded to 14K and 1 sec delay)
  -
+
+dyskt 0.1.6
+ desc: adding command interface
+ includes: dyskt 0.0.11 rto 0.0.12 rdoctl 0.0.6 dyskt.conf dyskt.log.conf dysktd
+ changes:
+  - added pause option on start (per radio)
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'
-__version__ = '0.1.5'
+__version__ = '0.1.6'
 __date__ = 'December 2014'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
