@@ -59,6 +59,7 @@ dyskt 0.1.6
  includes: dyskt 0.0.11 rto 0.0.12 rdoctl 0.0.7 dyskt.conf dyskt.log.conf dysktd
  changes:
   - added pause option on start (per radio)
+  - added command socket capabilities (still in testing phase)
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'

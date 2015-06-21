@@ -46,6 +46,8 @@ DySKT:
      or something on it
  45) move bulk framing to RadioController to minimize internal traffic
  46) After beginning adding of command socket, will hang occasionally on shutdown
+ 47) when dyskt hangs up on a connected socket, we get a bad file descriptor error
+ 48) odd behaviour with responses to client after commands are sent
 Nidus:
   1) return messages instead of just closing pipe for no running server etc
   2) need constraints either through postgresql (preferred) or nidusdb - one example

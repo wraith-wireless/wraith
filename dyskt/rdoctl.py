@@ -81,6 +81,7 @@ class Tuner(threading.Thread):
                 else:
                     try:
                         cmd,cid,ps = tkn.split(':') # force into 3 components
+                        cid = int(cid)
                     except:
                         # should never happen but just in case
                         self._qR.put(('!ERR!',ts,(-1,"invalid command format")))
