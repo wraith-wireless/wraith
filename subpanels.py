@@ -35,7 +35,7 @@ from wraith.utils import cmdline           # cmdline functionality
 # Validation reg. exp.
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr
 MACADDR = re.compile("^([0-9A-F]{2}:){5}([0-9A-F]{2})$")    # re for mac addr (capital letters only)
-GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device id (capital letss only)
+GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device id (capital leters only)
 
 # Some constants
 COPY = u"\N{COPYRIGHT SIGN}"
@@ -503,9 +503,9 @@ class DatabinPanel(gui.SimplePanel):
     def binrc(self,event):
         """ on right click, show context menu for this button """
         # determine which bin
-        bin = None
-        for b in self._bins:
-            if self._bins[b]['name'] == event.widget._name: bin = b
+        #bin = None
+        #for b in self._bins:
+        #    if self._bins[b]['name'] == event.widget._name: bin = b
 
         # and show context menu
         mnu = tk.Menu(None,tearoff=0)
@@ -2127,6 +2127,6 @@ class AboutPanel(gui.SimplePanel):
                   text="Wireless reconnaissance, collection,\nassault and exploitation toolkit",
                   font=("Roman",8,'bold')).grid(row=2,column=0,sticky='n')
         ttk.Label(self,text="Copyright %s %s %s" % (COPY,
-                                                   wraith.__date__.split(' ')[1],
-                                                   wraith.__email__),
+                                                    wraith.__date__.split(' ')[1],
+                                                    wraith.__email__),
                   font=('Roman',8,'bold')).grid(row=3,column=0,sticky='n')

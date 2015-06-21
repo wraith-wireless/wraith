@@ -2,8 +2,28 @@
 
 """ dyskt.py: main process captures and collates raw 802.11-2012 traffic
 
-802.11-2012 sensor that collects araw 802.11 frames and gps data for processing
-by an external process.
+802.11-2012 sensor that collects raw 802.11 frames and gps data for processing
+by an external process. Provides c2c functionality via a socket on port 2526
+unless otherwise specified in the config file.
+
+The protocol used is similar to kismet (see below)
+messages from client will be in the following format
+ !<id> <cmd> <radio> [param]\n
+ where:
+  id is an integer (unique)
+  cmd is oneof {scan|hold|listen|pause|txpwr|spoof}
+  radio is oneof {both|all|recon|collection} where both enforces recon and
+   collection radio and all does not
+  param is:
+   o of the format channel:width if cmd is listen
+   o of the format pwr:option where pwr is in dBm and option is oneof {fixed|auto|limit}
+   o a macaddr if cmd is spoof
+DySKT will notify the client if the cmd specified by id is invalid or valid with
+ OK <id> or
+ ERR <id> \001Reason for Failure\001
+ if the command was invalid and no command id could be readm it will be set to ?
+
+Note: DySKT only allows one client connection at a time
 """
 
 #__name__ = 'dyskt'
@@ -16,6 +36,7 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import os                                       # for path validations
+import re                                       # for reg expr
 import signal                                   # signal processing
 import time                                     # for sleep, timestamps
 import logging                                  # log
@@ -31,11 +52,11 @@ from wraith.radio import channels               # channel specifications
 from wraith.radio import iw                     # channel widths and region set/get
 from wraith.radio.iwtools import wifaces        # check for interface presents
 
-# auxiliary function - pulled out of DySKT class so it can be used elsewhhere
+# auxiliary function - pulled out of DySKT class so it can be used elsewhere
 # with minimal hassle
 def parsechlist(pattern,ptype):
     """
-      parse channel list pattern of type ptype = oneof {'scan','pass'} and return
+      parse channel list pattern of type ptype = oneof {'scan'|'pass'} and return
       a list of tuples (ch,chwidth)
     """
     if not pattern: chs,ws = [],[]
@@ -91,16 +112,108 @@ class DySKTException(Exception): pass
 class DySKTConfException(DySKTException): pass
 class DySKTParamException(DySKTException): pass
 class DySKTRuntimeException(DySKTException): pass
+class C2CRuntimeException(DySKTException): pass
 
-# WASP STATES
+class C2CSocket(object):
+    """
+     A simple wrapper around a socket that:
+      1) accepts one and only one client at a time
+      2) is non-blocking
+      3) handles a very simple protocol based on kismet's (see above)
+    """
+    def __init__(self,port):
+        """
+         initialize
+          port: port to listen for connections on
+        """
+        self._lp = port         # port to listen on
+        self._sock = None       # the listen socket
+        self._client = None     # the client addr
+        self._conn = None       # the conn from the client
+
+    def listen(self):
+        """ open socket for listening """
+        if self._sock is not None: raise C2CRuntimeException('C2CSocket already listening')
+        try:
+            self._sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            self._sock.setblocking(0)
+            self._sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+            self._sock.bind(('localhost',self._lp))
+            self._sock.listen(0)
+        except socket.error as e:
+            raise C2CRuntimeException('C2CSocket failed: %s' % e)
+
+    def accept(self):
+        """ accept a client request """
+        if self._client is not None: raise C2CRuntimeException("C2CSocket already has client")
+        # see if a client wants to accept
+        try:
+            # if we get a client connection, shutdown the listening the socket
+            # so no future clients will hang waiting on it
+            self._conn,self._client = self._sock.accept()
+            self._sock.shutdown(socket.SHUT_RDWR)
+            self._sock.close()
+            self._sock = None
+            return True
+        except socket.error as e:
+           return False
+
+    def recv(self):
+        """ recv from client """
+        if self._client is None: raise C2CRuntimeException("C2CSocket cannot receive")
+        msg = ''
+        try:
+            while len(msg) == 0 or msg[-1:] != '\n':
+                data = self._conn.recv(1024)
+                if not data: raise socket.error("client exited")
+                msg += data
+        except socket.error as e:
+            self._conn.shutdown(socket.SHUT_RDWR)
+            self._conn.close()
+            self._conn = self._client = None
+            return None
+        return msg
+
+    def send(self,msg):
+        """ send msg to client """
+        if self._client is None: raise C2CRuntimeException("C2CSocket cannot send")
+        try:
+            if not msg.endswith('\n'): msg += '\n'
+            self._conn.send(msg)
+            return True
+        except socket.error as e:
+            self._conn.shutdown(socket.SHUT_RDWR)
+            self._conn.close()
+            self._conn = self._client = None
+            return False
+
+    def shutdown(self,how=socket.SHUT_RDWR):
+        """ close any open sockets """
+        if self._conn:
+            self._conn.shutdown(how)
+            self._conn.close()
+        if self._sock:
+            self._sock.shutdown(how)
+            self._sock.close()
+
+    @property # C2CSocket has a client
+    def hasclient(self): return self._client is not None
+
+    @property # C2CSocket is listening
+    def islistening(self): return self._sock is not None
+
+    @property # C2CSocket's client addr (a tuple addr,port)
+    def client(self): return self._client
+
+# DYSKT STATES
 DYSKT_INVALID         = -1 # dyskt is unuseable
 DYSKT_CREATED         =  0 # dyskt is created but not yet started
 DYSKT_RUNNING         =  1 # dyskt is currently executing
-DYSKT_PAUSED_RECON    =  2 # dyskt recon radio is paused
-DYSKT_PAUSED_COLL     =  3 # dyskt collection radio is paused
-DYSKT_PAUSED_BOTH     =  4 # both radios are paused
 DYSKT_EXITING         =  5 # dyskt has finished execution loop
 DYSKT_DESTROYED       =  6 # dyskt is destroyed
+
+# re expr for macaddr
+MACADDR = re.compile("^([0-9A-F]{2}:){5}([0-9A-F]{2})$")
 
 class DySKT(object):
     """ DySKT - primary process of the Wraith sensor """
@@ -120,10 +233,92 @@ class DySKT(object):
         self._cr = None             # collection radio
         self._rd = None             # regulatory domain
         self._c2c = None            # our c2c socket
-    
+
+    @property
+    def state(self): return self._state
+
+    def start(self):
+        """ start execution """
+        # setup signal handlers for pause(s),resume(s),stop
+        signal.signal(signal.SIGINT,self.stop)   # CTRL-C and kill -INT stop
+        signal.signal(signal.SIGTERM,self.stop)  # kill -TERM stop
+
+        # initialize, quit on failure
+        logging.info("**** Starting DySKT %s ****" % dyskt.__version__)
+        self._create()
+        if self.state == DYSKT_INVALID:
+            # make sure we do not leave system in corrupt state (i.e. w/o nics)
+            self._destroy()
+            raise DySKTRuntimeException("DySKT failed to initialize, shutting down")
+
+        # set state to running
+        self._state = DYSKT_RUNNING
+
+        # execution loop
+        while not self._halt.is_set():
+            # anytime we get a command from a client, do not sleep
+            nop = True
+
+            # check the c2c
+            if not self._c2c.islistening and not self._c2c.hasclient:
+                self._c2c.listen()
+            elif self._c2c.islistening and not self._c2c.hasclient:
+                if self._c2c.accept():
+                    c = self._c2c.client
+                    logging.info("Client %s connect on port %d" % (c[0],c[1]))
+                    self._c2c.send("DySKT v%s" % dyskt.__version__)
+            else:
+                # get message (if any)
+                cid,cmd,rs,ps = self._processcmd(self._c2c.recv())
+                if cid is not None:
+                    for r in rs:
+                        logging.info("Client sent %s to %s" % (cmd,r))
+                        self._pConns[r].send('%s:%d:%s' % (cmd,cid,'-'.join(ps)))
+                    nop = False
+
+            # get message(s) a tuple: (level,originator,type,message) from children
+            for key in self._pConns:
+                try:
+                    if self._pConns[key].poll():
+                        l,o,t,m = self._pConns[key].recv()
+                        if l == 'err':
+                            # only process errors involved during execution
+                            if DYSKT_CREATED < self.state < DYSKT_EXITING:
+                                if o == 'collection':
+                                    # let collection radio to fail & still continue
+                                    logging.warning("Collection radio dropped.")
+                                    self._pConns['collection'].send('!STOP!')
+                                    self._pConns['collection'].close()
+                                    del self._pConns['collection']
+                                    mp.active_children()
+                                    self._cr = None
+                                else:
+                                    logging.error("%s failed. (%s) %s",o,t,m)
+                                    self.stop()
+                        elif l == 'warn': logging.warning("%s: (%s) %s",o,t,m)
+                        elif l == 'info': logging.info("%s: (%s) %s",o,t,m)
+                        elif l == 'cmderr':
+                            if t > -1: self._c2c.send("ERR %d \001%s\001\n" % (t,m))
+                            else: self._c2c.send("ERR ? \001%s\001\n" % m)
+                        elif l == 'cmdack':
+                            self._c2c.send("OK %d" % t)
+                except Exception as e:
+                    # blanke exception
+                    logging.error("DySKT failed. (Unknown) %s",e)
+            if nop: time.sleep(1) # sleep if no operation occurred
+
+    # noinspection PyUnusedLocal
+    def stop(self,signum=None,stack=None):
+        """ stop execution """
+        if DYSKT_RUNNING <= self.state < DYSKT_EXITING:
+            logging.info("**** Stopping DySKT ****")
+            self._destroy()
+
+    #### PRIVATE HELPERS
+
     def _create(self):
         """ create DySKT and member processes """
-        # read in and validate the conf file 
+        # read in and validate the conf file
         self._readconf()
 
         # intialize shared objects
@@ -133,23 +328,25 @@ class DySKT(object):
 
         # initialize children
         # Each child is expected to initialize in the _init_ function and throw
-        # a RuntimeError failure
+        # a RuntimeError on failure. For non-mandatory components, all exceptions
+        # are caught in in inner exceptions, mandatory are caught in the the outer
+        # exception and result in shutting down
         logging.info("Initializing subprocess...")
         try:
-            # start RTO first
+            # start RTO first (IOT accept comms from the radios)
             logging.info("Starting RTO")
             (conn1,conn2) = mp.Pipe()
             self._pConns['rto'] = conn1
             self._rto = RTO(self._ic,conn2,self._conf)
 
-            # set the region? if so, do it prior to starting the RadioController
+            # set the region? if so, do it prior to starting the radio(s)
             rd = self._conf['local']['region']
             if rd:
                 logging.info("Setting regulatory domain to %s",rd)
                 self._rd = iw.regget()
                 iw.regset(rd)
                 if iw.regget() != rd:
-                    logging.warn("Regulatory domain %s may not have been set",rd)
+                    logging.warning("Regulatory domain %s may not have been set",rd)
                 else:
                     logging.info("Regulatory domain set to %s",rd)
 
@@ -172,18 +369,17 @@ class DySKT(object):
                     # continue without collector, but log it
                     logging.warning("Collection Radio (%s), continuing without",e)
 
-            # start c2c socket - if it fails write to log but continue
-            #if self._conf['local']['c2c'] is not None:
-            #    logging.info("Starting C2C")
-            #    self._c2c = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            #    try:
-            #        self._c2c.bind(('localhost',self._conf['local']['c2c']))
-            #        self._c2c.listen(1)
-            #    except socket.error as e:
-            #        self._c2c = None
-            #        logging.warning("C2C not started: %s" % e)
-            #    else:
-            #        logging.info("C2C listening on %d" % self._conf['local']['c2c'])
+            # c2c socket?
+            if self._conf['local']['c2c'] is not None:
+                logging.info("Starting C2C...")
+                try:
+                    self._c2c = C2CSocket(self._conf['local']['c2c'])
+                    self._c2c.listen()
+                except C2CRuntimeException as e:
+                    self._c2c = None
+                    logging.warning("%s, continuing without",e)
+                else:
+                    logging.info("C2C listening on port %d" % self._conf['local']['c2c'])
         except RuntimeError as e:
             # e should have the form "Major:Minor:Description"
             ms = e.message.split(':')
@@ -208,7 +404,7 @@ class DySKT(object):
         # close our c2c if it is running
         if self._c2c:
             logging.info("Shutting down C2C")
-            self._c2c.close()
+            self._c2c.shutdown()
 
         # reset regulatory domain if necessary
         if self._rd:
@@ -217,7 +413,7 @@ class DySKT(object):
                 iw.regset(self._rd)
                 if iw.regget() != self._rd: raise RuntimeError
             except:
-                logging.warn("Failed to reset regulatory domain")
+                logging.warning("Failed to reset regulatory domain")
 
         # halt main execution loop & send out poison pills
         # put a token on the internal comms from us to break the RTO out of
@@ -236,64 +432,6 @@ class DySKT(object):
 
         # change our state
         self._state = DYSKT_DESTROYED
-
-    @property
-    def state(self): return self._state
-
-    def start(self):
-        """ start execution """
-        # setup signal handlers for pause(s),resume(s),stop
-        signal.signal(signal.SIGINT,self.stop)   # CTRL-C and kill -INT stop
-        signal.signal(signal.SIGTERM,self.stop)  # kill -TERM stop
-
-        # initialize, quit on failure
-        logging.info("**** Starting DySKT %s ****" % dyskt.__version__)
-        self._create()
-        if self.state == DYSKT_INVALID:
-            # make sure we do not leave system in corrupt state (i.e. no wireless nics)
-            self._destroy()
-            raise DySKTRuntimeException("DySKT failed to initialize, shutting down")
-
-        # set state to running
-        self._state = DYSKT_RUNNING
-
-        # execution loop
-        while not self._halt.is_set():
-            # get message a tuple: (level,originator,type,message)
-            # TODO: move to select?
-            for key in self._pConns:
-                try:
-                    if self._pConns[key].poll():
-                        (l,o,t,m) = self._pConns[key].recv()
-                        if l == "err":
-                            # only process errors involved during execution
-                            if DYSKT_CREATED < self.state < DYSKT_EXITING:
-                                if o == 'collection':
-                                    # allow collection radio to fail and still continue
-                                    logging.warning("Collection radio dropped. Continuing...")
-                                    self._pConns['collection'].send('!STOP!')
-                                    self._pConns['collection'].close()
-                                    del self._pConns['collection']
-                                    mp.active_children()
-                                else:
-                                    logging.error("%s failed. (%s) %s",o,t,m)
-                                    self.stop()
-                        elif l == "warn":
-                            # TODO: have to handle situations where this from a
-                            # bad command from the user
-                            logging.warning("%s: (%s) %s",o,t,m)
-                        elif l == "info": logging.info("%s: (%s) %s",o,t,m)
-                except Exception as e:
-                    # blanke exception
-                    logging.error("DySKT failed. (Unknown) %s",e)
-            time.sleep(1)
-
-    # noinspection PyUnusedLocal
-    def stop(self,signum=None,stack=None):
-        """ stop execution """
-        if DYSKT_RUNNING <= self.state < DYSKT_EXITING:
-            logging.info("**** Stopping DySKT ****")
-            self._destroy()
 
     def _readconf(self):
         """ read in config file at cpath """
@@ -340,12 +478,19 @@ class DySKT(object):
 
             # Local section
             self._conf['local'] = {'region':None,'c2c':None}
+
+            # c2c socket
             if conf.has_option('Local','C2C'):
-                self._conf['local']['c2c'] = conf.getint('Local','C2C')
+                try:
+                    self._conf['local']['c2c'] = conf.getint('Local','C2C')
+                except:
+                    logging.warning("Invalid C2C port specification. Continuing without")
+
+            # region
             if conf.has_option('Local','region'):
                 reg = conf.get('Local','region')
                 if len(reg) != 2:
-                    logging.warn("Regulatory domain %s is invalid" % reg)
+                    logging.warning("Regulatory domain %s is invalid" % reg)
                 else:
                     self._conf['local']['region'] = conf.get('Local','region')
         except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
@@ -374,8 +519,13 @@ class DySKT(object):
              'antennas':{}}
 
         # get optional properties
-        if conf.has_option(rtype,'spoof'): r['spoofed'] = conf.get(rtype,'spoof')
-        if conf.has_option(rtype,'desc'):  r['desc'] = conf.get(rtype,'desc')
+        if conf.has_option(rtype,'spoof'):
+            spoof = conf.get(rtype,'spoof').upper()
+            if re.match(MACADDR,spoof) is None:
+                logging.warn("Invalid spoofed MAC addr %s specified" % spoof)
+            else:
+                r['spoofed'] = spoof
+        if conf.has_option(rtype,'desc'): r['desc'] = conf.get(rtype,'desc')
         if conf.has_option(rtype,'paused'): r['paused'] = conf.getboolean(rtype,'paused')
 
         # process antennas - get the number first
@@ -385,7 +535,7 @@ class DySKT(object):
             nA = 0
 
         if nA:
-            # antennas has been specified, force correct/valid specifications
+            # antennas has been specified, warn (and ignore) invalid specifications
             try:
                 gain = map(float,conf.get(rtype,'antenna_gain').split(','))
                 if len(gain) != nA: raise RuntimeError('gain')
@@ -398,12 +548,11 @@ class DySKT(object):
                 for t in rs: xyz.append(tuple(map(int,t.split(':'))))
                 if len(xyz) != nA: raise RuntimeError('xyz')
             except ConfigParser.NoOptionError as e:
-                logging.warn("Antenna %s not specified" % e)
-                #raise DySKTConfException("%s" % e)
+                logging.warning("Antenna %s not specified" % e)
             except ValueError as e:
-                logging.warn("Invalid type for %s antenna configuration - %s")
+                logging.warning("Invalid type for %s antenna configuration - %s")
             except RuntimeError as e:
-                logging.warn("Antenna %s has invalid number of specifications" % e)
+                logging.warning("Antenna %s has invalid number of specifications" % e)
             else:
                 r['antennas']['num'] = nA
                 r['antennas']['gain'] = gain
@@ -441,6 +590,82 @@ class DySKT(object):
             r['scan_start'] = r['scan'][0]
 
         return r
+
+    def _processcmd(self,msg):
+        """ parse and process command from c2c socket """
+        # ensure there are at least 3 tokens
+        tkns = None
+        try:
+            tkns = msg.split(' ')
+        except:
+            return None,None,None,None
+
+        if len(tkns) < 3:
+            self._c2c.send("ERR ? \001invalid command format\001\n")
+            return None,None,None,None
+
+        # and a cmdid is present
+        cmdid = None
+        try:
+            cmdid = int(tkns[0].replace('!',''))
+        except:
+            self._c2c.send("ERR ? \001invalid command format\001\n")
+            return None,None,None,None
+
+        # ATT we can error/ack with associated cmd id
+        cmd = tkns[1].strip().lower()
+        if cmd not in ['scan','hold','listen','pause','txpwr','spoof']:
+            self._c2c.send("ERR %d \001invalid command: %s\001\n" % (cmdid,cmd))
+            return None,None,None,None
+
+        if cmd == 'txpwr' or cmd == 'spoof':
+            self._c2c.send("ERR %d \001%s not implemented\001\n" % (cmdid,cmd))
+            return None,None,None,None
+
+        radios = []
+        radio = tkns[2].strip().lower()
+        if radio not in ['both','all','recon','collection']:
+            self._c2c.send("ERR %d \001invalid radio specification:%s \001\n" % (cmdid,radio))
+            return None,None,None,None
+
+        if radio == 'all':
+            radios = ['recon']
+            if self._cr is not None: radios.append('collection')
+        elif radio == 'both': radios = ['recon','collection']
+        else: radios = [radio]
+        if 'collection' in radios and self._cr is None:
+            self._c2c.send("ERR %d \001collection radio not present\001\n" % cmdid)
+            return None,None,None,None
+
+        # ensure any params are valid
+        ps = []
+        if cmd in ['listen','txpwr','spoof']:
+            try:
+                ps = tkns[3].strip().split(':')
+                if len(ps) not in [1,2,6]: raise RuntimeError
+                if cmd == 'listen':
+                    # listen will be ch:chw or ch only
+                    ps[0] = int(ps[0])
+                    # ensure chwidth is correct or not specified set to None
+                    if len(ps) == 2:
+                        if ps[1] not in ['HT20','HT40+','HT40-']: raise RuntimeError
+                    else:
+                        ps.append(None)
+                elif cmd == 'txpwr':
+                    # txpwr will be pwr:opt
+                    ps[0] = int(ps[0])
+                    if ps[1] not in ['fixed','auto','limit']: raise RuntimeError
+                elif cmd == 'spoof':
+                    # spoof will be macaddr
+                    if len(ps) != 6: raise RuntimeError
+                    ps = [ps.join(':')] # rejoin the mac
+                    if re.match(MACADDR,ps[0].upper()) is None: raise RuntimeError
+            except:
+                self._c2c.send("ERR %d \001invalid param specification for cmd %s\001\n" % (cmdid,cmd))
+                return None,None,None,None
+
+        # all good
+        return cmdid,cmd,radios,ps
 
 if __name__ == '__main__':
     try:

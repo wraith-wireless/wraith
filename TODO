@@ -22,13 +22,12 @@ GUI:
  27) Splash panel
      o get rid of border around progressbar and progressbar.pbar
      o many statements are not even seen, remove them
- 29) icons or status bar to show what state services are in
+ 29) icons or status bar to show what state services are in??
  30) What is the best way to handle child panels and db connections?
      o psycopg2 claims excellent threaded cursors - do we use the main connection
        in WraithPanel and pass created cursors to children? -> have to trust the
        children to rollback on any errors
      o or do we create a new connection for each child that needs it?
-     o or do we force children to use callbacks in WraithPanel to query etc
  31) use postgresql listen/notify for updating data from tables
  34) look into Treeview virtual events Select,Open,Close to see if it is anything
      we can use
@@ -38,11 +37,15 @@ DySKT:
   3) implement adaptive scan pattern
  26) gps device handling
      o identify/handle device failing or being removed
-     o uniquely identify with a permanent id w/out hardcoding in conf file
+     o uniquely identify with a permanent id
      o allow no gps (fixed or otherwise)
  41) need to handle tuner thread failure in rdoctl
  43) allow sensor to start in paused mode
  44) implement control socket
+ 45) rdoctl will block on socket if no wireless traffic is present -> put a timeout
+     or something on it
+ 45) move bulk framing to RadioController to minimize internal traffic
+ 46) After beginning adding of command socket, will hang occasionally on shutdown
 Nidus:
   1) return messages instead of just closing pipe for no running server etc
   2) need constraints either through postgresql (preferred) or nidusdb - one example

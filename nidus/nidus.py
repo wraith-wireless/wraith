@@ -47,7 +47,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
         """ process client communications """
         caddr = self.client_address[0]
         cport = self.client_address[1]
-        logging.info("Sensor %s:%d connected...",caddr,cport)
+        logging.info("DySKT %s:%d connected...",caddr,cport)
         
         # get interface to databse
         connected = True
@@ -69,17 +69,17 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 data = self._recv()
                 if data: self._process(data,db)
                 else:
-                    logging.info("Sensor %s:%d exited...",caddr,cport)
+                    logging.info("DySKT %s:%d exited...",caddr,cport)
                     connected = False
             except RuntimeError as e:
                 # nidus server shutdown, close out the db
-                logging.warn("NidusDB from Sensor %s:%d shutting down: %s",caddr,cport,e)
+                logging.warning("NidusDB from DySKT %s:%d error: %s",caddr,cport,e)
                 db.submitdropped()
                 connected = False
             except Exception as e:
                 # lost connection with sensor, minimize errors to database
                 db.submitdropped()
-                logging.error("Sensor %s:%d dropped - %s",caddr,cport,e)
+                logging.error("DySKT %s:%d dropped - %s",caddr,cport,e)
                 connected = False
         
         # clean up
@@ -92,10 +92,7 @@ class NidusRequestHandler(ss.BaseRequestHandler):
         while len(msg) == 0 or msg[-4:] != "\x03\x12\x15\x04":
             try:
                 data = self.request.recv(1024)
-                if data == '':
-                    # TODO what about the data already in message
-                    print msg
-                    return None
+                if data == '': return None
                 msg += data
             except socket.error as e:
                 raise RuntimeError(e)
@@ -118,29 +115,29 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 elif t == 'ANTENNA': db.submitantenna(f)
                 elif t == 'RADIO_EVENT': db.submitradioevent(f)
                 elif t == 'GPSD': db.submitgpsd(f)
-                elif t == 'FRAME': db.submitsingle(f) # deprecated
+                #elif t == 'FRAME': db.submitsingle(f) # deprecated
                 elif t == 'BULK': db.submitbulk(f)
                 elif t == 'FLT': db.submitflt(f)
                 else:
-                    logging.warning("Sensor %s:%d sent data with invalid header %s",
+                    logging.warning("DySKT %s:%d sent data with invalid header %s",
                                     self.client_address[0],
                                     self.client_address[1],
                                     t)
             except AttributeError as e:
                 # this is caused by the reg exp
-                logging.warning("Sensor %s:%d sent invalid data: \n%s\n%s",
+                logging.warning("DySKT %s:%d sent invalid data: \n%s\n%s",
                                 self.client_address[0],
                                 self.client_address[1],
                                 f.__repr__(),e)
             except nidusdb.NidusDBSubmitParseException as e:
                 # failure in parsing nidus message protocol
-                logging.warning("Sensor %s:%d. Message\n%s\nfailed to parse: %s",
+                logging.warning("DySKT %s:%d. Message\n%s\nfailed to parse: %s",
                                 self.client_address[0],
                                 self.client_address[1],
                                 f.__repr__(),e)
             except nidusdb.NidusDBSubmitException as e:
                 # failure during datastore submission
-                logging.warning("Sensor %s:%d submit: %s",
+                logging.warning("DySKT %s:%d submit: %s",
                                 self.client_address[0],
                                 self.client_address[1],
                                 e)

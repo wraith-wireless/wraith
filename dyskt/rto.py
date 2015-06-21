@@ -68,7 +68,7 @@ class GPSPoller(threading.Thread):
         if self._conf['fixed']:
             # configure a 'fake' device
             poll = 0.5 # default poll time for fixed flt
-            qpx = qpy = float('inf') # quite PyCharm alerts
+            qpx = qpy = float('inf') # quiet PyCharm alerts
             dd = {'id':'xxxx:xxxx',
                   'version':'0.0',
                   'flags':0,

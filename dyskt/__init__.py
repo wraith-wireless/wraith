@@ -56,14 +56,14 @@ dyskt 0.1.5
 
 dyskt 0.1.6
  desc: adding command interface
- includes: dyskt 0.0.11 rto 0.0.12 rdoctl 0.0.6 dyskt.conf dyskt.log.conf dysktd
+ includes: dyskt 0.0.11 rto 0.0.12 rdoctl 0.0.7 dyskt.conf dyskt.log.conf dysktd
  changes:
   - added pause option on start (per radio)
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'
 __version__ = '0.1.6'
-__date__ = 'December 2014'
+__date__ = 'June 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'

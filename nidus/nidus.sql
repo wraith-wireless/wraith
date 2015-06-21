@@ -180,7 +180,7 @@ CREATE INDEX antenna_ts_idx ON antenna(ts);
 
 -- radio state enumerations
 DROP TYPE IF EXISTS RADIOSTATE;
-CREATE TYPE RADIOSTATE AS ENUM ('hold','scan','listen','spoof','txpwr','fail');
+CREATE TYPE RADIOSTATE AS ENUM ('hold','scan','pause','listen','spoof','txpwr','fail');
 
 -- radio_event table
 DROP TABLE IF EXISTS radio_event;
