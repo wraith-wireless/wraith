@@ -205,7 +205,6 @@ class RTO(mp.Process):
         gpsid = None # id of gps device
 
         # send sensor up notification, platform details and gpsid
-
         ret = self._send('DEVICE',time.time(),['sensor',socket.gethostname(),1])
         if ret: self._conn.send(('err','RTO','Nidus',ret))
         else:
@@ -232,7 +231,7 @@ class RTO(mp.Process):
             else:
                 if t == '!DEV!': # device up message
                     gpsid = msg['id']
-                    self._conn.send(('info','RTO','GPSD',"device %s initiated" % gpsid))
+                    self._conn.send(('info','RTO','GPSD',"%s initiated" % gpsid))
                     ret = self._send('GPSD',ts,msg)
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif t == '!GEO!': # frontline trace

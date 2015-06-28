@@ -2,7 +2,8 @@
 
 """ rdoctl.py: Radio Controller
 
-A "consolidated" radio with tuning , sniffing and reporting capabilities
+An interface to an underlying radio (wireless nic). Tunes and sniffs a radio
+forwarding data to the RTO.
 """
 __name__ = 'rdoctl'
 __license__ = 'GPL v3.0'
@@ -24,6 +25,7 @@ import wraith.radio.iwtools as iwt     # nic command line interaces
 from wraith.radio.mpdu import MAX_MPDU # maximum size of frame
 
 # tuner states
+TUNE_DESC = ['scan','hold','pause','listen','stop']
 TUNE_SCAN   = 0
 TUNE_HOLD   = 1
 TUNE_PAUSE  = 2
@@ -75,7 +77,7 @@ class Tuner(threading.Thread):
                 tkn = self._cD.recv()
                 ts = time.time()
 
-                # tokens will have 2 flavor's '!STOP!' and 'cmd:cmd id:params'
+                # tokens will have 2 flavor's '!STOP!' and 'cmd:cmdid:params'
                 # where params is empty or a '-' separated list
                 if tkn == '!STOP!': self._qR.put(('!STOP!',ts,(-1,' ')))
                 else:
@@ -89,7 +91,10 @@ class Tuner(threading.Thread):
                         # for hold, pause & listen, notify rdoctl & then block
                         # on DySKT until we get another token (assumes DySKT wont
                         # send consecutive holds etc)
-                        if cmd == 'scan':
+                        if cmd == 'state':
+                            self._qR.put(('!STATE!',ts,(cid,TUNE_DESC[self._state])))
+                            continue
+                        elif cmd == 'scan':
                             if self._state != TUNE_SCAN:
                                 self._state = TUNE_SCAN
                                 self._qR.put(('!SCAN!',ts,(cid,self._chs)))
@@ -416,25 +421,27 @@ class RadioController(mp.Process):
                 # process the notification
                 if event == '!ERR!':
                     # bad/failed command from user, notify DySKT
-                    self._cD.send(('cmderr',self._role,msg[0],msg[1]))
-                if event == '!FAIL!':
+                    if msg[0] > -1: self._cD.send(('cmderr',self._role,msg[0],msg[1]))
+                elif event == '!FAIL!':
                     self._qRTO.put((self._vnic,ts,'!FAIL!',msg[1]))
+                elif event == '!STATE!':
+                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!HOLD!':
                     self._stuner = TUNE_HOLD
                     self._qRTO.put((self._vnic,ts,'!HOLD!',msg[1]))
-                    if msg[0] > -1 : self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!SCAN!':
                     self._stuner = TUNE_SCAN
                     self._qRTO.put((self._vnic,time.time(),'!SCAN!',msg[1]))
-                    if msg[0] > -1 : self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!LISTEN':
                     self._stuner = TUNE_LISTEN
                     self._qRTO.put((self._vnic,time.time(),'!LISTEN!',msg[1]))
-                    if msg[0] > -1 : self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!PAUSE!':
                     self._stuner = TUNE_PAUSE
                     self._qRTO.put((self._vnic,time.time(),'!PAUSE!',' '))
-                    if msg[0] > -1 : self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!STOP!':
                     self._stuner = TUNE_STOP
                     break

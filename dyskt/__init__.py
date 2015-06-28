@@ -60,6 +60,7 @@ dyskt 0.1.6
  changes:
   - added pause option on start (per radio)
   - added command socket capabilities (still in testing phase)
+   o allows for state, pause, scan, hold, listen commands
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'

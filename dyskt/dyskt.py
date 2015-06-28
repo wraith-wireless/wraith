@@ -11,7 +11,7 @@ messages from client will be in the following format
  !<id> <cmd> <radio> [param]\n
  where:
   id is an integer (unique)
-  cmd is oneof {scan|hold|listen|pause|txpwr|spoof}
+  cmd is oneof {state|scan|hold|listen|pause|txpwr|spoof}
   radio is oneof {both|all|recon|collection} where both enforces recon and
    collection radio and all does not
   param is:
@@ -138,6 +138,7 @@ class C2CSocket(object):
             self._sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             self._sock.setblocking(0)
             self._sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+            #self._sock.setsockopt(socket.IPPROTO_TCP,socket.TCP_NODELAY,1)
             self._sock.bind(('localhost',self._lp))
             self._sock.listen(0)
         except socket.error as e:
@@ -178,8 +179,7 @@ class C2CSocket(object):
         """ send msg to client """
         if self._client is None: raise C2CRuntimeException("C2CSocket cannot send")
         try:
-            if not msg.endswith('\n'): msg += '\n'
-            self._conn.send(msg)
+            self._conn.sendall(msg)
             return True
         except socket.error as e:
             self._conn.shutdown(socket.SHUT_RDWR)
@@ -237,7 +237,7 @@ class DySKT(object):
     @property
     def state(self): return self._state
 
-    def start(self):
+    def run(self):
         """ start execution """
         # setup signal handlers for pause(s),resume(s),stop
         signal.signal(signal.SIGINT,self.stop)   # CTRL-C and kill -INT stop
@@ -262,25 +262,34 @@ class DySKT(object):
             # check the c2c
             if not self._c2c.islistening and not self._c2c.hasclient:
                 self._c2c.listen()
+                print 'listening'
             elif self._c2c.islistening and not self._c2c.hasclient:
                 if self._c2c.accept():
+                    print 'accepted'
                     c = self._c2c.client
                     logging.info("Client %s connect on port %d" % (c[0],c[1]))
-                    self._c2c.send("DySKT v%s" % dyskt.__version__)
+                    self._c2c.send("DySKT v%s\n" % dyskt.__version__)
             else:
                 # get message (if any)
                 cid,cmd,rs,ps = self._processcmd(self._c2c.recv())
+                print 'process cmd'
                 if cid is not None:
+                    print 'got cmd'
                     for r in rs:
                         logging.info("Client sent %s to %s" % (cmd,r))
+                        print 'sending cmd'
                         self._pConns[r].send('%s:%d:%s' % (cmd,cid,'-'.join(ps)))
+                        print 'sent cmd'
                     nop = False
 
             # get message(s) a tuple: (level,originator,type,message) from children
             for key in self._pConns:
+                print 'trying ', key
                 try:
                     if self._pConns[key].poll():
                         l,o,t,m = self._pConns[key].recv()
+                        print l,o,t,m
+
                         if l == 'err':
                             # only process errors involved during execution
                             if DYSKT_CREATED < self.state < DYSKT_EXITING:
@@ -297,11 +306,8 @@ class DySKT(object):
                                     self.stop()
                         elif l == 'warn': logging.warning("%s: (%s) %s",o,t,m)
                         elif l == 'info': logging.info("%s: (%s) %s",o,t,m)
-                        elif l == 'cmderr':
-                            if t > -1: self._c2c.send("ERR %d \001%s\001\n" % (t,m))
-                            else: self._c2c.send("ERR ? \001%s\001\n" % m)
-                        elif l == 'cmdack':
-                            self._c2c.send("OK %d" % t)
+                        elif l == 'cmderr': self._c2c.send("ERR %d \001%s\001\n" % (t,m))
+                        elif l == 'cmdack': self._c2c.send("OK %d\n" % t)
                 except Exception as e:
                     # blanke exception
                     logging.error("DySKT failed. (Unknown) %s",e)
@@ -614,7 +620,7 @@ class DySKT(object):
 
         # ATT we can error/ack with associated cmd id
         cmd = tkns[1].strip().lower()
-        if cmd not in ['scan','hold','listen','pause','txpwr','spoof']:
+        if cmd not in ['state','scan','hold','listen','pause','txpwr','spoof']:
             self._c2c.send("ERR %d \001invalid command: %s\001\n" % (cmdid,cmd))
             return None,None,None,None
 
@@ -671,7 +677,7 @@ if __name__ == '__main__':
     try:
         logging.info("DySKT %s",dyskt.__version__)
         skt = DySKT()
-        skt.start()
+        skt.run()
     except DySKTConfException as err:
         logging.error("Configuration Error: %s",err)
     except DySKTParamException as err:

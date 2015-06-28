@@ -44,10 +44,24 @@ DySKT:
  44) implement control socket
  45) rdoctl will block on socket if no wireless traffic is present -> put a timeout
      or something on it
- 45) move bulk framing to RadioController to minimize internal traffic
+ 45) move bulk framing to RadioController to minimize internal traffic???
  46) After beginning adding of command socket, will hang occasionally on shutdown
  47) when dyskt hangs up on a connected socket, we get a bad file descriptor error
+   Traceback (most recent call last):
+  File "/home/talib/workspace/projects/Python/wraith/dyskt/dyskt.py", line 674, in <module>
+    skt.start()
+  File "/home/talib/workspace/projects/Python/wraith/dyskt/dyskt.py", line 272, in start
+    cid,cmd,rs,ps = self._processcmd(self._c2c.recv())
+  File "/home/talib/workspace/projects/Python/wraith/dyskt/dyskt.py", line 171, in recv
+    self._conn.shutdown(socket.SHUT_RDWR)
+  File "/usr/lib/python2.7/socket.py", line 224, in meth
+    return getattr(self._sock,name)(*args)
+  File "/usr/lib/python2.7/socket.py", line 170, in _dummy
+    raise error(EBADF, 'Bad file descriptor')
+  error: [Errno 9] Bad file descriptor
  48) odd behaviour with responses to client after commands are sent
+ 49) when tuner handles tokens from DySKT including commands, the tuner does
+     not proceed to next channel
 Nidus:
   1) return messages instead of just closing pipe for no running server etc
   2) need constraints either through postgresql (preferred) or nidusdb - one example
