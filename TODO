@@ -45,23 +45,9 @@ DySKT:
  45) rdoctl will block on socket if no wireless traffic is present -> put a timeout
      or something on it
  45) move bulk framing to RadioController to minimize internal traffic???
- 46) After beginning adding of command socket, will hang occasionally on shutdown
- 47) when dyskt hangs up on a connected socket, we get a bad file descriptor error
-   Traceback (most recent call last):
-  File "/home/talib/workspace/projects/Python/wraith/dyskt/dyskt.py", line 674, in <module>
-    skt.start()
-  File "/home/talib/workspace/projects/Python/wraith/dyskt/dyskt.py", line 272, in start
-    cid,cmd,rs,ps = self._processcmd(self._c2c.recv())
-  File "/home/talib/workspace/projects/Python/wraith/dyskt/dyskt.py", line 171, in recv
-    self._conn.shutdown(socket.SHUT_RDWR)
-  File "/usr/lib/python2.7/socket.py", line 224, in meth
-    return getattr(self._sock,name)(*args)
-  File "/usr/lib/python2.7/socket.py", line 170, in _dummy
-    raise error(EBADF, 'Bad file descriptor')
-  error: [Errno 9] Bad file descriptor
- 48) odd behaviour with responses to client after commands are sent
- 49) when tuner handles tokens from DySKT including commands, the tuner does
-     not proceed to next channel
+ 49) timing issues, the tuner will repeat scan of current channel when it gets
+    tokens from DySKT including commands
+ 50) very inefficient when c2c does not have a client -  1 of 4 CPUs runs at 100%
 Nidus:
   1) return messages instead of just closing pipe for no running server etc
   2) need constraints either through postgresql (preferred) or nidusdb - one example
@@ -80,8 +66,15 @@ Nidus:
      o should we use nidusdb's connection or continue to create in the thread
  15) should we commit individual statements in long functions i.e. _setradio
  16) add radiotap extensions spatial streams
- 17) look into PPI (per packet information)
  18) add trigger to reset sequences when tables are emptied
+ 19) still having errors when a DySKT fails to close cleanly (see below)
+     291720LJun2015.458 [WARNING] DySKT 127.0.0.1:47740 submit: submit device type(<type 'exceptions.RuntimeError'>) RuntimeError('submit device 23P01: ERROR:  conflicting key value violates exclusion constraint "sensor_hostname_period_excl"\nDETAIL:  Key (hostname, period)=(feral, ["2015-06-29 23:20:32.455249+00",)) conflicts with existing key (hostname, period)=(feral, ["2015-06-29 23:16:53.002985+00",)).\n',)
+     291720LJun2015.639 [WARNING] DySKT 127.0.0.1:47740 submit: submit platform 23502: ERROR:  null value in column "sid" violates not-null constraint
+     DETAIL:  Failing row contains (null, Linux, Ubuntu, 14.04, trusty, 3.13.0-55-generic, x86_64, 2.7.6, GCC 4.8.2, glibc 2.4, 64bit, ELF, BO).
+     291720LJun2015.640 [WARNING] DySKT 127.0.0.1:47740 submit: submit radio 23502: ERROR:  null value in column "sid" violates not-null constraint
+     DETAIL:  Failing row contains (null, 00:c0:ca:59:af:a6, phy1, alfa0, dyskt0, recon, ["2015-06-29 23:20:30.876558+00",)).
+     291720LJun2015.694 [WARNING] DySKT 127.0.0.1:47740 submit: submit gpsde 23502: ERROR:  null value in column "sid" violates not-null constraint
+     DETAIL:  Failing row contains (null, 1, ["2015-06-29 23:20:32.63999+00",)).
 Radio:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)
