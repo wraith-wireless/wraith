@@ -52,7 +52,6 @@ dyskt 0.1.5
  - compresssed/encrypted comms with Nidus
    o uses secure socket layer to send data to Nidus
    o zlib library to compress frames (hardcoded to 14K and 1 sec delay)
- -
 
 dyskt 0.1.6
  desc: adding command interface
@@ -61,6 +60,7 @@ dyskt 0.1.6
   - added pause option on start (per radio)
   - added command socket capabilities (still in testing phase)
    o allows for state, pause, scan, hold, listen commands
+   o need to add functionality to txpwr and spoof
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'

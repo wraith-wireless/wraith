@@ -109,14 +109,15 @@ GPATH = os.path.dirname(os.path.abspath(__file__))
 logpath = os.path.join(GPATH,'dyskt.log.conf')
 logging.config.fileConfig(logpath)
 
+class C2CClientExit(Exception): pass
 class C2C(threading.Thread):
     """
      A "threaded socket", facilitates communication betw/ DySKT and a client
       1) accepts one and only one client at a time
-      2) is non-blocking
+      2) is non-blocking (the listening socket)
       3) handles a very simple protocol based on kismet's (see above)
-     The C2C has a very simplistic error handling - reseting itself on every
-     error
+     The C2C has a very simplistic error handling. On any error, will reset
+     itself
     """
     def __init__(self,conn,port):
         """
@@ -131,36 +132,34 @@ class C2C(threading.Thread):
         self._client = None     # the client addr
         self._conn = None       # the conn from the client
 
-    @property
-    def hasclient(self): return self._client is not None
-
-    @property
-    def islistening(self): return self._sock is not None
-
     def run(self):
         """ execution loop check/respond to clients """
         while True:
             try:
-                # check if DySKT sent anything
-                if self._cD.poll():
+                # should we listen? or accept?
+                if not self._sock and not self._client: self._listen()
+                elif self._sock and not self._client:
+                    if self._accept():
+                        logging.info("Client %s connected",self.clientstr)
+                        self._send("DySKT v%s\n" % dyskt.__version__)
+
+                # prepare inputs
+                ins = [self._cD,self._conn] if self._conn else [self._cD]
+
+                # block on inputs & process if present
+                rs,_,_ = select.select(ins,[],[],0.25)
+                if self._cD in rs:
+                    # token from DySKT
                     tkn = self._cD.recv()
                     if tkn == '!STOP!': break
                     else: self._send(tkn)
-
-                # what state are we in?
-                if not self.islistening and not self.hasclient: self._listen()
-                elif self.islistening and not self.hasclient:
-                    if self._accept():
-                        logging.info("Client %s:%d connected",self._client[0],self._client[1])
-                        self._send("DySKT v%s\n" % dyskt.__version__)
-                else:
-                    r = select.select([self._conn],[],[],0.25)
-                    if r[0]:
-                        pkt = self._recv()
-                        if pkt: self._cD.send(('cmd','c2c','msg',pkt))
+                if self._conn in rs:
+                    # cmd from client
+                    cmd = self._recv()
+                    if cmd: self._cD.send(('cmd','c2c','msg',cmd))
             except socket.error:
                 self._shutdown() # reset everything
-            except IOError:
+            except C2CClientExit:
                 # used to signal an exiting client
                 logging.info("Client exited")
                 self._shutdown()
@@ -177,18 +176,19 @@ class C2C(threading.Thread):
 
     def _accept(self):
         """ accept a client request """
-        if self._client is None:
-            # see if a client wants to accept
-            try:
-                # if we get a client connection, shutdown the listening the socket
-                # so no future clients will hang waiting on it
-                self._conn,self._client = self._sock.accept()
-                self._sock.shutdown(socket.SHUT_RDWR)
-                self._sock.close()
-                self._sock = None
-                return True
-            except socket.error as e:
-                return False
+        if self._client: return False
+
+        # see if a client wants to connect
+        try:
+            # if we get a client connection, shutdown the listening the socket
+            # so no future clients will hang waiting on it
+            self._conn,self._client = self._sock.accept()
+            self._sock.shutdown(socket.SHUT_RDWR)
+            self._sock.close()
+            self._sock = None
+            return True
+        except socket.error:
+            return False
 
     def _recv(self):
         """ recv from client """
@@ -196,7 +196,7 @@ class C2C(threading.Thread):
             msg = ''
             while len(msg) == 0 or msg[-1:] != '\n':
                 data = self._conn.recv(1024)
-                if not data: raise IOError
+                if not data: raise C2CClientExit
                 msg += data
             return msg
 
@@ -224,6 +224,13 @@ class C2C(threading.Thread):
             pass
         finally:
             self._sock = None
+
+    @property # will throw error on no client
+    def clientstr(self):
+        try:
+            return "%s:%d" % (self._client[0],self._client[1])
+        except:
+            return ""
 
 #### DySKT EXCEPTIONS
 class DySKTException(Exception): pass
@@ -312,7 +319,7 @@ class DySKT(object):
                         elif l == 'cmderr':
                             self._pConns['c2c'].send("ERR %d \001%s\001\n" % (t,m))
                         elif l == 'cmdack':
-                            self._pConns['c2c'].send("OK %d\n" % t)
+                            self._pConns['c2c'].send("OK %d \001%s\001\n" % (t,m))
                 except Exception as e:
                     # blanke exception
                     logging.error("DySKT failed. (Unknown) %s",e)

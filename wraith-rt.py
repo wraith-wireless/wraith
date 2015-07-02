@@ -56,7 +56,7 @@ def startnidus(pwd):
     try:
         cmdline.service('nidusd',pwd)
         time.sleep(0.5)
-        if not cmdline.nidusrunning(wraith.NIDUSPID): raise RuntimeError
+        if not cmdline.runningservice(wraith.NIDUSPID): raise RuntimeError
     except RuntimeError:
         return False
     else:
@@ -66,7 +66,7 @@ def stopnidus(pwd):
     """ stop nidus storage manager. pwd: Sudo password """
     try:
         cmdline.service('nidusd',pwd,False)
-        while cmdline.nidusrunning(wraith.NIDUSPID): time.sleep(1.0)
+        while cmdline.runningservice(wraith.NIDUSPID): time.sleep(1.0)
     except RuntimeError as e:
         return False
     else:
@@ -77,7 +77,7 @@ def startdyskt(pwd):
     try:
         cmdline.service('dysktd',pwd)
         time.sleep(1.0)
-        if not cmdline.dysktrunning(wraith.DYSKTPID): raise RuntimeError
+        if not cmdline.runningservice(wraith.DYSKTPID): raise RuntimeError
     except RuntimeError:
         return False
     else:
@@ -87,7 +87,7 @@ def stopdyskt(pwd):
     """ stop dyskt sensor. pwd: Sudo password """
     try:
         cmdline.service('dysktd',pwd,False)
-        while cmdline.nidusrunning(wraith.DYSKTPID): time.sleep(1.0)
+        while cmdline.runningservice(wraith.DYSKTPID): time.sleep(1.0)
     except RuntimeError as e:
         return False
     else:
@@ -226,14 +226,14 @@ class WraithPanel(gui.MasterPanel):
             msgs.append((time.strftime('%H:%M:%S'),"Not connected to DB",gui.LOG_WARN))
 
         # nidus running?
-        if cmdline.nidusrunning(wraith.NIDUSPID):
+        if cmdline.runningservice(wraith.NIDUSPID):
             msgs.append((time.strftime('%H:%M:%S'),"Nidus running",gui.LOG_NOERR))
             self._setstate(_STATE_NIDUS_)
         else:
             msgs.append((time.strftime('%H:%M:%S'),"Nidus not running",gui.LOG_WARN))
 
         # dyskt running?
-        if cmdline.dysktrunning(wraith.DYSKTPID):
+        if cmdline.runningservice(wraith.DYSKTPID):
             msgs.append((time.strftime('%H:%M:%S'),"DySKT running",gui.LOG_NOERR))
             self._setstate(_STATE_DYSKT_)
         else:
@@ -728,11 +728,11 @@ class WraithPanel(gui.MasterPanel):
     def _updatestate(self):
         """ reevaluates internal state """
         # state of nidus
-        if cmdline.nidusrunning(wraith.NIDUSPID): self._setstate(_STATE_NIDUS_)
+        if cmdline.runningservice(wraith.NIDUSPID): self._setstate(_STATE_NIDUS_)
         else: self._setstate(_STATE_NIDUS_,False)
 
         # state of dyskt
-        if cmdline.dysktrunning(wraith.DYSKTPID): self._setstate(_STATE_DYSKT_)
+        if cmdline.runningservice(wraith.DYSKTPID): self._setstate(_STATE_DYSKT_)
         else:  self._setstate(_STATE_DYSKT_,False)
 
         # state of postgres i.e. store
@@ -968,7 +968,7 @@ class WraithPanel(gui.MasterPanel):
                 self.logwrite("Starting DySKT...",gui.LOG_NOTE)
                 cmdline.service('dysktd',self._pwd)
                 time.sleep(0.5)
-                if not cmdline.dysktrunning(wraith.DYSKTPID): raise RuntimeError('unknown')
+                if not cmdline.runningservice(wraith.DYSKTPID): raise RuntimeError('unknown')
             except RuntimeError as e:
                 self.logwrite("Error starting DySKT: %s" % e,gui.LOG_ERR)
             else:
@@ -1094,7 +1094,7 @@ class WraithSplash(object):
     def _chknidus(self):
         self._sv.set("Checking Nidus...")
         self._pb.step(0.5)
-        if not cmdline.nidusrunning(wraith.NIDUSPID):
+        if not cmdline.runningservice(wraith.NIDUSPID):
             self._sv.set("Starting Nidus")
             if startnidus(pwd): self._sv.set("Nidus started")
             else: self._sv.set("Failed to start Nidus")
@@ -1106,17 +1106,17 @@ class WraithSplash(object):
     def _chkdyskt(self):
         self._sv.set("Checking DySKT...")
         self._pb.step(2.0)
-        if not cmdline.dysktrunning(wraith.DYSKTPID):
+        if not cmdline.runningservice(wraith.DYSKTPID):
             self._sv.set("Starting DySKT")
             if not startdyskt(pwd):
                 # because DySKT can sometimes take a while, we will run
                 # this several times
                 i = 5
-                while not cmdline.dysktrunning(wraith.DYSKTPID):
+                while not cmdline.runningservice(wraith.DYSKTPID):
                     i -= 1
                     if i == 0: break
                     time.sleep(0.5)
-            if cmdline.dysktrunning(wraith.DYSKTPID): self._sv.set("DySKT started")
+            if cmdline.runningservice(wraith.DYSKTPID): self._sv.set("DySKT started")
             else: self._sv.set("Failed to start DySKT")
         else:
             self._sv.set("DySKT already running")
@@ -1151,11 +1151,11 @@ if __name__ == '__main__':
 
         # stop DySKT, then Nidus, then PostgreSQL
         sd = sn = sp = True
-        if cmdline.dysktrunning(wraith.DYSKTPID):
+        if cmdline.runningservice(wraith.DYSKTPID):
             ret = 'ok' if stopdyskt(pwd) else 'fail'
             print "Stopping DySKT\t\t\t\t[%s]" % ret
         else: print "DySKT not running"
-        if cmdline.nidusrunning(wraith.NIDUSPID):
+        if cmdline.runningservice(wraith.NIDUSPID):
             ret = 'ok' if stopnidus(pwd) else 'fail'
             print "Stopping Nidus\t\t\t\t[%s]" % ret
         else: print "Nidus not running"
@@ -1181,12 +1181,12 @@ if __name__ == '__main__':
             print "Starting PostgreSQL\t\t\t[%s]" % ret
         else:
             print "PostgreSQL already running"
-        if not cmdline.nidusrunning(wraith.NIDUSPID):
+        if not cmdline.runningservice(wraith.NIDUSPID):
             ret = 'ok' if startnidus(pwd) else 'fail'
             print "Starting Nidus\t\t\t\t[%s]" % ret
         else:
             print "Nidus already running"
-        if not cmdline.dysktrunning(wraith.DYSKTPID):
+        if not cmdline.runningservice(wraith.DYSKTPID):
             ret = 'ok' if startdyskt(pwd) else 'fail'
             print "Starting DySKT\t\t\t\t[%s]" % ret
         else:

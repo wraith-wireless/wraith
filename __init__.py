@@ -46,8 +46,11 @@ wraith 0.0.4
   - added polling to check if service's states have changed and updates menus
     accordingly
   - added context menu to right-click on databin buttons (option do nothing as of
-    yet
+    yet)
   - semantic change: made geo flt (front-line trace) as it better describes the data
+  - added a manual remove (with rm) of pidfile in dysktd and nidusd to handle
+    ubuntu's lack of --remove-pidfile and modified wraith.py as necessary
+  - added c2c functionality to dyskt
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

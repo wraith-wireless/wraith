@@ -22,6 +22,16 @@ def runningprocess(process):
         if os.path.split(fields[7])[1] == process: pids.append(int(fields[1]))
     return pids
 
+def runningservice(pidfile):
+    """
+     determines if the service (dyskt/nidus) referenced by pidfile is running
+    """
+    try:
+        with open(pidfile): return True
+    except:
+        return False
+
+## deprecated
 def nidusrunning(pidfile):
     """
      the following checks if nidus is running. Because it runs under python,
@@ -35,6 +45,7 @@ def nidusrunning(pidfile):
     except (TypeError,IOError,OSError):
         return False
 
+## deprecated
 def dysktrunning(pidfile):
     """ see nidusrunning """
     try:

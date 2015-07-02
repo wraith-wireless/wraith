@@ -271,6 +271,7 @@ class RadioController(mp.Process):
         self._s = None
         try:
             # TODO: set a defaulttimeout value on the socket (catch the Timeouterror)
+            #  otherwise we'll hang in an environment w/out wireless traffic
             # bind the socket
             self._s = socket.socket(socket.AF_PACKET,
                                     socket.SOCK_RAW,
