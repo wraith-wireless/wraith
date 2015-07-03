@@ -192,6 +192,139 @@ class RadioController(mp.Process):
                          'z':None}
         self._setup(conf) # set up
 
+    def terminate(self): pass
+
+    def run(self):
+        """ run execution loop """
+        # ignore signals being used by main program
+        signal.signal(signal.SIGINT,signal.SIG_IGN)
+        signal.signal(signal.SIGTERM,signal.SIG_IGN)
+
+        # start tuner thread
+        self._tuner.start()
+
+        # execute sniffing loop
+        while True:
+            try:
+                # check for any notifications from tuner thread
+                # a tuple t=(event,timestmap,message) where message is another
+                # tuple m=(cmdid,description) such that cmdid != -1 if this
+                # command comes from an external source
+                event,ts,msg = self._qT.get_nowait()
+            except Empty:
+                # no notices from tuner thread
+                try:
+                    # pull the frame off and pass it on
+                    # NOTE: this will block if there is no wireless traffic
+                    frame = self._s.recv(MAX_MPDU)
+                    if self._stuner == TUNE_PAUSE: continue # don't forward
+                    self._qRTO.put((self._vnic,time.time(),'!FRAME!',frame))
+                except socket.error as e:
+                    self._qRTO.put((self._vnic,time.time(),'!FAIL!',e))
+                    self._cD.send(('err',self._role,'Socket',e,))
+                    break
+                except Exception as e:
+                    # blanket 'don't know what happend' exception
+                    self._qRTO.put((self._vnic,time.time(),'!FAIL!',e))
+                    self._cD.send(('err',self._role,'Unknown',e))
+                    break
+            else:
+                # process the notification
+                if event == '!ERR!':
+                    # bad/failed command from user, notify DySKT
+                    if msg[0] > -1: self._cD.send(('cmderr',self._role,msg[0],msg[1]))
+                elif event == '!FAIL!':
+                    self._qRTO.put((self._vnic,ts,'!FAIL!',msg[1]))
+                elif event == '!STATE!':
+                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                elif event == '!HOLD!':
+                    self._stuner = TUNE_HOLD
+                    self._qRTO.put((self._vnic,ts,'!HOLD!',msg[1]))
+                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                elif event == '!SCAN!':
+                    self._stuner = TUNE_SCAN
+                    self._qRTO.put((self._vnic,time.time(),'!SCAN!',msg[1]))
+                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                elif event == '!LISTEN':
+                    self._stuner = TUNE_LISTEN
+                    self._qRTO.put((self._vnic,time.time(),'!LISTEN!',msg[1]))
+                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                elif event == '!PAUSE!':
+                    self._stuner = TUNE_PAUSE
+                    self._qRTO.put((self._vnic,time.time(),'!PAUSE!',' '))
+                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                elif event == '!STOP!':
+                    self._stuner = TUNE_STOP
+                    break
+
+        # shut down
+        if not self.shutdown():
+            try:
+                self._cD.send(('warn',self._role,'Shutdown',"Incomplete reset"))
+            except IOError:
+                # most likely DySKT already closed their side
+                pass
+
+    def shutdown(self):
+        """
+         restore everything & clean up. returns whether a full reset or not occurred
+        """
+        # try shutting down & resetting radio (if it failed we may not be able to)
+        clean = True
+        try:
+            # stop the tuner
+            try:
+                # call shutdown and join timing out if necessary
+                self._tuner.shutdown()
+                self._tuner.join()
+            except:
+                clean = False
+            else:
+                self._tuner = None
+
+            # reset the device
+            try:
+                iw.devdel(self._vnic)
+                iw.phyadd(self._phy,self._nic)
+                if self._spoofed:
+                    iwt.ifconfig(self._nic,'down')
+                    iwt.resethwaddr(self._nic)
+                iwt.ifconfig(self._nic,'up')
+            except iw.IWException:
+                clean = False
+
+            # close socket and connection
+            if self._s:
+                self._s.shutdown(socket.SHUT_RD)
+                self._s.close()
+            self._cD.close()
+        except:
+            clean = False
+        return clean
+
+    @property
+    def radio(self):
+        """ returns a dict describing this radio """
+        return {'nic':self._nic,
+                'vnic':self._vnic,
+                'phy':self._phy,
+                'mac':self._mac,
+                'role':self._role,
+                'spoofed':self._spoofed,
+                'driver':self._driver,
+                'chipset':self._chipset,
+                'standards':self._std,
+                'channels':self._chs,
+                'txpwr':self._txpwr,
+                'desc':self._desc,
+                'nA':self._antenna['num'],
+                'type':self._antenna['type'],
+                'gain':self._antenna['gain'],
+                'loss':self._antenna['loss'],
+                'x':self._antenna['x'],
+                'y':self._antenna['y'],
+                'z':self._antenna['z']}
+
     def _setup(self,conf):
         """
          1) sets radio properties as specified in conf
@@ -381,136 +514,3 @@ class RadioController(mp.Process):
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
             raise RuntimeError("%s:Unknown:%s" % (self._role,e))
-
-    def terminate(self): pass
-
-    def run(self):
-        """ run execution loop """
-        # ignore signals being used by main program
-        signal.signal(signal.SIGINT,signal.SIG_IGN)
-        signal.signal(signal.SIGTERM,signal.SIG_IGN)
-
-        # start tuner thread
-        self._tuner.start()
-
-        # execute sniffing loop
-        while True:
-            try:
-                # check for any notifications from tuner thread
-                # a tuple t=(event,timestmap,message) where message is another
-                # tuple m=(cmdid,description) such that cmdid != -1 if this
-                # command comes from an external source
-                event,ts,msg = self._qT.get_nowait()
-            except Empty:
-                # no notices from tuner thread
-                try:
-                    # pull the frame off and pass it on
-                    # NOTE: this will block if there is no wireless traffic
-                    frame = self._s.recv(MAX_MPDU)
-                    if self._stuner == TUNE_PAUSE: continue # don't forward
-                    self._qRTO.put((self._vnic,time.time(),'!FRAME!',frame))
-                except socket.error as e:
-                    self._qRTO.put((self._vnic,time.time(),'!FAIL!',e))
-                    self._cD.send(('err',self._role,'Socket',e,))
-                    break
-                except Exception as e:
-                    # blanket 'don't know what happend' exception
-                    self._qRTO.put((self._vnic,time.time(),'!FAIL!',e))
-                    self._cD.send(('err',self._role,'Unknown',e))
-                    break
-            else:
-                # process the notification
-                if event == '!ERR!':
-                    # bad/failed command from user, notify DySKT
-                    if msg[0] > -1: self._cD.send(('cmderr',self._role,msg[0],msg[1]))
-                elif event == '!FAIL!':
-                    self._qRTO.put((self._vnic,ts,'!FAIL!',msg[1]))
-                elif event == '!STATE!':
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
-                elif event == '!HOLD!':
-                    self._stuner = TUNE_HOLD
-                    self._qRTO.put((self._vnic,ts,'!HOLD!',msg[1]))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
-                elif event == '!SCAN!':
-                    self._stuner = TUNE_SCAN
-                    self._qRTO.put((self._vnic,time.time(),'!SCAN!',msg[1]))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
-                elif event == '!LISTEN':
-                    self._stuner = TUNE_LISTEN
-                    self._qRTO.put((self._vnic,time.time(),'!LISTEN!',msg[1]))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
-                elif event == '!PAUSE!':
-                    self._stuner = TUNE_PAUSE
-                    self._qRTO.put((self._vnic,time.time(),'!PAUSE!',' '))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
-                elif event == '!STOP!':
-                    self._stuner = TUNE_STOP
-                    break
-
-        # shut down
-        if not self.shutdown():
-            try:
-                self._cD.send(('warn',self._role,'Shutdown',"Incomplete reset"))
-            except IOError:
-                # most likely DySKT already closed their side
-                pass
-
-    def shutdown(self):
-        """
-         restore everything & clean up. returns whether a full reset or not occurred
-        """
-        # try shutting down & resetting radio (if it failed we may not be able to)
-        clean = True
-        try:
-            # stop the tuner
-            try:
-                # call shutdown and join timing out if necessary
-                self._tuner.shutdown()
-                self._tuner.join()
-            except:
-                clean = False
-            else:
-                self._tuner = None
-
-            # reset the device
-            try:
-                iw.devdel(self._vnic)
-                iw.phyadd(self._phy,self._nic)
-                if self._spoofed:
-                    iwt.ifconfig(self._nic,'down')
-                    iwt.resethwaddr(self._nic)
-                iwt.ifconfig(self._nic,'up')
-            except iw.IWException:
-                clean = False
-
-            # close socket and connection
-            if self._s:
-                self._s.shutdown(socket.SHUT_RD)
-                self._s.close()
-            self._cD.close()
-        except:
-            clean = False
-        return clean
-
-    @property
-    def radio(self):
-        """ returns a dict describing this radio """
-        return {'nic':self._nic,
-                'vnic':self._vnic,
-                'phy':self._phy,
-                'mac':self._mac,
-                'role':self._role,
-                'spoofed':self._spoofed,
-                'driver':self._driver,
-                'chipset':self._chipset,
-                'standards':self._std,
-                'channels':self._chs,
-                'txpwr':self._txpwr,
-                'desc':self._desc,
-                'nA':self._antenna['num'],
-                'type':self._antenna['type'],
-                'gain':self._antenna['gain'],
-                'loss':self._antenna['loss'],
-                'x':self._antenna['x'],
-                'y':self._antenna['y'],
-                'z':self._antenna['z']}

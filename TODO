@@ -1,5 +1,7 @@
 Overall:
   2) run dyskt as root - requires a lot of (unnessary) workarounds otherwise
+    this should be simpler as the pidfile is being removed (we do not need
+    to send a signal to the pid as root anymore)
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -32,15 +34,14 @@ DySKT:
  26) gps device handling
      o identify/handle device failing or being removed
      o uniquely identify with a permanent id
-     o allow no gps (fixed or otherwise)
- 41) need to handle tuner thread failure in rdoctl
- 43) allow sensor to start in paused mode
- 44) implement control socket
+     o should we keep forced gps?
+     o continue to have static gps send fixed coordinates? or have it send one
+       and quit?
  45) rdoctl will block on socket if no wireless traffic is present -> put a timeout
      or something on it
  45) move bulk framing to RadioController to minimize internal traffic???
  49) timing issues, the tuner will repeat scan of current channel when it gets
-    tokens from DySKT including commands
+     tokens from DySKT including commands
 Nidus:
   1) return messages instead of just closing pipe for no running server etc
   2) need constraints either through postgresql (preferred) or nidusdb - one example

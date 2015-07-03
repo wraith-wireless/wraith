@@ -60,8 +60,6 @@ class GPSPoller(threading.Thread):
 
     def run(self):
         """ query for current location """
-        static = self._conf['fixed'] # dynamic gps or a fixed location
-
         # two execution loops - 1) get device details 2) get location
 
         # initialize device details dict
@@ -111,7 +109,7 @@ class GPSPoller(threading.Thread):
 
         # Location - loop until told to quit
         while not self._done.is_set():
-            if static:
+            if self._conf['fixed']:
                 # send static front line trace
                 self._eQ.put(('!GEO!',time.time(),{'id':dd['id'],
                                                   'fix':-1,
@@ -143,7 +141,7 @@ class GPSPoller(threading.Thread):
                                           'pdop':self._gpsd.pdop}
                             self._eQ.put(('!GEO',time.time(),flt))
                             break
-                    except (KeyError,AttributeError): # not all values present
+                    except (KeyError,AttributeError):
                         # a KeyError means not all values are present, an
                         # AttributeError means not all dop values are present
                         pass
@@ -200,6 +198,7 @@ class RTO(mp.Process):
         signal.signal(signal.SIGINT,signal.SIG_IGN)
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
+        # basic variables
         rmap = {}    # radio map: maps callsigns to mac addr
         bulk = {}    # stored frames
         gpsid = None # id of gps device
@@ -213,15 +212,12 @@ class RTO(mp.Process):
             else: self._setgpsd()
 
         # execution loop
-        tkn = None
-        while tkn != '!STOP!':
+        while True:
             # 1. anything from DySKT
             if self._conn.poll():
                 tkn = self._conn.recv()
-                if tkn != '!STOP!':
-                    self._conn.send(('warn','RTO','Token',"unknown %s" % tkn))
-                else:
-                    continue
+                if tkn == '!STOP!': break
+                else: self._conn.send(('warn','RTO','Token',"unknown %s" % tkn))
 
             # 2. gps device/frontline trace?
             try:
@@ -294,12 +290,12 @@ class RTO(mp.Process):
                 elif ev == '!PAUSE!':
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'pause',' '])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
-                #elif ev == '!SPOOF!':
-                #    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'spoof',msg])
-                #    if ret: self._conn.send(('err','RTO','Nidus',ret))
-                #elif ev == '!TXPWR!':
-                #    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'txpwr',msg])
-                #    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                elif ev == '!SPOOF!':
+                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'spoof',msg])
+                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                elif ev == '!TXPWR!':
+                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'txpwr',msg])
+                    if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!FRAME!':
                     # save the frame and update bulk details
                     if bulk[cs]['cnt'] == 0:
@@ -325,7 +321,7 @@ class RTO(mp.Process):
                             bulk[cs]['cnt'] = 0
                             bulk[cs]['sz'] = 0
                             bulk[cs]['frames'] = ''
-                else: # unidentified event type, notify leader
+                else: # unidentified event type, notify dyskt
                     self._conn.send(('warn','RTO','Radio',
                                      "unidentified event %s" % ev))
             except IndexError as e: # something wrong with antenna indexing

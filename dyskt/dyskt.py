@@ -435,11 +435,8 @@ class DySKT(object):
                 logging.info("Regulatory domain reset")
 
         # halt main execution loop & send out poison pills
-        # put a token on the internal comms from us to break the RTO out of
-        # any holding for data block
         logging.info("Stopping Sub-processes...")
         self._halt.set()
-        self._ic.put(('dyskt',time.time(),'!CHECK!',[]))
         for key in self._pConns:
             try:
                 self._pConns[key].send('!STOP!')
@@ -447,6 +444,15 @@ class DySKT(object):
             except IOError:
                 # ignore any broken pipe errors
                 pass
+
+        # put a token on internal comms to break the RTO out of holding for data#
+        # NOTE: of course this is entirely redundant as we could just put a
+        # poison pill here
+        try:
+            self._ic.put(('dyskt',time.time(),'!CHECK!',[]))
+        except:
+            # should not get anything but just in case
+            pass
 
         # active_children has the side effect of joining the processes
         while mp.active_children(): time.sleep(0.5)

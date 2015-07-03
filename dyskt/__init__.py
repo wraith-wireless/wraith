@@ -54,11 +54,12 @@ dyskt 0.1.5
    o zlib library to compress frames (hardcoded to 14K and 1 sec delay)
 
 dyskt 0.1.6
- desc: adding command interface
+ desc: added command interface
  includes: dyskt 0.0.11 rto 0.0.12 rdoctl 0.0.7 dyskt.conf dyskt.log.conf dysktd
  changes:
   - added pause option on start (per radio)
-  - added command socket capabilities (still in testing phase)
+  - dysktd manually removes created pidfile on exit
+  - added command socket capabilities (see dyskt.py for c2c protocol)
    o allows for state, pause, scan, hold, listen commands
    o need to add functionality to txpwr and spoof
 """

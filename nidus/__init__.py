@@ -57,6 +57,7 @@ nidus 0.0.6
     host is still being processed
   - added error handling in nidusdb to send more in-depth messages: method name
     and for blanket exceptions, exception type
+  - nidusd manually removes created pidfile on stop
 """
 __name__ = 'nidus'
 __license__ = 'GPL v3.0'
