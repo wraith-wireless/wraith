@@ -190,7 +190,7 @@ class RadioController(mp.Process):
                          'x':None,
                          'y':None,
                          'z':None}
-        self._setup(conf) # set up
+        self._setup(conf)
 
     def terminate(self): pass
 
@@ -215,10 +215,10 @@ class RadioController(mp.Process):
                 # no notices from tuner thread
                 try:
                     # pull the frame off and pass it on
-                    # NOTE: this will block if there is no wireless traffic
                     frame = self._s.recv(MAX_MPDU)
                     if self._stuner == TUNE_PAUSE: continue # don't forward
                     self._qRTO.put((self._vnic,time.time(),'!FRAME!',frame))
+                except socket.timeout: continue
                 except socket.error as e:
                     self._qRTO.put((self._vnic,time.time(),'!FAIL!',e))
                     self._cD.send(('err',self._role,'Socket',e,))
@@ -403,12 +403,11 @@ class RadioController(mp.Process):
         # release the socket after any failures ATT
         self._s = None
         try:
-            # TODO: set a defaulttimeout value on the socket (catch the Timeouterror)
-            #  otherwise we'll hang in an environment w/out wireless traffic
-            # bind the socket
+            # bind socket w/ a timeout of 5 just in case there is no wireless traffic
             self._s = socket.socket(socket.AF_PACKET,
                                     socket.SOCK_RAW,
                                     socket.htons(0x0003))
+            self._s.settimeout(5)
             self._s.bind((self._vnic,0x0003))
             uptime = time.time()
 

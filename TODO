@@ -34,11 +34,6 @@ DySKT:
  26) gps device handling
      o identify/handle device failing or being removed
      o uniquely identify with a permanent id
-     o should we keep forced gps?
-     o continue to have static gps send fixed coordinates? or have it send one
-       and quit?
- 45) rdoctl will block on socket if no wireless traffic is present -> put a timeout
-     or something on it
  49) timing issues, the tuner will repeat scan of current channel when it gets
      tokens from DySKT including commands
  50)

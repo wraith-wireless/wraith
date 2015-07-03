@@ -63,6 +63,8 @@ dyskt 0.1.6
    o allows for state, pause, scan, hold, listen commands
    o need to add functionality to txpwr and spoof
   - gpsd will only send 1 flt if static
+  - added timeout in RadioController to radio socket (in the event of no wireless
+    traffice)
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'
