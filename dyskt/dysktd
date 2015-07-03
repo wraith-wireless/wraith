@@ -26,8 +26,7 @@ do_start() {
     log_end_msg $?
 }
 
-# have to manually remove the pidfile as ubuntu does not seem to recognize
-# the flag --remove-pidfile
+# manually remove the pidfile as ubuntu does not recognize the flag --remove-pidfile
 do_stop() {
     log_daemon_msg "Stopping $DAEMON_NAME"
     start-stop-daemon --stop --pidfile $PIDFILE --retry 10
