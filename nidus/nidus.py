@@ -115,7 +115,6 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                 elif t == 'ANTENNA': db.submitantenna(f)
                 elif t == 'RADIO_EVENT': db.submitradioevent(f)
                 elif t == 'GPSD': db.submitgpsd(f)
-                #elif t == 'FRAME': db.submitsingle(f) # deprecated
                 elif t == 'BULK': db.submitbulk(f)
                 elif t == 'FLT': db.submitflt(f)
                 else:
@@ -177,7 +176,7 @@ class NidusServer(ss.ThreadingMixIn, SSLServer):
         logging.info("NidusServer waiting...")
         while not self.quit:
             try:
-                (rs,ws,es) = select.select([self],[],[],0.5)
+                rs,_,_ = select.select([self],[],[],0.5)
                 if self in rs: self.handle_request() 
             except select.error as ex:
                 if ex[0] == 4:

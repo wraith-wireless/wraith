@@ -58,11 +58,11 @@ dyskt 0.1.6
  includes: dyskt 0.0.11 rto 0.0.12 rdoctl 0.0.7 dyskt.conf dyskt.log.conf dysktd
  changes:
   - added pause option on start (per radio)
-  - dysktd manually removes created pidfile on exit
+  - dysktd manually removes created pidfile on exit & now configure to run as root
   - added command socket capabilities (see dyskt.py for c2c protocol)
    o allows for state, pause, scan, hold, listen commands
    o need to add functionality to txpwr and spoof
-  - configured dysktd to run as root
+  - gpsd will only send 1 flt if static
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'

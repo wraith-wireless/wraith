@@ -96,7 +96,8 @@ CREATE INDEX using_gpsd_period_idx ON using_gpsd USING GIST (period);
 
 -- flt (front-line trace) table
 -- locational data of sensor NOTE: we use the sensor id over a gps device id
--- due to the fact that the flt may be staticly defined
+-- due to the fact that the flt may be staticly defined and the gos device id
+-- is not unique
 -- how do we define a constraint such that the flt must have a sid that
 -- is in sensor and the ts falls within that sensor's current period
 -- *dop values:

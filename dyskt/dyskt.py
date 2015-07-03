@@ -157,7 +157,7 @@ class C2C(threading.Thread):
                     # cmd from client
                     cmd = self._recv()
                     if cmd: self._cD.send(('cmd','c2c','msg',cmd))
-            except socket.error:
+            except (select.error,socket.error): # hide any select errors
                 self._shutdown() # reset everything
             except C2CClientExit:
                 # used to signal an exiting client
@@ -290,7 +290,12 @@ class DySKT(object):
         # execution loop
         while not self._halt.is_set():
             # get message(s) a tuple: (level,originator,type,message) from children
-            rs,_,_ = select.select(self._pConns.values(),[],[],0.5)
+            rs = [] # hide pycharm unreferenced variable warning
+            try:
+                rs,_,_ = select.select(self._pConns.values(),[],[],0.5)
+            except select.error as e: # hide (4,'Interupted system call') errors
+                if e[0] == 4: continue
+
             for r in rs:
                 try:
                     l,o,t,m = r.recv()
@@ -445,18 +450,10 @@ class DySKT(object):
                 # ignore any broken pipe errors
                 pass
 
-        # put a token on internal comms to break the RTO out of holding for data#
-        # NOTE: of course this is entirely redundant as we could just put a
-        # poison pill here
-        try:
-            self._ic.put(('dyskt',time.time(),'!CHECK!',[]))
-        except:
-            # should not get anything but just in case
-            pass
-
         # active_children has the side effect of joining the processes
         while mp.active_children(): time.sleep(0.5)
         while self._c2c.is_alive(): self._c2c.join(0.5)
+        logging.info("Sub-processes stopped")
 
         # change our state
         self._state = DYSKT_DESTROYED
