@@ -62,6 +62,7 @@ dyskt 0.1.6
   - added command socket capabilities (see dyskt.py for c2c protocol)
    o allows for state, pause, scan, hold, listen commands
    o need to add functionality to txpwr and spoof
+  - configured dysktd to run as root
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'

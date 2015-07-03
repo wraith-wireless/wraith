@@ -1,7 +1,5 @@
 Overall:
-  2) run dyskt as root - requires a lot of (unnessary) workarounds otherwise
-    this should be simpler as the pidfile is being removed (we do not need
-    to send a signal to the pid as root anymore)
+
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -29,6 +27,8 @@ GUI:
      we can use
  35) implement query functionality, need a simplistic query language in xml or
      something
+ 36) add wildcards to some fields in query i.e. mac address allow search on vendor
+     with 00:01:02.*
 DySKT:
   3) implement adaptive scan pattern
  26) gps device handling
@@ -39,7 +39,6 @@ DySKT:
        and quit?
  45) rdoctl will block on socket if no wireless traffic is present -> put a timeout
      or something on it
- 45) move bulk framing to RadioController to minimize internal traffic???
  49) timing issues, the tuner will repeat scan of current channel when it gets
      tokens from DySKT including commands
 Nidus:
@@ -61,7 +60,7 @@ Nidus:
  15) should we commit individual statements in long functions i.e. _setradio
  16) add radiotap extensions spatial streams
  18) add trigger to reset sequences when tables are emptied
- 19) still having errors when a DySKT fails to close cleanly (see below)
+ 19) still having errors when a DySKT fails to close cleanly i.e. kill -9 (see below)
      291720LJun2015.458 [WARNING] DySKT 127.0.0.1:47740 submit: submit device type(<type 'exceptions.RuntimeError'>) RuntimeError('submit device 23P01: ERROR:  conflicting key value violates exclusion constraint "sensor_hostname_period_excl"\nDETAIL:  Key (hostname, period)=(feral, ["2015-06-29 23:20:32.455249+00",)) conflicts with existing key (hostname, period)=(feral, ["2015-06-29 23:16:53.002985+00",)).\n',)
      291720LJun2015.639 [WARNING] DySKT 127.0.0.1:47740 submit: submit platform 23502: ERROR:  null value in column "sid" violates not-null constraint
      DETAIL:  Failing row contains (null, Linux, Ubuntu, 14.04, trusty, 3.13.0-55-generic, x86_64, 2.7.6, GCC 4.8.2, glibc 2.4, 64bit, ELF, BO).

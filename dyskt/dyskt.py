@@ -290,40 +290,40 @@ class DySKT(object):
         # execution loop
         while not self._halt.is_set():
             # get message(s) a tuple: (level,originator,type,message) from children
-            for key in self._pConns:
+            rs,_,_ = select.select(self._pConns.values(),[],[],0.5)
+            for r in rs:
                 try:
-                    if self._pConns[key].poll():
-                        l,o,t,m = self._pConns[key].recv()
-                        if l == 'err':
-                            # only process errors involved during execution
-                            if DYSKT_CREATED < self.state < DYSKT_EXITING:
-                                if o == 'collection':
-                                    # let collection radio to fail & still continue
-                                    logging.warning("Collection radio dropped.")
-                                    self._pConns['collection'].send('!STOP!')
-                                    self._pConns['collection'].close()
-                                    del self._pConns['collection']
-                                    mp.active_children()
-                                    self._cr = None
-                                else:
-                                    logging.error("%s failed. (%s) %s",o,t,m)
-                                    self.stop()
-                        elif l == 'warn': logging.warning("%s: (%s) %s",o,t,m)
-                        elif l == 'info': logging.info("%s: (%s) %s",o,t,m)
-                        elif l == 'cmd':
-                            cid,cmd,rdos,ps = self._processcmd(m)
-                            if cid is None: continue
-                            for rdo in rdos:
-                                logging.info("Client sent %s to %s",cmd,rdo)
-                                self._pConns[rdo].send('%s:%d:%s' % (cmd,cid,'-'.join(ps)))
-                        elif l == 'cmderr':
-                            self._pConns['c2c'].send("ERR %d \001%s\001\n" % (t,m))
-                        elif l == 'cmdack':
-                            self._pConns['c2c'].send("OK %d \001%s\001\n" % (t,m))
+                    l,o,t,m = r.recv()
+                    if l == 'err':
+                        # only process errors invovled during execution
+                        if DYSKT_CREATED < self.state < DYSKT_EXITING:
+                            # continue w/out collection if it fails
+                            if o == 'collection':
+                                logging.warning("Collection radio dropped: %s",m)
+                                self._pConns['collection'].send('!STOP!')
+                                self._pConns['collection'].close()
+                                del self._pConns['collection']
+                                mp.active_children()
+                                self._cr = None
+                            else:
+                                logging.error("%s failed (%) %s",o,t,m)
+                        else:
+                            logging.warning("Uninitiated error (%) %s from %s",t,m,o)
+                    elif l == 'warn': logging.warning("%s: (%s) %s",o,t,m)
+                    elif l == 'info': logging.info("%s: (%s) %s",o,t,m)
+                    elif l == 'cmd':
+                        cid,cmd,rdos,ps = self._processcmd(m)
+                        if cid is None: continue
+                        for rdo in rdos:
+                            logging.info("Client sent %s to %s",cmd,rdo)
+                            self._pConns[rdo].send('%s:%d:%s' % (cmd,cid,'-'.join(ps)))
+                    elif l == 'cmderr':
+                        self._pConns['c2c'].send("ERR %d \001%s\001\n" % (t,m))
+                    elif l == 'cmdack':
+                        self._pConns['c2c'].send("OK %d \001%s\001\n" % (t,m))
                 except Exception as e:
-                    # blanke exception
-                    logging.error("DySKT failed. (Unknown) %s",e)
-            time.sleep(1) # sleep if no operation occurred
+                    # blanket catch all
+                    logging.error("DySKT failed. (Unknown) %s->%s", type(e),e)
 
     # noinspection PyUnusedLocal
     def stop(self,signum=None,stack=None):

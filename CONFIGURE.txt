@@ -55,31 +55,30 @@ postgres=# CREATE EXTENSION btree_gist;
      touch dyskt.log
      touch nidus.log
 
-  - configure iw, iwconfig, ifconfig and binding raw socket for root access
-   o We need root access to iw, iwconfig and ifconfig
-     * One can modify the dyskt deamon to run as root
-     * One can run python interpreter as root
-     * Or one can modify the sudoers file as below
-       # Cmnd alias specification
-       Cmnd_Alias	IWCONFIG = /sbin/iwconfig
-       Cmnd_Alias	IFCONFIG = /sbin/ifconfig
-       Cmnd_Alias	IW = /usr/sbin/iw #--> iw 3.17
-       Cmnd_Alias   MACCHANGER = /usr/bin/macchanger
+  - Configure DySKT. DySKT requires root privleges to a) bind to the raw socket
+    and b) set nic properities i.e. execute macchanger, iw, iwconfig and ifconfig.
+    There are two options:
+     o run dyskt as root (use current dysktd)
+     o If you're not comfortable running dyskt as root, it can be run as a user
+       (use dysktd_asuser) which also requires the following:
+      * configure iw, iwconfig, ifconfig and macchanger in /etc/sudoers
+        # Cmnd alias specification
+        Cmnd_Alias	IWCONFIG = /sbin/iwconfig
+        Cmnd_Alias	IFCONFIG = /sbin/ifconfig
+        Cmnd_Alias	IW = /usr/sbin/iw #--> iw 3.17
+        Cmnd_Alias   MACCHANGER = /usr/bin/macchanger
        
-       # Allow user to execute iw* commands
-       <user> ALL=NOPASSWD:IWCONFIG
-       <user> ALL=NOPASSWD:IFCONFIG
-       <user> ALL=NOPASSWD:IW
-       <user> ALL=NOPASSWD:MACCHANGER
+        # Allow user to execute iw* commands
+        <user> ALL=NOPASSWD:IWCONFIG
+        <user> ALL=NOPASSWD:IFCONFIG
+        <user> ALL=NOPASSWD:IW
+        <user> ALL=NOPASSWD:MACCHANGER
   
-       sudo service sudo restart # to have it start immediately
-    o We need to give the python interpreter set raw capability
-      * Once again, we could run as root
-      * Or give the python interpreter set raw capability
-        sudo setcap cap_net_raw=+ep /usr/bin/python2.7 
-        sudo setcap cap_net_raw=-ep /usr/bin/python2.7
-      * Using dyskt daemon, set raw capabilities are temporarily enabled and
-        then removed after the raw socket is bound (after a short sleep)
+       Then run 'sudo service sudo restart'
+     * We also need to give the python interpreter set raw capability in order to
+       bind the raw socket. Using dysktd_asuser, the dyskt daemon, will set raw
+       capabilities temporarily and then remove the permission after dyskt has
+       bound to the raw socket
 
   - configure ssl
    o openssl req -new -x509 -days 365 -nodes -out nidus.cert -keyout nidus.key
