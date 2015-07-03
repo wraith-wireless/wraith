@@ -36,15 +36,15 @@ _BTM_ = 1000    # time in milliseconds
 
 class GPSPoller(threading.Thread):
     """ periodically checks gps for current location """
-    def __init__(self,ev,conf):
+    def __init__(self,eq,conf):
         """
-         ev - event queue between rto and this Thread
+         eq - event queue between rto and this Thread
          conf - config file for gps
         """
         threading.Thread.__init__(self)
-        self._done = threading.Event()
-        self._eQ = ev      # event queue from radio controller
-        self._conf = conf  # gps configuration
+        self._done = threading.Event() # stop event
+        self._eQ = eq                  # msg queue from radio controller
+        self._conf = conf              # gps configuration
         self._gpsd = None
         self._setup()
 
@@ -163,7 +163,7 @@ class RTO(mp.Process):
          conf - necessary config details
         """
         mp.Process.__init__(self)
-        self._comms = comms                # communications queue
+        self._icomms = comms               # communications queue
         self._conn = conn                  # message queue to/from DySKT
         self._mgrs = None                  # lat/lon to mgrs conversion
         self._conf = conf['gps']           # configuration for gps/datastore
@@ -236,7 +236,7 @@ class RTO(mp.Process):
             # 3. queued data from internal comms
             ev = msg = None
             try:
-                rpt = self._comms.get(True,0.5)
+                rpt = self._icomms.get(True,0.5)
                 cs,ts,ev,msg = rpt[0],rpt[1],rpt[2],rpt[3]
 
                 if ev == '!UP!': # should be the 1st message we get from radio(s)

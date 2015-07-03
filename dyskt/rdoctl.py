@@ -34,10 +34,10 @@ TUNE_STOP   = 4
 
 class Tuner(threading.Thread):
     """ 'tunes' the radio's current channel and width """
-    def __init__(self,q,tC,iface,scan,dwell,i,pause=False):
+    def __init__(self,q,conn,iface,scan,dwell,i,pause=False):
         """
          q: msg queue between radio and this Thread
-         tC: dyskt token connnection
+         conn: dyskt token connnection
          iface: interface name of card
          scan: scan list of channel tuples (ch,chw)
          dwell: dwell list each stay on scan[i] for dwell[i]
@@ -47,7 +47,7 @@ class Tuner(threading.Thread):
         threading.Thread.__init__(self)
         self._done = threading.Event() # the stop event
         self._qR = q                   # event queue from radio controller
-        self._cD = tC                  # connection from DySKT to tuner
+        self._conn = conn              # connection from DySKT to tuner
         self._vnic = iface             # this radio's vnic
         self._chs = scan               # scan list
         self._ds = dwell               # corresponding dwell times
@@ -65,16 +65,16 @@ class Tuner(threading.Thread):
         if self._state == TUNE_PAUSE:
             # notify rdoctl we are paused then hold on dyskt token q
             self._qR.put(('!PAUSE!',time.time(),(-1,' ')))
-            self._cD.poll(None)
+            self._conn.poll(None)
         else:
             self._qR.put(('!SCAN!',time.time(),(-1,self._chs)))
 
         # execution loop
         while not self._done.is_set():
             # wait on DySKT for dwell time. If nothing, switch to next channel.
-            if self._cD.poll(self._ds[self._i]):
+            if self._conn.poll(self._ds[self._i]):
                 # get token and timestamp
-                tkn = self._cD.recv()
+                tkn = self._conn.recv()
                 ts = time.time()
 
                 # tokens will have 2 flavor's '!STOP!' and 'cmd:cmdid:params'
@@ -107,7 +107,7 @@ class Tuner(threading.Thread):
                             if self._state != TUNE_HOLD:
                                 self._state = TUNE_HOLD
                                 self._qR.put(('!HOLD!',ts,(cid,self.currch)))
-                                self._cD.poll(None) # block until a new token
+                                self._conn.poll(None) # block until a new token
                                 continue
                             else:
                                 self._qR.put(('!ERR!',ts,(cid,'redundant command')))
@@ -115,7 +115,7 @@ class Tuner(threading.Thread):
                             if self._state != TUNE_PAUSE:
                                 self._state = TUNE_PAUSE
                                 self._qR.put(('!PAUSE!',ts,(cid,' ')))
-                                self._cD.poll(None) # block until a new token
+                                self._conn.poll(None) # block until a new token
                                 continue
                             else:
                                 self._qR.put(('!ERR!',ts,(cid,'redundant command')))
@@ -127,7 +127,7 @@ class Tuner(threading.Thread):
                                 iw.chset(self._vnic,ch,chw)
                                 self._state = TUNE_LISTEN
                                 self._qR.put(('!LISTEN',ts,(cid,"%s:%s" % (ch,chw))))
-                                self._cD.poll(None) # block until a new token
+                                self._conn.poll(None) # block until a new token
                                 continue
                             except ValueError:
                                 self._qR.put(('!ERR!',ts,(cid,'invalid param format')))
@@ -163,27 +163,25 @@ class RadioController(mp.Process):
           scans
         """
         mp.Process.__init__(self)
-        self._qRTO = comms # internal queue (to RTO)
-        self._cD = conn     # message connection to DySKT
-        self._qT = None     # queue between tuner and us
-        
-        # _setup() sets the following
-        self._role = None             # role this radio plays
-        self._nic = None              # radio network interface controller name
-        self._mac = None              # real mac address
-        self._phy = None              # the phy of the device
-        self._vnic = None             # virtual monitor name
-        self._s = None                # the raw socket
-        self._std = None              # supported standards
-        self._chs = []                # supported channels
-        self._txpwr = 0               # current tx power
-        self._driver = None           # the driver
-        self._chipset = None          # the chipset
-        self._spoofed = ""            # spoofed mac address
-        self._desc = None             # optional description
-        self._tuner = None            # tuner thread
-        self._stuner = None           # tuner state
-        self._antenna = {'num':0,     # antenna details
+        self._icomms = comms      # communications queue
+        self._conn = conn         # message connection to/from DySKT
+        self._qT = None           # queue between tuner and us
+        self._role = None         # role this radio plays
+        self._nic = None          # radio network interface controller name
+        self._mac = None          # real mac address
+        self._phy = None          # the phy of the device
+        self._vnic = None         # virtual monitor name
+        self._s = None            # the raw socket
+        self._std = None          # supported standards
+        self._chs = []            # supported channels
+        self._txpwr = 0           # current tx power
+        self._driver = None       # the driver
+        self._chipset = None      # the chipset
+        self._spoofed = ""        # spoofed mac address
+        self._desc = None         # optional description
+        self._tuner = None        # tuner thread
+        self._stuner = None       # tuner state
+        self._antenna = {'num':0, # antenna details
                          'gain':None,
                          'type':None,
                          'loss':None,
@@ -217,42 +215,42 @@ class RadioController(mp.Process):
                     # pull the frame off and pass it on
                     frame = self._s.recv(MAX_MPDU)
                     if self._stuner == TUNE_PAUSE: continue # don't forward
-                    self._qRTO.put((self._vnic,time.time(),'!FRAME!',frame))
+                    self._icomms.put((self._vnic,time.time(),'!FRAME!',frame))
                 except socket.timeout: continue
                 except socket.error as e:
-                    self._qRTO.put((self._vnic,time.time(),'!FAIL!',e))
-                    self._cD.send(('err',self._role,'Socket',e,))
+                    self._icomms.put((self._vnic,time.time(),'!FAIL!',e))
+                    self._conn.send(('err',self._role,'Socket',e,))
                     break
                 except Exception as e:
                     # blanket 'don't know what happend' exception
-                    self._qRTO.put((self._vnic,time.time(),'!FAIL!',e))
-                    self._cD.send(('err',self._role,'Unknown',e))
+                    self._icomms.put((self._vnic,time.time(),'!FAIL!',e))
+                    self._conn.send(('err',self._role,'Unknown',e))
                     break
             else:
                 # process the notification
                 if event == '!ERR!':
                     # bad/failed command from user, notify DySKT
-                    if msg[0] > -1: self._cD.send(('cmderr',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._conn.send(('cmderr',self._role,msg[0],msg[1]))
                 elif event == '!FAIL!':
-                    self._qRTO.put((self._vnic,ts,'!FAIL!',msg[1]))
+                    self._icomms.put((self._vnic,ts,'!FAIL!',msg[1]))
                 elif event == '!STATE!':
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._conn.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!HOLD!':
                     self._stuner = TUNE_HOLD
-                    self._qRTO.put((self._vnic,ts,'!HOLD!',msg[1]))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    self._icomms.put((self._vnic,ts,'!HOLD!',msg[1]))
+                    if msg[0] > -1: self._conn.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!SCAN!':
                     self._stuner = TUNE_SCAN
-                    self._qRTO.put((self._vnic,time.time(),'!SCAN!',msg[1]))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    self._icomms.put((self._vnic,time.time(),'!SCAN!',msg[1]))
+                    if msg[0] > -1: self._conn.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!LISTEN':
                     self._stuner = TUNE_LISTEN
-                    self._qRTO.put((self._vnic,time.time(),'!LISTEN!',msg[1]))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    self._icomms.put((self._vnic,time.time(),'!LISTEN!',msg[1]))
+                    if msg[0] > -1: self._conn.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!PAUSE!':
                     self._stuner = TUNE_PAUSE
-                    self._qRTO.put((self._vnic,time.time(),'!PAUSE!',' '))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    self._icomms.put((self._vnic,time.time(),'!PAUSE!',' '))
+                    if msg[0] > -1: self._conn.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!STOP!':
                     self._stuner = TUNE_STOP
                     break
@@ -260,7 +258,7 @@ class RadioController(mp.Process):
         # shut down
         if not self.shutdown():
             try:
-                self._cD.send(('warn',self._role,'Shutdown',"Incomplete reset"))
+                self._conn.send(('warn',self._role,'Shutdown',"Incomplete reset"))
             except IOError:
                 # most likely DySKT already closed their side
                 pass
@@ -297,7 +295,7 @@ class RadioController(mp.Process):
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
-            self._cD.close()
+            self._conn.close()
         except:
             clean = False
         return clean
@@ -464,10 +462,10 @@ class RadioController(mp.Process):
 
             # initialize tuner thread
             self._qT = Queue()
-            self._tuner = Tuner(self._qT,self._cD,self._vnic,scan,ds,ch_i,conf['paused'])
+            self._tuner = Tuner(self._qT,self._conn,self._vnic,scan,ds,ch_i,conf['paused'])
 
             # notify RTO we are good
-            self._qRTO.put((self._vnic,uptime,'!UP!',self.radio))
+            self._icomms.put((self._vnic,uptime,'!UP!',self.radio))
         except socket.error as e:
             try:
                 iw.devdel(self._vnic)
