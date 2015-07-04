@@ -170,6 +170,7 @@ class RTO(mp.Process):
         self._nidus = None                 # nidus server
         self._gps = None                   # polling thread for front line traces
         self._q = None                     # internal queue for gps poller
+        self._bulk = {}                    # stored frames
         self._setup(conf['store']['host'], # nidus storage manager addres/port
                     conf['store']['port'])
 
@@ -201,7 +202,7 @@ class RTO(mp.Process):
 
         # basic variables
         rmap = {}    # radio map: maps callsigns to mac addr
-        bulk = {}    # stored frames
+        #bulk = {}    # stored frames
         gpsid = None # id of gps device
 
         # send sensor up notification, platform details and gpsid
@@ -220,10 +221,8 @@ class RTO(mp.Process):
             # 2. gps device/frontline trace?
             try:
                 t,ts,msg = self._q.get_nowait()
-            except (Empty,AttributeError): # no new messages (or no gps poller)
-                pass
+            except (Empty,AttributeError): pass
             else:
-                # handle device down??
                 if t == '!DEV!': # device up message
                     gpsid = msg['id']
                     self._conn.send(('info','RTO','GPSD',"%s initiated" % gpsid))
@@ -244,34 +243,31 @@ class RTO(mp.Process):
                     # radio device status, initial radio events and using_radio.
                     # Send each antenna separately
                     rmap[cs] = msg['mac']
-                    bulk[cs] = {'cob':None,       # zlib compressobj
-                                'mac':msg['mac'], # mac address of collecting radio
-                                'start':0,        # time first frame was seen
-                                'cnt':0,          # total number of frames
-                                'sz':0,           # total size of uncompressed frames
-                                'frames':''}      # the compressed frames
+                    self._bulk[cs] = {'cob':None,       # zlib compressobj
+                                      'mac':msg['mac'], # mac addr of collecting radio
+                                      'start':0,        # time first frame was seen
+                                      'cnt':0,          # ttl # of frames
+                                      'sz':0,           # ttl size of uncompressed frames
+                                      'frames':''}      # the compressed frames
                     self._conn.send(('info','RTO','Radio',"%s initiated" % cs))
                     ret = self._send('RADIO',ts,msg)
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                     else:
                         # send antennas
                         for i in xrange(msg['nA']):
-                            ret = self._send('ANTENNA',ts,{'mac':msg['mac'],
-                                                           'index':i,
-                                                           'type':msg['type'][i],
-                                                           'gain':msg['gain'][i],
-                                                           'loss':msg['loss'][i],
-                                                           'x':msg['x'][i],
-                                                           'y':msg['y'][i],
-                                                           'z':msg['z'][i]})
-                            if ret:
-                                self._conn.send(('err','RTO','Nidus',ret))
-                                break
+                            ret = self._send('ANTENNA',ts,
+                                             {'mac':msg['mac'],'index':i,
+                                              'type':msg['type'][i],'gain':msg['gain'][i],
+                                              'loss':msg['loss'][i],'x':msg['x'][i],
+                                              'y':msg['y'][i],'z':msg['z'][i]})
+                            if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!FAIL!':
-                    # send fail to nidus, notify DySKT & delete cs from rmap
-                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'fail',msg])
+                    # send bulked frames, notify nidus & DySKT & delete cs
+                    ret = self._flushbulk(ts,rmap[cs],cs)
+                    if not ret: ret = self._send('RADIO_EVENT',ts,[rmap[cs],'fail',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                     del rmap[cs]
+                    del self._bulk[cs]
                 elif ev == '!SCAN!':
                     # compile the scan list into a string before sending
                     sl = ",".join(["%d:%s" % (c,w) for (c,w) in msg])
@@ -284,7 +280,9 @@ class RTO(mp.Process):
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'hold',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!PAUSE!':
-                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'pause',' '])
+                    # send bulked frames
+                    ret = self._flushbulk(ts,rmap[cs],cs)
+                    if not ret: ret = self._send('RADIO_EVENT',ts,[rmap[cs],'pause',' '])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!SPOOF!':
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'spoof',msg])
@@ -294,41 +292,31 @@ class RTO(mp.Process):
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!FRAME!':
                     # save the frame and update bulk details
-                    if bulk[cs]['cnt'] == 0:
-                        bulk[cs]['start'] = ts               # reset start
-                        bulk[cs]['cob'] = zlib.compressobj() # new compression obj
-                    bulk[cs]['cnt'] += 1
-                    bulk[cs]['sz'] += len(msg)
-                    bulk[cs]['frames'] += bulk[cs]['cob'].compress('%s \x1EFB\x1F%s\x1FFE\x1E' % (ts2iso(ts),msg))
+                    if self._bulk[cs]['cnt'] == 0:
+                        self._bulk[cs]['start'] = ts               # reset start
+                        self._bulk[cs]['cob'] = zlib.compressobj() # new compression obj
+
+                    # add new frame and update metrics
+                    self._bulk[cs]['cnt'] += 1
+                    self._bulk[cs]['sz'] += len(msg)
+                    self._bulk[cs]['frames'] += self._bulk[cs]['cob'].compress('%s \x1EFB\x1F%s\x1FFE\x1E' % (ts2iso(ts),msg))
 
                     # if we have hit our limit, compress and send the bulk frames
-                    if bulk[cs]['sz'] > _BSZ_ or (ts - bulk[cs]['start'])/1000 > _BTM_:
-                        try:
-                            bulk[cs]['frames'] += bulk[cs]['cob'].flush()
-                            ret = self._send('BULK',ts,[rmap[cs],bulk[cs]['cnt'],
-                                                        bulk[cs]['frames']])
-                            if ret: raise RuntimeError(ret)
-                        except zlib.error as e:
-                            self._conn.send(('err','RTO','zlib',e))
-                        except RuntimeError as e:
-                            self._conn.send(('err','RTO','Nidus',ret))
-                        else:
-                            # reset bulk details
-                            bulk[cs]['cnt'] = 0
-                            bulk[cs]['sz'] = 0
-                            bulk[cs]['frames'] = ''
+                    if self._bulk[cs]['sz'] > _BSZ_ or (ts - self._bulk[cs]['start'])/1000 > _BTM_:
+                        self._flushbulk(ts,rmap[cs],cs)
                 else: # unidentified event type, notify dyskt
-                    self._conn.send(('warn','RTO','Radio',
-                                     "unidentified event %s" % ev))
+                    self._conn.send(('warn','RTO','Radio',"unknown event %s" % ev))
             except Empty: # nothing on queue
                 continue
             except IndexError as e: # something wrong with antenna indexing
                 self._conn.send(('err','RTO',"Radio","misconfigured antennas"))
             except KeyError as e: # a radio sent a message without initiating
-                self._conn.send(('warn','RTO','Radio %s' % e,
-                                 "sent data %s of type %s w/o 'initiating'" % (msg,ev)))
+                self._conn.send(('warn','RTO','Radio %s' % e,"uninitiated data (%s)" % ev))
             except Exception as e: # handle catchall error
                 self._conn.send(('err','RTO','Unknown',e))
+
+        # any bulked frames not yet sent?
+        for cs in rmap: self._flushbulk(time.time(),rmap[cs],cs)
 
         # notify Nidus of closing (radios,sensor,gpsd). hopefully no errors on send
         ts = time.time()
@@ -337,14 +325,16 @@ class RTO(mp.Process):
         self._send('DEVICE',ts,['sensor',socket.gethostname(),0])
 
         # shut down
-        if not self.shutdown():
+        if not self._shutdown():
             try:
                 self._conn.send(('warn','RTO','Shutdown',"Incomplete shutdown"))
             except IOError:
                 # most likely DySKT(.py) closed their side of the pipe
                 pass
 
-    def shutdown(self):
+        #### private helper functions
+
+    def _shutdown(self):
         """ clean up. returns whether a full reset or not occurred """
         # try shutting down & resetting radio (if it failed we may not be able to)
         clean = True
@@ -359,7 +349,21 @@ class RTO(mp.Process):
             clean = False
         return clean
 
-    #### private helper functions
+    def _flushbulk(self,ts,mac,rdo):
+        """ send bulked frames belonging to rdo with mac addr """
+        # if no stored frames, exit
+        if self._bulk[rdo]['sz'] == 0: return None
+        try:
+            self._bulk[rdo]['frames'] += self._bulk[rdo]['cob'].flush()
+            ret = self._send('BULK',ts,[mac,self._bulk[rdo]['cnt'],
+                                        self._bulk[rdo]['frames']])
+            return ret
+        except zlib.error as e: self._conn.send(('err','RTO','zlib',e))
+        finally:
+            # reset bulk details
+            self._bulk[rdo]['cnt'] = 0
+            self._bulk[rdo]['sz'] = 0
+            self._bulk[rdo]['frames'] = ''
 
     def _setgpsd(self):
         """ determines whether to use no gps, fixed gps or gps device """
@@ -367,11 +371,10 @@ class RTO(mp.Process):
         self._q = Queue()
         try:
             self._gps = GPSPoller(self._q,self._conf)
+            self._gps.start()
         except RuntimeError as e:
             self._conn.send(('warn','RTO','FLT',"Failed to connnect %s" %e))
             self._gps = None
-        else:
-            self._gps.start()
 
     @staticmethod
     def _pfdetails():

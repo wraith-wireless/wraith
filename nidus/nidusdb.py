@@ -144,9 +144,7 @@ class NidusDB(object):
             for thread in self._tSave:
                 self._qSave[thread].put('!STOP!')
                 if self._tSave[thread].is_alive(): self._tSave[thread].join()
-        except:
-            # blanket exception
-            pass
+        except: pass # blanket exception
         finally:
             # close out database
             if self._curs: self._curs.close()

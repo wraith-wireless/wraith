@@ -31,12 +31,8 @@ GUI:
      with 00:01:02.*
 DySKT:
   3) implement adaptive scan pattern
- 26) gps device handling
-     o identify/handle device failing or being removed
-     o uniquely identify with a permanent id
- 49) timing issues, the tuner will repeat scan of current channel when it gets
-     tokens from DySKT including commands
- 50)
+ 26) how to identify gps device failure, removal?
+ 51)
 Nidus:
   1) return messages instead of just closing pipe for no running server etc
   2) need constraints either through postgresql (preferred) or nidusdb - one example

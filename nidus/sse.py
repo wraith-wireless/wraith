@@ -199,10 +199,11 @@ class SaveThread(SSEThread):
 
     def _writepkts(self):
         """ write stored packets to file """
+        curs = None
         try:
             # we'll catch db errors in the internal loop and attempt to
             # continue writing
-            curs = None
+
             curs = self._conn.cursor()
             for i,pkt in enumerate(self._pkts):
                 sql = "insert into frame_path (fid,filepath,n) values (%s,%s,%s);"
@@ -219,7 +220,7 @@ class SaveThread(SSEThread):
         finally:
             # make sure to reset packet list and close the cursor
             self._pkts = []
-            curs.close()
+            if curs: curs.close()
 
 class StoreThread(SSEThread):
     """ stores the frame details in the task queue to the db """

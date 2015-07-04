@@ -7,8 +7,8 @@ forwarding data to the RTO.
 """
 __name__ = 'rdoctl'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.7'
-__date__ = 'June 2015'
+__version__ = '0.0.8'
+__date__ = 'July 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -70,9 +70,16 @@ class Tuner(threading.Thread):
             self._qR.put(('!SCAN!',time.time(),(-1,self._chs)))
 
         # execution loop
+        # wait on the internal connection for each channels dwell time.  IOT
+        # avoid a state where we would continue to scan the same channel, i.e.
+        # receiving repeated state commands, use a remaining time counter
+        remaining = 0
         while not self._done.is_set():
-            # wait on DySKT for dwell time. If nothing, switch to next channel.
-            if self._conn.poll(self._ds[self._i]):
+            # set the dwell time to remaining if we need to finish this scan
+            dwell = self._ds[self._i] if not remaining else remaining
+
+            ts1 = time.time() # mark time
+            if self._conn.poll(dwell):
                 # get token and timestamp
                 tkn = self._conn.recv()
                 ts = time.time()
@@ -81,11 +88,14 @@ class Tuner(threading.Thread):
                 # where params is empty or a '-' separated list
                 if tkn == '!STOP!': self._qR.put(('!STOP!',ts,(-1,' ')))
                 else:
+                    # calculate time remaining for this channel
+                    remaining = self._ds[self._i] - (ts-ts1)
+
+                    # parse the requested command
                     try:
                         cmd,cid,ps = tkn.split(':') # force into 3 components
                         cid = int(cid)
-                    except:
-                        # should never happen but just in case
+                    except: # should never happen but just in case
                         self._qR.put(('!ERR!',ts,(-1,"invalid command format")))
                     else:
                         # for hold, pause & listen, notify rdoctl & then block
@@ -142,11 +152,10 @@ class Tuner(threading.Thread):
                     iw.chset(self._vnic,
                              str(self._chs[self._i][0]),
                              self._chs[self._i][1])
+                    remaining = 0 # reset remaining
                 except iw.IWException as e:
-                    # iw related exception, set event token and stop execution
                     self._qR.put(('!FAIL!',time.time(),(-1,e)))
-                except Exception as e:
-                    # catch all
+                except Exception as e: # blanket exception
                     self._qR.put(('!FAIL!',time.time(),(-1,e)))
 
 class RadioController(mp.Process):

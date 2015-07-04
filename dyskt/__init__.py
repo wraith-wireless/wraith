@@ -28,7 +28,7 @@ dyskt 0.1.5
   dyskt.conf dyskt.log.conf dysktd
  changes:
   - streamlined inter-process communication methods/objects
-   o replaced interprocess Pipes with a single Queue
+   o replaced internal communcation (messages to RTO) Pipes with a single Queue
    o removed the Queue used by children to communicate with DySKT and made
     each connection dual-ended
   - scan pattern config modified
@@ -54,8 +54,8 @@ dyskt 0.1.5
    o zlib library to compress frames (hardcoded to 14K and 1 sec delay)
 
 dyskt 0.1.6
- desc: added command interface
- includes: dyskt 0.0.11 rto 0.0.12 rdoctl 0.0.7 dyskt.conf dyskt.log.conf dysktd
+ desc: added command interface through a socket
+ includes: dyskt 0.0.11 rto 0.0.12 rdoctl 0.0.8 dyskt.conf dyskt.log.conf dysktd
  changes:
   - added pause option on start (per radio)
   - dysktd manually removes created pidfile on exit & now configure to run as root
@@ -64,7 +64,12 @@ dyskt 0.1.6
    o need to add functionality to txpwr and spoof
   - gpsd will only send 1 flt if static
   - added timeout in RadioController to radio socket (in the event of no wireless
-    traffice)
+    traffic)
+  - fixed two programmer errors
+    o frames were not being sent in the event of error/stoppage. Added
+     sending of bulked frames when radio goes to paused state as well
+    o possibility of a never-ending scan on same channel when receiving tokens
+     from DySKT
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'
