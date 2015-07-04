@@ -321,12 +321,9 @@ class NidusDB(object):
             self._curs.execute(sql,(self._sid,ds['mac'],ds['phy'],ds['nic'],
                                     ds['vnic'],ds['role'],ds['ts']))
 
+            # insert initial events (spoof if any, and txpwr)
             sql = "insert into radio_event (mac,state,params,ts) values (%s,%s,%s,%s);"
-            # insert initial events (spoof if any, and txpwr
-            print 'spoofed: ', ds['spoofed']
-            print 'txpwr: ', ds['txpwr']
-            if ds['spoofed']:# and ds['spoofed'] != 'None':
-                self._curs.execute(sql,(ds['mac'],'spoof',ds['spoofed'],ds['ts']))
+            if ds['spoofed']: self._curs.execute(sql,(ds['mac'],'spoof',ds['spoofed'],ds['ts']))
             self._curs.execute(sql,(ds['mac'],'txpwr',ds['txpwr'],ds['ts']))
 
             # start save thread if save is enabled

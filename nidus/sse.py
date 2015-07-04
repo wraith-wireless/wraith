@@ -125,11 +125,9 @@ class SSEThread(threading.Thread):
                 self._consume(item)
             except SSEConsumeException as e:
                 # TODO: how to 'pass', 'log' or whatever with this
-                #print e
                 pass
             except Exception as e:
                 # TODO: how to 'pass', 'log' or whatever with this
-                #print e
                 pass
         self._clean() # cleanup
 
@@ -316,7 +314,6 @@ class StoreThread(SSEThread):
                 else: bw = '20U'
                 width = 40 if bw == '40' else 20
                 stbc = mcsflags['stbc']
-                print stbc
                 gi = 1 if 'gi' in mcsflags and mcsflags['gi'] > 0 else 0
                 ht = 1 if 'ht' in mcsflags and mcsflags['ht'] > 0 else 0
                 index = r['mcs'][2]
@@ -439,8 +436,7 @@ class StoreThread(SSEThread):
                                       m.crypt['icv']))
             elif m.crypt['type'] == 'ccmp':
                 sql = """
-                       insert into ccmpcrypt (fid,pn0,pn1,key_id,pn2,
-                                              pn3,pn4,pn5,mic)
+                       insert into ccmpcrypt (fid,pn0,pn1,key_id,pn2,pn3,pn4,pn5,mic)
                        values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
                       """
                 curs.execute(sql,(fid,m.crypt['pn0'],
@@ -469,7 +465,7 @@ class ExtractThread(SSEThread):
     """
     def __init__(self,tasks,lSta,sid,oui,db):
         """
-         lSta - lock on the stay dictionary
+         lSta - lock on the sta dictionary
          sid - session id
          oui - oui dict
          db: datbase connection tuple t = (h=host,p=port,db=dbname,u=user,pwd=db pwd)
@@ -500,28 +496,20 @@ class ExtractThread(SSEThread):
         addrs = {}
         for i,a in enumerate(['addr1','addr2','addr3','addr4']):
             if not a in l2: break
-            if l2[a] in addrs:
-                addrs[l2[a]]['loc'].append(i+1)
-            else:
-                addrs[l2[a]]['loc'] = {'locl':[i+1],'id':None}
-        #locations = ['addr1','addr2','addr3','addr4']
-        #for i in xrange(len(locations)):
-        #    a = locations[i]
-        #    if not a in l2: break         # no more stas to process
-        #    if l2[a] in addrs:
-        #        addrs[l2[a]]['loc'].append(i+1)
-        #    else:
-        #        addrs[l2[a]] = {'loc':[i+1],'id':None}
+            if l2[a] in addrs: addrs[l2[a]]['loc'].append(i+1)
+            else: addrs[l2[a]] = {'loc':[i+1],'id':None}
+
 
         # each _insert function will reraise psql related errors after
         # setting the internal err tuple
         try:
-            # NOTE: 1) insertsta modifies the addrs dict in place, assigning
-            # ids to each nonbroadcast address
+            # NOTE:
+            # 1) insertsta modifies the addrs dict in place, assigning ids to
+            #    each nonbroadcast address
             # 2) insertsta/insertsta_activity also commits the tranaction after
-            # each insert (in the internal loops)
+            #    each insert (in the internal loops)
             # 3) Each of the insertsta and insertsta_activity use the shared lock
-            # to ensure ts and id data is written correctly
+            #    to ensure ts and id data is written correctly
             self._insertsta(fid,ts,addrs,curs)
             self._insertsta_activity(fid,ts,addrs,curs)
 
@@ -566,10 +554,8 @@ class ExtractThread(SSEThread):
                                        addrs[l2.addr3]['id'],True,l2,curs)
         except psql.Error as e:
             self._conn.rollback()
-            print 'Extract: ', self._err
             raise SSEConsumeException('Extract: ' + e.__repr__())
         except Exception as e:
-            print 'Extract: ', self._err
             self._conn.rollback()
             raise SSEConsumeException('Extract: ' + e.__repr__())
         else:
@@ -616,12 +602,10 @@ class ExtractThread(SSEThread):
                     self._conn.commit()
         except psql.Error as e:
             # tag the error & reraise (letting the finally block release the lock)
-            print e
             self._err = ('sta',fid)
             raise
         except Exception as e:
             # tag the error & reraise (letting the finally block release the lock)
-            print e
             self._err = ('sta',fid)
             raise
         finally:
