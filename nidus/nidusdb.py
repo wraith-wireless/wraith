@@ -391,12 +391,12 @@ class NidusDB(object):
                   """
             self._curs.execute(sql,(ds['mac'],ds['event'],ds['params'],ds['ts']))
         except nmp.NMPException as e:
-            raise NidusDBSubmitParseException("submit radio event" % e)
+            raise NidusDBSubmitParseException("submit radio event %s" % e)
         except psql.Error as e:
             self._conn.rollback()
             raise NidusDBSubmitException("submit radio event %s: %s" % (e.pgcode,e.pgerror))
         except Exception as e:
-            # blannket
+            # blanket
             self._conn.rollback()
             raise NidusDBSubmitException("submit radio event type(%s) %s" % (type(e),e.__repr__()))
         else:

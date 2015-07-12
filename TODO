@@ -1,5 +1,5 @@
 Overall:
-
+when DySKT starts in pause mode
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -30,9 +30,10 @@ GUI:
  36) add wildcards to some fields in query i.e. mac address allow search on vendor
      with 00:01:02.*
 DySKT:
-  3) implement adaptive scan pattern
  26) how to identify gps device failure, removal?
- 51)
+ 52) pass hop time and interval time to dyskt (from rdoctl)
+ 53) implement spoof, txpwr commands
+ 54) DySKT fails to stop (now) on ctrl-c when it starts in pause state
 Nidus:
   1) return messages instead of just closing pipe for no running server etc
   2) need constraints either through postgresql (preferred) or nidusdb - one example
@@ -60,7 +61,9 @@ Nidus:
      DETAIL:  Failing row contains (null, 00:c0:ca:59:af:a6, phy1, alfa0, dyskt0, recon, ["2015-06-29 23:20:30.876558+00",)).
      291720LJun2015.694 [WARNING] DySKT 127.0.0.1:47740 submit: submit gpsde 23502: ERROR:  null value in column "sid" violates not-null constraint
      DETAIL:  Failing row contains (null, 1, ["2015-06-29 23:20:32.63999+00",)).
+     This should be handled by submitdropped
  20) put ctrl frames back in db
+ 21) latency from DySKT closing to Nidus processing remaining data is still great
 Radio:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)

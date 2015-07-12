@@ -73,13 +73,13 @@ class NidusRequestHandler(ss.BaseRequestHandler):
                     connected = False
             except RuntimeError as e:
                 # nidus server shutdown, close out the db
-                logging.warning("NidusDB from DySKT %s:%d error: %s",caddr,cport,e)
+                logging.warning("DySKT %s:%d error: %s",caddr,cport,e)
                 db.submitdropped()
                 connected = False
             except Exception as e:
                 # lost connection with sensor, minimize errors to database
-                db.submitdropped()
                 logging.error("DySKT %s:%d dropped - %s",caddr,cport,e)
+                db.submitdropped()
                 connected = False
         
         # clean up

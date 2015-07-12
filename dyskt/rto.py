@@ -202,7 +202,6 @@ class RTO(mp.Process):
 
         # basic variables
         rmap = {}    # radio map: maps callsigns to mac addr
-        #bulk = {}    # stored frames
         gpsid = None # id of gps device
 
         # send sensor up notification, platform details and gpsid
@@ -270,26 +269,34 @@ class RTO(mp.Process):
                     del self._bulk[cs]
                 elif ev == '!SCAN!':
                     # compile the scan list into a string before sending
-                    sl = ",".join(["%d:%s" % (c,w) for (c,w) in msg])
+                    sl = ",".join(["%s:%s" % (c,w) for (c,w) in msg])
+                    self._conn.send(('info',cs,ev.replace('!',''),sl))
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'scan',sl])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!LISTEN!':
+                    self._conn.send(('info',cs,ev.replace('!',''),msg))
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'listen',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!HOLD!':
+                    self._conn.send(('info',cs,ev.replace('!',''),msg))
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'hold',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!PAUSE!':
                     # send bulked frames
+                    self._conn.send(('info',cs,ev.replace('!',''),msg))
                     ret = self._flushbulk(ts,rmap[cs],cs)
                     if not ret: ret = self._send('RADIO_EVENT',ts,[rmap[cs],'pause',' '])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!SPOOF!':
+                    self._conn.send(('info',cs,ev.replace('!',''),msg))
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'spoof',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
                 elif ev == '!TXPWR!':
+                    self._conn.send(('info',cs,ev.replace('!',''),msg))
                     ret = self._send('RADIO_EVENT',ts,[rmap[cs],'txpwr',msg])
                     if ret: self._conn.send(('err','RTO','Nidus',ret))
+                elif ev == '!DWELL!':
+                    if msg: self._conn.send(('info',cs,ev.replace('!',''),msg))
                 elif ev == '!FRAME!':
                     # save the frame and update bulk details
                     if self._bulk[cs]['cnt'] == 0:
@@ -303,20 +310,25 @@ class RTO(mp.Process):
 
                     # if we have hit our limit, compress and send the bulk frames
                     if self._bulk[cs]['sz'] > _BSZ_ or (ts - self._bulk[cs]['start'])/1000 > _BTM_:
-                        self._flushbulk(ts,rmap[cs],cs)
+                        ret = self._flushbulk(ts,rmap[cs],cs)
+                        if ret: self._conn.send(('err','RTO','Nidus',ret))
                 else: # unidentified event type, notify dyskt
                     self._conn.send(('warn','RTO','Radio',"unknown event %s" % ev))
             except Empty: # nothing on queue
                 continue
-            except IndexError as e: # something wrong with antenna indexing
+            except IndexError: # something wrong with antenna indexing
                 self._conn.send(('err','RTO',"Radio","misconfigured antennas"))
             except KeyError as e: # a radio sent a message without initiating
-                self._conn.send(('warn','RTO','Radio %s' % e,"uninitiated data (%s)" % ev))
+                self._conn.send(('err','RTO','Radio %s' % e,"uninitiated data (%s)" % ev))
             except Exception as e: # handle catchall error
                 self._conn.send(('err','RTO','Unknown',e))
 
         # any bulked frames not yet sent?
-        for cs in rmap: self._flushbulk(time.time(),rmap[cs],cs)
+        for cs in rmap:
+            ret = self._flushbulk(time.time(),rmap[cs],cs)
+            if ret:
+                if ret: self._conn.send(('err','RTO','Nidus',ret))
+                break
 
         # notify Nidus of closing (radios,sensor,gpsd). hopefully no errors on send
         ts = time.time()

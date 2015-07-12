@@ -15,7 +15,7 @@ messages from client will be in the following format
   radio is oneof {both|all|recon|collection} where both enforces recon and
    collection radio and all does not
   param is:
-   o of the format channel:width if cmd is listen
+   o of the format channel:width if cmd is listen where width is oneof {'None','HT20','HT40+','HT40-'}
    o of the format pwr:option where pwr is in dBm and option is oneof {fixed|auto|limit}
    o a macaddr if cmd is spoof
 DySKT will notify the client if the cmd specified by id is invalid or valid with
@@ -311,7 +311,8 @@ class DySKT(object):
                                 mp.active_children()
                                 self._cr = None
                             else:
-                                logging.error("%s failed (%) %s",o,t,m)
+                                logging.error("%s failed (%s) %s",o,t,m)
+                                self.stop()
                         else:
                             logging.warning("Uninitiated error (%) %s from %s",t,m,o)
                     elif l == 'warn': logging.warning("%s: (%s) %s",o,t,m)
@@ -320,15 +321,17 @@ class DySKT(object):
                         cid,cmd,rdos,ps = self._processcmd(m)
                         if cid is None: continue
                         for rdo in rdos:
-                            logging.info("Client sent %s to %s",cmd,rdo)
+                            logging.info("Client sent %s w/ id %d to %s",cmd,cid,rdo)
                             self._pConns[rdo].send('%s:%d:%s' % (cmd,cid,'-'.join(ps)))
                     elif l == 'cmderr':
                         self._pConns['c2c'].send("ERR %d \001%s\001\n" % (t,m))
+                        logging.info('Command %d failed: %s',t,m)
                     elif l == 'cmdack':
                         self._pConns['c2c'].send("OK %d \001%s\001\n" % (t,m))
+                        logging.info('Command %d succeeded',t)
                 except Exception as e:
-                    # blanket catch all
-                    logging.error("DySKT failed. (Unknown) %s->%s", type(e),e)
+                    logging.error("DySKT failed. %s->%s", type(e),e)
+                    self.stop()
 
     # noinspection PyUnusedLocal
     def stop(self,signum=None,stack=None):
@@ -452,7 +455,8 @@ class DySKT(object):
 
         # active_children has the side effect of joining the processes
         while mp.active_children(): time.sleep(0.5)
-        while self._c2c.is_alive(): self._c2c.join(0.5)
+        if self._c2c:
+            while self._c2c.is_alive(): self._c2c.join(0.5)
         logging.info("Sub-processes stopped")
 
         # change our state
@@ -667,24 +671,20 @@ class DySKT(object):
         if cmd in ['listen','txpwr','spoof']:
             try:
                 ps = tkns[3].strip().split(':')
-                if len(ps) not in [1,2,6]: raise RuntimeError
+                if len(ps) not in [2,6]: raise RuntimeError
                 if cmd == 'listen':
-                    # listen will be ch:chw or ch only
-                    ps[0] = int(ps[0])
-                    # ensure chwidth is correct or not specified set to None
-                    if len(ps) == 2:
-                        if ps[1] not in ['HT20','HT40+','HT40-']: raise RuntimeError
-                    else:
-                        ps.append(None)
+                    # listen will be ch:chw
+                    int(ps[0]) # type check
+                    if ps[1] not in ['None','HT20','HT40+','HT40-']: raise RuntimeError
                 elif cmd == 'txpwr':
                     # txpwr will be pwr:opt
-                    ps[0] = int(ps[0])
+                    int(ps[0]) # type check
                     if ps[1] not in ['fixed','auto','limit']: raise RuntimeError
                 elif cmd == 'spoof':
                     # spoof will be macaddr
                     if len(ps) != 6: raise RuntimeError
-                    ps = [ps.join(':')] # rejoin the mac
-                    if re.match(MACADDR,ps[0].upper()) is None: raise RuntimeError
+                    ps = ':'.join(ps).upper() # rejoin the mac
+                    if re.match(MACADDR,ps) is None: raise RuntimeError
             except:
                 self._pConns['c2c'].send("ERR %d \001invalid params\001\n" % cmdid)
                 return None,None,None,None
