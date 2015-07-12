@@ -49,7 +49,7 @@ class Tuner(threading.Thread):
          conn: dyskt token connnection
          iface: interface name of card
          scan: scan list of channel tuples (ch,chw)
-         dwell: dwell list each stay on scan[i] for dwell[i]
+         dwell: dwell list. for each i stay on ch in scan[i] for dwell[i]
          i: initial channel index
          hist: (shared) histogram with RadioController
          pause: start paused?
@@ -85,8 +85,6 @@ class Tuner(threading.Thread):
             # or to None if we are in a static state
             if self._state in [TUNE_PAUSE,TUNE_HOLD,TUNE_LISTEN]: to = None
             else: to = self._ds[self._i] if not remaining else remaining
-            #to = self._ds[self._i] if not remaining else remaining
-            #to = None if self._state in [TUNE_PAUSE,TUNE_HOLD,TUNE_LISTEN] else to
 
             # get timestamp
             ts1 = time.time()
@@ -165,25 +163,35 @@ class Tuner(threading.Thread):
 
                     # modify scan dwell times?
                     if epochs == _EPOCHS_:
-                        new = {'i':'','d':'','c':''}
-                        ttl = float(sum([self._hist[k] for k in self._hist]))
-                        for i,(c,w) in enumerate(self._chs):
-                            p = self._hist['%s:%s' % (c,w)] / ttl
-                            if p > _THRESH_H_ and self._ds[i] < dwell:
-                                self._ds[i] += _INC_
-                                new['i'] += '%s:%s ' % (c,w)
-                            elif p < _THRESH_L_ and self._ds[i] > _MIN_:
-                                self._ds[i] -= _INC_
-                                new['d'] += '%s:%s ' % (c,w)
-                            else:
-                                new['c'] += '%s:%s ' % (c,w)
-                        print new
-                        if not new['i'] and not new['d']: new = 'static'
-                        else:
-                            new = "incr: %s decr: %s const: %s" % (new['i'].strip(),
-                                                                   new['d'].strip(),
-                                                                   new['c'].strip())
-                        self._qR.put(('!DWELL!',time.time(),(-1,new)))
+                        # sum ttl dwell times and ttl packets collected
+                        ttlSlots = sum(self._ds)
+                        ttlPkts = sum([self._hist[k] for k in self._hist])
+
+                        # calculate proportions
+                        pSlots = [d_i/ttlSlots for d_i in self._ds]
+                        pPkts = [0 if not ttlPkts else self._hist[k]/ttlPkts for k in self._hist]
+
+                        for i,(c,w) in enumerate(self._chs): pass
+                        epochs = 0
+                        #print pSlots
+                        #print pPkts
+                        #new = {'i':'','d':'','c':''}
+                        #for i,(c,w) in enumerate(self._chs):
+                        #    p = self._hist['%s:%s' % (c,w)] / ttl
+                        #    if p > _THRESH_H_ and self._ds[i] < dwell:
+                        #        self._ds[i] += _INC_
+                        #        new['i'] += '%s:%s ' % (c,w)
+                        #    elif p < _THRESH_L_ and self._ds[i] > _MIN_:
+                        #        self._ds[i] -= _INC_
+                        #        new['d'] += '%s:%s ' % (c,w)
+                        #    else:
+                        #        new['c'] += '%s:%s ' % (c,w)
+                        #if not new['i'] and not new['d']: new = 'static'
+                        #else:
+                        #    new = "incr: %s decr: %s const: %s" % (new['i'].strip(),
+                        #                                           new['d'].strip(),
+                        #                                           new['c'].strip())
+                        #self._qR.put(('!DWELL!',time.time(),(-1,new)))
                         epochs = 0
                 except iw.IWException as e:
                     self._qR.put(('!FAIL!',time.time(),(-1,e)))
@@ -464,7 +472,7 @@ class RadioController(mp.Process):
             #print interval
 
             # create list of dwell times
-            ds = [dec.Decimal('%d' % conf['dwell'])] * len(scan)
+            ds = [dec.Decimal(str(conf['dwell']))] * len(scan)
 
             # get start ch & set the initial channel
             try:
@@ -514,8 +522,7 @@ class RadioController(mp.Process):
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
             raise RuntimeError("%s:config:%s" % (self._role,e))
-        except Exception as e:
-            # blanket exception
+        except Exception as e: # blanket exception
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
@@ -532,17 +539,13 @@ class RadioController(mp.Process):
         # try shutting down & resetting radio (if it failed we may not be able to)
         clean = True
         try:
-            # stop the tuner
             try:
-                # call shutdown and join
-                #self._tuner.shutdown()
                 self._tuner.join()
             except:
                 clean = False
             else:
                 self._tuner = None
 
-            # reset the device
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
@@ -553,7 +556,6 @@ class RadioController(mp.Process):
             except iw.IWException:
                 clean = False
 
-            # close socket and connection
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()

@@ -371,6 +371,7 @@ class CalculatePanel(gui.SimplePanel):
         formula = self._formula
         # make sure no entries are empty substituting the value of the entry as
         # we go
+        # TODO use enumerate here
         for i in xrange(len(self._entries)):
             if self._entries[i].get():
                 formula = formula.replace('$%d' % i,"%s('%s')" % (self._inputs[i][2],self._entries[i].get()))
@@ -602,6 +603,7 @@ class QueryPanel(gui.SlavePanel):
         hdrs = ['ID','Host','Start','Frames']
         hdrlens = [gui.lenpix(3),gui.lenpix(4),gui.lenpix(13),gui.lenpix(6)]
         self._trSess['columns'] = hdrs
+        # TODO use enumerate here
         for i in xrange(len(hdrs)):
             self._trSess.column(i,width=hdrlens[i],anchor=tk.CENTER)
             self._trSess.heading(i,text=hdrs[i])
@@ -632,6 +634,7 @@ class QueryPanel(gui.SlavePanel):
         frmFO.grid(row=1,column=0,sticky='nwse')
         filters = ['Sensor','Signal','Traffic']
         self._vfilteron = []
+        # TODO: use enumerate here
         for i in xrange(3):
             self._vfilteron.append(tk.IntVar())
             ttk.Checkbutton(frmFO,text=filters[i],variable=self._vfilteron[i]).grid(row=0,column=i,sticky='w')
@@ -737,6 +740,7 @@ class QueryPanel(gui.SlavePanel):
         frmSigFlags = ttk.LabelFrame(frmSig,text='Flags')
         frmSigFlags.grid(row=1,column=0,sticky='nwse')
         self._vrtflags = []
+        # TODO use enumerate here
         for i in xrange(len(RT_FLAGS)):
             self._vrtflags.append(tk.IntVar())
             chk = ttk.Checkbutton(frmSigFlags,text=RT_FLAGS[i],variable=self._vrtflags[i])
@@ -748,6 +752,7 @@ class QueryPanel(gui.SlavePanel):
         frmSigChFlags = ttk.LabelFrame(frmSig,text="Channel Flags")
         frmSigChFlags.grid(row=2,column=0,sticky='nwse')
         self._vchflags = []
+        # TODO use enumerate here
         for i in xrange(len(CH_FLAGS)):
             self._vchflags.append(tk.IntVar())
             chk = ttk.Checkbutton(frmSigChFlags,text=CH_FLAGS[i],variable=self._vchflags[i])
@@ -769,6 +774,7 @@ class QueryPanel(gui.SlavePanel):
         frmSigHTBW.grid(row=1,column=0,sticky='nwse')
         ttk.Label(frmSigHTBW,text='BW: ').grid(row=0,column=0,sticky='nwse')
         self._vbws = []
+        # TODO use enumerate here
         for i in xrange(len(BW_FLAGS)):
             self._vbws.append(tk.IntVar())
             chk = ttk.Checkbutton(frmSigHTBW,text=BW_FLAGS[i],variable=self._vbws[i])
@@ -822,6 +828,7 @@ class QueryPanel(gui.SlavePanel):
         frmRFC = ttk.LabelFrame(frmR,text="Frame Control Frames")
         frmRFC.grid(row=0,column=0,sticky='nwse')
         self._vfcflags = []
+        # TODO use enumerate here
         for i in xrange(len(FC_FLAGS)):
             self._vfcflags.append(tk.IntVar())
             chk = ttk.Checkbutton(frmRFC,text=FC_FLAGS[i],variable=self._vfcflags[i])
@@ -845,6 +852,7 @@ class QueryPanel(gui.SlavePanel):
         frmRAL = ttk.Frame(frmRA,border=0)
         frmRAL.grid(row=2,column=1,columnspan=3)
         self._vlimitto = []
+        # TODO should we use enumerate here
         for i in xrange(4):
             self._vlimitto.append(tk.IntVar())
             chk = ttk.Checkbutton(frmRAL,text="ADDR %d" % (i+1),variable=self._vlimitto[i])

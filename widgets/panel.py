@@ -456,6 +456,7 @@ class TabularPanel(SlavePanel):
         # configure the headers
         self._ctypes = [] # the type in this column
         self._tree['columns'] = [t[0] for t in cols]
+        # TODO use enumerate here
         for i in xrange(len(cols)):
             # for each one set the column to the use specified width (or 0)
             # and set the text for each header if present as well as the sort

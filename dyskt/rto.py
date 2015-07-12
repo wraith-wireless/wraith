@@ -314,12 +314,11 @@ class RTO(mp.Process):
                         if ret: self._conn.send(('err','RTO','Nidus',ret))
                 else: # unidentified event type, notify dyskt
                     self._conn.send(('warn','RTO','Radio',"unknown event %s" % ev))
-            except Empty: # nothing on queue
-                continue
+            except Empty: continue
             except IndexError: # something wrong with antenna indexing
                 self._conn.send(('err','RTO',"Radio","misconfigured antennas"))
             except KeyError as e: # a radio sent a message without initiating
-                self._conn.send(('err','RTO','Radio %s' % e,"uninitiated data (%s)" % ev))
+                self._conn.send(('err','RTO','Radio %s' % e,"data out of order (%s)" % ev))
             except Exception as e: # handle catchall error
                 self._conn.send(('err','RTO','Unknown',e))
 
