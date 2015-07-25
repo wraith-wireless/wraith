@@ -17,8 +17,8 @@ administrators with the ability to view their network(s) from a bird's eye view 
 drill down as necessary to a single device. Wraith allows the user to decide what
 data to view, how to view it and 'when' to view it.
 
-Once the reconnaissance and collection development is stable, assault plug-ins will
-be developed to aid WLAN administrators in the security testing of their networks.
+~~Once the reconnaissance and collection development is stable, assault plug-ins will
+be developed to aid WLAN administrators in the security testing of their networks.~~
 
 ## 2. REQUIREMENTS: 
  * linux (preferred 3.x kernel, tested on 3.13.0-43)
