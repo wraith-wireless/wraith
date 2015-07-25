@@ -340,10 +340,10 @@ class RTO(mp.Process):
             try:
                 self._conn.send(('warn','RTO','Shutdown',"Incomplete shutdown"))
             except IOError:
-                # most likely DySKT(.py) closed their side of the pipe
+                # most likely DySKT closed its side of the pipe
                 pass
 
-        #### private helper functions
+#### private helper functions
 
     def _shutdown(self):
         """ clean up. returns whether a full reset or not occurred """
@@ -366,9 +366,10 @@ class RTO(mp.Process):
         if self._bulk[rdo]['sz'] == 0: return None
         try:
             self._bulk[rdo]['frames'] += self._bulk[rdo]['cob'].flush()
-            ret = self._send('BULK',ts,[mac,self._bulk[rdo]['cnt'],
-                                        self._bulk[rdo]['frames']])
-            return ret
+            #ret = self._send('BULK',ts,[mac,self._bulk[rdo]['cnt'],
+            #                            self._bulk[rdo]['frames']])
+            #return ret
+            ret = ''
         except zlib.error as e: self._conn.send(('err','RTO','zlib',e))
         finally:
             # reset bulk details

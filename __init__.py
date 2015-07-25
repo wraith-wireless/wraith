@@ -12,6 +12,7 @@ Requires:
  dateutil 2.3
  PIL (python-pil,python-imaging-tk,tk8.5-dev tcl8.5-dev) NOTE: I had to unistall
   python-pil and reinstall after installing tk8.5 and tcl8.5
+ numpy 1.9.2
 
 wraith 0.0.2
  desc: dyskt,nidus are developmentally sound, begin work on gui
@@ -35,7 +36,8 @@ wraith 0.0.3
    - added a splash panel that initiates services
 
 wraith 0.0.4
- desc: developmental cycle
+ desc: developmental cycle: with two main components, dyskt the sensor and nidus
+  the storage manager
  includes:  wraith-rt.py, subpanels.py and wraith.conf (also all subdirectories etc)
  changes:
   - added TLS support for encrypted comms betw/ Nidus & DySKT

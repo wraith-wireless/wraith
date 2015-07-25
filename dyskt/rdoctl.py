@@ -18,8 +18,6 @@ import time                            # timestamps
 import signal                          # handling signals
 import socket                          # reading frames
 import threading                       # for the tuner thread
-import decimal as dec                  # for defined precision
-dec.getcontext().prec = 4              # at 4 digits
 from Queue import Queue, Empty         # thread-safe queue
 import multiprocessing as mp           # for Process
 from wraith.radio import iw            # iw command line interface
@@ -33,17 +31,9 @@ TUNE_HOLD   = 1
 TUNE_PAUSE  = 2
 TUNE_LISTEN = 3
 
-# HARDCODED values
-_THRESH_H_ = dec.Decimal('0.10') # threshold for raising dwell time (% of ttl packet count)
-_THRESH_L_ = dec.Decimal('0.05') # threshold for lowering dwell time (% of ttl packet count)
-_INC_      = dec.Decimal('0.01') # increment to increase/decrease dwell time by
-_MIN_      = dec.Decimal('0.05') # minimum dwell time
-#_MAX_      = 0.5 # maximum dwell time
-_EPOCHS_   = 3   # number of epochs to execute before recalculating dwell times
-
 class Tuner(threading.Thread):
     """ 'tunes' the radio's current channel and width """
-    def __init__(self,q,conn,iface,scan,dwell,i,hist,pause=False):
+    def __init__(self,q,conn,iface,scan,dwell,i,pause=False):
         """
          q: msg queue between RadioController and this Thread
          conn: dyskt token connnection
@@ -51,7 +41,6 @@ class Tuner(threading.Thread):
          scan: scan list of channel tuples (ch,chw)
          dwell: dwell list. for each i stay on ch in scan[i] for dwell[i]
          i: initial channel index
-         hist: (shared) histogram with RadioController
          pause: start paused?
         """
         threading.Thread.__init__(self)
@@ -61,7 +50,6 @@ class Tuner(threading.Thread):
         self._chs = scan               # scan list
         self._ds = dwell               # corresponding dwell times
         self._i = i                    # initial/current index into scan/dwell
-        self._hist = hist              # shared histogram
         self._state = TUNE_PAUSE if pause else TUNE_SCAN # initial state
 
     @property
@@ -77,8 +65,6 @@ class Tuner(threading.Thread):
         # dwell time. IOT avoid a state where we would continue to scan the same
         # channel, i.e. 'state' commands, use a remaining time counter
         remaining = 0       # remaining dwell time counter
-        iters = 0           # intra-epoch iteration counter
-        epochs = 0          # epoch counter
         dwell = self._ds[0] # save original dwell time
         while True:
             # set the poll timeout to remaining if we need to finish this scan
@@ -100,8 +86,8 @@ class Tuner(threading.Thread):
                     break
                 else:
                     # calculate time remaining for this channel
-                    if not remaining: remaining = self._ds[self._i] - dec.Decimal(ts-ts1)
-                    else: remaining -= dec.Decimal(ts-ts1)
+                    if not remaining: remaining = self._ds[self._i] - (ts-ts1)
+                    else: remaining -= (ts-ts1)
 
                     # parse the requested command
                     try:
@@ -154,45 +140,6 @@ class Tuner(threading.Thread):
                     iw.chset(self._vnic,self._chs[self._i][0],self._chs[self._i][1])
                     self._qR.put(('!CHANNEL!',time.time(),(-1,self.channel)))
                     remaining = 0 # reset remaining timeout
-                    iters += 1    # increment iteration
-
-                    # update epoch (and reset iters) if necessary
-                    if iters == len(self._ds):
-                        epochs += 1
-                        iters = 0
-
-                    # modify scan dwell times?
-                    if epochs == _EPOCHS_:
-                        # sum ttl dwell times and ttl packets collected
-                        ttlSlots = sum(self._ds)
-                        ttlPkts = sum([self._hist[k] for k in self._hist])
-
-                        # calculate proportions
-                        pSlots = [d_i/ttlSlots for d_i in self._ds]
-                        pPkts = [0 if not ttlPkts else self._hist[k]/ttlPkts for k in self._hist]
-
-                        for i,(c,w) in enumerate(self._chs): pass
-                        epochs = 0
-                        #print pSlots
-                        #print pPkts
-                        #new = {'i':'','d':'','c':''}
-                        #for i,(c,w) in enumerate(self._chs):
-                        #    p = self._hist['%s:%s' % (c,w)] / ttl
-                        #    if p > _THRESH_H_ and self._ds[i] < dwell:
-                        #        self._ds[i] += _INC_
-                        #        new['i'] += '%s:%s ' % (c,w)
-                        #    elif p < _THRESH_L_ and self._ds[i] > _MIN_:
-                        #        self._ds[i] -= _INC_
-                        #        new['d'] += '%s:%s ' % (c,w)
-                        #    else:
-                        #        new['c'] += '%s:%s ' % (c,w)
-                        #if not new['i'] and not new['d']: new = 'static'
-                        #else:
-                        #    new = "incr: %s decr: %s const: %s" % (new['i'].strip(),
-                        #                                           new['d'].strip(),
-                        #                                           new['c'].strip())
-                        #self._qR.put(('!DWELL!',time.time(),(-1,new)))
-                        epochs = 0
                 except iw.IWException as e:
                     self._qR.put(('!FAIL!',time.time(),(-1,e)))
                 except Exception as e: # blanket exception
@@ -472,7 +419,7 @@ class RadioController(mp.Process):
             #print interval
 
             # create list of dwell times
-            ds = [dec.Decimal(str(conf['dwell']))] * len(scan)
+            ds = [conf['dwell']] * len(scan)
 
             # get start ch & set the initial channel
             try:
@@ -484,8 +431,7 @@ class RadioController(mp.Process):
 
             # initialize tuner thread
             self._qT = Queue()
-            self._tuner = Tuner(self._qT,self._conn,self._vnic,scan,ds,ch_i,
-                                self._hist,conf['paused'])
+            self._tuner = Tuner(self._qT,self._conn,self._vnic,scan,ds,ch_i,conf['paused'])
 
             # notify RTO we are good
             self._icomms.put((self._vnic,uptime,'!UP!',self.radio))
