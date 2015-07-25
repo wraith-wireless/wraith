@@ -55,10 +55,10 @@ to higher.
 
 ~~### c. Nidus (v 0.0.6): Data Storage Manager~~
 
-Nidus is the Data Storage manager processing data received from DySKT. Nidus is the
-interface to the backend Postgresql database, processing data in terms of raw 802.11
-frames, gps location, and 'device' details/status. 
-~~
+~~Nidus is the Data Storage manager processing data received from DySKT. Nidus is the~~
+~~interface to the backend Postgresql database, processing data in terms of raw 802.11~~
+~~frames, gps location, and 'device' details/status.~~
+
 
 ### d. wraith-rt: GUI
 
@@ -105,13 +105,13 @@ and editing of configuration files, some manipulation of backened storage.
      - rdoctl.py        radio controler with tuner, sniffer
      - rto.py           data collation and forwarding
      - dysktd           dyskt daemon
- *  nidus               subpackage for datamanager
-     - \_\_init\_\_.py  initialize nidus package
-     - nidus.conf       nidus configuration
-     - nidus.log.conf   nidus logging configuration
-     - nidus.py         nidus server
-     - nmp.py           nidus protocol definition
-     - nidusdb.py       interface to storage system
-     - sse.py           frame/metaframe processing
+ *  ~~nidus               subpackage for datamanager~~
+     - ~~\_\_init\_\_.py  initialize nidus package~~
+     - ~~nidus.conf       nidus configuration~~
+     - ~~nidus.log.conf   nidus logging configuration~~
+     - ~~nidus.py         nidus server~~
+     - ~~nmp.py           nidus protocol definition~~
+     - ~~nidusdb.py       interface to storage system~~
+     - ~~sse.py           frame/metaframe processing~~
      - nidus.sql        sql tables definition
-     - nidusd           nidus daemon
+     - ~~nidusd           nidus daemon~~
