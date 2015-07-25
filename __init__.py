@@ -53,6 +53,11 @@ wraith 0.0.4
   - added a manual remove (with rm) of pidfile in dysktd and nidusd to handle
     ubuntu's lack of --remove-pidfile and modified wraith.py (and utilities) as necessary
   - added c2c functionality to dyskt
+
+ wraith 0.0.5
+  desc: concentration on single-platform system. Remove nidus and allow dyskt
+   sensor to communicate directly with postgresql.
+ includes:  wraith-rt.py, subpanels.py
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

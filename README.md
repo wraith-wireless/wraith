@@ -53,11 +53,13 @@ of raw 802.11 packets with the reconnaissance (and collection if present) radios
 forwarding that data along with any geolocational data (if a gps device is present)
 to higher.
 
+~~
 ### c. Nidus (v 0.0.6): Data Storage Manager
 
 Nidus is the Data Storage manager processing data received from DySKT. Nidus is the
 interface to the backend Postgresql database, processing data in terms of raw 802.11
 frames, gps location, and 'device' details/status. 
+~~
 
 ### d. wraith-rt: GUI
 
