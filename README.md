@@ -1,5 +1,5 @@
 ![](widgets/icons/wraith-banner.png?raw=true)
-# WRAITH: Wireless assault, reconnaissance, collection and exploitation toolkit.
+# WRAITH: Wireless Reconnaissance, Analysis, Intelligent Target Harvesting.
 
 > "You knew that I reap where I have not sown and gather where I scattered no seed."
 
@@ -30,9 +30,9 @@ be developed to aid WLAN administrators in the security testing of their network
  * pyscopg 2.6
  * mgrs 1.1
  * macchanger 1.7.0
- * lxml 3.4.4
+ * ~~lxml 3.4.4~~
 
-## 3. MODULES: Currently consists of four components/modules
+## 3. MODULES: Currently consists of ~~four~~ three components/modules
 
 ###  a. Radio (v 0.0.4): 802.11 network interface objects and functions
 
