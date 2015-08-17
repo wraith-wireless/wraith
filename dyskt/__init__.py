@@ -62,7 +62,7 @@ dyskt 0.1.6
   - added command socket capabilities (see dyskt.py for c2c protocol)
    o allows for state, pause, scan, hold, listen commands
    o need to add functionality to txpwr and spoof
-  - gpsd will only send 1 flt if static
+  - gpsd will only send 1 frontline trace if static
   - added timeout in RadioController to radio socket (in the event of no wireless
     traffic)
   - fixed two programmer errors
@@ -70,10 +70,23 @@ dyskt 0.1.6
      sending of bulked frames when radio goes to paused state as well
     o possibility of a never-ending scan on same channel when receiving tokens
      from DySKT
+
+ dyskt 0.2.0
+  desc: Utilizes a "circular buffer" IOT remove the inherent inefficiency from
+   passing frame(s) through multiple connections and functions including the
+   inefficiency involved in making frequent copies of the frame(s). Because
+   python does not have a "PACKET_MMAP" flag for sockets (at least not that I
+   can find), the circular buffer is created by wrapping a multiprocessing.Array
+   of bytes with a memoryview and using the socket.recv_from method to 'put'
+   frames onto the "buffer". Children then utilize shared access to the "buffer"
+   to process the frames accordingly.
+  includes: dyskt 0.1.0 rto 0.1.0 rdoctl 0.1.0 dyskt.conf dyskt.log.conf dysktd
+  changes:
+   - uses a memoryview to hold captured frames in a circular buffer
 """
 __name__ = 'dyskt'
 __license__ = 'GPL v3.0'
-__version__ = '0.1.6'
+__version__ = '0.2.0'
 __date__ = 'June 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'

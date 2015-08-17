@@ -7,8 +7,8 @@ by a pf and 3) messages from tuner(s) and sniffer(s0
 """
 __name__ = 'rto'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.12'
-__date__ = 'March 2015'
+__version__ = '0.1.0'
+__date__ = 'August 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -18,21 +18,16 @@ import platform                            # system details
 import sys                                 # python intepreter details
 import signal                              # signal processing
 import time                                # sleep and timestamps
-import socket                              # connection to nidus and gps device
-import ssl                                 # encrypted comms w/ nidus
+import socket                              # connection to gps device
 import threading                           # threads
 import mgrs                                # lat/lon to mgrs conversion
 import gps                                 # gps device access
-import zlib                                # compress bulk frames
 from Queue import Queue, Empty             # thread-safe queue
 import multiprocessing as mp               # multiprocessing
-import wraith                              # for cert path
+import psycopg2 as psql                    # postgresql api
 from wraith.utils.timestamps import ts2iso # timestamp conversion
 from wraith.radio.iw import regget         # regulatory domain
-
-# CONSTANTS
-_BSZ_ = 14336   # size in bytes
-_BTM_ = 1000    # time in milliseconds
+from wraith.utils.cmdline import ipaddr    # returns ip address
 
 class GPSPoller(threading.Thread):
     """ periodically checks gps for current location """
@@ -45,7 +40,7 @@ class GPSPoller(threading.Thread):
         self._done = threading.Event() # stop event
         self._eQ = eq                  # msg queue from radio controller
         self._conf = conf              # gps configuration
-        self._gpsd = None
+        self._gpsd = None              # connection to the gps device
         self._setup()
 
     def _setup(self):
@@ -153,44 +148,31 @@ class GPSPoller(threading.Thread):
 
 class RTO(mp.Process):
     """ RTO - handles further processing of raw frames from the sniffer """
-    def __init__(self,comms,conn,conf):
+    def __init__(self,comms,conn,rb,cb,conf):
         """
          initializes RTO
          comms - internal communication
           NOTE: all messages sent on internal comms must be a tuple T where
            T = (sender callsign,timestamp of event,type of message,event message)
          conn - connection to/from DySKT
+         rb - recon circular buffer
+         cb - collection circular buffer
          conf - necessary config details
         """
         mp.Process.__init__(self)
-        self._icomms = comms               # communications queue
-        self._conn = conn                  # message queue to/from DySKT
-        self._mgrs = None                  # lat/lon to mgrs conversion
-        self._conf = conf['gps']           # configuration for gps/datastore
-        self._nidus = None                 # nidus server
-        self._gps = None                   # polling thread for front line traces
-        self._q = None                     # internal queue for gps poller
-        self._bulk = {}                    # stored frames
-        self._setup(conf['store']['host'], # nidus storage manager addres/port
-                    conf['store']['port'])
-
-    def _setup(self,host,port):
-        """ connect to Nidus for data transfer and pass sensor up event """
-        try:
-            # get mgrs converter
-            self._mgrs = mgrs.MGRS()
-
-            # connect to data store
-            self._nidus = ssl.wrap_socket(socket.socket(socket.AF_INET,
-                                                        socket.SOCK_STREAM),
-                                          ca_certs=wraith.NIDUSCERT,
-                                          cert_reqs=ssl.CERT_REQUIRED,
-                                          ssl_version=ssl.PROTOCOL_TLSv1)
-            self._nidus.connect((host,port))
-        except socket.error as e:
-            raise RuntimeError("RTO:Nidus:%s" % e)
-        except Exception as e:
-            raise RuntimeError("RTO:Unknown:%s" % e)
+        self._icomms = comms       # communications queue
+        self._cD = conn            # message connection to/from DySKT
+        self._gconf = conf['gps']  # configuration for gps/datastore
+        self._rb = rb              # recon buffer
+        self._cb = cb              # collection buffer
+        self._gps = None           # polling thread for front line traces
+        self._qG = None            # internal queue for gps poller
+        self._conn = None          # conn to backend db
+        self._curs = None          # primary db cursors
+        self._sid = None           # our session id
+        self._gid = None           # the gpsd id from the backend
+        self._mgrs = None          # lat/lon to mgrs conversion
+        self._setup(conf['store'])
 
     def terminate(self): pass
     
@@ -205,154 +187,171 @@ class RTO(mp.Process):
         gpsid = None # id of gps device
 
         # send sensor up notification, platform details and gpsid
-        ret = self._send('DEVICE',time.time(),['sensor',socket.gethostname(),1])
-        if ret: self._conn.send(('err','RTO','Nidus',ret))
-        else:
-            ret = self._send('PLATFORM',time.time(),self._pfdetails())
-            if ret: self._conn.send(('err','RTO','Nidus',ret))
-            else: self._setgpsd()
+        try:
+            self._submitsensor(ts2iso(time.time()),True)
+            self._submitplatform(ts2iso(time.time()))
+            if self._gconf:
+                self._qG = Queue()
+                try:
+                    self._gps = GPSPoller(self._qG,self._gconf)
+                    self._gps.start()
+                except RuntimeError as e:
+                    self._cD.send(('warn','RTO','GPSD',"Failed to connnect: %s" %e))
+                    self._gps = None
+        except psql.Error as e:
+            # sensor submit failed, no point continuing
+            if e.pgcode == '23P01':
+                errmsg = "Sensor failed to close correctly last session"
+            else:
+                errmsg = "%s: %s" % (e.pgcode,e.pgerror)
+            self._conn.rollback()
+            self._cD.send(('err','RTO','DB',errmsg))
+            return
+        except Exception as e:
+            self._conn.rollback()
+            self._cD.send(('err','RTO','Unknown',e))
 
         # execution loop
         while True:
+            # TODO: convert all to select
             # 1. anything from DySKT
-            if self._conn.poll() and self._conn.recv() == '!STOP!': break
+            if self._cD.poll() and self._cD.recv() == '!STOP!': break
 
             # 2. gps device/frontline trace?
             try:
-                t,ts,msg = self._q.get_nowait()
+                t,ts,msg = self._qG.get_nowait()
             except (Empty,AttributeError): pass
             else:
-                if t == '!DEV!': # device up message
-                    gpsid = msg['id']
-                    self._conn.send(('info','RTO','GPSD',"%s initiated" % gpsid))
-                    ret = self._send('GPSD',ts,msg)
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
-                elif t == '!FLT!': # frontline trace
-                    ret = self._send('FLT',ts,msg)
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                if t == '!FLT!': self._submitflt(ts2iso(ts),msg)
+                elif t == '!DEV!':
+                    try:
+                        gpsid = msg['id']
+                        self._cD.send(('info','RTO','GPSD',"%s initiated" % gpsid))
+                        self._submitgpsd(ts2iso(ts),True,msg)
+                    except psql.OperationalError as e: # unrecoverable
+                        self._cD.send(('err','RTO','DB',"%s: %s" % (e.pgcode,e.pgerror)))
+                    except psql.Error as e: # possible incorrect semantics/syntax
+                        self._conn.rollback()
+                        self._cD.send(('warn','RTO','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
 
             # 3. queued data from internal comms
             ev = msg = None
             try:
-                rpt = self._icomms.get(True,0.5)
-                cs,ts,ev,msg = rpt[0],rpt[1],rpt[2],rpt[3]
+                cs,ts,ev,msg = self._icomms.get(True,0.5)
+                ts = ts2iso(ts)
 
-                if ev == '!UP!': # should be the 1st message we get from radio(s)
-                    # NOTE: send the radio, nidus will take care of setting the
-                    # radio device status, initial radio events and using_radio.
-                    # Send each antenna separately
+                if ev == '!UP!':
+                    # should be the 1st message we get from radio(s). Notify
+                    # DySKT, submit the new radio and it's antennas
                     rmap[cs] = msg['mac']
-                    self._bulk[cs] = {'cob':None,       # zlib compressobj
-                                      'mac':msg['mac'], # mac addr of collecting radio
-                                      'start':0,        # time first frame was seen
-                                      'cnt':0,          # ttl # of frames
-                                      'sz':0,           # ttl size of uncompressed frames
-                                      'frames':''}      # the compressed frames
-                    self._conn.send(('info','RTO','Radio',"%s initiated" % cs))
-                    ret = self._send('RADIO',ts,msg)
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
-                    else:
-                        # send antennas
-                        for i in xrange(msg['nA']):
-                            ret = self._send('ANTENNA',ts,
-                                             {'mac':msg['mac'],'index':i,
-                                              'type':msg['type'][i],'gain':msg['gain'][i],
-                                              'loss':msg['loss'][i],'x':msg['x'][i],
-                                              'y':msg['y'][i],'z':msg['z'][i]})
-                            if ret: self._conn.send(('err','RTO','Nidus',ret))
+                    self._cD.send(('info','RTO','Radio',"%s initiated" % cs))
+                    self._submitradio(ts,True,msg)
+                    for i in xrange(msg['nA']):
+                        self._submitantenna(ts,{'mac':msg['mac'],'idx':i,
+                                                'type':msg['type'][i],
+                                                'gain':msg['gain'][i],
+                                                'loss':msg['loss'][i],
+                                                'x':msg['x'][i],
+                                                'y':msg['y'][i],
+                                                'z':msg['z'][i]})
                 elif ev == '!FAIL!':
-                    # send bulked frames, notify nidus & DySKT & delete cs
-                    ret = self._flushbulk(ts,rmap[cs],cs)
-                    if not ret: ret = self._send('RADIO_EVENT',ts,[rmap[cs],'fail',msg])
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                    # notify DySKT, submit faile & delete cs
+                    self._submitradioevent(ts,[rmap[cs],'fail',msg])
                     del rmap[cs]
                     del self._bulk[cs]
                 elif ev == '!SCAN!':
                     # compile the scan list into a string before sending
                     sl = ",".join(["%s:%s" % (c,w) for (c,w) in msg])
-                    self._conn.send(('info',cs,ev.replace('!',''),sl))
-                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'scan',sl])
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                    self._cD.send(('info',cs,ev.replace('!',''),sl))
+                    self._submitradioevent(ts,[rmap[cs],'scan',sl])
                 elif ev == '!LISTEN!':
-                    self._conn.send(('info',cs,ev.replace('!',''),msg))
-                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'listen',msg])
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                    self._cD.send(('info',cs,ev.replace('!',''),msg))
+                    self._submitradioevent(ts,[rmap[cs],'listen',msg])
                 elif ev == '!HOLD!':
-                    self._conn.send(('info',cs,ev.replace('!',''),msg))
-                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'hold',msg])
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                    self._cD.send(('info',cs,ev.replace('!',''),msg))
+                    self._submitradioevent(ts,[rmap[cs],'hold',msg])
                 elif ev == '!PAUSE!':
-                    # send bulked frames
-                    self._conn.send(('info',cs,ev.replace('!',''),msg))
-                    ret = self._flushbulk(ts,rmap[cs],cs)
-                    if not ret: ret = self._send('RADIO_EVENT',ts,[rmap[cs],'pause',' '])
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                    self._cD.send(('info',cs,ev.replace('!',''),msg))
+                    self._submitradioevent(ts,[rmap[cs],'pause',' '])
                 elif ev == '!SPOOF!':
-                    self._conn.send(('info',cs,ev.replace('!',''),msg))
-                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'spoof',msg])
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
+                    self._cD.send(('info',cs,ev.replace('!',''),msg))
+                    self._submitradioevent(ts,[rmap[cs],'spoof',msg])
                 elif ev == '!TXPWR!':
-                    self._conn.send(('info',cs,ev.replace('!',''),msg))
-                    ret = self._send('RADIO_EVENT',ts,[rmap[cs],'txpwr',msg])
-                    if ret: self._conn.send(('err','RTO','Nidus',ret))
-                elif ev == '!DWELL!':
-                    if msg: self._conn.send(('info',cs,ev.replace('!',''),msg))
+                    self._cD.send(('info',cs,ev.replace('!',''),msg))
+                    self._submitradioevent(ts,[rmap[cs],'txpwr',msg])
+                #elif ev == '!DWELL!':
+                #    if msg: self._cD.send(('info',cs,ev.replace('!',''),msg))
                 elif ev == '!FRAME!':
-                    # save the frame and update bulk details
-                    if self._bulk[cs]['cnt'] == 0:
-                        self._bulk[cs]['start'] = ts               # reset start
-                        self._bulk[cs]['cob'] = zlib.compressobj() # new compression obj
-
-                    # add new frame and update metrics
-                    self._bulk[cs]['cnt'] += 1
-                    self._bulk[cs]['sz'] += len(msg)
-                    self._bulk[cs]['frames'] += self._bulk[cs]['cob'].compress('%s \x1EFB\x1F%s\x1FFE\x1E' % (ts2iso(ts),msg))
-
-                    # if we have hit our limit, compress and send the bulk frames
-                    if self._bulk[cs]['sz'] > _BSZ_ or (ts - self._bulk[cs]['start'])/1000 > _BTM_:
-                        ret = self._flushbulk(ts,rmap[cs],cs)
-                        if ret: self._conn.send(('err','RTO','Nidus',ret))
+                    pass
                 else: # unidentified event type, notify dyskt
-                    self._conn.send(('warn','RTO','Radio',"unknown event %s" % ev))
+                    self._cD.send(('warn','RTO','Radio',"unknown event %s" % ev))
             except Empty: continue
-            except IndexError: # something wrong with antenna indexing
-                self._conn.send(('err','RTO',"Radio","misconfigured antennas"))
+            except psql.OperationalError as e: # unrecoverable
+                self._cD.send(('err','RTO','DB',"%s: %s" % (e.pgcode,e.pgerror)))
+            except psql.Error as e: # possible incorrect semantics/syntax
+                self._conn.rollback()
+                self._cD.send(('warn','RTO','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
+            #except IndexError: # something wrong with antenna indexing
+            #    self._cD.send(('err','RTO',"Radio","misconfigured antennas"))
             except KeyError as e: # a radio sent a message without initiating
-                self._conn.send(('err','RTO','Radio %s' % e,"data out of order (%s)" % ev))
-            except Exception as e: # handle catchall error
-                self._conn.send(('err','RTO','Unknown',e))
+                self._cD.send(('err','RTO','Radio %s' % e,"data out of order (%s)" % ev))
+            #except Exception as e: # handle catchall error
+            #    self._cD.send(('err','RTO','Unknown',e))
 
         # any bulked frames not yet sent?
-        for cs in rmap:
-            ret = self._flushbulk(time.time(),rmap[cs],cs)
-            if ret:
-                if ret: self._conn.send(('err','RTO','Nidus',ret))
-                break
+        #for cs in rmap:
+        #    ret = self._flushbulk(time.time(),rmap[cs],cs)
+        #    if ret:
+        #        if ret: self._cD.send(('err','RTO','Nidus',ret))
+        #        break
 
         # notify Nidus of closing (radios,sensor,gpsd). hopefully no errors on send
-        ts = time.time()
-        for cs in rmap: self._send('DEVICE',ts,['radio',rmap[cs],0])
-        self._send('DEVICE',ts,['gpsd',gpsid,0])
-        self._send('DEVICE',ts,['sensor',socket.gethostname(),0])
+        ts = ts2iso(time.time())
+        for cs in rmap: self._submitradio(ts,False,{'mac':rmap[cs]})
+        if self._gps: self._submitgpsd(ts,False)
+        self._submitsensor(ts,False)
 
         # shut down
         if not self._shutdown():
             try:
-                self._conn.send(('warn','RTO','Shutdown',"Incomplete shutdown"))
+                self._cD.send(('warn','RTO','Shutdown',"Incomplete shutdown"))
             except IOError:
                 # most likely DySKT closed its side of the pipe
                 pass
 
 #### private helper functions
 
+    def _setup(self,store):
+        """ connect to db w/ params in store & pass sensor up event """
+        try:
+            self._mgrs = mgrs.MGRS() # get mgrs converter
+            self._conn = psql.connect(host=store['host'],
+                                      port=store['port'],
+                                      dbname=store['db'],
+                                      user=store['user'],
+                                      password=store['pwd'])
+            self._curs = self._conn.cursor()
+            self._curs.execute("set time zone 'UTC';")
+            self._conn.commit()
+        except psql.OperationalError as e:
+            if e.__str__().find('connect') > 0:
+                raise RuntimeError('RTO:PostgreSQL:DB not running')
+            elif e.__str__().find('authentication') > 0:
+                raise RuntimeError('RTO:PostgreSQL:Invalid connection string')
+            else:
+                raise RuntimeError('RTO:PostgreSQL:DB error: %s' % e)
+        except Exception as e:
+            raise RuntimeError("RTO:Unknown:%s" % e)
+
     def _shutdown(self):
         """ clean up. returns whether a full reset or not occurred """
         # try shutting down & resetting radio (if it failed we may not be able to)
         clean = True
         try:
-            # close socket to storage manager and connection
-            self._nidus.close()
-            self._conn.close()
+            # close backend connection and connection to DySKT
+            if self._curs: self._curs.close()
+            if self._conn: self._conn.close()
+            self._cD.close()
 
             # stop GPSPoller
             if self._gps and self._gps.is_alive(): self._gps.stop()
@@ -360,56 +359,162 @@ class RTO(mp.Process):
             clean = False
         return clean
 
-    def _flushbulk(self,ts,mac,rdo):
-        """ send bulked frames belonging to rdo with mac addr """
-        # if no stored frames, exit
-        if self._bulk[rdo]['sz'] == 0: return None
-        try:
-            self._bulk[rdo]['frames'] += self._bulk[rdo]['cob'].flush()
-            #ret = self._send('BULK',ts,[mac,self._bulk[rdo]['cnt'],
-            #                            self._bulk[rdo]['frames']])
-            #return ret
-            ret = ''
-        except zlib.error as e: self._conn.send(('err','RTO','zlib',e))
-        finally:
-            # reset bulk details
-            self._bulk[rdo]['cnt'] = 0
-            self._bulk[rdo]['sz'] = 0
-            self._bulk[rdo]['frames'] = ''
+    #### DB functionality ####
+    def _submitsensor(self,ts,state):
+        """ submit sensor at ts having state """
+        if state:
+            sql = """
+                   insert into sensor (hostname,ip,period)
+                   values (%s,%s,tstzrange(%s,NULL,'[]')) RETURNING session_id;
+                  """
+            self._curs.execute(sql,(socket.gethostname(),ipaddr(),ts))
+            self._sid = self._curs.fetchone()[0]
+        else:
+            sql = """
+                   update sensor set period = tstzrange(lower(period),%s)
+                   where session_id = %s;
+                  """
+            self._curs.execute(sql,(ts,self._sid))
+        self._conn.commit()
 
-    def _setgpsd(self):
-        """ determines whether to use no gps, fixed gps or gps device """
-        #if not self._conf: return # if there is no gps config, do nothing
-        self._q = Queue()
-        try:
-            self._gps = GPSPoller(self._q,self._conf)
-            self._gps.start()
-        except RuntimeError as e:
-            self._conn.send(('warn','RTO','FLT',"Failed to connnect %s" %e))
-            self._gps = None
+    def _submitplatform(self,ts):
+        """ submit platform details """
+        assert self._sid
 
-    @staticmethod
-    def _pfdetails():
-        """ get platform details as dict and return """
-        d = {'rd':None,'dist':None,'osvers':None,'name':None}
-        d['os'] = platform.system().capitalize()
+        # get platform details
+        os = platform.system()
         try:
-            d['dist'],d['osvers'],d['name'] = platform.linux_distribution()
+            dist,osvers,name = platform.linux_distribution()
         except:
-            pass
+            dist = osvers = name = None
         try:
-            d['rd'] = regget()
+            rd = regget()
         except:
-            pass
-        d['kernel'] = platform.release()
-        d['arch'] = platform.machine()
-        d['pyvers'] = "%d.%d.%d" % (sys.version_info.major,
-                                    sys.version_info.minor,
-                                    sys.version_info.micro)
-        d['bits'],d['link'] = platform.architecture()
-        d['compiler'] = platform.python_compiler()
-        d['libcvers'] = " ".join(platform.libc_ver())
-        return d
+            rd = None
+        kernel = platform.release()
+        arch = platform.machine()
+        pyvers = "%d.%d.%d" % (sys.version_info.major,
+                               sys.version_info.minor,
+                               sys.version_info.micro)
+        bits,link = platform.architecture()
+        compiler = platform.python_compiler()
+        libcvers = " ".join(platform.libc_ver())
+
+        # submit the details
+        sql = """
+               insert into platform (sid,os,dist,version,name,kernel,machine,
+                                     pyvers,pycompiler,pylibcvers,pybits,
+                                     pylinkage,region)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(self._sid,os,dist,osvers,name,kernel,arch,
+                                pyvers,compiler,libcvers,bits,link,rd))
+        self._conn.commit()
+
+    def _submitgpsd(self,ts,state,g=None):
+        """ submit gps device having state w/ details """
+        assert self._sid
+        if state:
+            # insert if gpsd does not already exist
+            self._curs.execute("select gpsd_id from gpsd where devid=%s;",(g['id'],))
+            row = self._curs.fetchone()
+            if row: self._gid = row[0]
+            else:
+                sql = """
+                       insert into gpsd (devid,version,flags,driver,bps,tty)
+                       values (%s,%s,%s,%s,%s,%s) returning gpsd_id;
+                      """
+                self._curs.execute(sql,(g['id'],g['version'],g['flags'],
+                                        g['driver'],g['bps'],g['path']))
+                self._gid = self._curs.fetchone()[0]
+
+            # update using table
+            sql = """
+                   insert into using_gpsd (sid,gid,period)
+                   values (%s,%s,tstzrange(%s,NULL,'[]'));
+                  """
+            self._curs.execute(sql,(self._sid,self._gid,ts))
+        else:
+            assert self._gid
+            sql = """
+                   update using_gpsd set period = tstzrange(lower(period),%s)
+                   where sid = %s and gid = %s;
+                  """
+            self._curs.execute(sql,(ts,self._sid,self._gid))
+        self._conn.commit()
+
+    def _submitflt(self,ts,flt):
+        """ submit the flt at ts """
+        assert self._sid
+        sql = """
+               insert into flt (sid,ts,coord,alt,spd,dir,fix,xdop,ydop,pdop,epx,epy)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(self._sid,ts,
+                                self._mgrs.toMGRS(flt['lat'][0],flt['lon'][0]),
+                                flt['alt'],flt['spd'],flt['dir'],flt['fix'],
+                                flt['dop']['xdop'],flt['dop']['ydop'],
+                                flt['dop']['pdop'],flt['lat'][1],flt['lon'][1]))
+        self._conn.commit()
+
+    def _submitradio(self,ts,state,r):
+        """ submit gps device having state w/ details """
+        assert self._sid
+        if state:
+            # add radio if it does not exist
+            self._curs.execute("select * from radio where mac=%s;",(r['mac'],))
+            if not self._curs.fetchone():
+                sql = """
+                       insert into radio (mac,driver,chipset,channels,standards,description)
+                       values (%s,%s,%s,%s,%s,%s);
+                      """
+                self._curs.execute(sql,(r['mac'],r['driver'][0:20],r['chipset'][0:20],
+                                        [int(c) for c in r['channels']],r['standards'][0:20],
+                                        r['desc'][0:200]))
+
+            # add a using_radio record
+            sql = """
+                   insert into using_radio (sid,mac,phy,nic,vnic,role,period)
+                   values (%s,%s,%s,%s,%s,%s,tstzrange(%s,NULL,'[]'));
+                  """
+            self._curs.execute(sql,(self._sid,r['mac'],r['phy'],r['nic'],
+                                    r['vnic'],r['role'],ts))
+
+            # add a txpwr event
+            sql = "insert into radio_event (mac,state,params,ts) values (%s,%s,%s,%s);"
+            self._curs.execute(sql,(r['mac'],'txpwr',r['txpwr'],ts))
+
+             # add a spoof event (if necessary)
+            if r['spoofed']: self._curs.execute(sql,(r['mac'],'spoof',r['spoofed'],ts))
+        else:
+            sql = """
+                   update using_radio set period = tstzrange(lower(period),%s)
+                   where sid = %s and mac =%s;
+                  """
+            self._curs.execute(sql,(ts,self._sid,r['mac']))
+        self._conn.commit()
+
+    def _submitantenna(self,ts,a):
+        """ submit antenna at ts """
+        assert self._sid
+        sql = """
+               insert into antenna (mac,ind,gain,loss,x,y,z,type,ts)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(a['mac'],a['idx'],a['gain'],a['loss'],
+                                a['x'],a['y'],a['z'],a['type'],ts))
+        self._conn.commit()
+
+
+    def _submitradioevent(self,ts,m):
+        """ submit radioevent at ts """
+        assert self._sid
+        sql = """
+               insert into radio_event (mac,state,params,ts)
+               values (%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(m[0],m[1],m[2],ts))
+        self._conn.commit()
 
     #### send helper functions
 
@@ -437,44 +542,12 @@ class RTO(mp.Process):
             elif t == 'FLT': send += self._craftflt(ts,d,self._mgrs)
             elif t == 'RADIO_EVENT': send += self._craftradioevent(ts,d)
             send += "\x03\x12\x15\04"
-            if not self._nidus.send(send): return "Nidus socket closed unexpectantly"
+            #if not self._nidus.send(send): return "Nidus socket closed unexpectantly"
             return None
         except socket.error, ret:
             return ret
         except Exception, ret:
             return ret
-
-    @staticmethod
-    def _craftdevice(ts,d):
-        """ create body of device message """
-        return "%s %s \x1EFB\x1F%s\x1FFE\x1E %d" % (ts,d[0],d[1],d[2])
-
-    @staticmethod
-    def _craftplatform(d):
-        """ create body of platform message """
-        return "%s \x1EFB\x1F%s\x1FFE\x1E %s \x1EFB\x1F%s\x1FFE\x1E %s %s %s %s %s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E" % \
-                (d['os'],d['dist'],d['osvers'],d['name'],d['kernel'],d['arch'],
-                 d['pyvers'],d['bits'],d['link'],d['compiler'],d['libcvers'],d['rd'])
-
-    @staticmethod
-    def _craftradio(ts,d):
-        """ creates radio message body """
-        return "%s %s %s \x1EFB\x1F%s\x1FFE\x1E %s %s %s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E %s %s %s \x1EFB\x1F%s\x1FFE\x1E"  % \
-               (ts,d['mac'],d['role'],d['spoofed'],d['phy'],d['nic'],d['vnic'],
-                d['driver'],d['chipset'],d['standards'],','.join(d['channels']),
-                d['txpwr'],d['desc'])
-
-    @staticmethod
-    def _craftradioevent(ts,d):
-        """ create body of radio event message """
-        return "%s %s %s \x1EFB\x1F%s\x1FFE\x1E" % (ts,d[0],d[1],d[2])
-
-    @staticmethod
-    def _craftantenna(ts,d):
-        """ create body of antenna message """
-        return "%s %s %d \x1EFB\x1F%s\x1FFE\x1E %.2f %.2f %d %d %d" %\
-               (ts,d['mac'],d['index'],d['type'],d['gain'],d['loss'],d['x'],
-                d['y'],d['z'])
 
     @staticmethod
     def _craftbulk(ts,d):
@@ -485,17 +558,3 @@ class RTO(mp.Process):
     def _craftframe(ts,d):
         """ creates body of the frame message """
         return "%s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E" % (ts,d[0],d[1])
-
-    @staticmethod
-    def _craftgpsd(ts,d):
-        """ create body of gps device message """
-        return "%s %s %s %d \x1EFB\x1F%s\x1FFE\x1E %d \x1EFB\x1F%s\x1FFE\x1E" %\
-               (ts,d['id'],d['version'],d['flags'],d['driver'],d['bps'],d['path'])
-
-    @staticmethod
-    def _craftflt(ts,d,m):
-        """ create body of the gps location message """
-        return "%s %s %d %s %.2f %.2f %.2f %.3f %.3f %.3f %.3f %.3f" %\
-               (ts,d['id'],d['fix'],m.toMGRS(d['lat'][0],d['lon'][0]),d['alt'],
-                d['dir'],d['spd'],d['lat'][1],d['lon'][1],d['dop']['xdop'],
-                d['dop']['ydop'],d['dop']['pdop'])

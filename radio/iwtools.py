@@ -132,7 +132,7 @@ def sethwaddr(nic,setto=None):
      will return the new mac
     """
     if not setto:
-        cmd = ['macchanger','-a',nic]
+        cmd = ['macchanger','-A',nic]
     else:
         cmd = ['macchanger','-m',setto,nic]
     if os.getuid() != 0: cmd.insert(0,'sudo')

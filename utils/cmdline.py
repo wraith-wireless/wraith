@@ -3,8 +3,8 @@
 
 __name__ = 'cmdline'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.1'
-__date__ = 'February 2015'
+__version__ = '0.0.2'
+__date__ = 'August 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -12,7 +12,7 @@ __status__ = 'Production'
 
 import os                         # popen and path functions
 import psycopg2 as psql           # postgres API
-from subprocess import Popen,PIPE # execute process
+import subprocess as sp           # subprcess stuff
 
 def runningprocess(process):
     """ returns the pid(s) of process if running or the empty list """
@@ -24,7 +24,7 @@ def runningprocess(process):
 
 def runningservice(pidfile):
     """
-     determines if the service (dyskt/nidus) referenced by pidfile is running
+     determines if the service referenced by pidfile is running
     """
     try:
         with open(pidfile): return True
@@ -62,16 +62,24 @@ def service(process,pwd,start=True):
     """
     state = 'start' if start else 'stop'
     cmd = ['sudo','-S','service',process,state]
-    p = Popen(cmd,stdout=PIPE,stdin=PIPE,stderr=PIPE,universal_newlines=True)
+    p = sp.Popen(cmd,stdout=sp.PIPE,stdin=sp.PIPE,stderr=sp.PIPE,universal_newlines=True)
     _,err = p.communicate(pwd+'\n')
     if err: raise RuntimeError(err)
 
 def testsudopwd(pwd):
     """ tests the pwd for sudo rights using a simple sudo ls -l """
-    p = Popen(['sudo','-S','ls','-l'],stdout=PIPE,stdin=PIPE,stderr=PIPE,universal_newlines=True)
+    p = sp.Popen(['sudo','-S','ls','-l'],stdout=sp.PIPE,stdin=sp.PIPE,stderr=sp.PIPE,universal_newlines=True)
     out,err = p.communicate(pwd+'\n')
     if out: return True
     return False
+
+def ipaddr():
+    """ returns the local ip address """
+    # TODO: not tested on machine w/ multiple connected interfaces
+    p = sp.Popen(['hostname','-I'],stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
+    out,err = p.communicate()
+    if err: return '127.0.0.1'
+    else: return out.strip()
 
 def psqlconnect(c):
     """
