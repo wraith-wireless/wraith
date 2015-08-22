@@ -2,43 +2,32 @@
 
 """ oui.py: oui/manuf related functions
 
-Parse the 802.11 MAC Protocol Data Unit (MPDU) IAW IEED 802.11-2012
-we use Std when referring to IEEE Std 802.11-2012
-
-This requires aircrack-ng oui file
+Parse the 802.11 MAC Protocol Data Unit (MPDU) IAW IEEE 802.11-2012
 """
 
 __name__ = 'oui'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 __date__ = 'January 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import re
-
 def parseoui(path):
-    """ parse aircrack-ng oui file at path filling in oui dict oui->manuf """
+    """ parse oui.txt file at path filling in oui dict oui->manuf """
     fin = None
-    oui = {}
-    pattern = r'^([-|\w]*)   \(hex\)\t\t(.*)\r'
+    ouis = {}
+
     try:
         fin = open(path)
-        for line in fin.readlines():
-            found = re.search(pattern,line)
-            try:
-                m = found.group(2)
-                if m.startswith('IEEE REGISTRATION AUTHORITY'):
-                    m = 'IEEE REGISTRATION AUTHORITY'
-                oui[(found.group(1).replace('-',':')).lower()] = m[:100]
-            except AttributeError:
-                pass
+        for line in fin.readlines()[1:]:
+            oui,manuf = line.strip().split('\t')
+            ouis[oui.lower()] = manuf[0:100]
         fin.close()
     except IOError:
         if fin and not fin.closed: fin.close()
-    return oui
+    return ouis
 
 def manufacturer(oui,mac):
     """ returns the manufacturer of the mac address if exists, otherwise 'unknown' """
