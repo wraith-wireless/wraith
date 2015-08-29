@@ -46,12 +46,10 @@ Partial support of 802.11-2012
 
 ### b. DySKT (v 0.1.5) : Dynamic Small Kill Team (Wraith Sensor)
 
-An 802.11 sensor consisting of an optional surveillance radio (i.e. spotter), a
-mandatory reconnaissance radio (i.e. shooter) and an RTO which relays collected
-data to Nidus, the data storage system (i.e. HQ). DySKT collects data in the form
-of raw 802.11 packets with the reconnaissance (and surveillance if present) radios,
-forwarding that data along with any geolocational data (if a gps device is present)
-to higher.
+DySKT is a 802.11 sensor consisting of an optional surveillance radio, a mandatory
+reconnaissance radio and an RTO which relays collected data to the backend database.
+DySKT collects data in the form of raw 802.11 packets, along with any geolocational
+data (if a gps device is present).
 
 ~~### c. Nidus (v 0.0.6): Data Storage Manager~~
 
