@@ -196,7 +196,7 @@ CREATE INDEX radio_event_ts_idx on radio_event(ts);
 
 -- radio role type enumeration
 DROP TYPE IF EXISTS ROLE;
-CREATE TYPE ROLE AS ENUM ('recon','collection');
+CREATE TYPE ROLE AS ENUM ('recon','surveillance');
 
 -- using_radio table
 DROP TABLE IF EXISTS using_radio;
@@ -966,7 +966,7 @@ CREATE TABLE action(
 --   FOREIGN KEY(staid) REFERENCES sta(sta_id)
 --);
 
-#### PERMANENT VIEWS
+---- PERMANENT VIEWS
 
 DROP VIEW IF EXISTS sessions;
 CREATE VIEW sessions AS
@@ -974,7 +974,7 @@ CREATE VIEW sessions AS
            p.kernel,
            g.devid,
            (SELECT ur.mac FROM using_radio ur WHERE ur.sid = s.session_id AND ur.role = 'recon') as recon,
-           (SELECT ur.mac FROM using_radio ur WHERE ur.sid = s.session_id AND ur.role = 'collection') as collection,
+           (SELECT ur.mac FROM using_radio ur WHERE ur.sid = s.session_id AND ur.role = 'surveillance') as surveillance,
            (SELECT count(f.frame_id) FROM frame f WHERE f.sid = s.session_id) as fcnt
     FROM sensor s, platform p, using_gpsd ug, gpsd g
     WHERE s.session_id = p.sid AND
@@ -982,7 +982,7 @@ CREATE VIEW sessions AS
           g.gpsd_id = ug.gid
     ORDER BY start;
 
-#### STORED PROCEDURES
+---- STORED PROCEDURES
 
 -- store procedure for deleting all content from all tables
 DROP FUNCTION IF EXISTS delete_all();

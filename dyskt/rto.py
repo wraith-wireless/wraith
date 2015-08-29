@@ -148,7 +148,7 @@ class GPSPoller(threading.Thread):
 
 class RTO(mp.Process):
     """ RTO - handles further processing of raw frames from the sniffer """
-    def __init__(self,comms,conn,rb,cb,conf):
+    def __init__(self,comms,conn,rb,sb,conf):
         """
          initializes RTO
          comms - internal communication
@@ -156,7 +156,7 @@ class RTO(mp.Process):
            T = (sender callsign,timestamp of event,type of message,event message)
          conn - connection to/from DySKT
          rb - recon circular buffer
-         cb - collection circular buffer
+         sb - surveillance circular buffer
          conf - necessary config details
         """
         mp.Process.__init__(self)
@@ -164,7 +164,7 @@ class RTO(mp.Process):
         self._cD = conn            # message connection to/from DySKT
         self._gconf = conf['gps']  # configuration for gps/datastore
         self._rb = rb              # recon buffer
-        self._cb = cb              # collection buffer
+        self._sb = sb              # surveillance buffer
         self._gps = None           # polling thread for front line traces
         self._qG = None            # internal queue for gps poller
         self._conn = None          # conn to backend db

@@ -701,7 +701,7 @@ class QueryPanel(gui.SlavePanel):
         self._vrecon = tk.IntVar()
         ttk.Checkbutton(frmSL,text='Recon',variable=self._vrecon).grid(row=1,column=3,sticky='w')
         self._vcoll = tk.IntVar()
-        ttk.Checkbutton(frmSL,text='Collection',variable=self._vcoll).grid(row=2,column=3,sticky='w')
+        ttk.Checkbutton(frmSL,text='Surveillance',variable=self._vcoll).grid(row=2,column=3,sticky='w')
         frmSRL = ttk.LabelFrame(frmSR,text='Location')
         frmSRL.grid(row=0,column=1,sticky='nwse')
         ttk.Label(frmSRL,text='Center PT: ').grid(row=1,column=5,sticky='w')
@@ -1138,7 +1138,7 @@ class SessionsPanel(gui.DBPollingTabularPanel):
                                           ('Stop',gui.lenpix(13),str),
                                           ('GPSD',gui.lenpix(8),str),
                                           ('Recon',gui.lenpix(12),str),
-                                          ('Collection',gui.lenpix(12),str),
+                                          ('Surveillance',gui.lenpix(12),str),
                                           ('Frames',gui.lenpix(6),int)],
                                          "widgets/icons/sessions.png",False)
 
@@ -1175,7 +1175,7 @@ class SessionsPanel(gui.DBPollingTabularPanel):
             kern = s['kernel'].replace('-generic','') # save some space
             devid = s['devid']
             recon = s['recon']
-            coll = s['collection']
+            surveil = s['surveillance']
             nF = s['fcnt']
             if sid in ls: # session is present
                 # check for changes (id and start are not checked0
@@ -1185,7 +1185,7 @@ class SessionsPanel(gui.DBPollingTabularPanel):
                 if cur['Stop'] != stop: self._tree.set(sid,'Stop',stop)
                 if cur['GPSD'] != devid: self._tree.set(sid,'GPSD',devid)
                 if cur['Recon'] != recon: self._tree.set(sid,'Recon',recon)
-                if cur['Collection'] != coll: self._tree.set(sid,'Collection',coll)
+                if cur['Surveillance'] != surveil: self._tree.set(sid,'Surveillance',surveil)
                 if cur['Frames'] != nF: self._tree.set(sid,'Frames',nF)
             else:         # session not present
                 self._tree.insert('','end',iid=sid,values=(sid,host,kern,start,stop,
@@ -1557,60 +1557,60 @@ class DySKTConfigPanel(gui.ConfigPanel):
         ttk.Checkbutton(frmRS,text="Paused",variable=self._vrpause).grid(row=2,column=0,columnspan=2)
         nb.add(frmR,text='Recon')
 
-        # Collection Tab Configuration
+        # Surveillance Tab Configuration
         frmC = ttk.Frame(nb)
         ttk.Label(frmC,text='NIC: ').grid(row=0,column=0,sticky='nw')
-        self._entCollectionNic = ttk.Entry(frmC,width=5)
-        self._entCollectionNic.grid(row=0,column=1,sticky='nw')
+        self._entSurveilNic = ttk.Entry(frmC,width=5)
+        self._entSurveilNic.grid(row=0,column=1,sticky='nw')
         ttk.Label(frmC,text=' ').grid(row=0,column=2,sticky='w')
         ttk.Label(frmC,text='Spoof: ').grid(row=0,column=3,sticky='wn')
-        self._entCollectionSpoof = ttk.Entry(frmC,width=17)
-        self._entCollectionSpoof.grid(row=0,column=4,sticky='nw')
+        self._entSurveilSpoof = ttk.Entry(frmC,width=17)
+        self._entSurveilSpoof.grid(row=0,column=4,sticky='nw')
         ttk.Label(frmC,text='Desc: ').grid(row=1,column=0,sticky='nw')
-        self._entCollectionDesc = tk.Text(frmC,width=42,height=3)
-        self._entCollectionDesc.grid(row=1,column=1,columnspan=4,sticky='e')
+        self._entSurveilDesc = tk.Text(frmC,width=42,height=3)
+        self._entSurveilDesc.grid(row=1,column=1,columnspan=4,sticky='e')
 
         # ANTENNA SUB SECTION
         frmCA = ttk.LabelFrame(frmC,text='Antennas')
         frmCA.grid(row=2,column=0,columnspan=5,sticky='nwse')
         # ANTENNA SUBSECTION
         ttk.Label(frmCA,text="Number: ").grid(row=0,column=0,sticky='w')
-        self._entCollectionAntNum = ttk.Entry(frmCA,width=2)
-        self._entCollectionAntNum.grid(row=0,column=1,sticky='w')
+        self._entSurveilAntNum = ttk.Entry(frmCA,width=2)
+        self._entSurveilAntNum.grid(row=0,column=1,sticky='w')
         ttk.Label(frmCA,text='Gain: ').grid(row=1,column=0,sticky='w')
-        self._entCollectionAntGain = ttk.Entry(frmCA,width=7)
-        self._entCollectionAntGain.grid(row=1,column=1,sticky='w')
+        self._entSurveilAntGain = ttk.Entry(frmCA,width=7)
+        self._entSurveilAntGain.grid(row=1,column=1,sticky='w')
         ttk.Label(frmCA,text=" ").grid(row=1,column=2)
         ttk.Label(frmCA,text="Type: ").grid(row=1,column=3,sticky='e')
-        self._entCollectionAntType = ttk.Entry(frmCA,width=15)
-        self._entCollectionAntType.grid(row=1,column=4,sticky='e')
+        self._entSurveilAntType = ttk.Entry(frmCA,width=15)
+        self._entSurveilAntType.grid(row=1,column=4,sticky='e')
         ttk.Label(frmCA,text='Loss: ').grid(row=2,column=0,sticky='w')
-        self._entCollectionAntLoss = ttk.Entry(frmCA,width=7)
-        self._entCollectionAntLoss.grid(row=2,column=1,sticky='w')
+        self._entSurveilAntLoss = ttk.Entry(frmCA,width=7)
+        self._entSurveilAntLoss.grid(row=2,column=1,sticky='w')
         ttk.Label(frmCA,text=" ").grid(row=2,column=2)
         ttk.Label(frmCA,text="XYZ: ").grid(row=2,column=3,sticky='e')
-        self._entCollectionAntXYZ = ttk.Entry(frmCA,width=15)
-        self._entCollectionAntXYZ.grid(row=2,column=4,sticky='e')
+        self._entSurveilAntXYZ = ttk.Entry(frmCA,width=15)
+        self._entSurveilAntXYZ.grid(row=2,column=4,sticky='e')
         # SCAN PATTERN SUB SECTION
         frmCS = ttk.LabelFrame(frmC,text='Scan Pattern')
         frmCS.grid(row=3,column=0,columnspan=5,sticky='nwse')
         ttk.Label(frmCS,text="Dwell: ").grid(row=0,column=0,sticky='w')
-        self._entCollectionScanDwell = ttk.Entry(frmCS,width=5)
-        self._entCollectionScanDwell.grid(row=0,column=2,sticky='w')
+        self._entSurveilScanDwell = ttk.Entry(frmCS,width=5)
+        self._entSurveilScanDwell.grid(row=0,column=2,sticky='w')
         ttk.Label(frmCS,text=" ").grid(row=0,column=3)
         ttk.Label(frmCS,text="Start: ").grid(row=0,column=4,sticky='e')
-        self._entCollectionScanStart = ttk.Entry(frmCS,width=3)
-        self._entCollectionScanStart.grid(row=0,column=5,sticky='w')
+        self._entSurveilScanStart = ttk.Entry(frmCS,width=3)
+        self._entSurveilScanStart.grid(row=0,column=5,sticky='w')
         ttk.Label(frmCS,text="Scan: ").grid(row=1,column=0,sticky='w')
-        self._entCollectionScanScan = ttk.Entry(frmCS,width=12)
-        self._entCollectionScanScan.grid(row=1,column=2,sticky='w')
+        self._entSurveilScanScan = ttk.Entry(frmCS,width=12)
+        self._entSurveilScanScan.grid(row=1,column=2,sticky='w')
         ttk.Label(frmCS,text=" ").grid(row=1,column=3)
         ttk.Label(frmCS,text="Pass: ").grid(row=1,column=4,sticky='w')
-        self._entCollectionScanPass = ttk.Entry(frmCS,width=12)
-        self._entCollectionScanPass.grid(row=1,column=5,sticky='e')
+        self._entSurveilScanPass = ttk.Entry(frmCS,width=12)
+        self._entSurveilScanPass.grid(row=1,column=5,sticky='e')
         self._vcpause = tk.IntVar()
         ttk.Checkbutton(frmCS,text="Paused",variable=self._vcpause).grid(row=2,column=0,columnspan=2)
-        nb.add(frmC,text='Collection')
+        nb.add(frmC,text='Surveillance')
 
         # GPS Tab Configuration
         # use a checkbutton & two subframes to differentiate betw/ fixed & dyanmic
@@ -1720,46 +1720,46 @@ class DySKTConfigPanel(gui.ConfigPanel):
         if cp.has_option('Recon','paused'):
             if cp.getboolean('Recon','paused'): self._vrpause.set(1)
 
-        # then the collection radio details
-        self._entCollectionNic.delete(0,tk.END)
-        if cp.has_option('Collection','nic'):
-            self._entCollectionNic.insert(0,cp.get('Collection','nic'))
-        self._entCollectionSpoof.delete(0,tk.END)
-        if cp.has_option('Collection','spoof'):
-            self._entCollectionSpoof.insert(0,cp.get('Collection','spoof'))
-        self._entCollectionDesc.delete(1.0,tk.END)
-        if cp.has_option('Collection','desc'):
-            self._entCollectionDesc.insert(tk.END,cp.get('Collection','desc'))
-        self._entCollectionAntNum.delete(0,tk.END)
-        if cp.has_option('Collection','antennas'):
-            self._entCollectionAntNum.insert(0,cp.get('Collection','antennas'))
-        self._entCollectionAntGain.delete(0,tk.END)
-        if cp.has_option('Collection','antenna_gain'):
-            self._entCollectionAntGain.insert(0,cp.get('Collection','antenna_gain'))
-        self._entCollectionAntType.delete(0,tk.END)
-        if cp.has_option('Collection','antenna_type'):
-            self._entCollectionAntType.insert(0,cp.get('Collection','antenna_type'))
-        self._entCollectionAntLoss.delete(0,tk.END)
-        if cp.has_option('Collection','antenna_loss'):
-            self._entCollectionAntLoss.insert(0,cp.get('Collection','antenna_loss'))
-        self._entCollectionAntXYZ.delete(0,tk.END)
-        if cp.has_option('Collection','antenna_xyz'):
-            self._entCollectionAntXYZ.insert(0,cp.get('Collection','antenna_xyz'))
-        self._entCollectionScanDwell.delete(0,tk.END)
-        if cp.has_option('Collection','dwell'):
-            self._entCollectionScanDwell.insert(0,cp.get('Collection','dwell'))
-        self._entCollectionScanStart.delete(0,tk.END)
-        if cp.has_option('Collection','scan_start'):
-            self._entCollectionScanStart.insert(0,cp.get('Collection','scan_start'))
-        self._entCollectionScanScan.delete(0,tk.END)
-        if cp.has_option('Collection','scan'):
-            self._entCollectionScanScan.insert(0,cp.get('Collection','scan'))
-        self._entCollectionScanPass.delete(0,tk.END)
-        if cp.has_option('Collection','pass'):
-            self._entCollectionScanPass.insert(0,cp.get('Collection','pass'))
+        # then the surveillance radio details
+        self._entSurveilNic.delete(0,tk.END)
+        if cp.has_option('Surveillance','nic'):
+            self._entSurveilNic.insert(0,cp.get('Surveillance','nic'))
+        self._entSurveilSpoof.delete(0,tk.END)
+        if cp.has_option('Surveillance','spoof'):
+            self._entSurveilSpoof.insert(0,cp.get('Surveillance','spoof'))
+        self._entSurveilDesc.delete(1.0,tk.END)
+        if cp.has_option('Surveillance','desc'):
+            self._entSurveilDesc.insert(tk.END,cp.get('Surveillance','desc'))
+        self._entSurveilAntNum.delete(0,tk.END)
+        if cp.has_option('Surveillance','antennas'):
+            self._entSurveilAntNum.insert(0,cp.get('Surveillance','antennas'))
+        self._entSurveilAntGain.delete(0,tk.END)
+        if cp.has_option('Surveillance','antenna_gain'):
+            self._entSurveilAntGain.insert(0,cp.get('Surveillance','antenna_gain'))
+        self._entSurveilAntType.delete(0,tk.END)
+        if cp.has_option('Surveillance','antenna_type'):
+            self._entSurveilAntType.insert(0,cp.get('Surveillance','antenna_type'))
+        self._entSurveilAntLoss.delete(0,tk.END)
+        if cp.has_option('Surveillance','antenna_loss'):
+            self._entSurveilAntLoss.insert(0,cp.get('Surveillance','antenna_loss'))
+        self._entSurveilAntXYZ.delete(0,tk.END)
+        if cp.has_option('Surveillance','antenna_xyz'):
+            self._entSurveilAntXYZ.insert(0,cp.get('Surveillance','antenna_xyz'))
+        self._entSurveilScanDwell.delete(0,tk.END)
+        if cp.has_option('Surveillance','dwell'):
+            self._entSurveilScanDwell.insert(0,cp.get('Surveillance','dwell'))
+        self._entSurveilScanStart.delete(0,tk.END)
+        if cp.has_option('Surveillance','scan_start'):
+            self._entSurveilScanStart.insert(0,cp.get('Surveillance','scan_start'))
+        self._entSurveilScanScan.delete(0,tk.END)
+        if cp.has_option('Surveillance','scan'):
+            self._entSurveilScanScan.insert(0,cp.get('Surveillance','scan'))
+        self._entSurveilScanPass.delete(0,tk.END)
+        if cp.has_option('Surveillance','pass'):
+            self._entSurveilScanPass.insert(0,cp.get('Surveillance','pass'))
         self._vcpause.set(0)
-        if cp.has_option('Collection','paused'):
-            if cp.getboolean('Collection','paused'): self._vcpause.set(1)
+        if cp.has_option('Surveillance','paused'):
+            if cp.getboolean('Surveillance','paused'): self._vcpause.set(1)
 
         # gps entries
         try:
@@ -1875,35 +1875,35 @@ class DySKTConfigPanel(gui.ConfigPanel):
             self.err("Invalid Recon Input",e)
             return False
 
-        # then collection radio details
-        nic = self._entCollectionNic.get()
+        # then surveillance radio details
+        nic = self._entSurveilNic.get()
         if nic:
             if not nic in iwt.wifaces(): self.warn("Not Found","Radio may not be wireless")
-            spoof = self._entCollectionSpoof.get().upper()
+            spoof = self._entSurveilSpoof.get().upper()
             if spoof and re.match(MACADDR,spoof) is None:
-                self.err("Invalid Colleciton Input","Spoofed MAC address is not valid")
+                self.err("Invalid Surveillance Input","Spoofed MAC address is not valid")
                 return False
 
             # process the antennas - if antenna number is > 0 then force validation of
             # all antenna widgets
-            if self._entCollectionAntNum.get():
+            if self._entSurveilAntNum.get():
                 try:
-                    nA = int(self._entCollectionAntNum.get())
+                    nA = int(self._entSurveilAntNum.get())
                     if nA:
                         try:
-                            if len(map(float,self._entCollectionAntGain.get().split(','))) != nA:
+                            if len(map(float,self._entSurveilAntGain.get().split(','))) != nA:
                                 raise DySKTConfigException("Number of gain is invalid")
                         except ValueError:
                             raise DySKTConfigException("Gain must be float or list of floats")
-                        if len(self._entCollectionAntType.get().split(',')) != nA:
+                        if len(self._entSurveilAntType.get().split(',')) != nA:
                             raise DySKTConfigException("Number of types is invalid")
                         try:
-                            if len(map(float,self._entCollectionAntLoss.get().split(','))) != nA:
+                            if len(map(float,self._entSurveilAntLoss.get().split(','))) != nA:
                                 raise DySKTConfigException("Number of loss is invalid")
                         except:
                             raise DySKTConfigException("Loss must be float or list of floats")
                         try:
-                            xyzs = self._entCollectionAntXYZ.get().split(',')
+                            xyzs = self._entSurveilAntXYZ.get().split(',')
                             if len(xyzs) != nA:
                                 raise DySKTConfigException("Number of xyz is invalid")
                             for xyz in xyzs:
@@ -1914,19 +1914,19 @@ class DySKTConfigPanel(gui.ConfigPanel):
                         except ValueError:
                             raise DySKTConfigException("XYZ must be integer")
                 except ValueError:
-                    self.err("Invalid Collection Input","Number of antennas must be numeric")
+                    self.err("Invalid Surveillance Input","Number of antennas must be numeric")
                     return False
                 except DySKTConfigException as e:
-                    self.err("Invalid Collection Input",e)
+                    self.err("Invalid Surveillance Input",e)
                     return False
 
             # process scan patterns
             try:
-                float(self._entCollectionScanDwell.get())
+                float(self._entSurveilScanDwell.get())
             except:
-                self.err("Invalid Collection Input", "Scan dwell must be float")
+                self.err("Invalid Surveillance Input", "Scan dwell must be float")
                 return False
-            start = self._entCollectionScanStart.get()
+            start = self._entSurveilScanStart.get()
             try:
                 if start:
                     if ':' in start: ch,chw = start.split(':')
@@ -1937,16 +1937,16 @@ class DySKTConfigPanel(gui.ConfigPanel):
                     if chw and not chw in iw.IW_CHWS:
                         raise RuntimeError("Specified channel width is not valid")
             except ValueError:
-                self.err("Invalid Collection Input", "Scan start must be integer")
+                self.err("Invalid Surveillance Input", "Scan start must be integer")
                 return False
             except Exception as e:
-                self.err("Invalid Collection Input",e)
+                self.err("Invalid Surveillance Input",e)
                 return False
             try:
-                parsechlist(self._entCollectionScanScan.get(),'scan')
-                parsechlist(self._entCollectionScanPass.get(),'pass')
+                parsechlist(self._entSurveilScanScan.get(),'scan')
+                parsechlist(self._entSurveilScanPass.get(),'pass')
             except ValueError as e:
-                self.err("Invalid Collection Input",e)
+                self.err("Invalid Surveillance Input",e)
                 return False
 
         # gps - only process enabled widgets
@@ -2042,25 +2042,25 @@ class DySKTConfigPanel(gui.ConfigPanel):
             cp.set('Recon','scan',self._entReconScanScan.get())
             cp.set('Recon','pass',self._entReconScanPass.get())
             cp.set('Recon','scan_start',self._entReconScanStart.get())
-            if self._entCollectionNic.get():
-                cp.add_section('Collection')
-                cp.set('Collection','nic',self._entCollectionNic.get())
-                cp.set('Collection','paused','on' if self._vcpause.get() else 'off')
-                if self._entCollectionSpoof.get():
-                    cp.set('Collection','spoof',self._entCollectionSpoof.get())
-                nA = self._entCollectionAntNum.get()
+            if self._entSurveilNic.get():
+                cp.add_section('Surveillance')
+                cp.set('Surveillance','nic',self._entSurveilNic.get())
+                cp.set('Surveillance','paused','on' if self._vcpause.get() else 'off')
+                if self._entSurveilSpoof.get():
+                    cp.set('Surveillance','spoof',self._entSurveilSpoof.get())
+                nA = self._entSurveilAntNum.get()
                 if nA:
-                    cp.set('Collection','antennas',self._entCollectionAntNum.get())
-                    cp.set('Collection','antenna_gain',self._entCollectionAntGain.get())
-                    cp.set('Collection','antenna_loss',self._entCollectionAntLoss.get())
-                    cp.set('Collection','antenna_type',self._entCollectionAntType.get())
-                    cp.set('Collection','antenna_xyz',self._entCollectionAntXYZ.get())
-                desc = self._entCollectionDesc.get(1.0,tk.END).strip()
-                if desc: cp.set('Collection','desc',desc)
-                cp.set('Collection','dwell',self._entCollectionScanDwell.get())
-                cp.set('Collection','scan',self._entCollectionScanScan.get())
-                cp.set('Collection','pass',self._entCollectionScanPass.get())
-                cp.set('Collection','scan_start',self._entCollectionScanStart.get())
+                    cp.set('Surveillance','antennas',self._entSurveilAntNum.get())
+                    cp.set('Surveillance','antenna_gain',self._entSurveilAntGain.get())
+                    cp.set('Surveillance','antenna_loss',self._entSurveilAntLoss.get())
+                    cp.set('Surveillance','antenna_type',self._entSurveilAntType.get())
+                    cp.set('Surveillance','antenna_xyz',self._entSurveilAntXYZ.get())
+                desc = self._entSurveilDesc.get(1.0,tk.END).strip()
+                if desc: cp.set('Surveillance','desc',desc)
+                cp.set('Surveillance','dwell',self._entSurveilScanDwell.get())
+                cp.set('Surveillance','scan',self._entSurveilScanScan.get())
+                cp.set('Surveillance','pass',self._entSurveilScanPass.get())
+                cp.set('Surveillance','scan_start',self._entSurveilScanStart.get())
             cp.add_section('GPS')
             fixed = self.vfixed.get()
             cp.set('GPS','fixed','yes' if fixed else 'no')
@@ -2132,7 +2132,7 @@ class AboutPanel(gui.SimplePanel):
         ttk.Label(self,text="wraith-rt %s" % wraith.__version__,
                   font=("Roman",16,'bold')).grid(row=1,column=0,sticky='n')
         ttk.Label(self,justify=tk.CENTER,
-                  text="Wireless reconnaissance, collection,\nassault and exploitation toolkit",
+                  text="Wireless Reconnaissance And\nIntelligent Target Harvesting",
                   font=("Roman",8,'bold')).grid(row=2,column=0,sticky='n')
         ttk.Label(self,text="Copyright %s %s %s" % (COPY,
                                                     wraith.__date__.split(' ')[1],

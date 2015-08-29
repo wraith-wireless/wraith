@@ -12,8 +12,8 @@ messages from client will be in the following format
  where:
   id is an integer (unique)
   cmd is oneof {state|scan|hold|listen|pause|txpwr|spoof}
-  radio is oneof {both|all|recon|collection} where both enforces recon and
-   collection radio and all does not
+  radio is oneof {both|all|recon|surveillance} where both enforces recon and
+   surveillance radio and all does not
   param is:
    o of the format channel:width if cmd is listen where width is oneof {'None','HT20','HT40+','HT40-'}
    o of the format pwr:option where pwr is in dBm and option is oneof {fixed|auto|limit}
@@ -255,8 +255,8 @@ class DySKT(object):
         self._rto = None            # data collation/forwarding
         self._rr = None             # recon radio
         self._rbuffer = None        # recon radio buffer
-        self._cr = None             # collection radio
-        self._cbuffer = None        # collection radio buffer
+        self._sr = None             # surveillance radio
+        self._sbuffer = None        # surveillance radio buffer
         self._rd = None             # regulatory domain
         self._c2c = None            # our c2c
 
@@ -271,7 +271,7 @@ class DySKT(object):
 
         # initialize, quit on failure
         logging.info("**** Starting DySKT %s ****",dyskt.__version__)
-        self._create()
+        self._sreate()
         if self.state == DYSKT_INVALID:
             # make sure we do not leave system in corrupt state (i.e. w/o nics)
             self._destroy()
@@ -295,14 +295,14 @@ class DySKT(object):
                     if l == 'err':
                         # only process errors invovled during execution
                         if DYSKT_CREATED < self.state < DYSKT_EXITING:
-                            # continue w/out collection if it fails
-                            if o == 'collection':
-                                logging.warning("Collection radio dropped: %s",m)
-                                self._pConns['collection'].send('!STOP!')
-                                self._pConns['collection'].close()
-                                del self._pConns['collection']
+                            # continue w/out surveillance if it fails
+                            if o == 'surveillance':
+                                logging.warning("Surveillance radio dropped: %s",m)
+                                self._pConns['surveillance'].send('!STOP!')
+                                self._pConns['surveillance'].close()
+                                del self._pConns['surveillance']
                                 mp.active_children()
-                                self._cr = None
+                                self._sr = None
                             else:
                                 logging.error("%s failed (%s) %s",o,t,m)
                                 self.stop()
@@ -360,15 +360,15 @@ class DySKT(object):
 
             # create circular buffers
             self._rbuffer = memoryview(mp.Array('B',M*N,lock=False))
-            if self._conf['collection']:
-                self._cbuffer = memoryview(mp.Array('B',M*N,lock=False))
+            if self._conf['surveillance']:
+                self._sbuffer = memoryview(mp.Array('B',M*N,lock=False))
 
             # start RTO first (IOT accept comms from the radios)
             logging.info("Initializing subprocess...")
             logging.info("Starting RTO...")
             (conn1,conn2) = mp.Pipe()
             self._pConns['rto'] = conn1
-            self._rto = RTO(self._ic,conn2,self._cbuffer,self._rbuffer,self._conf)
+            self._rto = RTO(self._ic,conn2,self._sbuffer,self._rbuffer,self._conf)
             logging.info("RTO started")
 
             # set the region? if so, do it prior to starting the radio(s)
@@ -390,20 +390,20 @@ class DySKT(object):
             self._rr = RadioController(self._ic,conn2,self._rbuffer,self._conf['recon'])
             logging.info("Reconnaissance Radio started in %s mode",mode)
 
-            # collection if present
-            if self._conf['collection']:
+            # surveillance if present
+            if self._conf['surveillance']:
                 try:
-                    mode = 'paused' if self._conf['collection']['paused'] else 'scan'
-                    logging.info("Starting Collection Radio...")
+                    mode = 'paused' if self._conf['surveillance']['paused'] else 'scan'
+                    logging.info("Starting Surveillance Radio...")
                     (conn1,conn2) = mp.Pipe()
-                    self._pConns['collection'] = conn1
-                    self._cr = RadioController(self._ic,conn2,
-                                               self._cbuffer,self._conf['collection'])
+                    self._pConns['surveillance'] = conn1
+                    self._sr = RadioController(self._ic,conn2,
+                                               self._sbuffer,self._conf['surveillance'])
                 except RuntimeError as e:
                     # continue without collector, but log it
-                    logging.warning("Collection Radio failed: %s, continuing w/out",e)
+                    logging.warning("Surveillance Radio failed: %s, continuing w/out",e)
                 else:
-                    logging.info("Collection Radio started in %s mode",mode)
+                    logging.info("Surveillance Radio started in %s mode",mode)
 
             # c2c socket -> on failure log it and keep going
             logging.info("Starting C2C...")
@@ -430,7 +430,7 @@ class DySKT(object):
             # start children execution
             self._state = DYSKT_CREATED
             self._rr.start()
-            if self._cr: self._cr.start()
+            if self._sr: self._sr.start()
             self._rto.start()
 
     def _destroy(self):
@@ -483,14 +483,14 @@ class DySKT(object):
             # read in the recon radio configuration
             self._conf['recon'] = self._readradio(cp,'Recon')
             try:
-                # catch any collection exceptions and log a warning
-                if cp.has_section('Collection'):
-                    self._conf['collection'] = self._readradio(cp,'Collection')
+                # catch any surveillance exceptions and log a warning
+                if cp.has_section('Surveillance'):
+                    self._conf['surveillance'] = self._readradio(cp,'Surveillance')
                 else:
-                    self._conf['collection'] = None
-                    logging.info("No collection radio specified")
+                    self._conf['surveillance'] = None
+                    logging.info("No surveillance radio specified")
             except (ConfigParser.NoSectionError,ConfigParser.NoOptionError,RuntimeError,ValueError):
-                logging.warning("Invalid collection specification. Continuing without...")
+                logging.warning("Invalid surveillance specification. Continuing without...")
 
             # GPS section
             self._conf['gps'] = {}
@@ -673,17 +673,17 @@ class DySKT(object):
 
         radios = []
         radio = tkns[2].strip().lower()
-        if radio not in ['both','all','recon','collection']:
+        if radio not in ['both','all','recon','surveillance']:
             self._pConns['c2c'].send("ERR %d \001invalid radio specification: %s \001\n" % (cmdid,radio))
             return None,None,None,None
 
         if radio == 'all':
             radios = ['recon']
-            if self._cr is not None: radios.append('collection')
-        elif radio == 'both': radios = ['recon','collection']
+            if self._sr is not None: radios.append('surveillance')
+        elif radio == 'both': radios = ['recon','surveillance']
         else: radios = [radio]
-        if 'collection' in radios and self._cr is None:
-            self._pConns['c2c'].send("ERR %d \001collection radio not present\001\n" % cmdid)
+        if 'surveillance' in radios and self._sr is None:
+            self._pConns['c2c'].send("ERR %d \001surveillance radio not present\001\n" % cmdid)
             return None,None,None,None
 
         # ensure any params are valid

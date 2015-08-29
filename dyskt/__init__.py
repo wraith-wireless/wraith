@@ -2,13 +2,10 @@
 
 """ dyskt: Dynamic Small Kill Team (Wraith Sensor)
 
-DySKT is a 802.11 sensor consisting of an optional collection radio (i.e.
-spotter), a mandatory reconnaissance radio (i.e. shooter) and an RTO which relays
-collected data to Nidus, the data storage system (i.e. HQ). DySKT collects data
-in the form of raw 802.11 packets with the reconnaissance (and collection if
-present) radios, forwarding that date along with any geolocational data (if a
-gps device is present) to higher. The reconnaissance radio will also partake in
-assaults in directed to.
+DySKT is a 802.11 sensor consisting of an optional surveillance radio, a mandatory
+reconnaissance radio and an RTO which relays collected data to the backend database.
+DySKT collects data in the form of raw 802.11 packets, along with any geolocational
+data (if a gps device is present).
 
 REVISIONS:
 dyskt 0.1.4

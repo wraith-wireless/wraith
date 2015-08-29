@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """ wraith
-Wireless assault, reconnaissance, collection and exploitation toolkit.
+Wireless Reconnaissance And Intelligent Target Harvesting.
 
 Requires:
  linux (preferred 3.x kernel)

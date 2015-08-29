@@ -1,5 +1,5 @@
 ![](widgets/icons/wraith-banner.png?raw=true)
-# WRAITH: Wireless Reconnaissance, Analysis, Intelligent Target Harvesting.
+# WRAITH: Wireless Reconnaissance And Intelligent Target Harvesting.
 
 > "You knew that I reap where I have not sown and gather where I scattered no seed."
 
@@ -46,10 +46,10 @@ Partial support of 802.11-2012
 
 ### b. DySKT (v 0.1.5) : Dynamic Small Kill Team (Wraith Sensor)
 
-An 802.11 sensor consisting of an optional collection radio (i.e. spotter), a
+An 802.11 sensor consisting of an optional surveillance radio (i.e. spotter), a
 mandatory reconnaissance radio (i.e. shooter) and an RTO which relays collected
 data to Nidus, the data storage system (i.e. HQ). DySKT collects data in the form
-of raw 802.11 packets with the reconnaissance (and collection if present) radios,
+of raw 802.11 packets with the reconnaissance (and surveillance if present) radios,
 forwarding that data along with any geolocational data (if a gps device is present)
 to higher.
 
