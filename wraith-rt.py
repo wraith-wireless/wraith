@@ -237,7 +237,7 @@ class WraithPanel(gui.MasterPanel):
             msgs.append((time.strftime('%H:%M:%S'),"Iyri running",gui.LOG_NOERR))
             self._setstate(_STATE_LYRI_)
         else:
-            msgs.append((time.strftime('%H:%M:%S'),"DySKt not running",gui.LOG_WARN))
+            msgs.append((time.strftime('%H:%M:%S'),"Iyri not running",gui.LOG_WARN))
 
         # set initial state to initialized
         self._setstate(_STATE_INIT_)

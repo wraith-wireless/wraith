@@ -3,7 +3,7 @@
 """ rdoctl.py: Radio Controller
 
 An interface to an underlying radio (wireless nic). Tunes and sniffs a radio
-forwarding data to the RTO.
+forwarding data to the Collator.
 """
 __name__ = 'rdoctl'
 __license__ = 'GPL v3.0'
@@ -23,14 +23,14 @@ import multiprocessing as mp           # for Process
 from wraith.radio import iw            # iw command line interface
 import wraith.radio.iwtools as iwt     # nic command line interaces
 from wraith.radio.mpdu import MAX_MPDU # maximum size of frame
-from wraith.dyskt.constants import *   # tuner states & buffer dims
+from wraith.iyri.constants import *    # tuner states & buffer dims
 
 class Tuner(threading.Thread):
     """ 'tunes' the radio's current channel and width """
     def __init__(self,q,conn,iface,scan,dwell,i,pause=False):
         """
          q: msg queue between RadioController and this Thread
-         conn: dyskt token connnection
+         conn: iyri token connnection
          iface: interface name of card
          scan: scan list of channel tuples (ch,chw)
          dwell: dwell list. for each i stay on ch in scan[i] for dwell[i]
@@ -39,7 +39,7 @@ class Tuner(threading.Thread):
         """
         threading.Thread.__init__(self)
         self._qR = q        # event queue to RadioController
-        self._cD = conn     # connection from DySKT to tuner
+        self._cI = conn     # connection from Iyri to tuner
         self._vnic = iface  # this radio's vnic
         self._chs = scan    # scan list
         self._ds = dwell    # corresponding dwell times
@@ -68,8 +68,8 @@ class Tuner(threading.Thread):
 
             # get timestamp
             ts1 = time.time()
-            if self._cD.poll(to): # get token and timestamp
-                tkn = self._cD.recv()
+            if self._cI.poll(to): # get token and timestamp
+                tkn = self._cI.recv()
                 ts = time.time()
 
                 # tokens will have 2 flavor's '!STOP!' and 'cmd:cmdid:params'
@@ -143,7 +143,7 @@ class RadioController(mp.Process):
     def __init__(self,comms,conn,buff,conf):
         """ initialize radio
          comms - internal communications
-         conn - connection to/from DysKT
+         conn - connection to/from Iyri
          buff - the circular buffer
          conf - radio configuration dict. Must have key->value pairs for keys role,
           nic, dwell, scan and pass and optionally for keys spoof, ant_gain, ant_type,
@@ -151,7 +151,7 @@ class RadioController(mp.Process):
         """
         mp.Process.__init__(self)
         self._icomms = comms      # communications queue
-        self._cD = conn           # message connection to/from DySKT
+        self._cI = conn           # message connection to/from Iyri
         self._buffer = buff       # buffer for frames
         self._qT = None           # queue between tuner and us
         self._hist = {}           # channel histogram
@@ -210,39 +210,39 @@ class RadioController(mp.Process):
                 except socket.timeout: continue
                 except socket.error as e:
                     self._icomms.put((self._vnic,time.time(),'!FAIL!',e))
-                    self._cD.send(('err',self._role,'Socket',e,))
+                    self._cI.send(('err',self._role,'Socket',e,))
                     break
                 except Exception as e:
                     # blanket 'don't know what happend' exception
                     self._icomms.put((self._vnic,time.time(),'!FAIL!',e))
-                    self._cD.send(('err',self._role,'Unknown',e))
+                    self._cI.send(('err',self._role,'Unknown',e))
                     break
             else:
                 # process the notification
                 if event == '!ERR!':
-                    # bad/failed command from user, notify DySKT
-                    if msg[0] > -1: self._cD.send(('cmderr',self._role,msg[0],msg[1]))
+                    # bad/failed command from user, notify Iyri
+                    if msg[0] > -1: self._cI.send(('cmderr',self._role,msg[0],msg[1]))
                 elif event == '!FAIL!':
                     self._icomms.put((self._vnic,ts,'!FAIL!',msg[1]))
                 elif event == '!STATE!':
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!HOLD!':
                     self._stuner = TUNE_HOLD
                     self._icomms.put((self._vnic,ts,'!HOLD!',msg[1]))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!SCAN!':
                     self._stuner = TUNE_SCAN
                     self._icomms.put((self._vnic,ts,'!SCAN!',msg[1]))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
                     #self._resethist()
                 elif event == '!LISTEN':
                     self._stuner = TUNE_LISTEN
                     self._icomms.put((self._vnic,ts,'!LISTEN!',msg[1]))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
                 elif event == '!PAUSE!':
                     self._stuner = TUNE_PAUSE
                     self._icomms.put((self._vnic,ts,'!PAUSE!',' '))
-                    if msg[0] > -1: self._cD.send(('cmdack',self._role,msg[0],msg[1]))
+                    if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
                 #elif event == '!CHANNEL!': self._hkey = msg[1]
                 #elif event == '!DWELL!':
                 #    self._resethist()
@@ -252,9 +252,9 @@ class RadioController(mp.Process):
         # shut down
         if not self._shutdown():
             try:
-                self._cD.send(('warn',self._role,'Shutdown',"Incomplete reset"))
+                self._cI.send(('warn',self._role,'Shutdown',"Incomplete reset"))
             except IOError:
-                # most likely DySKT already closed their side
+                # most likely Iyri already closed their side
                 pass
 
     @property
@@ -326,13 +326,13 @@ class RadioController(mp.Process):
         # determine virtual interface name
         ns = []
         for wiface in iwt.wifaces():
-            cs = wiface.split('dyskt')
+            cs = wiface.split('iyri')
             try:
                 if len(cs) > 1: ns.append(int(cs[1]))
             except ValueError:
                 pass
         n = 0 if not 0 in ns else max(ns)+1
-        self._vnic = "dyskt%d" % n
+        self._vnic = "iyri%d" % n
 
         # sniffing interface
         try:
@@ -425,9 +425,9 @@ class RadioController(mp.Process):
 
             # initialize tuner thread
             self._qT = Queue()
-            self._tuner = Tuner(self._qT,self._cD,self._vnic,scan,ds,ch_i,conf['paused'])
+            self._tuner = Tuner(self._qT,self._cI,self._vnic,scan,ds,ch_i,conf['paused'])
 
-            # notify RTO we are good
+            # notify Collator we are good
             self._icomms.put((self._vnic,uptime,'!UP!',self.radio))
         except socket.error as e:
             try:
@@ -499,7 +499,7 @@ class RadioController(mp.Process):
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
-            self._cD.close()
+            self._cI.close()
         except:
             clean = False
         return clean

@@ -32,21 +32,7 @@ def runningservice(pidfile):
         return False
 
 ## deprecated
-def nidusrunning(pidfile):
-    """
-     the following checks if nidus is running. Because it runs under python,
-     we cannot use ps easily, rather check the pidfile for a valid pid. Assumes
-     that nidus was executed using the service start
-    """
-    try:
-        # open the pid file and check running status with signal = 0
-        with open(pidfile) as fin: os.kill(int(fin.read()),0)
-        return True
-    except (TypeError,IOError,OSError):
-        return False
-
-## deprecated
-def dysktrunning(pidfile):
+def iyrirunning(pidfile):
     """ see nidusrunning """
     try:
         # open the pid file and check running status with signal = 0

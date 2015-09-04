@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" constants.py: defines contstants used by dyskt
+""" constants.py: defines contstants used by iyri
 """
 __name__ = 'constants'
 __license__ = 'GPL v3.0'
@@ -18,12 +18,12 @@ import re
 M = 1000     # number of rows for memory view
 N = MAX_MPDU # number of cols
 
-# dyskt states
-DYSKT_INVALID         = -1 # dyskt is unuseable
-DYSKT_CREATED         =  0 # dyskt is created but not yet started
-DYSKT_RUNNING         =  1 # dyskt is currently executing
-DYSKT_EXITING         =  5 # dyskt has finished execution loop
-DYSKT_DESTROYED       =  6 # dyskt is destroyed
+# iyri states
+IYRI_INVALID         = -1 # iyri is unuseable
+IYRI_CREATED         =  0 # iyri is created but not yet started
+IYRI_RUNNING         =  1 # iyri is currently executing
+IYRI_EXITING         =  5 # iyri has finished execution loop
+IYRI_DESTROYED       =  6 # iyri is destroyed
 
 # tuner states
 TUNE_DESC = ['scan','hold','pause','listen']

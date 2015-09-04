@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
-""" rto.py: collates and relays wraith sensor data
+""" collator.py: collates and relays wraith sensor data
 
 Processes and forwards 1) frames from the sniffer(s) 2) gps data (if any) collected
 by a pf and 3) messages from tuner(s) and sniffer(s0
 """
-__name__ = 'rto'
+__name__ = 'collate'
 __license__ = 'GPL v3.0'
 __version__ = '0.1.0'
 __date__ = 'August 2015'
@@ -33,7 +33,7 @@ class GPSPoller(threading.Thread):
     """ periodically checks gps for current location """
     def __init__(self,eq,conf):
         """
-         eq - event queue between rto and this Thread
+         eq - event queue between collator and this Thread
          conf - config file for gps
         """
         threading.Thread.__init__(self)
@@ -146,22 +146,22 @@ class GPSPoller(threading.Thread):
         # close out connection
         self._gpsd.close()
 
-class RTO(mp.Process):
-    """ RTO - handles further processing of raw frames from the sniffer """
+class Collator(mp.Process):
+    """ Collator - handles further processing of raw frames from the sniffer """
     def __init__(self,comms,conn,rb,sb,conf):
         """
-         initializes RTO
+         initializes Collator
          comms - internal communication
           NOTE: all messages sent on internal comms must be a tuple T where
            T = (sender callsign,timestamp of event,type of message,event message)
-         conn - connection to/from DySKT
+         conn - connection to/from Iyri
          rb - recon circular buffer
          sb - surveillance circular buffer
          conf - necessary config details
         """
         mp.Process.__init__(self)
         self._icomms = comms       # communications queue
-        self._cD = conn            # message connection to/from DySKT
+        self._cI = conn            # message connection to/from Iyri
         self._gconf = conf['gps']  # configuration for gps/datastore
         self._rb = rb              # recon buffer
         self._sb = sb              # surveillance buffer
@@ -196,7 +196,7 @@ class RTO(mp.Process):
                     self._gps = GPSPoller(self._qG,self._gconf)
                     self._gps.start()
                 except RuntimeError as e:
-                    self._cD.send(('warn','RTO','GPSD',"Failed to connnect: %s" %e))
+                    self._cI.send(('warn','Collator','GPSD',"Failed to connnect: %s" %e))
                     self._gps = None
         except psql.Error as e:
             # sensor submit failed, no point continuing
@@ -205,17 +205,17 @@ class RTO(mp.Process):
             else:
                 errmsg = "%s: %s" % (e.pgcode,e.pgerror)
             self._conn.rollback()
-            self._cD.send(('err','RTO','DB',errmsg))
+            self._cI.send(('err','Collator','DB',errmsg))
             return
         except Exception as e:
             self._conn.rollback()
-            self._cD.send(('err','RTO','Unknown',e))
+            self._cI.send(('err','Collator','Unknown',e))
 
         # execution loop
         while True:
             # TODO: convert all to select
-            # 1. anything from DySKT
-            if self._cD.poll() and self._cD.recv() == '!STOP!': break
+            # 1. anything from Iyri
+            if self._cI.poll() and self._cI.recv() == '!STOP!': break
 
             # 2. gps device/frontline trace?
             try:
@@ -226,13 +226,13 @@ class RTO(mp.Process):
                 elif t == '!DEV!':
                     try:
                         gpsid = msg['id']
-                        self._cD.send(('info','RTO','GPSD',"%s initiated" % gpsid))
+                        self._cI.send(('info','Collator','GPSD',"%s initiated" % gpsid))
                         self._submitgpsd(ts2iso(ts),True,msg)
                     except psql.OperationalError as e: # unrecoverable
-                        self._cD.send(('err','RTO','DB',"%s: %s" % (e.pgcode,e.pgerror)))
+                        self._cI.send(('err','Collator','DB',"%s: %s" % (e.pgcode,e.pgerror)))
                     except psql.Error as e: # possible incorrect semantics/syntax
                         self._conn.rollback()
-                        self._cD.send(('warn','RTO','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
+                        self._cI.send(('warn','Collator','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
 
             # 3. queued data from internal comms
             ev = msg = None
@@ -242,9 +242,9 @@ class RTO(mp.Process):
 
                 if ev == '!UP!':
                     # should be the 1st message we get from radio(s). Notify
-                    # DySKT, submit the new radio and it's antennas
+                    # Iyri, submit the new radio and it's antennas
                     rmap[cs] = msg['mac']
-                    self._cD.send(('info','RTO','Radio',"%s initiated" % cs))
+                    self._cI.send(('info','Collator','Radio',"%s initiated" % cs))
                     self._submitradio(ts,True,msg)
                     for i in xrange(msg['nA']):
                         self._submitantenna(ts,{'mac':msg['mac'],'idx':i,
@@ -255,54 +255,54 @@ class RTO(mp.Process):
                                                 'y':msg['y'][i],
                                                 'z':msg['z'][i]})
                 elif ev == '!FAIL!':
-                    # notify DySKT, submit faile & delete cs
+                    # notify Iyri, submit faile & delete cs
                     self._submitradioevent(ts,[rmap[cs],'fail',msg])
                     del rmap[cs]
                     del self._bulk[cs]
                 elif ev == '!SCAN!':
                     # compile the scan list into a string before sending
                     sl = ",".join(["%s:%s" % (c,w) for (c,w) in msg])
-                    self._cD.send(('info',cs,ev.replace('!',''),sl))
+                    self._cI.send(('info',cs,ev.replace('!',''),sl))
                     self._submitradioevent(ts,[rmap[cs],'scan',sl])
                 elif ev == '!LISTEN!':
-                    self._cD.send(('info',cs,ev.replace('!',''),msg))
+                    self._cI.send(('info',cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'listen',msg])
                 elif ev == '!HOLD!':
-                    self._cD.send(('info',cs,ev.replace('!',''),msg))
+                    self._cI.send(('info',cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'hold',msg])
                 elif ev == '!PAUSE!':
-                    self._cD.send(('info',cs,ev.replace('!',''),msg))
+                    self._cI.send(('info',cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'pause',' '])
                 elif ev == '!SPOOF!':
-                    self._cD.send(('info',cs,ev.replace('!',''),msg))
+                    self._cI.send(('info',cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'spoof',msg])
                 elif ev == '!TXPWR!':
-                    self._cD.send(('info',cs,ev.replace('!',''),msg))
+                    self._cI.send(('info',cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'txpwr',msg])
                 #elif ev == '!DWELL!':
-                #    if msg: self._cD.send(('info',cs,ev.replace('!',''),msg))
+                #    if msg: self._cI.send(('info',cs,ev.replace('!',''),msg))
                 elif ev == '!FRAME!':
                     pass
-                else: # unidentified event type, notify dyskt
-                    self._cD.send(('warn','RTO','Radio',"unknown event %s" % ev))
+                else: # unidentified event type, notify iyri
+                    self._cI.send(('warn','Collator','Radio',"unknown event %s" % ev))
             except Empty: continue
             except psql.OperationalError as e: # unrecoverable
-                self._cD.send(('err','RTO','DB',"%s: %s" % (e.pgcode,e.pgerror)))
+                self._cI.send(('err','Collator','DB',"%s: %s" % (e.pgcode,e.pgerror)))
             except psql.Error as e: # possible incorrect semantics/syntax
                 self._conn.rollback()
-                self._cD.send(('warn','RTO','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
+                self._cI.send(('warn','Collator','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
             #except IndexError: # something wrong with antenna indexing
-            #    self._cD.send(('err','RTO',"Radio","misconfigured antennas"))
+            #    self._cI.send(('err','Collator',"Radio","misconfigured antennas"))
             except KeyError as e: # a radio sent a message without initiating
-                self._cD.send(('err','RTO','Radio %s' % e,"data out of order (%s)" % ev))
+                self._cI.send(('err','Collator','Radio %s' % e,"data out of order (%s)" % ev))
             #except Exception as e: # handle catchall error
-            #    self._cD.send(('err','RTO','Unknown',e))
+            #    self._cI.send(('err','Collator','Unknown',e))
 
         # any bulked frames not yet sent?
         #for cs in rmap:
         #    ret = self._flushbulk(time.time(),rmap[cs],cs)
         #    if ret:
-        #        if ret: self._cD.send(('err','RTO','Nidus',ret))
+        #        if ret: self._cI.send(('err','Collator','Nidus',ret))
         #        break
 
         # notify Nidus of closing (radios,sensor,gpsd). hopefully no errors on send
@@ -314,9 +314,9 @@ class RTO(mp.Process):
         # shut down
         if not self._shutdown():
             try:
-                self._cD.send(('warn','RTO','Shutdown',"Incomplete shutdown"))
+                self._cI.send(('warn','Collator','Shutdown',"Incomplete shutdown"))
             except IOError:
-                # most likely DySKT closed its side of the pipe
+                # most likely Iyri closed its side of the pipe
                 pass
 
 #### private helper functions
@@ -335,23 +335,23 @@ class RTO(mp.Process):
             self._conn.commit()
         except psql.OperationalError as e:
             if e.__str__().find('connect') > 0:
-                raise RuntimeError('RTO:PostgreSQL:DB not running')
+                raise RuntimeError('Collator:PostgreSQL:DB not running')
             elif e.__str__().find('authentication') > 0:
-                raise RuntimeError('RTO:PostgreSQL:Invalid connection string')
+                raise RuntimeError('Collator:PostgreSQL:Invalid connection string')
             else:
-                raise RuntimeError('RTO:PostgreSQL:DB error: %s' % e)
+                raise RuntimeError('Collator:PostgreSQL:DB error: %s' % e)
         except Exception as e:
-            raise RuntimeError("RTO:Unknown:%s" % e)
+            raise RuntimeError("Collator:Unknown:%s" % e)
 
     def _shutdown(self):
         """ clean up. returns whether a full reset or not occurred """
         # try shutting down & resetting radio (if it failed we may not be able to)
         clean = True
         try:
-            # close backend connection and connection to DySKT
+            # close backend connection and connection to Iyri
             if self._curs: self._curs.close()
             if self._conn: self._conn.close()
-            self._cD.close()
+            self._cI.close()
 
             # stop GPSPoller
             if self._gps and self._gps.is_alive(): self._gps.stop()

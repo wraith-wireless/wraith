@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
-""" dyskt: Dynamic Small Kill Team (Wraith Sensor)
+""" iyri: Wraith Sensor
 
-DySKT is a 802.11 sensor consisting of an optional surveillance radio, a mandatory
-reconnaissance radio and an RTO which relays collected data to the backend database.
-DySKT collects data in the form of raw 802.11 packets, along with any geolocational
-data (if a gps device is present).
+Iyri is a 802.11 sensor consisting of an optional surveillance radio, a mandatory
+reconnaissance radio and a Collator which relays collected data to the backend
+database. Iryi collects/stores data in the form of raw 802.11 packets, along with
+any geolocational data (if a gps device is present).
 
 REVISIONS:
 dyskt 0.1.4
@@ -21,7 +21,7 @@ dyskt 0.1.4
 dyskt 0.1.5
  desc: utilizes a new internal communication SOP to streamline and simplify
   interprocess communications
- includes: dyskt 0.0.10 internal 0.0.1 rto 0.0.11 (previously collator) rdoctl 0.0.5
+ includes: dyskt 0.0.10 internal 0.0.1 rto 0.0.11, rdoctl 0.0.5
   dyskt.conf dyskt.log.conf dysktd
  changes:
   - streamlined inter-process communication methods/objects
@@ -68,7 +68,7 @@ dyskt 0.1.6
     o possibility of a never-ending scan on same channel when receiving tokens
      from DySKT
 
- dyskt 0.2.0
+ iyri 0.2.0
   desc: Utilizes a "circular buffer" IOT remove the inherent inefficiency from
    passing frame(s) through multiple connections and functions including the
    inefficiency involved in making frequent copies of the frame(s). Because
@@ -77,14 +77,15 @@ dyskt 0.1.6
    of bytes with a memoryview and using the socket.recv_from method to 'put'
    frames onto the "buffer". Children then utilize shared access to the "buffer"
    to process the frames accordingly.
-  includes: dyskt 0.1.0 rto 0.1.0 rdoctl 0.1.0 dyskt.conf dyskt.log.conf dysktd
+  includes: iyri 0.1.0 collator 0.1.0 rdoctl 0.1.0 iyri.conf iyri.log.conf iyrid
   changes:
+   - no longer passes data to storage manager, rather writes directly to db
    - uses a memoryview to hold captured frames in a circular buffer
 """
-__name__ = 'dyskt'
+__name__ = 'iyri'
 __license__ = 'GPL v3.0'
 __version__ = '0.2.0'
-__date__ = 'June 2015'
+__date__ = 'September 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'

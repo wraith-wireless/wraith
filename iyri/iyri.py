@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" dyskt.py: main process captures and collates raw 802.11-2012 traffic
+""" iyri.py: main process captures and collates raw 802.11-2012 traffic
 
 802.11-2012 sensor that collects raw 802.11 frames and gps data for processing
 by an external process. Provides c2c functionality via a socket on port 2526
@@ -18,15 +18,15 @@ messages from client will be in the following format
    o of the format channel:width if cmd is listen where width is oneof {'None','HT20','HT40+','HT40-'}
    o of the format pwr:option where pwr is in dBm and option is oneof {fixed|auto|limit}
    o a macaddr if cmd is spoof
-DySKT will notify the client if the cmd specified by id is invalid or valid with
+Iryi will notify the client if the cmd specified by id is invalid or valid with
  OK <id> or
  ERR <id> \001Reason for Failure\001
  if the command was invalid and no command id could be readm it will be set to ?
 
-Note: DySKT only allows one client connection at a time
+Note: Iryi only allows one client connection at a time
 """
 
-#__name__ = 'dyskt'
+#__name__ = 'iyri'
 __license__ = 'GPL v3.0'
 __version__ = '0.1.0'
 __date__ = 'August 2015'
@@ -47,16 +47,16 @@ import ConfigParser                             # reading configuration files
 import socket                                   # for the c2c server
 import threading                                # for the c2c server
 import select                                   # c2c & main loop
-from wraith import dyskt                        # for rev number, author
-from wraith.dyskt.rto import RTO                # the rto
-from wraith.dyskt.rdoctl import RadioController # Radio object etc
+from wraith import iyri                         # for rev number, author
+from wraith.iyri.collate import Collator        # the collator
+from wraith.iyri.rdoctl import RadioController  # Radio object etc
 from wraith.radio import channels               # channel specifications
 from wraith.radio import iw                     # channel widths and region set/get
 from wraith.radio.iwtools import wifaces        # check for interface presents
 from wraith.utils.cmdline import runningprocess # check for psql running
-from wraith.dyskt.constants import *            # buffer dims
+from wraith.iyri.constants import *             # buffer dims
 
-# auxiliary function - pulled out of DySKT class so it can be used elsewhere
+# auxiliary function - pulled out of Iryi class so it can be used elsewhere
 # with minimal hassle
 def parsechlist(pattern,ptype):
     """
@@ -107,13 +107,13 @@ def parsechlist(pattern,ptype):
 
 #### set up log -> have to configure absolute path
 GPATH = os.path.dirname(os.path.abspath(__file__))
-logpath = os.path.join(GPATH,'dyskt.log.conf')
+logpath = os.path.join(GPATH,'iyri.log.conf')
 logging.config.fileConfig(logpath)
 
 class C2CClientExit(Exception): pass
 class C2C(threading.Thread):
     """
-     A "threaded socket", facilitates communication betw/ DySKT and a client
+     A "threaded socket", facilitates communication betw/ Iryi and a client
       1) accepts one and only one client at a time
       2) is non-blocking (the listening socket)
       3) handles a very simple protocol based on kismet's (see above)
@@ -127,7 +127,7 @@ class C2C(threading.Thread):
           port: port to listen for connections on
         """
         threading.Thread.__init__(self)
-        self._cD = conn     # connection to/from DySKT
+        self._cD = conn     # connection to/from Iryi
         self._lp = port     # port to listen on
         self._sock = None   # the listen socket
         self._caddr = None  # the client addr
@@ -142,7 +142,7 @@ class C2C(threading.Thread):
                 elif self._sock and not self._caddr:
                     if self._accept():
                         logging.info("Client %s connected",self.clientstr)
-                        self._send("DySKT v%s\n" % dyskt.__version__)
+                        self._send("Iryi v%s\n" % iyri.__version__)
 
                 # prepare inputs
                 ins = [self._cD,self._csock] if self._csock else [self._cD]
@@ -150,7 +150,7 @@ class C2C(threading.Thread):
                 # block on inputs & process if present
                 rs,_,_ = select.select(ins,[],[],0.25)
                 if self._cD in rs:
-                    # token from DySKT
+                    # token from Iryi
                     tkn = self._cD.recv()
                     if tkn == '!STOP!': break
                     else: self._send(tkn)
@@ -233,26 +233,26 @@ class C2C(threading.Thread):
         except:
             return ""
 
-#### DySKT EXCEPTIONS
-class DySKTException(Exception): pass
-class DySKTConfException(DySKTException): pass
-class DySKTParamException(DySKTException): pass
-class DySKTRuntimeException(DySKTException): pass
+#### Iryi EXCEPTIONS
+class IryiException(Exception): pass
+class IryiConfException(IryiException): pass
+class IryiParamException(IryiException): pass
+class IryiRuntimeException(IryiException): pass
 
-class DySKT(object):
-    """ DySKT - primary process of the Wraith sensor """
+class Iryi(object):
+    """ Iryi - primary process of the Wraith sensor """
     def __init__(self,conf=None):
         """ initialize variables """
         # get parameters
-        self._cpath = conf if conf else os.path.join(GPATH,'dyskt.conf')
+        self._cpath = conf if conf else os.path.join(GPATH,'iyri.conf')
         
         # internal variables
-        self._state = DYSKT_INVALID # current state
-        self._conf = {}             # dyskt configuration dict
+        self._state = IYRI_INVALID # current state
+        self._conf = {}             # iyri configuration dict
         self._halt = None           # the stop event
         self._pConns = None         # token pipes for children (& c2c)
         self._ic = None             # internal comms queue
-        self._rto = None            # data collation/forwarding
+        self._collator = None            # data collation/forwarding
         self._rr = None             # recon radio
         self._rbuffer = None        # recon radio buffer
         self._sr = None             # surveillance radio
@@ -270,15 +270,15 @@ class DySKT(object):
         signal.signal(signal.SIGTERM,self.stop)  # kill -TERM stop
 
         # initialize, quit on failure
-        logging.info("**** Starting DySKT %s ****",dyskt.__version__)
+        logging.info("**** Starting Iryi %s ****",iyri.__version__)
         self._sreate()
-        if self.state == DYSKT_INVALID:
+        if self.state == IYRI_INVALID:
             # make sure we do not leave system in corrupt state (i.e. w/o nics)
             self._destroy()
-            raise DySKTRuntimeException("DySKT failed to initialize, shutting down")
+            raise IryiRuntimeException("Iryi failed to initialize, shutting down")
 
         # set state to running
-        self._state = DYSKT_RUNNING
+        self._state = IYRI_RUNNING
 
         # execution loop
         while not self._halt.is_set():
@@ -294,7 +294,7 @@ class DySKT(object):
                     l,o,t,m = r.recv()
                     if l == 'err':
                         # only process errors invovled during execution
-                        if DYSKT_CREATED < self.state < DYSKT_EXITING:
+                        if IYRI_CREATED < self.state < IYRI_EXITING:
                             # continue w/out surveillance if it fails
                             if o == 'surveillance':
                                 logging.warning("Surveillance radio dropped: %s",m)
@@ -323,20 +323,20 @@ class DySKT(object):
                         self._pConns['c2c'].send("OK %d \001%s\001\n" % (t,m))
                         logging.info('Command %d succeeded',t)
                 except Exception as e:
-                    logging.error("DySKT failed. %s->%s", type(e),e)
+                    logging.error("Iryi failed. %s->%s", type(e),e)
                     self.stop()
 
     # noinspection PyUnusedLocal
     def stop(self,signum=None,stack=None):
         """ stop execution """
-        if DYSKT_RUNNING <= self.state < DYSKT_EXITING:
-            logging.info("**** Stopping DySKT ****")
+        if IYRI_RUNNING <= self.state < IYRI_EXITING:
+            logging.info("**** Stopping Iryi ****")
             self._destroy()
 
     #### PRIVATE HELPERS
 
     def _create(self):
-        """ create DySKT and member processes """
+        """ create Iryi and member processes """
         # read in and validate the conf file
         self._readconf()
 
@@ -363,13 +363,13 @@ class DySKT(object):
             if self._conf['surveillance']:
                 self._sbuffer = memoryview(mp.Array('B',M*N,lock=False))
 
-            # start RTO first (IOT accept comms from the radios)
+            # start Collator first (IOT accept comms from the radios)
             logging.info("Initializing subprocess...")
-            logging.info("Starting RTO...")
+            logging.info("Starting Collator...")
             (conn1,conn2) = mp.Pipe()
-            self._pConns['rto'] = conn1
-            self._rto = RTO(self._ic,conn2,self._sbuffer,self._rbuffer,self._conf)
-            logging.info("RTO started")
+            self._pConns['collator'] = conn1
+            self._collator = Collator(self._ic,conn2,self._sbuffer,self._rbuffer,self._conf)
+            logging.info("Collator started")
 
             # set the region? if so, do it prior to starting the radio(s)
             rd = self._conf['local']['region']
@@ -420,23 +420,23 @@ class DySKT(object):
             # e should have the form "Major:Minor:Description"
             ms = e.message.split(':')
             logging.error("%s (%s) %s",ms[0],ms[1],ms[2])
-            self._state = DYSKT_INVALID
+            self._state = IYRI_INVALID
         except Exception as e:
             # catchall
             logging.error(e)
-            self._state = DYSKT_INVALID
+            self._state = IYRI_INVALID
         except OSError as e: pass
         else:
             # start children execution
-            self._state = DYSKT_CREATED
+            self._state = IYRI_CREATED
             self._rr.start()
             if self._sr: self._sr.start()
-            self._rto.start()
+            self._collator.start()
 
     def _destroy(self):
-        """ destroy DySKT cleanly """
+        """ destroy Iryi cleanly """
         # change our state
-        self._state = DYSKT_EXITING
+        self._state = IYRI_EXITING
 
         # reset regulatory domain if necessary
         if self._rd:
@@ -467,14 +467,14 @@ class DySKT(object):
         logging.info("Sub-processes stopped")
 
         # change our state
-        self._state = DYSKT_DESTROYED
+        self._state = IYRI_DESTROYED
 
     def _readconf(self):
         """ read in config file at cpath """
         logging.info("Reading configuration file...")
         cp = ConfigParser.RawConfigParser()
         if not cp.read(self._cpath):
-            raise DySKTConfException('%s is invalid' % self._cpath)
+            raise IryiConfException('%s is invalid' % self._cpath)
 
         # intialize conf to empty dict
         self._conf = {}
@@ -541,9 +541,9 @@ class DySKT(object):
                 if os.path.isfile(oui): self._conf['local']['oui'] = oui
                 else: logging.warning("OUI path does not exists. Ignoring")
         except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
-            raise DySKTConfException("%s" % e)
+            raise IryiConfException("%s" % e)
         except (RuntimeError,ValueError) as e:
-            raise DySKTConfException("%s" % e)
+            raise IryiConfException("%s" % e)
 
     # noinspection PyMethodMayBeStatic
     def _readradio(self,cp,rtype='Recon'):
@@ -714,16 +714,16 @@ class DySKT(object):
 
 if __name__ == '__main__':
     try:
-        logging.info("DySKT %s",dyskt.__version__)
-        skt = DySKT()
+        logging.info("Iryi %s",iyri.__version__)
+        skt = Iryi()
         skt.run()
-    except DySKTConfException as err:
+    except IryiConfException as err:
         logging.error("Configuration Error: %s",err)
-    except DySKTParamException as err:
+    except IryiParamException as err:
         logging.error("Parameter Error: %s",err)
-    except DySKTRuntimeException as err:
+    except IryiRuntimeException as err:
         logging.error("Runtime Error: %s",err)
-    except DySKTException as err:
+    except IryiException as err:
         logging.error("General Error: %s",err)
     except Exception as err:
         logging.exception("Unknown Error: %s",err)

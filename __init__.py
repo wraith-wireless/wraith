@@ -15,7 +15,7 @@ Requires:
  numpy 1.9.2
 
 wraith 0.0.2
- desc: dyskt,nidus are developmentally sound, begin work on gui
+ desc: iyri,nidus are developmentally sound, begin work on gui
  includes: wraith-rt. py,subpanels.py and wraith.conf (also all subdirectories etc)
  changes:
   GUI:
@@ -36,7 +36,7 @@ wraith 0.0.3
    - added a splash panel that initiates services
 
 wraith 0.0.4
- desc: developmental cycle: with two main components, dyskt the sensor and nidus
+ desc: developmental cycle: with two main components, iyri the sensor and nidus
   the storage manager
  includes:  wraith-rt.py, subpanels.py and wraith.conf (also all subdirectories etc)
  changes:
@@ -50,14 +50,18 @@ wraith 0.0.4
   - added context menu to right-click on databin buttons (option do nothing as of
     yet)
   - semantic change: made geo flt (front-line trace) as it better describes the data
-  - added a manual remove (with rm) of pidfile in dysktd and nidusd to handle
+  - added a manual remove (with rm) of pidfile in iyrid and nidusd to handle
     ubuntu's lack of --remove-pidfile and modified wraith.py (and utilities) as necessary
-  - added c2c functionality to dyskt
+  - added c2c functionality to iyri
 
  wraith 0.0.5
-  desc: concentration on single-platform system. Remove nidus and allow dyskt
-   sensor to communicate directly with postgresql.
+  desc: concentration on single-platform system. Remove nidus and allow sensor
+  to communicate directly with postgresql.
  includes:  wraith-rt.py, subpanels.py
+ changes:
+  - removed nidus service
+  - renamed iyri to iyri
+  - moved db writes to iyri
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
@@ -72,8 +76,8 @@ import os
 
 #### CONSTANTS
 
-BINS = "ABCDEFG"                        # data bin ids
-IYRILOG   = '/var/log/wraith/dyskt.log' # path to dyskt log
-IYRIPID   = '/var/run/dysktd.pid'       # path to dyskt pidfile
-WRAITHCONF = 'wraith.conf'              # path to wraith config file
-IYRICONF  = 'dyskt/dyskt.conf'          # path to dyskt config file
+BINS = "ABCDEFG"                       # data bin ids
+IYRILOG   = '/var/log/wraith/iyri.log' # path to iyri log
+IYRIPID   = '/var/run/iyrid.pid'       # path to iyri pidfile
+WRAITHCONF = 'wraith.conf'             # path to wraith config file
+IYRICONF  = 'iyri/iyri.conf'           # path to iyri config file
