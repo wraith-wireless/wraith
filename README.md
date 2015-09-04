@@ -50,7 +50,6 @@ DySKT is a 802.11 sensor consisting of an optional surveillance radio, a mandato
 reconnaissance radio and an RTO which relays collected data to the backend database.
 DySKT collects data in the form of raw 802.11 packets, along with any geolocational
 data (if a gps device is present).
-
 ~~### c. Nidus (v 0.0.6): Data Storage Manager~~
 
 ~~Nidus is the Data Storage manager processing data received from DySKT. Nidus is the~~
