@@ -17,9 +17,6 @@ administrators with the ability to view their network(s) from a bird's eye view 
 drill down as necessary to a single device. Wraith allows the user to decide what
 data to view, how to view it and 'when' to view it.
 
-~~Once the reconnaissance and collection development is stable, assault plug-ins will
-be developed to aid WLAN administrators in the security testing of their networks.~~
-
 ## 2. REQUIREMENTS: 
  * linux (preferred 3.x kernel, tested on 3.13.0-43)
    - NOTE: some cards i.e. rosewill usb nics were not fully supported through iw
@@ -30,9 +27,8 @@ be developed to aid WLAN administrators in the security testing of their network
  * pyscopg 2.6
  * mgrs 1.1
  * macchanger 1.7.0
- * ~~lxml 3.4.4~~
 
-## 3. MODULES: Currently consists of ~~four~~ three components/modules
+## 3. MODULES: Currently consists of three components/modules
 
 ###  a. Radio (v 0.0.4): 802.11 network interface objects and functions
 
@@ -44,18 +40,12 @@ Partial support of 802.11-2012
 * Partially Supported: 802.11n
 * Not Supported: 802.11s\y\u\ac\ad\af
 
-### b. DySKT (v 0.1.5) : Dynamic Small Kill Team (Wraith Sensor)
+### b. Iryi (v 0.1.5) : Wraith Sensor
 
-DySKT is a 802.11 sensor consisting of an optional surveillance radio, a mandatory
-reconnaissance radio and an RTO which relays collected data to the backend database.
-DySKT collects data in the form of raw 802.11 packets, along with any geolocational
-data (if a gps device is present).
-~~### c. Nidus (v 0.0.6): Data Storage Manager~~
-
-~~Nidus is the Data Storage manager processing data received from DySKT. Nidus is the~~
-~~interface to the backend Postgresql database, processing data in terms of raw 802.11~~
-~~frames, gps location, and 'device' details/status.~~
-
+Iryi is a 802.11 sensor consisting of an optional surveillance radio, a mandatory
+reconnaissance radio and an Collator which relays collected data to the backend
+database. Iryi collects data in the form of raw 802.11 packets, along with any
+geolocational data (if a gps device is present).
 
 ### d. wraith-rt: GUI
 
@@ -94,21 +84,11 @@ and editing of configuration files, some manipulation of backened storage.
      - channels.py      802.11 channel, freq utilities
      - mcs.py           mcs index functions
      - oui.py           oui/manuf related functions
- *  dyskt               subpackage for wraith sensor
-     - \_\_init\_\_.py  initialize dyskt package
-     - dyskt.conf       configuration file for dyskt
-     - dyskt.log.conf   configuration file for dyskt logging
-     - dyskt.py         primary module
+ *  iyri                subpackage for wraith sensor
+     - \_\_init\_\_.py  initialize iyri package
+     - iyri.conf        configuration file for iyri
+     - iyri.log.conf    configuration file for iyri logging
+     - iyri.py          primary module
      - rdoctl.py        radio controler with tuner, sniffer
      - rto.py           data collation and forwarding
-     - dysktd           dyskt daemon
- *  ~~nidus               subpackage for datamanager~~
-     - ~~\_\_init\_\_.py  initialize nidus package~~
-     - ~~nidus.conf       nidus configuration~~
-     - ~~nidus.log.conf   nidus logging configuration~~
-     - ~~nidus.py         nidus server~~
-     - ~~nmp.py           nidus protocol definition~~
-     - ~~nidusdb.py       interface to storage system~~
-     - ~~sse.py           frame/metaframe processing~~
-     - nidus.sql        sql tables definition
-     - ~~nidusd           nidus daemon~~
+     - iyrid            iyri daemon

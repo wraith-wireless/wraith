@@ -72,14 +72,8 @@ import os
 
 #### CONSTANTS
 
-BINS = "ABCDEFG"                         # data bin ids
-NIDUSLOG   = '/var/log/wraith/nidus.log' # path to nidus log
-DYSKTLOG   = '/var/log/wraith/dyskt.log' # path to dyskt log
-NIDUSPID   = '/var/run/nidusd.pid'       # path to nidus pidfile
-DYSKTPID   = '/var/run/dysktd.pid'       # path to dyskt pidfile
-WRAITHCONF = 'wraith.conf'               # path to wraith config file
-NIDUSCONF  = 'nidus/nidus.conf'          # path to nidus config file
-DYSKTCONF  = 'dyskt/dyskt.conf'          # path to dyskt config file
-# path to tls cert,key
-NIDUSCERT  = os.path.join(os.path.dirname(os.path.abspath(__file__)),'nidus.cert')
-NIDUSKEY   = os.path.join(os.path.dirname(os.path.abspath(__file__)),'nidus.key')
+BINS = "ABCDEFG"                        # data bin ids
+IYRILOG   = '/var/log/wraith/dyskt.log' # path to dyskt log
+IYRIPID   = '/var/run/dysktd.pid'       # path to dyskt pidfile
+WRAITHCONF = 'wraith.conf'              # path to wraith config file
+IYRICONF  = 'dyskt/dyskt.conf'          # path to dyskt config file

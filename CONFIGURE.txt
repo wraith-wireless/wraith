@@ -35,16 +35,12 @@ postgres=# CREATE EXTENSION btree_gist;
    o tix
 
 3) Configure system for use
- - Set up daemons
-   o dysktd
-     1) copy <pathtowraith>/dyskt/dysktd to /etc/init.d
+ - Set up sensor daemon
+   o iyrid
+     1) copy <pathtowraith>/iyri/iyrid to /etc/init.d
      2) change ownership to root/root (if necessary)
-     3) make dyskt.py executable (change permissions of dyskt.py to 755)
-   o nidusd
-     1) copy <pathtowraith>/nidus/nidusd to /etc/init.d
-     2) change ownership to root/root (if necessary)
-     3) make nidus.py executable (change permissions of nidus.py to 755)
-   o verify both do not start on boot (unless desired)
+     3) make iyri.py executable (change permissions of iyri.py to 755)
+     4) verify iyri does not start on boot (unless desired)
  
   - Set up logs
      cd /var/logs
@@ -52,15 +48,14 @@ postgres=# CREATE EXTENSION btree_gist;
      sudo chown <user>:adm wraith
      chmod 750 wraith
      cd wraith
-     touch dyskt.log
-     touch nidus.log
+     touch iyri.log
 
-  - Configure DySKT. DySKT requires root privleges to a) bind to the raw socket
+  - Configure Iyri. Iyri requires root privleges to a) bind to the raw socket
     and b) set nic properities i.e. execute macchanger, iw, iwconfig and ifconfig.
     There are two options:
-     o run dyskt as root (use current dysktd)
-     o If you're not comfortable running dyskt as root, it can be run as a user
-       (use dysktd_asuser) which also requires the following:
+     o run iyri as root (use current iyrid)
+     o If you're not comfortable running iyri as root, it can be run as a user
+       which requires the following:
       * configure iw, iwconfig, ifconfig and macchanger in /etc/sudoers
         # Cmnd alias specification
         Cmnd_Alias	IWCONFIG = /sbin/iwconfig
@@ -75,13 +70,17 @@ postgres=# CREATE EXTENSION btree_gist;
         <user> ALL=NOPASSWD:MACCHANGER
   
        Then run 'sudo service sudo restart'
-     * We also need to give the python interpreter set raw capability in order to
-       bind the raw socket. Using dysktd_asuser, the dyskt daemon, will set raw
-       capabilities temporarily and then remove the permission after dyskt has
-       bound to the raw socket
+     * You also need to give the python interpreter set raw capability in order to
+       bind the raw socket. Configure the iyri daemon, to set raw capabilities
+       temporarily and then remove the permission after iyri has bound to the
+       raw socket by setting do_start to the following:
 
-  - configure ssl
-   o openssl req -new -x509 -days 365 -nodes -out nidus.cert -keyout nidus.key
-     * save nidus.cert and nidus.key in the toplevel wraith folder
-       NOTE: wraith/__init__.py is configured to set variables for nidus.cert and
-        nidus.key. Change this for your configuration.
+       do_start() {
+           log_daemon_msg "Setting capability cap_net_raw"
+           setcap cap_net_raw=+ep /usr/bin/python2.7
+           log_daemon_msg "Starting $DAEMON_NAME"
+           start-stop-daemon --start --background --pidfile $PIDFILE --make-pid --user $DAEMON_USER --chuid $DAEMON_USER --startas $DAEMON
+           log_daemon_msg "Removing capability cap_net_raw"
+           setcap cap_net_raw=-ep /usr/bin/python2.7
+           log_end_msg $?
+       }
