@@ -27,7 +27,7 @@ import wraith.widgets.panel as gui         # graphics suite
 from wraith.radio import iw                # wireless interface details
 from wraith.radio import iwtools as iwt    # interface details
 from wraith.radio import mpdu              # for 802.11 types/subtypes
-from wraith.dyskt.dyskt import parsechlist # channelist validity check
+from wraith.iyri.iyri import parsechlist   # channelist validity check
 from wraith.utils import timestamps        # valid data/time
 from wraith.utils import landnav           # lang nav utilities
 from wraith.utils import cmdline           # cmdline functionality
@@ -1490,12 +1490,12 @@ class NidusConfigPanel(gui.ConfigPanel):
         finally:
             if fout: fout.close()
 
-# DySKT->Config
-class DySKTConfigException(Exception): pass
-class DySKTConfigPanel(gui.ConfigPanel):
+# Iyri->Config
+class IyriConfigException(Exception): pass
+class IyriConfigPanel(gui.ConfigPanel):
     """ Display Nidus Configuration Panel """
     def __init__(self,tl,chief):
-        gui.ConfigPanel.__init__(self,tl,chief,"Configure DySKT")
+        gui.ConfigPanel.__init__(self,tl,chief,"Configure Iyri")
 
     def _makegui(self,frm):
         """ set up entry widgets """
@@ -1675,8 +1675,8 @@ class DySKTConfigPanel(gui.ConfigPanel):
     def _initialize(self):
         """ insert values from config file into entry boxes """
         cp = ConfigParser.RawConfigParser()
-        if not cp.read(wraith.DYSKTCONF):
-            self.err("File Not Found","File dyskt.conf was not found")
+        if not cp.read(wraith.IYRICONF):
+            self.err("File Not Found","File iyri.conf was not found")
             return
 
         # start by reading the recon radio details
@@ -1818,31 +1818,31 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 if nA:
                     try:
                         if len(map(float,self._entReconAntGain.get().split(','))) != nA:
-                            raise DySKTConfigException("Number of gain is invalid")
+                            raise IyriConfigException("Number of gain is invalid")
                     except ValueError:
-                        raise DySKTConfigException("Gain must be float or list of floats")
+                        raise IyriConfigException("Gain must be float or list of floats")
                     if len(self._entReconAntType.get().split(',')) != nA:
-                        raise DySKTConfigException("Number of types is invalid")
+                        raise IyriConfigException("Number of types is invalid")
                     try:
                         if len(map(float,self._entReconAntLoss.get().split(','))) != nA:
-                            raise DySKTConfigException("Number of loss is invalid")
+                            raise IyriConfigException("Number of loss is invalid")
                     except:
-                        raise DySKTConfigException("Loss must be float or list of floats")
+                        raise IyriConfigException("Loss must be float or list of floats")
                     try:
                         xyzs = self._entReconAntXYZ.get().split(',')
                         if len(xyzs) != nA:
-                            raise DySKTConfigException("Number of xyz is invalid")
+                            raise IyriConfigException("Number of xyz is invalid")
                         for xyz in xyzs:
                             xyz = xyz.split(':')
                             if len(xyz) != 3:
-                                raise DySKTConfigException("XYZ must be three integers")
+                                raise IyriConfigException("XYZ must be three integers")
                             map(int,xyz)
                     except ValueError:
-                        raise DySKTConfigException('XYZ must be integer')
+                        raise IyriConfigException('XYZ must be integer')
             except ValueError:
                 self.err("Invalid Recon Input","Number of antennas must be numeric")
                 return False
-            except DySKTConfigException as e:
+            except IyriConfigException as e:
                 self.err("Invalid Recon Input",e)
                 return False
 
@@ -1892,31 +1892,31 @@ class DySKTConfigPanel(gui.ConfigPanel):
                     if nA:
                         try:
                             if len(map(float,self._entSurveilAntGain.get().split(','))) != nA:
-                                raise DySKTConfigException("Number of gain is invalid")
+                                raise IyriConfigException("Number of gain is invalid")
                         except ValueError:
-                            raise DySKTConfigException("Gain must be float or list of floats")
+                            raise IyriConfigException("Gain must be float or list of floats")
                         if len(self._entSurveilAntType.get().split(',')) != nA:
-                            raise DySKTConfigException("Number of types is invalid")
+                            raise IyriConfigException("Number of types is invalid")
                         try:
                             if len(map(float,self._entSurveilAntLoss.get().split(','))) != nA:
-                                raise DySKTConfigException("Number of loss is invalid")
+                                raise IyriConfigException("Number of loss is invalid")
                         except:
-                            raise DySKTConfigException("Loss must be float or list of floats")
+                            raise IyriConfigException("Loss must be float or list of floats")
                         try:
                             xyzs = self._entSurveilAntXYZ.get().split(',')
                             if len(xyzs) != nA:
-                                raise DySKTConfigException("Number of xyz is invalid")
+                                raise IyriConfigException("Number of xyz is invalid")
                             for xyz in xyzs:
                                 xyz = xyz.split(':')
                                 if len(xyz) != 3:
-                                    raise DySKTConfigException("XYZ must be three integers")
+                                    raise IyriConfigException("XYZ must be three integers")
                                 map(int,xyz)
                         except ValueError:
-                            raise DySKTConfigException("XYZ must be integer")
+                            raise IyriConfigException("XYZ must be integer")
                 except ValueError:
                     self.err("Invalid Surveillance Input","Number of antennas must be numeric")
                     return False
-                except DySKTConfigException as e:
+                except IyriConfigException as e:
                     self.err("Invalid Surveillance Input",e)
                     return False
 
@@ -2084,7 +2084,7 @@ class DySKTConfigPanel(gui.ConfigPanel):
                 cp.add_section('Local')
                 if region: cp.set('Local','region',region)
                 if c2cport: cp.set('Local','C2C',c2cport)
-            fout = open(wraith.DYSKTCONF,'w')
+            fout = open(wraith.IYRICONF,'w')
             cp.write(fout)
         except IOError as e:
             self.err("File Error","Error <%s> writing to config file" % e)

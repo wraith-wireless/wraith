@@ -1,5 +1,4 @@
 Overall:
-when DySKT starts in pause mode
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -29,41 +28,11 @@ GUI:
      something
  36) add wildcards to some fields in query i.e. mac address allow search on vendor
      with 00:01:02.*
-DySKT:
+Iyri:
  26) how to identify gps device failure, removal?
- 52) pass hop time and interval time to dyskt (from rdoctl)
+ 52) pass hop time and interval time to iyri (from rdoctl)
  53) implement spoof, txpwr commands
- 54) DySKT fails to stop (now) on ctrl-c when it starts in pause state
-Nidus:
-  1) return messages instead of just closing pipe for no running server etc
-  2) need constraints either through postgresql (preferred) or nidusdb - one example
-   for each flt inserted verify first that the ts is within the period defined for
-   the corresponding sensor
-  3) Optimize postgresql database, storage, retrieval, indexing etc
-  4) identify postgresql server not running prior to request handler
-  8) secured (hashed) username/password from/to datastore
- 10) how/when to partition table to offload older records
- 12) nidusdb.py
-     o Save thread does not save last n frames to file
-     o in SSE Threads handle errors in some way to notify nidusdb why
-       - have started using a err variable in SSEThread class, must extend that
-         to allow nidusdb to see the error
-     o look into processes over threads for SSE
-     o should we use nidusdb's connection or continue to create in the thread
- 15) should we commit individual statements in long functions i.e. _setradio
- 16) add radiotap extensions spatial streams
- 18) add trigger to reset sequences when tables are emptied
- 19) still having errors when a DySKT fails to close cleanly i.e. kill -9 (see below)
-     291720LJun2015.458 [WARNING] DySKT 127.0.0.1:47740 submit: submit device type(<type 'exceptions.RuntimeError'>) RuntimeError('submit device 23P01: ERROR:  conflicting key value violates exclusion constraint "sensor_hostname_period_excl"\nDETAIL:  Key (hostname, period)=(feral, ["2015-06-29 23:20:32.455249+00",)) conflicts with existing key (hostname, period)=(feral, ["2015-06-29 23:16:53.002985+00",)).\n',)
-     291720LJun2015.639 [WARNING] DySKT 127.0.0.1:47740 submit: submit platform 23502: ERROR:  null value in column "sid" violates not-null constraint
-     DETAIL:  Failing row contains (null, Linux, Ubuntu, 14.04, trusty, 3.13.0-55-generic, x86_64, 2.7.6, GCC 4.8.2, glibc 2.4, 64bit, ELF, BO).
-     291720LJun2015.640 [WARNING] DySKT 127.0.0.1:47740 submit: submit radio 23502: ERROR:  null value in column "sid" violates not-null constraint
-     DETAIL:  Failing row contains (null, 00:c0:ca:59:af:a6, phy1, alfa0, dyskt0, recon, ["2015-06-29 23:20:30.876558+00",)).
-     291720LJun2015.694 [WARNING] DySKT 127.0.0.1:47740 submit: submit gpsde 23502: ERROR:  null value in column "sid" violates not-null constraint
-     DETAIL:  Failing row contains (null, 1, ["2015-06-29 23:20:32.63999+00",)).
-     This should be handled by submitdropped
- 20) put ctrl frames back in db
- 21) latency from DySKT closing to Nidus processing remaining data is still great
+ 54) Iyri fails to stop (now) on ctrl-c when it starts in pause state
 Radio:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)

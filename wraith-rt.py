@@ -72,22 +72,22 @@ def stopnidus(pwd):
     else:
         return True
 
-def startdyskt(pwd):
-    """ start dyskt sensor. pwd: the sudo password """
+def startiyri(pwd):
+    """ start Iyri sensor. pwd: the sudo password """
     try:
-        cmdline.service('dysktd',pwd)
+        cmdline.service('Iyrid',pwd)
         time.sleep(1.0)
-        if not cmdline.runningservice(wraith.DYSKTPID): raise RuntimeError
+        if not cmdline.runningservice(wraith.LYRIPID): raise RuntimeError
     except RuntimeError:
         return False
     else:
         return True
 
-def stopdyskt(pwd):
-    """ stop dyskt sensor. pwd: Sudo password """
+def stopIyri(pwd):
+    """ stop Iyri sensor. pwd: Sudo password """
     try:
-        cmdline.service('dysktd',pwd,False)
-        while cmdline.runningservice(wraith.DYSKTPID): time.sleep(1.0)
+        cmdline.service('Iyrid',pwd,False)
+        while cmdline.runningservice(wraith.LYRIPID): time.sleep(1.0)
     except RuntimeError as e:
         return False
     else:
@@ -127,14 +127,14 @@ _STATE_INIT_   = 0
 _STATE_STORE_  = 1
 _STATE_CONN_   = 2
 _STATE_NIDUS_  = 3
-_STATE_DYSKT_  = 4
+_STATE_LYRI_  = 4
 _STATE_EXIT_   = 5
-_STATE_FLAGS_NAME_ = ['init','store','conn','nidus','dyskt','exit']
+_STATE_FLAGS_NAME_ = ['init','store','conn','nidus','Iyri','exit']
 _STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
                  'store':(1 << 1),  # storage instance is running (i.e. postgresql)
                  'conn':(1 << 2),   # connected to storage instance
                  'nidus':(1 << 3),  # nidus storage manager running
-                 'dyskt':(1 << 4),  # at least one sensor is collecting data
+                 'Iyri':(1 << 4),  # at least one sensor is collecting data
                  'exit':(1 << 5)}   # exiting/shutting down
 
 class WraithPanel(gui.MasterPanel):
@@ -172,8 +172,8 @@ class WraithPanel(gui.MasterPanel):
     @property # return {True: Nidus is running|False: Nidus is not running}
     def nidusisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['nidus']
 
-    @property # return {True: DySKT is running|False: DySKT is not running|
-    def dysktisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['dyskt']
+    @property # return {True: Iyri is running|False: Iyri is not running|
+    def Iyriisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['Iyri']
 
     @property # return {True: Wraith is exiting|False: Wraith is not exiting}
     def isexiting(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['exit']
@@ -232,10 +232,10 @@ class WraithPanel(gui.MasterPanel):
         else:
             msgs.append((time.strftime('%H:%M:%S'),"Nidus not running",gui.LOG_WARN))
 
-        # dyskt running?
-        if cmdline.runningservice(wraith.DYSKTPID):
-            msgs.append((time.strftime('%H:%M:%S'),"DySKT running",gui.LOG_NOERR))
-            self._setstate(_STATE_DYSKT_)
+        # Iyri running?
+        if cmdline.runningservice(wraith.LYRIPID):
+            msgs.append((time.strftime('%H:%M:%S'),"Iyri running",gui.LOG_NOERR))
+            self._setstate(_STATE_LYRI_)
         else:
             msgs.append((time.strftime('%H:%M:%S'),"DySKt not running",gui.LOG_WARN))
 
@@ -254,7 +254,7 @@ class WraithPanel(gui.MasterPanel):
         """ if connected to datastorage, closes connection """
         self.setbusy()               # we're busy
         self._setstate(_STATE_EXIT_) # set the state
-        self._stopsensor()           # shutdown dyskt
+        self._stopsensor()           # shutdown Iyri
         self._stopstorage()          # shutdown storage
         self.setbusy(False)          # we're done
 
@@ -327,19 +327,19 @@ class WraithPanel(gui.MasterPanel):
         self._mnuStorageNidus.add_command(label='Config',command=self.confignidus)   # 5
         self._mnuStorage.add_cascade(label='Nidus',menu=self._mnuStorageNidus)      # 4
 
-        # DySKT Menu
-        self._mnuDySKT = tk.Menu(self._menubar,tearoff=0)
-        self._mnuDySKT.add_command(label='Start',command=self.dysktstart)   # 0
-        self._mnuDySKT.add_command(label='Stop',command=self.dysktstop)     # 1
-        self._mnuDySKT.add_separator()                                      # 2
-        self._mnuDySKT.add_command(label='Control',command=self.dysktctrl)  # 3
-        self._mnuDySKT.add_separator()                                      # 4
-        self._mnuDySKTLog = tk.Menu(self._mnuDySKT,tearoff=0)
-        self._mnuDySKTLog.add_command(label='View',command=self.viewdysktlog)   # 0
-        self._mnuDySKTLog.add_command(label='Clear',command=self.cleardysktlog) # 1
-        self._mnuDySKT.add_cascade(label='Log',menu=self._mnuDySKTLog)       # 5
-        self._mnuDySKT.add_separator()                                      # 6
-        self._mnuDySKT.add_command(label='Config',command=self.configdyskt) # 7
+        # Iyri Menu
+        self._mnuIyri = tk.Menu(self._menubar,tearoff=0)
+        self._mnuIyri.add_command(label='Start',command=self.Iyristart)   # 0
+        self._mnuIyri.add_command(label='Stop',command=self.Iyristop)     # 1
+        self._mnuIyri.add_separator()                                      # 2
+        self._mnuIyri.add_command(label='Control',command=self.Iyrictrl)  # 3
+        self._mnuIyri.add_separator()                                      # 4
+        self._mnuIyriLog = tk.Menu(self._mnuIyri,tearoff=0)
+        self._mnuIyriLog.add_command(label='View',command=self.viewIyrilog)   # 0
+        self._mnuIyriLog.add_command(label='Clear',command=self.clearIyrilog) # 1
+        self._mnuIyri.add_cascade(label='Log',menu=self._mnuIyriLog)       # 5
+        self._mnuIyri.add_separator()                                      # 6
+        self._mnuIyri.add_command(label='Config',command=self.configIyri) # 7
 
         # Help Menu
         self._mnuHelp = tk.Menu(self._menubar,tearoff=0)
@@ -351,7 +351,7 @@ class WraithPanel(gui.MasterPanel):
         self._menubar.add_cascade(label="Tools",menu=self._mnuTools)
         self._menubar.add_cascade(label='Data',menu=self._mnuData)
         self._menubar.add_cascade(label='Storage',menu=self._mnuStorage)
-        self._menubar.add_cascade(label='DySKT',menu=self._mnuDySKT)
+        self._menubar.add_cascade(label='Iyri',menu=self._mnuIyri)
         self._menubar.add_cascade(label='Help',menu=self._mnuHelp)
 
     def showpanel(self,desc):
@@ -363,8 +363,8 @@ class WraithPanel(gui.MasterPanel):
         elif desc == 'preferences': self.configwraith()
         elif desc == 'niduslog': self.viewniduslog()
         elif desc == 'nidusprefs': self.confignidus()
-        elif desc == 'dysktlog': self.viewdysktlog()
-        elif desc == 'dysktprefs': self.configdyskt()
+        elif desc == 'Iyrilog': self.viewIyrilog()
+        elif desc == 'Iyriprefs': self.configIyri()
         elif desc == 'about': self.about()
         else: raise RuntimeError, "WTF Cannot open %s" % desc
 
@@ -507,7 +507,7 @@ class WraithPanel(gui.MasterPanel):
         """ starts postgresql """
         # should not be enabled if postgresql is not running, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store'] and not flags['dyskt']:
+        if flags['store'] and not flags['Iyri']:
             # do we have a password
             if not self._pwd:
                 pwd = self._getpwd()
@@ -531,7 +531,7 @@ class WraithPanel(gui.MasterPanel):
         # should not be enabled unless postgres is running, we are connected
         # and no sensors are running
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store'] and flags['conn'] and not flags['dyskt']:
+        if flags['store'] and flags['conn'] and not flags['Iyri']:
             curs = None
             try:
                 self.logwrite("Fixing null-ended records in database...",gui.LOG_NOTE)
@@ -551,7 +551,7 @@ class WraithPanel(gui.MasterPanel):
         # should not be enabled unless postgres is running, we are connected
         # and a sensor is not running, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store'] and flags['conn'] and not flags['dyskt']:
+        if flags['store'] and flags['conn'] and not flags['Iyri']:
             ans = self.ask('Delete Records','Delete all DB records?')
             self.update()
             if ans == 'no': return
@@ -646,54 +646,54 @@ class WraithPanel(gui.MasterPanel):
             panel[0].tk.deiconify()
             panel[0].tk.lift()
 
-#### DySKT Menu
+#### Iyri Menu
 
-    def dysktstart(self):
-        """ starts DySKT sensor """
+    def Iyristart(self):
+        """ starts Iyri sensor """
         self._startsensor()
         self._updatestate()
         self._menuenable()
 
-    def dysktstop(self):
-        """ stops DySKT sensor """
+    def Iyristop(self):
+        """ stops Iyri sensor """
         self._stopsensor()
         self._updatestate()
         self._menuenable()
 
-    def dysktctrl(self):
-        """ displays DySKT Control Panel """
+    def Iyrictrl(self):
+        """ displays Iyri Control Panel """
         self.unimplemented()
 
-    def viewdysktlog(self):
-        """ display DySKT log """
-        panel = self.getpanels('dysktlog',False)
+    def viewIyrilog(self):
+        """ display Iyri log """
+        panel = self.getpanels('Iyrilog',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = gui.TailLogPanel(t,self,"DySKT Log",200,wraith.DYSKTLOG,50)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'dysktlog'))
+            pnl = gui.TailLogPanel(t,self,"Iyri Log",200,wraith.LYRILOG,50)
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'Iyrilog'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
 
-    def cleardysktlog(self):
-        """ clears the DySKT log """
+    def clearIyrilog(self):
+        """ clears the Iyri log """
         # prompt first
-        finfo = os.stat(wraith.DYSKTLOG)
+        finfo = os.stat(wraith.LYRILOG)
         if finfo.st_size > 0:
-            ans = self.ask("Clear Log","Clear contents of DySKT log?")
+            ans = self.ask("Clear Log","Clear contents of Iyri log?")
             self.update()
             if ans == 'no': return
-            with open(wraith.DYSKTLOG,'w'): pass
-            lv = self.getpanel('dysktlog')
+            with open(wraith.LYRILOG,'w'): pass
+            lv = self.getpanel('Iyrilog')
             if lv: lv.reset()
 
-    def configdyskt(self):
-        """ display dyskt config file preference editor """
-        panel = self.getpanels('dysktprefs',False)
+    def configIyri(self):
+        """ display Iyri config file preference editor """
+        panel = self.getpanels('Iyriprefs',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = subgui.DySKTConfigPanel(t,self)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'dysktprefs'))
+            pnl = subgui.IyriConfigPanel(t,self)
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'Iyriprefs'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -731,9 +731,9 @@ class WraithPanel(gui.MasterPanel):
         if cmdline.runningservice(wraith.NIDUSPID): self._setstate(_STATE_NIDUS_)
         else: self._setstate(_STATE_NIDUS_,False)
 
-        # state of dyskt
-        if cmdline.runningservice(wraith.DYSKTPID): self._setstate(_STATE_DYSKT_)
-        else:  self._setstate(_STATE_DYSKT_,False)
+        # state of Iyri
+        if cmdline.runningservice(wraith.LYRIPID): self._setstate(_STATE_LYRI_)
+        else:  self._setstate(_STATE_LYRI_,False)
 
         # state of postgres i.e. store
         if cmdline.runningprocess('postgres'): self._setstate(_STATE_STORE_)
@@ -765,20 +765,20 @@ class WraithPanel(gui.MasterPanel):
         else: self._mnuData.entryconfig(4,state=tk.DISABLED)
 
         # start all
-        if flags['store'] and flags['nidus'] and flags['dyskt']:
+        if flags['store'] and flags['nidus'] and flags['Iyri']:
             self._mnuData.entryconfig(4,state=tk.DISABLED)
         else: self._mnuData.entryconfig(4,state=tk.NORMAL)
 
         # stop all
-        if not flags['store'] and not flags['nidus'] and not flags['dyskt']:
+        if not flags['store'] and not flags['nidus'] and not flags['Iyri']:
             self._mnuStorage.entryconfig(1,state=tk.DISABLED)
         else: self._mnuStorage.entryconfig(1,state=tk.NORMAL)
 
         # start/stop postgres
         if flags['store']:
-            # disable start, enable stop (if dyskt is not running)
+            # disable start, enable stop (if Iyri is not running)
             self._mnuStoragePSQL.entryconfig(0,state=tk.DISABLED)
-            if not flags['dyskt']: self._mnuStoragePSQL.entryconfig(1,state=tk.NORMAL)
+            if not flags['Iyri']: self._mnuStoragePSQL.entryconfig(1,state=tk.NORMAL)
         else:
             # enable start and disable stop
             self._mnuStoragePSQL.entryconfig(0,state=tk.NORMAL)
@@ -794,9 +794,9 @@ class WraithPanel(gui.MasterPanel):
             self._mnuStoragePSQL.entryconfig(3,state=tk.NORMAL)
             self._mnuStoragePSQL.entryconfig(4,state=tk.DISABLED)
 
-        # fix db and delete all (only allowed if connected and dyskt is not running)
+        # fix db and delete all (only allowed if connected and Iyri is not running)
         if flags['conn']:
-            if flags['dyskt']:
+            if flags['Iyri']:
                 self._mnuStoragePSQL.entryconfig(6,state=tk.DISABLED)
                 self._mnuStoragePSQL.entryconfig(7,state=tk.DISABLED)
             else:
@@ -807,7 +807,7 @@ class WraithPanel(gui.MasterPanel):
             self._mnuStoragePSQL.entryconfig(7,state=tk.DISABLED)
 
         # nidus start/stop & clear log NOTE: unlike psql, we allow nidus to stop
-        # even in cases where dyskt may be running as dyskt will handle nidus
+        # even in cases where Iyri may be running as Iyri will handle nidus
         # closing the comms socket)
         if flags['nidus']:
             # disable start and clear log and enable stop
@@ -820,29 +820,29 @@ class WraithPanel(gui.MasterPanel):
             self._mnuNidusLog.entryconfig(1,state=tk.NORMAL)
             self._mnuStorageNidus.entryconfig(1,state=tk.DISABLED)
 
-        # dyskt
+        # Iyri
         if not flags['store'] and not flags['nidus']:
-            # cannot start/stop/control dyskt unless nidus & postgres is running
-            self._mnuDySKT.entryconfig(0,state=tk.DISABLED)  # start
-            self._mnuDySKT.entryconfig(1,state=tk.DISABLED)  # stop
-            self._mnuDySKT.entryconfig(3,state=tk.DISABLED)  # ctrl panel
-            self._mnuDySKTLog.entryconfig(1,state=tk.NORMAL) # clear log
-            self._mnuDySKT.entryconfig(7,state=tk.NORMAL)    # configure
+            # cannot start/stop/control Iyri unless nidus & postgres is running
+            self._mnuIyri.entryconfig(0,state=tk.DISABLED)  # start
+            self._mnuIyri.entryconfig(1,state=tk.DISABLED)  # stop
+            self._mnuIyri.entryconfig(3,state=tk.DISABLED)  # ctrl panel
+            self._mnuIyriLog.entryconfig(1,state=tk.NORMAL) # clear log
+            self._mnuIyri.entryconfig(7,state=tk.NORMAL)    # configure
         else:
-            if flags['dyskt']:
-                # DySKT sensor is running
-                self._mnuDySKT.entryconfig(0,state=tk.DISABLED)    # start
-                self._mnuDySKT.entryconfig(1,state=tk.NORMAL)      # stop
-                self._mnuDySKT.entryconfig(3,state=tk.NORMAL)      # ctrl panel
-                self._mnuDySKTLog.entryconfig(1,state=tk.DISABLED) # clear log
-                self._mnuDySKT.entryconfig(7,state=tk.NORMAL)      # configure
+            if flags['Iyri']:
+                # Iyri sensor is running
+                self._mnuIyri.entryconfig(0,state=tk.DISABLED)    # start
+                self._mnuIyri.entryconfig(1,state=tk.NORMAL)      # stop
+                self._mnuIyri.entryconfig(3,state=tk.NORMAL)      # ctrl panel
+                self._mnuIyriLog.entryconfig(1,state=tk.DISABLED) # clear log
+                self._mnuIyri.entryconfig(7,state=tk.NORMAL)      # configure
             else:
-                # DySKT sensor is not running
-                self._mnuDySKT.entryconfig(0,state=tk.NORMAL)    # start
-                self._mnuDySKT.entryconfig(1,state=tk.DISABLED)  # stop
-                self._mnuDySKT.entryconfig(3,state=tk.DISABLED)  # ctrl panel
-                self._mnuDySKTLog.entryconfig(1,state=tk.NORMAL) # clear log
-                self._mnuDySKT.entryconfig(7,state=tk.NORMAL)    # configure
+                # Iyri sensor is not running
+                self._mnuIyri.entryconfig(0,state=tk.NORMAL)    # start
+                self._mnuIyri.entryconfig(1,state=tk.DISABLED)  # stop
+                self._mnuIyri.entryconfig(3,state=tk.DISABLED)  # ctrl panel
+                self._mnuIyriLog.entryconfig(1,state=tk.NORMAL) # clear log
+                self._mnuIyri.entryconfig(7,state=tk.NORMAL)    # configure
 
     def _startstorage(self):
         """ start postgresql db and nidus storage manager & connect to db """
@@ -890,10 +890,10 @@ class WraithPanel(gui.MasterPanel):
 
     def _stopstorage(self):
         """ stop posgresql db, nidus storage manager & disconnect """
-        # if DySKT is running, prompt for clearance
+        # if Iyri is running, prompt for clearance
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['dyskt']:
-            ans = self.ask('DySKT Running','Quit and lose queued data?')
+        if flags['Iyri']:
+            ans = self.ask('Iyri Running','Quit and lose queued data?')
             self.update()
             if ans == 'no': return
 
@@ -951,9 +951,9 @@ class WraithPanel(gui.MasterPanel):
         self.logwrite("Disconnected from Nidus datastore")
 
     def _startsensor(self):
-        """ starts the DySKT sensor """
+        """ starts the Iyri sensor """
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store'] and flags['nidus'] and not flags['dyskt']:
+        if flags['store'] and flags['nidus'] and not flags['Iyri']:
             # do we have a password
             if not self._pwd:
                 pwd = self._getpwd()
@@ -965,20 +965,20 @@ class WraithPanel(gui.MasterPanel):
 
             # start the sensor
             try:
-                self.logwrite("Starting DySKT...",gui.LOG_NOTE)
-                cmdline.service('dysktd',self._pwd)
+                self.logwrite("Starting Iyri...",gui.LOG_NOTE)
+                cmdline.service('Iyrid',self._pwd)
                 time.sleep(0.5)
-                if not cmdline.runningservice(wraith.DYSKTPID): raise RuntimeError('unknown')
+                if not cmdline.runningservice(wraith.LYRIPID): raise RuntimeError('unknown')
             except RuntimeError as e:
-                self.logwrite("Error starting DySKT: %s" % e,gui.LOG_ERR)
+                self.logwrite("Error starting Iyri: %s" % e,gui.LOG_ERR)
             else:
-                self.logwrite("DySKT Started")
-                self._setstate(_STATE_DYSKT_)
+                self.logwrite("Iyri Started")
+                self._setstate(_STATE_LYRI_)
 
     def _stopsensor(self):
-        """ stops the DySKT sensor """
+        """ stops the Iyri sensor """
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['dyskt']:
+        if flags['Iyri']:
             # do we have a password
             if not self._pwd:
                 pwd = self._getpwd()
@@ -990,13 +990,13 @@ class WraithPanel(gui.MasterPanel):
 
             # stop the sensor
             try:
-                self.logwrite("Shutting down DySKT...",gui.LOG_NOTE)
-                cmdline.service('dysktd',self._pwd,False)
+                self.logwrite("Shutting down Iyri...",gui.LOG_NOTE)
+                cmdline.service('Iyrid',self._pwd,False)
             except RuntimeError as e:
-                self.logwrite("Error shutting down DySKT: %s" % e,gui.LOG_ERR)
+                self.logwrite("Error shutting down Iyri: %s" % e,gui.LOG_ERR)
             else:
-                self._setstate(_STATE_DYSKT_,False)
-                self.logwrite("DySKT shut down")
+                self._setstate(_STATE_LYRI_,False)
+                self.logwrite("Iyri shut down")
 
     def _getpwd(self):
         """ prompts for sudo password until correct or canceled"""
@@ -1067,7 +1067,7 @@ class WraithSplash(object):
             if not self._bconfig: self._chkconfig()
             elif not self._bpsql: self._chkpsql()
             elif not self._bnidus: self._chknidus()
-            else: self._chkdyskt()
+            else: self._chkIyri()
             self._tl.after(1000,self._busy)
 
     def _chkconfig(self):
@@ -1103,23 +1103,23 @@ class WraithSplash(object):
         self._bnidus = True
         self._pb.step(2.0)
 
-    def _chkdyskt(self):
-        self._sv.set("Checking DySKT...")
+    def _chkIyri(self):
+        self._sv.set("Checking Iyri...")
         self._pb.step(2.0)
-        if not cmdline.runningservice(wraith.DYSKTPID):
-            self._sv.set("Starting DySKT")
-            if not startdyskt(pwd):
-                # because DySKT can sometimes take a while, we will run
+        if not cmdline.runningservice(wraith.LYRIPID):
+            self._sv.set("Starting Iyri")
+            if not startIyri(pwd):
+                # because Iyri can sometimes take a while, we will run
                 # this several times
                 i = 5
-                while not cmdline.runningservice(wraith.DYSKTPID):
+                while not cmdline.runningservice(wraith.LYRIPID):
                     i -= 1
                     if i == 0: break
                     time.sleep(0.5)
-            if cmdline.runningservice(wraith.DYSKTPID): self._sv.set("DySKT started")
-            else: self._sv.set("Failed to start DySKT")
+            if cmdline.runningservice(wraith.LYRIPID): self._sv.set("Iyri started")
+            else: self._sv.set("Failed to start Iyri")
         else:
-            self._sv.set("DySKT already running")
+            self._sv.set("Iyri already running")
         self._bfinished = True
 
 if __name__ == '__main__':
@@ -1149,12 +1149,12 @@ if __name__ == '__main__':
             i -= 1
             if i == 0: ap.error("Three incorrect password attempts")
 
-        # stop DySKT, then Nidus, then PostgreSQL
+        # stop Iyri, then Nidus, then PostgreSQL
         sd = sn = sp = True
-        if cmdline.runningservice(wraith.DYSKTPID):
-            ret = 'ok' if stopdyskt(pwd) else 'fail'
-            print "Stopping DySKT\t\t\t\t[%s]" % ret
-        else: print "DySKT not running"
+        if cmdline.runningservice(wraith.LYRIPID):
+            ret = 'ok' if stopIyri(pwd) else 'fail'
+            print "Stopping Iyri\t\t\t\t[%s]" % ret
+        else: print "Iyri not running"
         if cmdline.runningservice(wraith.NIDUSPID):
             ret = 'ok' if stopnidus(pwd) else 'fail'
             print "Stopping Nidus\t\t\t\t[%s]" % ret
@@ -1175,7 +1175,7 @@ if __name__ == '__main__':
             i -= 1
             if i == 0: ap.error("Three incorrect password attempts")
 
-        # start postgresql (if needed), nidus and dyskt
+        # start postgresql (if needed), nidus and Iyri
         if not cmdline.runningprocess('postgres'):
             ret = 'ok' if startpsql(pwd) else 'fail'
             print "Starting PostgreSQL\t\t\t[%s]" % ret
@@ -1186,11 +1186,11 @@ if __name__ == '__main__':
             print "Starting Nidus\t\t\t\t[%s]" % ret
         else:
             print "Nidus already running"
-        if not cmdline.runningservice(wraith.DYSKTPID):
-            ret = 'ok' if startdyskt(pwd) else 'fail'
-            print "Starting DySKT\t\t\t\t[%s]" % ret
+        if not cmdline.runningservice(wraith.LYRIPID):
+            ret = 'ok' if startIyri(pwd) else 'fail'
+            print "Starting Iyri\t\t\t\t[%s]" % ret
         else:
-            print "DySKT already Running"
+            print "Iyri already Running"
         sys.exit(0)
     else:
         if sopts == 'all':
