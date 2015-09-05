@@ -1028,7 +1028,7 @@ CREATE FUNCTION delete_all()
 
 -- store procedure to fix any NULL-ended periods which can occur after
 -- error or a forced kill Nidus (or a sensor)
-DROP FUNCTIOON IF EXISTS fix_nullperiod();
+DROP FUNCTION IF EXISTS fix_nullperiod();
 CREATE OR REPLACE FUNCTION fix_nullperiod()
     RETURNS void as $$
     BEGIN
