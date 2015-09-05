@@ -271,7 +271,7 @@ class Iryi(object):
 
         # initialize, quit on failure
         logging.info("**** Starting Iryi %s ****",iyri.__version__)
-        self._sreate()
+        self._create()
         if self.state == IYRI_INVALID:
             # make sure we do not leave system in corrupt state (i.e. w/o nics)
             self._destroy()
