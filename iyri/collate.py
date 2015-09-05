@@ -41,12 +41,14 @@ class GPSPoller(threading.Thread):
         self._eQ = eq                  # msg queue from radio controller
         self._conf = conf              # gps configuration
         self._gpsd = None              # connection to the gps device
+        self._mgrs = None              # mgrs converter
         self._setup()
 
     def _setup(self):
         """ attempt to connect to device if fixed is off """
         if self._conf['fixed']: return # static, do nothing
         try:
+            self._mgrs = mgrs.MGRS()
             self._gpsd = gps.gps('127.0.0.1',self._conf['port'])
             self._gpsd.stream(gps.WATCH_ENABLE)
         except socket.error as e:
@@ -105,8 +107,10 @@ class GPSPoller(threading.Thread):
             if self._conf['fixed']: # send static front line trace
                 self._eQ.put(('!FLT!',time.time(),{'id':dd['id'],
                                                   'fix':-1,
-                                                  'lat':(self._conf['lat'],0.0),
-                                                  'lon':(self._conf['lon'],0.0),
+                                                  'coord':self._mgrs.toMGRS(self._conf['lat'],
+                                                                            self._conf['lon']),
+                                                  'epy':0.0,
+                                                  'epx':0.0,
                                                   'alt':self._conf['alt'],
                                                   'dir':self._conf['dir'],
                                                   'spd':0.0,
@@ -123,18 +127,17 @@ class GPSPoller(threading.Thread):
                 try:
                     if rpt['epx'] > qpx or rpt['epy'] > qpy: continue
                     else:
-                        # get all values
-                        flt = {}
-                        flt['id'] = dd['id']
-                        flt['fix'] = rpt['mode']
-                        flt['lat'] = (rpt['lat'],rpt['epy'])
-                        flt['lon'] = (rpt['lon'],rpt['epx'])
-                        flt['alt'] = rpt['alt'] if 'alt' in rpt else float("nan")
-                        flt['dir'] = rpt['track'] if 'track' in rpt else float("nan")
-                        flt['spd'] = rpt['spd'] if 'spd' in rpt else float("nan")
-                        flt['dop'] = {'xdop':'%.3f' % self._gpsd.xdop,
-                                       'ydop':'%.3f' % self._gpsd.ydop,
-                                       'pdop':'%.3f' % self._gpsd.pdop}
+                        flt = {'id':dd['id'],
+                               'fix':rpt['mode'],
+                               'coord':self._mgrs.toMGRS(rpt['lat'],rpt['lon']),
+                               'epy':rpt['epy'],
+                               'epx':rpt['epx'],
+                               'alt':rpt['alt'] if 'alt' in rpt else float("nan"),
+                               'dir':rpt['track'] if 'track' in rpt else float("nan"),
+                               'spd':rpt['spd'] if 'spd' in rpt else float("nan"),
+                               'dop':{'xdop':'%.3f' % self._gpsd.xdop,
+                                      'ydop':'%.3f' % self._gpsd.ydop,
+                                      'pdop':'%.3f' % self._gpsd.pdop}}
                         self._eQ.put(('!GEO',time.time(),flt))
                         break
                 except (KeyError,AttributeError):
@@ -171,7 +174,6 @@ class Collator(mp.Process):
         self._curs = None          # primary db cursors
         self._sid = None           # our session id
         self._gid = None           # the gpsd id from the backend
-        self._mgrs = None          # lat/lon to mgrs conversion
         self._setup(conf['store'])
 
     def terminate(self): pass
@@ -317,7 +319,6 @@ class Collator(mp.Process):
     def _setup(self,store):
         """ connect to db w/ params in store & pass sensor up event """
         try:
-            self._mgrs = mgrs.MGRS() # get mgrs converter
             self._conn = psql.connect(host=store['host'],
                                       port=store['port'],
                                       dbname=store['db'],
@@ -443,11 +444,10 @@ class Collator(mp.Process):
                insert into flt (sid,ts,coord,alt,spd,dir,fix,xdop,ydop,pdop,epx,epy)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
               """
-        self._curs.execute(sql,(self._sid,ts,
-                                self._mgrs.toMGRS(flt['lat'][0],flt['lon'][0]),
-                                flt['alt'],flt['spd'],flt['dir'],flt['fix'],
-                                flt['dop']['xdop'],flt['dop']['ydop'],
-                                flt['dop']['pdop'],flt['lat'][1],flt['lon'][1]))
+        self._curs.execute(sql,(self._sid,ts,flt['coord'],flt['alt'],flt['spd'],
+                                flt['dir'],flt['fix'],flt['dop']['xdop'],
+                                flt['dop']['ydop'],flt['dop']['pdop'],flt['epy'],
+                                flt['epx']))
         self._conn.commit()
 
     def _submitradio(self,ts,state,r):
@@ -508,46 +508,3 @@ class Collator(mp.Process):
               """
         self._curs.execute(sql,(m[0],m[1],m[2],ts))
         self._conn.commit()
-
-    #### send helper functions
-
-    def _send(self,t,ts,d):
-        """
-         send - sends message msg m of type t with timestamp ts to Nidus
-          t - message type
-          ts - message timestamp
-          d - data
-         returns None on success otherwise returns reason for failure
-        """
-        # convert the timestamp to utc isoformat before crafting
-        ts = ts2iso(ts)
-        
-        # craft the message
-        try:
-            send = "\x01*%s:\x02" % t
-            if t == 'DEVICE': send += self._craftdevice(ts,d)
-            elif t == 'PLATFORM': send += self._craftplatform(d)
-            elif t == 'RADIO': send += self._craftradio(ts,d)
-            elif t == 'ANTENNA': send += self._craftantenna(ts,d)
-            elif t == 'GPSD': send += self._craftgpsd(ts,d)
-            elif t == 'FRAME': send += self._craftframe(ts,d)
-            elif t == 'BULK': send += self._craftbulk(ts,d)
-            elif t == 'FLT': send += self._craftflt(ts,d,self._mgrs)
-            elif t == 'RADIO_EVENT': send += self._craftradioevent(ts,d)
-            send += "\x03\x12\x15\04"
-            #if not self._nidus.send(send): return "Nidus socket closed unexpectantly"
-            return None
-        except socket.error, ret:
-            return ret
-        except Exception, ret:
-            return ret
-
-    @staticmethod
-    def _craftbulk(ts,d):
-        """ create body of bulk message """
-        return "%s %s %s \x1EFB\x1F%s\x1FFE\x1E" % (ts,d[0],d[1],d[2])
-
-    @staticmethod
-    def _craftframe(ts,d):
-        """ creates body of the frame message """
-        return "%s \x1EFB\x1F%s\x1FFE\x1E \x1EFB\x1F%s\x1FFE\x1E" % (ts,d[0],d[1])
