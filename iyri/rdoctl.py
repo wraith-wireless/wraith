@@ -154,20 +154,22 @@ class RadioController(mp.Process):
         self._cI = conn           # message connection to/from Iyri
         self._buffer = buff       # buffer for frames
         self._qT = None           # queue between tuner and us
-        self._hist = {}           # channel histogram
+        #self._hist = {}           # channel histogram
         self._role = None         # role this radio plays
         self._nic = None          # radio network interface controller name
         self._mac = None          # real mac address
         self._phy = None          # the phy of the device
         self._vnic = None         # virtual monitor name
-        self._s = None            # the raw socket
         self._std = None          # supported standards
+        self._hop = None          # hop time
+        self._interval = None     # interval time
         self._chs = []            # supported channels
         self._txpwr = 0           # current tx power
         self._driver = None       # the driver
         self._chipset = None      # the chipset
         self._spoofed = ""        # spoofed mac address
         self._desc = None         # optional description
+        self._s = None            # the raw socket
         self._tuner = None        # tuner thread
         self._stuner = None       # tuner state
         self._antenna = {'num':0, # antenna details
@@ -270,6 +272,8 @@ class RadioController(mp.Process):
                 'chipset':self._chipset,
                 'standards':self._std,
                 'channels':self._chs,
+                'hop':self._hop,
+                'interval':self._interval,
                 'txpwr':self._txpwr,
                 'desc':self._desc,
                 'nA':self._antenna['num'],
@@ -387,13 +391,13 @@ class RadioController(mp.Process):
             # i.e. Ch 14, Width HT40+ and any user specified channels the card
             # cannot tune to.
             i = 0
-            hop = 0
+            self._hop = 0
             while scan:
                 try:
                     t = time.time()
                     iw.chset(self._vnic,scan[i][0],scan[i][1])
-                    hop += (time.time() - t)
-                    self._hist['%s:%s' % (scan[i][0],scan[i][1])] = 0 # init histogram
+                    self._hop += (time.time() - t)
+                    #self._hist['%s:%s' % (scan[i][0],scan[i][1])] = 0 # init histogram
                     i += 1
                 except iw.IWException as e:
                     # if invalid argument, drop the channel otherwise reraise error
@@ -408,9 +412,8 @@ class RadioController(mp.Process):
 
             # calculate avg hop time, and interval time
             # NOTE: these are not currently used but may be useful later
-            #hop /= len(scan)
-            #interval = len(scan) * conf['dwell'] + len(scan) * hop
-            #print interval
+            self._hop /= len(scan)
+            self._interval = len(scan) * conf['dwell'] + len(scan) * self._hop
 
             # create list of dwell times
             ds = [conf['dwell']] * len(scan)
