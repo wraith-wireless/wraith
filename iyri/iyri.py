@@ -13,7 +13,7 @@ messages from client will be in the following format
   id is an integer (unique)
   cmd is oneof {state|scan|hold|listen|pause|txpwr|spoof}
   radio is oneof {both|all|abad|shama} where both enforces abad and
-   shama radio and all does not
+   shama radio and all enforces shama only if present
   param is:
    o of the format channel:width if cmd is listen where width is oneof {'None','HT20','HT40+','HT40-'}
    o of the format pwr:option where pwr is in dBm and option is oneof {fixed|auto|limit}
@@ -21,7 +21,7 @@ messages from client will be in the following format
 Iryi will notify the client if the cmd specified by id is invalid or valid with
  OK <id> or
  ERR <id> \001Reason for Failure\001
- if the command was invalid and no command id could be readm it will be set to ?
+If the command was invalid and no command id could be read it will be set to ?
 
 Note: Iryi only allows one client connection at a time
 """
