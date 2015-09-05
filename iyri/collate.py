@@ -41,14 +41,12 @@ class GPSPoller(threading.Thread):
         self._eQ = eq                  # msg queue from radio controller
         self._conf = conf              # gps configuration
         self._gpsd = None              # connection to the gps device
-        self._mgrs = None              # mgrs converter
         self._setup()
 
     def _setup(self):
         """ attempt to connect to device if fixed is off """
         if self._conf['fixed']: return # static, do nothing
         try:
-            self._mgrs = mgrs.MGRS()
             self._gpsd = gps.gps('127.0.0.1',self._conf['port'])
             self._gpsd.stream(gps.WATCH_ENABLE)
         except socket.error as e:
@@ -101,14 +99,15 @@ class GPSPoller(threading.Thread):
                     except KeyError:
                         pass
 
+        m = mgrs.MGRS()
         # send device details. If fixed gps, exit immediately
         if not self._done.is_set():
             self._eQ.put(('!DEV!',time.time(),dd))
             if self._conf['fixed']: # send static front line trace
                 self._eQ.put(('!FLT!',time.time(),{'id':dd['id'],
                                                   'fix':-1,
-                                                  'coord':self._mgrs.toMGRS(self._conf['lat'],
-                                                                            self._conf['lon']),
+                                                  'coord':m.toMGRS(self._conf['lat'],
+                                                                   self._conf['lon']),
                                                   'epy':0.0,
                                                   'epx':0.0,
                                                   'alt':self._conf['alt'],
@@ -129,7 +128,7 @@ class GPSPoller(threading.Thread):
                     else:
                         flt = {'id':dd['id'],
                                'fix':rpt['mode'],
-                               'coord':self._mgrs.toMGRS(rpt['lat'],rpt['lon']),
+                               'coord':m.toMGRS(rpt['lat'],rpt['lon']),
                                'epy':rpt['epy'],
                                'epx':rpt['epx'],
                                'alt':rpt['alt'] if 'alt' in rpt else float("nan"),
