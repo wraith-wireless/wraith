@@ -2,13 +2,13 @@
 
 """ iyri: Wraith Sensor
 
-Iyri is a 802.11 sensor consisting of an optional surveillance radio, a mandatory
-reconnaissance radio and a Collator which relays collected data to the backend
-database. Iryi collects/stores data in the form of raw 802.11 packets, along with
-any geolocational data (if a gps device is present).
+Iyri is a 802.11 sensor consisting of a mandatory radio (Abad) and an optional
+radio (Shama). While Abad can receive/collect and send, Shama will only receive.
+Iyri relays collected data to the backend database nidus, collects/stores data
+from raw 802.11 packets and any geolocational data (if a gps device is present).
 
 REVISIONS:
-dyskt 0.1.4
+ 0.1.4
  includes: dyskt 0.0.8, radio 0.0.4, collate 0.0.8, pf 0.0.6, dysktd, dyskt.conf,
   dyskt.log.conf dyskt
  changes:
@@ -18,7 +18,7 @@ dyskt 0.1.4
      shared communication objects and the number of sub process
    o radio class now subclasses mp.Process
 
-dyskt 0.1.5
+ 0.1.5
  desc: utilizes a new internal communication SOP to streamline and simplify
   interprocess communications
  includes: dyskt 0.0.10 internal 0.0.1 rto 0.0.11, rdoctl 0.0.5
@@ -50,7 +50,7 @@ dyskt 0.1.5
    o uses secure socket layer to send data to Nidus
    o zlib library to compress frames (hardcoded to 14K and 1 sec delay)
 
-dyskt 0.1.6
+ 0.1.6
  desc: added command interface through a socket
  includes: dyskt 0.0.11 rto 0.0.12 rdoctl 0.0.8 dyskt.conf dyskt.log.conf dysktd
  changes:
@@ -68,7 +68,7 @@ dyskt 0.1.6
     o possibility of a never-ending scan on same channel when receiving tokens
      from DySKT
 
- iyri 0.2.0
+ 0.2.0
   desc: Utilizes a "circular buffer" IOT remove the inherent inefficiency from
    passing frame(s) through multiple connections and functions including the
    inefficiency involved in making frequent copies of the frame(s). Because

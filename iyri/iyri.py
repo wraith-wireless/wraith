@@ -12,8 +12,8 @@ messages from client will be in the following format
  where:
   id is an integer (unique)
   cmd is oneof {state|scan|hold|listen|pause|txpwr|spoof}
-  radio is oneof {both|all|recon|surveillance} where both enforces recon and
-   surveillance radio and all does not
+  radio is oneof {both|all|abad|shama} where both enforces abad and
+   shama radio and all does not
   param is:
    o of the format channel:width if cmd is listen where width is oneof {'None','HT20','HT40+','HT40-'}
    o of the format pwr:option where pwr is in dBm and option is oneof {fixed|auto|limit}
@@ -247,16 +247,16 @@ class Iryi(object):
         self._cpath = conf if conf else os.path.join(GPATH,'iyri.conf')
         
         # internal variables
-        self._state = IYRI_INVALID # current state
+        self._state = IYRI_INVALID  # current state
         self._conf = {}             # iyri configuration dict
         self._halt = None           # the stop event
         self._pConns = None         # token pipes for children (& c2c)
         self._ic = None             # internal comms queue
-        self._collator = None            # data collation/forwarding
-        self._rr = None             # recon radio
-        self._rbuffer = None        # recon radio buffer
-        self._sr = None             # surveillance radio
-        self._sbuffer = None        # surveillance radio buffer
+        self._collator = None       # data collation/forwarding
+        self._ar = None             # abad radio
+        self._abuffer = None        # abad radio buffer
+        self._sr = None             # shama radio
+        self._sbuffer = None        # shama radio buffer
         self._rd = None             # regulatory domain
         self._c2c = None            # our c2c
 
@@ -295,12 +295,12 @@ class Iryi(object):
                     if l == 'err':
                         # only process errors invovled during execution
                         if IYRI_CREATED < self.state < IYRI_EXITING:
-                            # continue w/out surveillance if it fails
-                            if o == 'surveillance':
-                                logging.warning("Surveillance radio dropped: %s",m)
-                                self._pConns['surveillance'].send('!STOP!')
-                                self._pConns['surveillance'].close()
-                                del self._pConns['surveillance']
+                            # continue w/out shama if it fails
+                            if o == 'shama':
+                                logging.warning("Shama dropped: %s",m)
+                                self._pConns['shama'].send('!STOP!')
+                                self._pConns['shama'].close()
+                                del self._pConns['shama']
                                 mp.active_children()
                                 self._sr = None
                             else:
@@ -359,8 +359,8 @@ class Iryi(object):
                     raise RuntimeError("Backend:PostgreSQL:service not running")
 
             # create circular buffers
-            self._rbuffer = memoryview(mp.Array('B',M*N,lock=False))
-            if self._conf['surveillance']:
+            self._abuffer = memoryview(mp.Array('B',M*N,lock=False))
+            if self._conf['shama']:
                 self._sbuffer = memoryview(mp.Array('B',M*N,lock=False))
 
             # start Collator first (IOT accept comms from the radios)
@@ -368,7 +368,7 @@ class Iryi(object):
             logging.info("Starting Collator...")
             (conn1,conn2) = mp.Pipe()
             self._pConns['collator'] = conn1
-            self._collator = Collator(self._ic,conn2,self._sbuffer,self._rbuffer,self._conf)
+            self._collator = Collator(self._ic,conn2,self._sbuffer,self._abuffer,self._conf)
             logging.info("Collator started")
 
             # set the region? if so, do it prior to starting the radio(s)
@@ -382,28 +382,28 @@ class Iryi(object):
                 else:
                     logging.info("Regulatory domain set to %s",rd)
 
-            # recon radio is mandatory
-            mode = 'paused' if self._conf['recon']['paused'] else 'scan'
-            logging.info("Starting Reconnaissance Radio...")
+            # abad radio is mandatory
+            mode = 'paused' if self._conf['abad']['paused'] else 'scan'
+            logging.info("Starting Abad...")
             (conn1,conn2) = mp.Pipe()
-            self._pConns['recon'] = conn1
-            self._rr = RadioController(self._ic,conn2,self._rbuffer,self._conf['recon'])
-            logging.info("Reconnaissance Radio started in %s mode",mode)
+            self._pConns['abad'] = conn1
+            self._ar = RadioController(self._ic,conn2,self._abuffer,self._conf['abad'])
+            logging.info("Abad started in %s mode",mode)
 
-            # surveillance if present
-            if self._conf['surveillance']:
+            # shama if present
+            if self._conf['shama']:
                 try:
-                    mode = 'paused' if self._conf['surveillance']['paused'] else 'scan'
-                    logging.info("Starting Surveillance Radio...")
+                    mode = 'paused' if self._conf['shama']['paused'] else 'scan'
+                    logging.info("Starting Shama...")
                     (conn1,conn2) = mp.Pipe()
-                    self._pConns['surveillance'] = conn1
+                    self._pConns['shama'] = conn1
                     self._sr = RadioController(self._ic,conn2,
-                                               self._sbuffer,self._conf['surveillance'])
+                                               self._sbuffer,self._conf['shama'])
                 except RuntimeError as e:
                     # continue without collector, but log it
-                    logging.warning("Surveillance Radio failed: %s, continuing w/out",e)
+                    logging.warning("Shama failed: %s, continuing w/out",e)
                 else:
-                    logging.info("Surveillance Radio started in %s mode",mode)
+                    logging.info("Shama started in %s mode",mode)
 
             # c2c socket -> on failure log it and keep going
             logging.info("Starting C2C...")
@@ -429,7 +429,7 @@ class Iryi(object):
         else:
             # start children execution
             self._state = IYRI_CREATED
-            self._rr.start()
+            self._ar.start()
             if self._sr: self._sr.start()
             self._collator.start()
 
@@ -480,17 +480,17 @@ class Iryi(object):
         self._conf = {}
 
         try:
-            # read in the recon radio configuration
-            self._conf['recon'] = self._readradio(cp,'Recon')
+            # read in the abad radio configuration
+            self._conf['abad'] = self._readradio(cp,'Abad')
             try:
-                # catch any surveillance exceptions and log a warning
-                if cp.has_section('Surveillance'):
-                    self._conf['surveillance'] = self._readradio(cp,'Surveillance')
+                # catch any shama exceptions and log a warning
+                if cp.has_section('Shama'):
+                    self._conf['shama'] = self._readradio(cp,'Shama')
                 else:
-                    self._conf['surveillance'] = None
-                    logging.info("No surveillance radio specified")
+                    self._conf['shama'] = None
+                    logging.info("No shama radio specified")
             except (ConfigParser.NoSectionError,ConfigParser.NoOptionError,RuntimeError,ValueError):
-                logging.warning("Invalid surveillance specification. Continuing without...")
+                logging.warning("Invalid shama specification. Continuing without...")
 
             # GPS section
             self._conf['gps'] = {}
@@ -546,7 +546,7 @@ class Iryi(object):
             raise IryiConfException("%s" % e)
 
     # noinspection PyMethodMayBeStatic
-    def _readradio(self,cp,rtype='Recon'):
+    def _readradio(self,cp,rtype='Abad'):
         """ read in the rtype radio configuration from conf and return parsed dict """
         # don't bother if specified radio is not present
         if not cp.get(rtype,'nic') in wifaces():
@@ -673,17 +673,17 @@ class Iryi(object):
 
         radios = []
         radio = tkns[2].strip().lower()
-        if radio not in ['both','all','recon','surveillance']:
+        if radio not in ['both','all','abad','shama']:
             self._pConns['c2c'].send("ERR %d \001invalid radio specification: %s \001\n" % (cmdid,radio))
             return None,None,None,None
 
         if radio == 'all':
-            radios = ['recon']
-            if self._sr is not None: radios.append('surveillance')
-        elif radio == 'both': radios = ['recon','surveillance']
+            radios = ['abad']
+            if self._sr is not None: radios.append('shama')
+        elif radio == 'both': radios = ['abad','shama']
         else: radios = [radio]
-        if 'surveillance' in radios and self._sr is None:
-            self._pConns['c2c'].send("ERR %d \001surveillance radio not present\001\n" % cmdid)
+        if 'shama' in radios and self._sr is None:
+            self._pConns['c2c'].send("ERR %d \001shama radio not present\001\n" % cmdid)
             return None,None,None,None
 
         # ensure any params are valid

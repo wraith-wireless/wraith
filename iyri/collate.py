@@ -148,23 +148,23 @@ class GPSPoller(threading.Thread):
 
 class Collator(mp.Process):
     """ Collator - handles further processing of raw frames from the sniffer """
-    def __init__(self,comms,conn,rb,sb,conf):
+    def __init__(self,comms,conn,ab,sb,conf):
         """
          initializes Collator
          comms - internal communication
           NOTE: all messages sent on internal comms must be a tuple T where
            T = (sender callsign,timestamp of event,type of message,event message)
          conn - connection to/from Iyri
-         rb - recon circular buffer
-         sb - surveillance circular buffer
+         ab - Abad's circular buffer
+         sb - Shama's circular buffer
          conf - necessary config details
         """
         mp.Process.__init__(self)
         self._icomms = comms       # communications queue
         self._cI = conn            # message connection to/from Iyri
         self._gconf = conf['gps']  # configuration for gps/datastore
-        self._rb = rb              # recon buffer
-        self._sb = sb              # surveillance buffer
+        self._ab = ab              # abad buffer
+        self._sb = sb              # shama buffer
         self._gps = None           # polling thread for front line traces
         self._qG = None            # internal queue for gps poller
         self._conn = None          # conn to backend db
