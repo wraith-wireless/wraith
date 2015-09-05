@@ -204,9 +204,13 @@ CREATE TABLE using_radio(
    phy VARCHAR(5) NOT NULL,   -- the phy of radio
    nic VARCHAR(5) NOT NULL,   -- actual nic of radio
    vnic VARCHAR(6) NOT NULL,  -- virtual nic of radio
+   hop REAL NOT NULL,         -- avg hop time
+   ival REAL NOT NULL,        -- ttl time to complete a scan
    role ROLE NOT NULL,        -- what role radio is playing now
    period TSTZRANGE NOT NULL, -- timerange sensor is using mac
    CONSTRAINT ch_sid CHECK (sid > 0),
+   CONSTRAINT ch_hop CHECK (hop > 0),
+   CONSTRAINT ch_ival CHECK (ival > 0),
    FOREIGN KEY (sid) REFERENCES sensor(session_id) ON DELETE CASCADE,
    FOREIGN KEY (mac) REFERENCES radio(mac) ON DELETE CASCADE,
    EXCLUDE USING gist (sid WITH =,mac WITH =,period WITH &&)

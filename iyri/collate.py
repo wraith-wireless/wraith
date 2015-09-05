@@ -132,9 +132,9 @@ class GPSPoller(threading.Thread):
                         flt['alt'] = rpt['alt'] if 'alt' in rpt else float("nan")
                         flt['dir'] = rpt['track'] if 'track' in rpt else float("nan")
                         flt['spd'] = rpt['spd'] if 'spd' in rpt else float("nan")
-                        flt['dop'] = {'xdop':self._gpsd.xdop,
-                                       'ydop':self._gpsd.ydop,
-                                       'pdop':self._gpsd.pdop}
+                        flt['dop'] = {'xdop':'%.3f' % self._gpsd.xdop,
+                                       'ydop':'%.3f' % self._gpsd.ydop,
+                                       'pdop':'%.3f' % self._gpsd.pdop}
                         self._eQ.put(('!GEO',time.time(),flt))
                         break
                 except (KeyError,AttributeError):
@@ -291,19 +291,12 @@ class Collator(mp.Process):
             except psql.Error as e: # possible incorrect semantics/syntax
                 self._conn.rollback()
                 self._cI.send(('warn','Collator','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
-            #except IndexError: # something wrong with antenna indexing
-            #    self._cI.send(('err','Collator',"Radio","misconfigured antennas"))
+            except IndexError: # something wrong with antenna indexing
+                self._cI.send(('err','Collator',"Radio","misconfigured antennas"))
             except KeyError as e: # a radio sent a message without initiating
                 self._cI.send(('err','Collator','Radio %s' % e,"data out of order (%s)" % ev))
-            #except Exception as e: # handle catchall error
-            #    self._cI.send(('err','Collator','Unknown',e))
-
-        # any bulked frames not yet sent?
-        #for cs in rmap:
-        #    ret = self._flushbulk(time.time(),rmap[cs],cs)
-        #    if ret:
-        #        if ret: self._cI.send(('err','Collator','Nidus',ret))
-        #        break
+            except Exception as e: # handle catchall error
+                self._cI.send(('err','Collator','Unknown',e))
 
         # notify Nidus of closing (radios,sensor,gpsd). hopefully no errors on send
         ts = ts2iso(time.time())
@@ -474,11 +467,11 @@ class Collator(mp.Process):
 
             # add a using_radio record
             sql = """
-                   insert into using_radio (sid,mac,phy,nic,vnic,role,period)
-                   values (%s,%s,%s,%s,%s,%s,tstzrange(%s,NULL,'[]'));
+                   insert into using_radio (sid,mac,phy,nic,vnic,hop,ival,role,period)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,tstzrange(%s,NULL,'[]'));
                   """
-            self._curs.execute(sql,(self._sid,r['mac'],r['phy'],r['nic'],
-                                    r['vnic'],r['role'],ts))
+            self._curs.execute(sql,(self._sid,r['mac'],r['phy'],r['nic'],r['vnic'],
+                                    r['hop'],r['ival'],r['role'],ts))
 
             # add a txpwr event
             sql = "insert into radio_event (mac,state,params,ts) values (%s,%s,%s,%s);"
