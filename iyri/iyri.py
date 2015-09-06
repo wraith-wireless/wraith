@@ -522,7 +522,7 @@ class Iryi(object):
                 raise RuntimeError("Invalid IP address for storage host")
 
             # Local section
-            self._conf['local'] = {'region':None,'c2c':2526,'oui':''}
+            self._conf['local'] = {'region':None,'c2c':2526}
             if cp.has_option('Local','C2C'):
                 try:
                     self._conf['local']['c2c'] = cp.getint('Local','C2C')
@@ -535,11 +535,6 @@ class Iryi(object):
                     logging.warning("Regulatory domain %s is invalid",reg)
                 else:
                     self._conf['local']['region'] = cp.get('Local','region')
-
-            if cp.has_option('Local','oui'):
-                oui = cp.get('Local','oui')
-                if os.path.isfile(oui): self._conf['local']['oui'] = oui
-                else: logging.warning("OUI path does not exists. Ignoring")
         except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
             raise IryiConfException("%s" % e)
         except (RuntimeError,ValueError) as e:

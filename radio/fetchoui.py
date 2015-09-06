@@ -15,31 +15,43 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import urllib2 as url
+import urllib2
 import os
 import re
-import wraith
+import sys
+import time
+from wraith import OUI, __version__ as v
+from wraith.utils.timestamps import ts2iso
 
-if __name__ == '__main__':
-    req = url.Request('http://standards-oui.ieee.org/oui.txt')
-    req.add_header('User-Agent',
-                   "wraith-rt/%s +https://github.com/wraith-wireless/wraith/" % wraith.__version__)
+def fetch():
+    """retrieves oui.txt from IEEE and write to data file """
+    ouiurl = 'http://standards-oui.ieee.org/oui.txt'
+    ouipath = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           os.path.abspath('../'+OUI))
+    if not os.path.isdir(os.path.dirname(ouipath)):
+        print 'Path to data is incorrect %s' % oupath
+        sys.exit(1)
+
+    # fetch oui file from ieee
     fout = None
     pattern = r'^([-|\w]*)   \(hex\)\t\t(.*)\r'
+    req = urllib2.Request(ouiurl)
+    req.add_header('User-Agent',"wraith-rt/%s +https://github.com/wraith-wireless/wraith/" % v)
     try:
-        # retrieve the oui file and parse out gen date
-        res = url.urlopen(req)
-        ls = res.readlines()
-        gen = ls[0].strip().split('Generated: ')[1]
+        # retrieve the oui file and parse out generated date
+        print 'Fetching ', ouiurl
+        res = urllib2.urlopen(req)
+        print "Parsing OUI file"
 
+        gen = ts2iso(time.time())
         # open oui file
-        dpath = os.path.abspath('../data/oui.txt')
-        fout = open(dpath,'w')
+        fout = open(ouipath,'w')
         fout.write(gen+'\n')
 
         # pull out ouis
+        t = time.time()
         cnt = 0
-        for l in ls[7:]:
+        for l in res.readlines():
             if '(hex)' in l:
                 # extract oui and manufacturer
                 oui,manuf = l.split('(hex)')
@@ -51,12 +63,15 @@ if __name__ == '__main__':
                 # write to file & update count
                 fout.write('%s\t%s\n' % (oui,manuf))
                 cnt += 1
-        print "Wrote %d ouis generated %s" % (cnt,gen)
-    except url.URLError as e:
+        t1 = time.time()
+        print "Wrote %d OUIs in %.3f secs" % (cnt,t1-t)
+    except urllib2.URLError as e:
         print "Error fetching oui file: %s" % e
     except IOError as e:
         print "Error opening output file :%s" % e
-    except Exception as e:
-        print "Error parsing oui file: %s" % e
+    #except Exception as e:
+    #    print "Error parsing oui file: %s" % e
     finally:
         if fout: fout.close()
+
+if __name__ == '__main__': fetch()
