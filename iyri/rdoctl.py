@@ -330,13 +330,13 @@ class RadioController(mp.Process):
         # determine virtual interface name
         ns = []
         for wiface in iwt.wifaces():
-            cs = wiface.split('iyri')
+            cs = wiface.split(self._role)
             try:
                 if len(cs) > 1: ns.append(int(cs[1]))
             except ValueError:
                 pass
         n = 0 if not 0 in ns else max(ns)+1
-        self._vnic = "iyri%d" % n
+        self._vnic = "%s%d" % (self._role,n)
 
         # sniffing interface
         try:

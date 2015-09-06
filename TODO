@@ -30,7 +30,6 @@ GUI:
      with 00:01:02.*
 Iyri:
  26) how to identify gps device failure, removal?
- 52) pass hop time and interval time to iyri (from rdoctl)
  53) implement spoof, txpwr commands
  54) Iyri fails to stop (now) on ctrl-c when it starts in pause state
 Radio:
@@ -47,21 +46,3 @@ Radio:
  6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
  7) compile/use own oui file, not relying on aircrack-ng
     see http://standards-oui.ieee.org/oui.txt
-    >>> s
-'  FC-FE-C2   (hex)\t\tInvensys Controls UK Limited'
->>> s2
-'FC-FB-FB   (hex)\t\tCISCO SYSTEMS, INC.'
->>> s2.split('   (hex)\t\t')
-['FC-FB-FB', 'CISCO SYSTEMS, INC.']
->>> (oui,manuf) = s2.split('   (hex)\t\t')
->>> oui
-'FC-FB-FB'
->>> manuf
-'CISCO SYSTEMS, INC.'
->>> s3='FCFC48     (base 16)            Apple, Inc.'
->>> s3.split('   (hex)\t\t')
-['FCFC48     (base 16)\t\tApple, Inc.']
->>> (oui,manuf) = s3.split('   (hex)\t\t')
-Traceback (most recent call last):
-  File "<stdin>", line 1, in <module>
-ValueError: need more than 1 value to unpack

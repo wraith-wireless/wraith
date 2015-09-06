@@ -57,8 +57,9 @@ wraith 0.0.4
  wraith 0.0.5
   desc: concentration on single-platform system. Remove nidus and allow sensor
   to communicate directly with postgresql.
- includes:  wraith-rt.py, subpanels.py
+ includes:  wraith-rt.py, subpanels.py iyri 0.2.0
  changes:
+  - added fetchoui to use our own oui file
   - removed nidus service
   - renamed iyri to iyri
   - moved db writes to iyri
