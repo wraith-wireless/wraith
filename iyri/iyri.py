@@ -353,8 +353,8 @@ class Iryi(object):
 
         try:
             # don't even bother if psql is local and it's not running
-            if self._conf['store']['host'] == '127.0.0.1' or\
-               self._conf['store']['host'] == 'localhost':
+            host = self._conf['store']['host']
+            if host == '127.0.0.1' or host == 'localhost':
                 if not runningprocess('postgres'):
                     raise RuntimeError("Backend:PostgreSQL:service not running")
 

@@ -19,7 +19,6 @@ import sys                                 # python intepreter details
 import signal                              # signal processing
 import time                                # sleep and timestamps
 import socket                              # connection to gps device
-import threading                           # threads
 import mgrs                                # lat/lon to mgrs conversion
 import gps                                 # gps device access
 from Queue import Queue, Empty             # thread-safe queue
@@ -29,30 +28,20 @@ from wraith.utils.timestamps import ts2iso # timestamp conversion
 from wraith.radio.iw import regget         # regulatory domain
 from wraith.utils.cmdline import ipaddr    # returns ip address
 
-class GPSPoller(threading.Thread):
+class GPSPoller(mp.Process):
     """ periodically checks gps for current location """
-    def __init__(self,eq,conf):
+    def __init__(self,cC,conf):
         """
-         eq - event queue between collator and this Thread
+         cC - connection to/from Collator
          conf - config file for gps
         """
-        threading.Thread.__init__(self)
-        self._done = threading.Event() # stop event
-        self._eQ = eq                  # msg queue from radio controller
-        self._conf = conf              # gps configuration
-        self._gpsd = None              # connection to the gps device
+        mp.Process.__init__(self)
+        self._cC = cC     # connection to/from Collator
+        self._conf = conf # gps configuration
+        self._gpsd = None # connection to the gps device
         self._setup()
 
-    def _setup(self):
-        """ attempt to connect to device if fixed is off """
-        if self._conf['fixed']: return # static, do nothing
-        try:
-            self._gpsd = gps.gps('127.0.0.1',self._conf['port'])
-            self._gpsd.stream(gps.WATCH_ENABLE)
-        except socket.error as e:
-            raise RuntimeError(e)
-
-    def shutdown(self): self._done.set()
+    def terminate(self): pass
 
     def run(self):
         """ query for current location """
@@ -61,7 +50,7 @@ class GPSPoller(threading.Thread):
         # initialize device details dict
         if self._conf['fixed']:
             # configure a 'fake' device
-            poll = 0.5 # please poll charm
+            poll = 0.5               # quiet pyCharm alerts
             qpx = qpy = float('inf') # quiet PyCharm alerts
             dd = {'id':'xxxx:xxxx',
                   'version':'0.0',
@@ -82,7 +71,7 @@ class GPSPoller(threading.Thread):
 
         # Device Details Loop - get complete details or quit on done
         while dd['flags'] is None:
-            if self._done.is_set(): break
+            if self._cC.poll() and self._cC.recv() == '!STOP!':  break
             else:
                 # loop while data is on serial, polling first
                 while self._gpsd.waiting():
@@ -99,28 +88,33 @@ class GPSPoller(threading.Thread):
                     except KeyError:
                         pass
 
-        m = mgrs.MGRS()
         # send device details. If fixed gps, exit immediately
-        if not self._done.is_set():
-            self._eQ.put(('!DEV!',time.time(),dd))
-            if self._conf['fixed']: # send static front line trace
-                self._eQ.put(('!FLT!',time.time(),{'id':dd['id'],
-                                                  'fix':-1,
-                                                  'coord':m.toMGRS(self._conf['lat'],
-                                                                   self._conf['lon']),
-                                                  'epy':0.0,
-                                                  'epx':0.0,
-                                                  'alt':self._conf['alt'],
-                                                  'dir':self._conf['dir'],
-                                                  'spd':0.0,
-                                                  'dop':{'xdop':1,'ydop':1,'pdop':1}}))
-                return
+        m = mgrs.MGRS()
+        if self._cC.poll() and self._cC.recv() == '!STOP!':
+            if self._gpsd: self._gpsd.close()
+            self._cC.close()
+            return
+
+        self._cC.send(('!DEV!',time.time(),dd))
+        if self._conf['fixed']: # send static front line trace
+            self._cC.send(('!FLT!',time.time(),{'id':dd['id'],
+                                               'fix':-1,
+                                               'coord':m.toMGRS(self._conf['lat'],
+                                                                self._conf['lon']),
+                                               'epy':0.0,
+                                               'epx':0.0,
+                                               'alt':self._conf['alt'],
+                                               'dir':self._conf['dir'],
+                                               'spd':0.0,
+                                               'dop':{'xdop':1,'ydop':1,'pdop':1}}))
+            return
 
         # Location - loop until told to quit
-        while not self._done.is_set():
-            # while there's data, get it (NOTE: this loop may exit without data)
+        while True:
+            if self._cC.poll() and self._cC.recv() == '!STOP!': break
             while self._gpsd.waiting():
-                if self._done.is_set(): break
+                # recheck if we need to stop
+                if self._cC.poll() and self._cC.recv() == '!STOP!': break
                 rpt = self._gpsd.next()
                 if rpt['class'] != 'TPV': continue
                 try:
@@ -137,16 +131,29 @@ class GPSPoller(threading.Thread):
                                'dop':{'xdop':'%.3f' % self._gpsd.xdop,
                                       'ydop':'%.3f' % self._gpsd.ydop,
                                       'pdop':'%.3f' % self._gpsd.pdop}}
-                        self._eQ.put(('!GEO',time.time(),flt))
+                        self._cC.send(('!GEO',time.time(),flt))
                         break
                 except (KeyError,AttributeError):
                     # a KeyError means not all values are present, an
                     # AttributeError means not all dop values are present
                     pass
+                except:
+                    # blanket exception
+                    break
             time.sleep(poll)
 
         # close out connection
         self._gpsd.close()
+        self._cC.close()
+
+    def _setup(self):
+        """ attempt to connect to device if fixed is off """
+        if not self._conf['fixed']:
+            try:
+                self._gpsd = gps.gps('127.0.0.1',self._conf['port'])
+                self._gpsd.stream(gps.WATCH_ENABLE)
+            except socket.error as e:
+                raise RuntimeError(e)
 
 class Collator(mp.Process):
     """ Collator - handles further processing of raw frames from the sniffer """
@@ -168,7 +175,7 @@ class Collator(mp.Process):
         self._ab = ab              # abad buffer
         self._sb = sb              # shama buffer
         self._gps = None           # polling thread for front line traces
-        self._qG = None            # internal queue for gps poller
+        self._cG = None            # internal connection for gps poller
         self._conn = None          # conn to backend db
         self._curs = None          # primary db cursors
         self._sid = None           # our session id
@@ -192,9 +199,9 @@ class Collator(mp.Process):
             self._submitsensor(ts2iso(time.time()),True)
             self._submitplatform(ts2iso(time.time()))
             if self._gconf:
-                self._qG = Queue()
+                (self._cG,conn2) = mp.Pipe()
                 try:
-                    self._gps = GPSPoller(self._qG,self._gconf)
+                    self._gps = GPSPoller(conn2,self._gconf)
                     self._gps.start()
                 except RuntimeError as e:
                     self._cI.send(('warn','Collator','GPSD',"Failed to connnect: %s" %e))
@@ -214,26 +221,27 @@ class Collator(mp.Process):
 
         # execution loop
         while True:
-            # TODO: convert all to select
+            # TODO: convert all to select??
             # 1. anything from Iyri
             if self._cI.poll() and self._cI.recv() == '!STOP!': break
 
             # 2. gps device/frontline trace?
             try:
-                t,ts,msg = self._qG.get_nowait()
-            except (Empty,AttributeError): pass
-            else:
-                if t == '!FLT!': self._submitflt(ts2iso(ts),msg)
-                elif t == '!DEV!':
-                    try:
+                if self._cG.poll():
+                    t,ts,msg = self._cG.recv()
+                    if t == '!FLT!': self._submitflt(ts2iso(ts),msg)
+                    elif t == '!DEV!':
                         gpsid = msg['id']
                         self._cI.send(('info','Collator','GPSD',"%s initiated" % gpsid))
                         self._submitgpsd(ts2iso(ts),True,msg)
-                    except psql.OperationalError as e: # unrecoverable
-                        self._cI.send(('err','Collator','DB',"%s: %s" % (e.pgcode,e.pgerror)))
-                    except psql.Error as e: # possible incorrect semantics/syntax
-                        self._conn.rollback()
-                        self._cI.send(('warn','Collator','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
+            except EOFError:
+                # pipe was closed TODO: need to do something with this
+                pass
+            except psql.OperationalError as e: # unrecoverable
+                self._cI.send(('err','Collator','DB',"%s: %s" % (e.pgcode,e.pgerror)))
+            except psql.Error as e: # possible incorrect semantics/syntax
+                self._conn.rollback()
+                self._cI.send(('warn','Collator','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
 
             # 3. queued data from internal comms
             ev = msg = None
@@ -309,7 +317,7 @@ class Collator(mp.Process):
         if not self._shutdown():
             try:
                 self._cI.send(('warn','Collator','Shutdown',"Incomplete shutdown"))
-            except IOError:
+            except EOFError:
                 # most likely Iyri closed its side of the pipe
                 pass
 
@@ -341,13 +349,14 @@ class Collator(mp.Process):
         # try shutting down & resetting radio (if it failed we may not be able to)
         clean = True
         try:
+            # stop GPSPoller
+            self._cG.send('!STOP!')
+            while mp.active_children(): time.sleep(0.5)
+
             # close backend connection and connection to Iyri
             if self._curs: self._curs.close()
             if self._conn: self._conn.close()
             self._cI.close()
-
-            # stop GPSPoller
-            if self._gps and self._gps.is_alive(): self._gps.stop()
         except:
             clean = False
         return clean
@@ -496,7 +505,6 @@ class Collator(mp.Process):
         self._curs.execute(sql,(a['mac'],a['idx'],a['gain'],a['loss'],
                                 a['x'],a['y'],a['z'],a['type'],ts))
         self._conn.commit()
-
 
     def _submitradioevent(self,ts,m):
         """ submit radioevent at ts """

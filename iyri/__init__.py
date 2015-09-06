@@ -80,6 +80,7 @@ REVISIONS:
   includes: iyri 0.1.0 collator 0.1.0 rdoctl 0.1.0 iyri.conf iyri.log.conf iyrid
   changes:
    - no longer passes data to storage manager, rather writes directly to db
+   - set GPSPoller as a process rather than a thread
    - uses a memoryview to hold captured frames in a circular buffer
 """
 __name__ = 'iyri'
