@@ -20,10 +20,14 @@ import time
 from wraith import OUI, __version__ as v
 from wraith.utils.timestamps import ts2iso
 
-def parseoui(path):
+def parseoui(path = None):
     """ parse oui.txt file at path filling in oui dict oui->manuf """
     fin = None
     ouis = {}
+
+    if path is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            os.path.abspath('../'+OUI))
 
     try:
         fin = open(path)

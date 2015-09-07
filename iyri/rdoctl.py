@@ -22,7 +22,6 @@ from Queue import Queue, Empty         # thread-safe queue
 import multiprocessing as mp           # for Process
 from wraith.radio import iw            # iw command line interface
 import wraith.radio.iwtools as iwt     # nic command line interaces
-from wraith.radio.mpdu import MAX_MPDU # maximum size of frame
 from wraith.iyri.constants import *    # tuner states & buffer dims
 
 class Tuner(threading.Thread):
@@ -128,10 +127,9 @@ class Tuner(threading.Thread):
                             self._qR.put(('!ERR!',ts,(cid,"invalid command %s" % cmd)))
             else:
                 try:
-                    # no token, go to next channel, notify RadioController reset remaining
+                    # no token, go to next channel, reset remaining
                     self._i = (self._i+1) % len(self._chs)
                     iw.chset(self._vnic,self._chs[self._i][0],self._chs[self._i][1])
-                    #self._qR.put(('!CHANNEL!',time.time(),(-1,self.channel)))
                     remaining = 0 # reset remaining timeout
                 except iw.IWException as e:
                     self._qR.put(('!FAIL!',time.time(),(-1,e)))
@@ -154,7 +152,6 @@ class RadioController(mp.Process):
         self._cI = conn           # message connection to/from Iyri
         self._buffer = buff       # buffer for frames
         self._qT = None           # queue between tuner and us
-        #self._hist = {}           # channel histogram
         self._role = None         # role this radio plays
         self._nic = None          # radio network interface controller name
         self._mac = None          # real mac address
@@ -236,7 +233,6 @@ class RadioController(mp.Process):
                     self._stuner = TUNE_SCAN
                     self._icomms.put((self._vnic,ts,'!SCAN!',msg[1]))
                     if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
-                    #self._resethist()
                 elif event == '!LISTEN':
                     self._stuner = TUNE_LISTEN
                     self._icomms.put((self._vnic,ts,'!LISTEN!',msg[1]))
@@ -245,17 +241,13 @@ class RadioController(mp.Process):
                     self._stuner = TUNE_PAUSE
                     self._icomms.put((self._vnic,ts,'!PAUSE!',' '))
                     if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
-                #elif event == '!CHANNEL!': self._hkey = msg[1]
-                #elif event == '!DWELL!':
-                #    self._resethist()
-                #    self._icomms.put((self._vnic,ts,'!DWELL!',msg[1]))
                 elif event == '!STOP!': break
 
         # shut down
         if not self._shutdown():
             try:
                 self._cI.send(('warn',self._role,'Shutdown',"Incomplete reset"))
-            except IOError:
+            except EOFError:
                 # most likely Iyri already closed their side
                 pass
 
@@ -397,7 +389,6 @@ class RadioController(mp.Process):
                     t = time.time()
                     iw.chset(self._vnic,scan[i][0],scan[i][1])
                     self._hop += (time.time() - t)
-                    #self._hist['%s:%s' % (scan[i][0],scan[i][1])] = 0 # init histogram
                     i += 1
                 except iw.IWException as e:
                     # if invalid argument, drop the channel otherwise reraise error
@@ -506,7 +497,3 @@ class RadioController(mp.Process):
         except:
             clean = False
         return clean
-
-    #def _resethist(self):
-    #    """ set all hist values to 0 """
-    #    for key in self._hist: self._hist[key] = 0

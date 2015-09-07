@@ -21,12 +21,15 @@ import time                                # sleep and timestamps
 import socket                              # connection to gps device
 import mgrs                                # lat/lon to mgrs conversion
 import gps                                 # gps device access
-from Queue import Queue, Empty             # thread-safe queue
+from Queue import Empty                    # thread-safe queue
 import multiprocessing as mp               # multiprocessing
 import psycopg2 as psql                    # postgresql api
 from wraith.utils.timestamps import ts2iso # timestamp conversion
 from wraith.radio.iw import regget         # regulatory domain
 from wraith.utils.cmdline import ipaddr    # returns ip address
+from wraith.radio.oui import parseoui      # parse out oui dict
+import wraith.radio.radiotap as rtap
+from wraith.iyri.constants import N        # buffer length
 
 class GPSPoller(mp.Process):
     """ periodically checks gps for current location """
@@ -172,14 +175,14 @@ class Collator(mp.Process):
         self._icomms = comms       # communications queue
         self._cI = conn            # message connection to/from Iyri
         self._gconf = conf['gps']  # configuration for gps/datastore
-        self._ab = ab              # abad buffer
-        self._sb = sb              # shama buffer
         self._gps = None           # polling thread for front line traces
         self._cG = None            # internal connection for gps poller
         self._conn = None          # conn to backend db
         self._curs = None          # primary db cursors
-        self._sid = None           # our session id
-        self._gid = None           # the gpsd id from the backend
+        self._sid = None           # our session id (from the backend)
+        self._gid = None           # the gpsd id (from the backend)
+        self._ab = ab              # abad's buffer
+        self._sb = sb              # shama's buffer
         self._setup(conf['store'])
 
     def terminate(self): pass
@@ -191,13 +194,14 @@ class Collator(mp.Process):
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
         # basic variables
+        ouis = parseoui()
         rmap = {}    # radio map: maps callsigns to mac addr
-        gpsid = None # id of gps device
+        buffers = {} # buffer map
 
         # send sensor up notification, platform details and gpsid
         try:
             self._submitsensor(ts2iso(time.time()),True)
-            self._submitplatform(ts2iso(time.time()))
+            self._submitplatform()
             if self._gconf:
                 (self._cG,conn2) = mp.Pipe()
                 try:
@@ -231,8 +235,7 @@ class Collator(mp.Process):
                     t,ts,msg = self._cG.recv()
                     if t == '!FLT!': self._submitflt(ts2iso(ts),msg)
                     elif t == '!DEV!':
-                        gpsid = msg['id']
-                        self._cI.send(('info','Collator','GPSD',"%s initiated" % gpsid))
+                        self._cI.send(('info','Collator','GPSD',"%s initiated" % msg['id']))
                         self._submitgpsd(ts2iso(ts),True,msg)
             except EOFError:
                 # pipe was closed TODO: need to do something with this
@@ -244,14 +247,17 @@ class Collator(mp.Process):
                 self._cI.send(('warn','Collator','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
 
             # 3. queued data from internal comms
-            ev = msg = None
+            cs = ts = ev = msg = None
             try:
                 cs,ts,ev,msg = self._icomms.get(True,0.5)
                 ts = ts2iso(ts)
 
-                if ev == '!UP!':
-                    # should be the 1st message we get from radio(s). Notify
-                    # Iyri, submit the new radio and it's antennas
+                if ev == '!UP!': # should be the 1st message we get from radio(s).
+                    # assign buffers TODO I don't like constraining this assignment
+                    if cs.startswith('abad'): buffers[cs] = self._ab
+                    else: buffers[cs] = self._sb
+
+                    # assign radio map and submit antenna
                     rmap[cs] = msg['mac']
                     self._cI.send(('info','Collator','Radio',"%s initiated" % cs))
                     self._submitradio(ts,True,msg)
@@ -264,10 +270,9 @@ class Collator(mp.Process):
                                                 'y':msg['y'][i],
                                                 'z':msg['z'][i]})
                 elif ev == '!FAIL!':
-                    # notify Iyri, submit faile & delete cs
+                    # notify Iyri, submit fail & delete cs
                     self._submitradioevent(ts,[rmap[cs],'fail',msg])
                     del rmap[cs]
-                    del self._bulk[cs]
                 elif ev == '!SCAN!':
                     # compile the scan list into a string before sending
                     sl = ",".join(["%s:%s" % (c,w) for (c,w) in msg])
@@ -288,10 +293,12 @@ class Collator(mp.Process):
                 elif ev == '!TXPWR!':
                     self._cI.send(('info',cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'txpwr',msg])
-                #elif ev == '!DWELL!':
-                #    if msg: self._cI.send(('info',cs,ev.replace('!',''),msg))
                 elif ev == '!FRAME!':
-                    pass
+                    ix,l = msg
+                    #b = buffers[cs][(ix*N):(ix*N)+l]
+                    #bytes = b.tobytes()
+                    #dR = rtap.parse(bytes)
+                    #print dR
                 else: # unidentified event type, notify iyri
                     self._cI.send(('warn','Collator','Radio',"unknown event %s" % ev))
             except Empty: continue
@@ -300,12 +307,14 @@ class Collator(mp.Process):
             except psql.Error as e: # possible incorrect semantics/syntax
                 self._conn.rollback()
                 self._cI.send(('warn','Collator','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
+            except ValueError as e: # a tuple did not unpack
+                self._cI.send(('warn','Collator','Unpack',e))
             except IndexError: # something wrong with antenna indexing
                 self._cI.send(('err','Collator',"Radio","misconfigured antennas"))
-            except KeyError as e: # a radio sent a message without initiating
-                self._cI.send(('err','Collator','Radio %s' % e,"data out of order (%s)" % ev))
-            except Exception as e: # handle catchall error
-                self._cI.send(('err','Collator','Unknown',e))
+            except KeyError as e: # (most likely) a radio sent a message without initiating
+                self._cI.send(('err','Collator',"Key %s" % e,"in event (%s)" % ev))
+            #except Exception as e: # handle catchall error
+            #    self._cI.send(('err','Collator','Unknown',e))
 
         # notify Nidus of closing (radios,sensor,gpsd). hopefully no errors on send
         ts = ts2iso(time.time())
@@ -379,7 +388,7 @@ class Collator(mp.Process):
             self._curs.execute(sql,(ts,self._sid))
         self._conn.commit()
 
-    def _submitplatform(self,ts):
+    def _submitplatform(self):
         """ submit platform details """
         assert self._sid
 

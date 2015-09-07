@@ -368,7 +368,7 @@ class Iryi(object):
             logging.info("Starting Collator...")
             (conn1,conn2) = mp.Pipe()
             self._pConns['collator'] = conn1
-            self._collator = Collator(self._ic,conn2,self._sbuffer,self._abuffer,self._conf)
+            self._collator = Collator(self._ic,conn2,self._abuffer,self._sbuffer,self._conf)
             logging.info("Collator started")
 
             # set the region? if so, do it prior to starting the radio(s)
@@ -425,7 +425,7 @@ class Iryi(object):
             # catchall
             logging.error(e)
             self._state = IYRI_INVALID
-        except OSError as e: pass
+        except OSError: pass
         else:
             # start children execution
             self._state = IYRI_CREATED
