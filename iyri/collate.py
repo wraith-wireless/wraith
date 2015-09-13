@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
-""" collator.py: collates and relays wraith sensor data
+""" collator.py: coordinates collection and transfer of wraith sensor & gps data
 
 Processes and forwards 1) frames from the sniffer(s) 2) gps data (if any) collected
 by a pf and 3) messages from tuner(s) and sniffer(s0
 """
 __name__ = 'collate'
 __license__ = 'GPL v3.0'
-__version__ = '0.1.0'
-__date__ = 'August 2015'
+__version__ = '0.1.1'
+__date__ = 'September 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -19,8 +19,6 @@ import sys                                 # python intepreter details
 import signal                              # signal processing
 import time                                # sleep and timestamps
 import socket                              # connection to gps device
-import mgrs                                # lat/lon to mgrs conversion
-import gps                                 # gps device access
 from Queue import Empty                    # thread-safe queue
 import multiprocessing as mp               # multiprocessing
 import psycopg2 as psql                    # postgresql api
@@ -28,135 +26,9 @@ from wraith.utils.timestamps import ts2iso # timestamp conversion
 from wraith.radio.iw import regget         # regulatory domain
 from wraith.utils.cmdline import ipaddr    # returns ip address
 from wraith.radio.oui import parseoui      # parse out oui dict
-import wraith.radio.radiotap as rtap
-from wraith.iyri.constants import N        # buffer length
+#import wraith.radio.radiotap as rtap
+#from wraith.iyri.constants import N        # buffer length
 
-class GPSPoller(mp.Process):
-    """ periodically checks gps for current location """
-    def __init__(self,cC,conf):
-        """
-         cC - connection to/from Collator
-         conf - config file for gps
-        """
-        mp.Process.__init__(self)
-        self._cC = cC     # connection to/from Collator
-        self._conf = conf # gps configuration
-        self._gpsd = None # connection to the gps device
-        self._setup()
-
-    def terminate(self): pass
-
-    def run(self):
-        """ query for current location """
-        # two execution loops - 1) get device details 2) get location
-
-        # initialize device details dict
-        if self._conf['fixed']:
-            # configure a 'fake' device
-            poll = 0.5               # quiet pyCharm alerts
-            qpx = qpy = float('inf') # quiet PyCharm alerts
-            dd = {'id':'xxxx:xxxx',
-                  'version':'0.0',
-                  'flags':0,
-                  'driver':'static',
-                  'bps':0,
-                  'path':'None'}
-        else:
-            poll = self._conf['poll'] # extract polltime from config
-            qpx = self._conf['epx']   # extract quality ellipse x from config
-            qpy = self._conf['epy']   # extract quality ellipse x from config
-            dd = {'id':self._conf['id'],
-                  'version':None,
-                  'driver':None,
-                  'bps':None,
-                  'path':None,
-                  'flags':None}
-
-        # Device Details Loop - get complete details or quit on done
-        while dd['flags'] is None:
-            if self._cC.poll() and self._cC.recv() == '!STOP!':  break
-            else:
-                # loop while data is on serial, polling first
-                while self._gpsd.waiting():
-                    dev = self._gpsd.next()
-                    try:
-                        if dev['class'] == 'VERSION': dd['version'] = dev['release']
-                        elif dev['class'] == 'DEVICE':
-                            # flags will not be present until gpsd has seen identifiable
-                            # packets from the device
-                            dd['flags'] = dev['flags']
-                            dd['driver'] = dev['driver']
-                            dd['bps'] = dev['bps']
-                            dd['path'] = dev['path']
-                    except KeyError:
-                        pass
-
-        # send device details. If fixed gps, exit immediately
-        m = mgrs.MGRS()
-        if self._cC.poll() and self._cC.recv() == '!STOP!':
-            if self._gpsd: self._gpsd.close()
-            self._cC.close()
-            return
-
-        self._cC.send(('!DEV!',time.time(),dd))
-        if self._conf['fixed']: # send static front line trace
-            self._cC.send(('!FLT!',time.time(),{'id':dd['id'],
-                                               'fix':-1,
-                                               'coord':m.toMGRS(self._conf['lat'],
-                                                                self._conf['lon']),
-                                               'epy':0.0,
-                                               'epx':0.0,
-                                               'alt':self._conf['alt'],
-                                               'dir':self._conf['dir'],
-                                               'spd':0.0,
-                                               'dop':{'xdop':1,'ydop':1,'pdop':1}}))
-            return
-
-        # Location - loop until told to quit
-        while True:
-            if self._cC.poll() and self._cC.recv() == '!STOP!': break
-            while self._gpsd.waiting():
-                # recheck if we need to stop
-                if self._cC.poll() and self._cC.recv() == '!STOP!': break
-                rpt = self._gpsd.next()
-                if rpt['class'] != 'TPV': continue
-                try:
-                    if rpt['epx'] > qpx or rpt['epy'] > qpy: continue
-                    else:
-                        flt = {'id':dd['id'],
-                               'fix':rpt['mode'],
-                               'coord':m.toMGRS(rpt['lat'],rpt['lon']),
-                               'epy':rpt['epy'],
-                               'epx':rpt['epx'],
-                               'alt':rpt['alt'] if 'alt' in rpt else float("nan"),
-                               'dir':rpt['track'] if 'track' in rpt else float("nan"),
-                               'spd':rpt['spd'] if 'spd' in rpt else float("nan"),
-                               'dop':{'xdop':'%.3f' % self._gpsd.xdop,
-                                      'ydop':'%.3f' % self._gpsd.ydop,
-                                      'pdop':'%.3f' % self._gpsd.pdop}}
-                        self._cC.send(('!GEO',time.time(),flt))
-                        break
-                except (KeyError,AttributeError):
-                    # a KeyError means not all values are present, an
-                    # AttributeError means not all dop values are present
-                    pass
-                except:
-                    # blanket exception
-                    break
-            time.sleep(poll)
-
-        # close out connection
-        self._gpsd.close()
-        self._cC.close()
-
-    def _setup(self):
-        """ attempt to connect to device if fixed is off """
-        if not self._conf['fixed']:
-            try:
-                self._gpsd = gps.gps('127.0.0.1',self._conf['port'])
-                self._gpsd.stream(gps.WATCH_ENABLE)
-            except socket.error as e:
-                raise RuntimeError(e)
 
 class Collator(mp.Process):
     """ Collator - handles further processing of raw frames from the sniffer """
@@ -175,7 +47,6 @@ class Collator(mp.Process):
         self._icomms = comms       # communications queue
         self._cI = conn            # message connection to/from Iyri
         self._gconf = conf['gps']  # configuration for gps/datastore
-        self._gps = None           # polling thread for front line traces
         self._cG = None            # internal connection for gps poller
         self._conn = None          # conn to backend db
         self._curs = None          # primary db cursors
@@ -186,7 +57,7 @@ class Collator(mp.Process):
         self._setup(conf['store'])
 
     def terminate(self): pass
-    
+
     def run(self):
         """ run execution loop """
         # ignore signals being used by main program
@@ -202,14 +73,6 @@ class Collator(mp.Process):
         try:
             self._submitsensor(ts2iso(time.time()),True)
             self._submitplatform()
-            if self._gconf:
-                (self._cG,conn2) = mp.Pipe()
-                try:
-                    self._gps = GPSPoller(conn2,self._gconf)
-                    self._gps.start()
-                except RuntimeError as e:
-                    self._cI.send(('warn','Collator','GPSD',"Failed to connnect: %s" %e))
-                    self._gps = None
         except psql.Error as e:
             # sensor submit failed, no point continuing
             if e.pgcode == '23P01':
@@ -225,52 +88,53 @@ class Collator(mp.Process):
 
         # execution loop
         while True:
-            # TODO: convert all to select??
             # 1. anything from Iyri
             if self._cI.poll() and self._cI.recv() == '!STOP!': break
-
-            # 2. gps device/frontline trace?
-            try:
-                if self._cG.poll():
-                    t,ts,msg = self._cG.recv()
-                    if t == '!FLT!': self._submitflt(ts2iso(ts),msg)
-                    elif t == '!DEV!':
-                        self._cI.send(('info','Collator','GPSD',"%s initiated" % msg['id']))
-                        self._submitgpsd(ts2iso(ts),True,msg)
-            except EOFError:
-                # pipe was closed TODO: need to do something with this
-                pass
-            except psql.OperationalError as e: # unrecoverable
-                self._cI.send(('err','Collator','DB',"%s: %s" % (e.pgcode,e.pgerror)))
-            except psql.Error as e: # possible incorrect semantics/syntax
-                self._conn.rollback()
-                self._cI.send(('warn','Collator','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
 
             # 3. queued data from internal comms
             cs = ts = ev = msg = None
             try:
+                # pull off data
                 cs,ts,ev,msg = self._icomms.get(True,0.5)
-                ts = ts2iso(ts)
+                #print cs,ts,ev,msg
+                if ev == '!GPSD!':
+                    # updown message from gpsd (if down delete the gps id)
+                    self._submitgpsd(ts,msg)
+                    if msg is not None:
+                        self._cI.send(('info','Collator','GPSD',"%s initiated" % cs))
+                    else:
+                        self._gid = None
+                        self._cI.send(('info','Collator','GPSD',"%s shutdown" % cs))
+                elif ev == '!FLT!':
+                    self._submitflt(ts,msg)
+                elif ev == '!RADIO!': #
+                    # up/down message from radio(s).
+                    if msg is not None:
+                        # assign buffers
+                        if msg['role'] == 'abad': buffers['cs'] = self._ab
+                        elif msg['role'] == 'shama': buffers['cs'] = self._sb
+                        else:
+                            raise RuntimeError("Invalid role %s" % msg['role'])
 
-                if ev == '!UP!': # should be the 1st message we get from radio(s).
-                    # assign buffers TODO I don't like constraining this assignment
-                    if cs.startswith('abad'): buffers[cs] = self._ab
-                    else: buffers[cs] = self._sb
-
-                    # assign radio map and submit antenna
-                    rmap[cs] = msg['mac']
-                    self._cI.send(('info','Collator','Radio',"%s initiated" % cs))
-                    self._submitradio(ts,True,msg)
-                    for i in xrange(msg['nA']):
-                        self._submitantenna(ts,{'mac':msg['mac'],'idx':i,
-                                                'type':msg['type'][i],
-                                                'gain':msg['gain'][i],
-                                                'loss':msg['loss'][i],
-                                                'x':msg['x'][i],
-                                                'y':msg['y'][i],
-                                                'z':msg['z'][i]})
+                        # add to radio map, submit radio & submit antenna(s)
+                        self._cI.send(('info','Collator','Radio',"%s (%s) initiated" % (cs,msg['role'])))
+                        rmap[cs] = msg['mac']
+                        self._submitradio(ts,msg['mac'],msg)
+                        for i in xrange(msg['nA']):
+                            self._submitantenna(ts,{'mac':msg['mac'],'idx':i,
+                                                    'type':msg['type'][i],
+                                                    'gain':msg['gain'][i],
+                                                    'loss':msg['loss'][i],
+                                                    'x':msg['x'][i],
+                                                    'y':msg['y'][i],
+                                                    'z':msg['z'][i]})
+                    else:
+                        self._cI.send(('info','Collator','Radio',"%s shutdown" % cs))
+                        self._submitradio(ts,rmap[cs],None)
+                        del rmap[cs]
                 elif ev == '!FAIL!':
                     # notify Iyri, submit fail & delete cs
+                    self._cI.send(('err','Collator',"Deleting radio %s" % cs,msg))
                     self._submitradioevent(ts,[rmap[cs],'fail',msg])
                     del rmap[cs]
                 elif ev == '!SCAN!':
@@ -300,7 +164,7 @@ class Collator(mp.Process):
                     #dR = rtap.parse(bytes)
                     #print dR
                 else: # unidentified event type, notify iyri
-                    self._cI.send(('warn','Collator','Radio',"unknown event %s" % ev))
+                    self._cI.send(('warn','Collator','Radio',"unknown event %s from %s" % (ev,cs)))
             except Empty: continue
             except psql.OperationalError as e: # unrecoverable
                 self._cI.send(('err','Collator','DB',"%s: %s" % (e.pgcode,e.pgerror)))
@@ -313,13 +177,13 @@ class Collator(mp.Process):
                 self._cI.send(('err','Collator',"Radio","misconfigured antennas"))
             except KeyError as e: # (most likely) a radio sent a message without initiating
                 self._cI.send(('err','Collator',"Key %s" % e,"in event (%s)" % ev))
-            #except Exception as e: # handle catchall error
-            #    self._cI.send(('err','Collator','Unknown',e))
+            except Exception as e: # handle catchall error
+                self._cI.send(('err','Collator','Unknown',e))
 
-        # notify Nidus of closing (radios,sensor,gpsd). hopefully no errors on send
+        # notify Nidus of sensor - check if radio(s), gpsd closed out
         ts = ts2iso(time.time())
-        for cs in rmap: self._submitradio(ts,False,{'mac':rmap[cs]})
-        if self._gps: self._submitgpsd(ts,False)
+        for cs in rmap: self._submitradio(ts,rmap[cs],None)
+        if self._gid: self._submitgpsd(ts,None)
         self._submitsensor(ts,False)
 
         # shut down
@@ -422,10 +286,10 @@ class Collator(mp.Process):
                                 pyvers,compiler,libcvers,bits,link,rd))
         self._conn.commit()
 
-    def _submitgpsd(self,ts,state,g=None):
+    def _submitgpsd(self,ts,g):
         """ submit gps device having state w/ details """
         assert self._sid
-        if state:
+        if g is not None:
             # insert if gpsd does not already exist
             self._curs.execute("select gpsd_id from gpsd where devid=%s;",(g['id'],))
             row = self._curs.fetchone()
@@ -467,41 +331,41 @@ class Collator(mp.Process):
                                 flt['epx']))
         self._conn.commit()
 
-    def _submitradio(self,ts,state,r):
+    def _submitradio(self,ts,mac,r):
         """ submit gps device having state w/ details """
         assert self._sid
-        if state:
+        if r is not None:
             # add radio if it does not exist
-            self._curs.execute("select * from radio where mac=%s;",(r['mac'],))
+            self._curs.execute("select * from radio where mac=%s;",(mac,))
             if not self._curs.fetchone():
                 sql = """
                        insert into radio (mac,driver,chipset,channels,standards,description)
                        values (%s,%s,%s,%s,%s,%s);
                       """
-                self._curs.execute(sql,(r['mac'],r['driver'][0:20],r['chipset'][0:20],
-                                        [int(c) for c in r['channels']],r['standards'][0:20],
-                                        r['desc'][0:200]))
+                self._curs.execute(sql,(mac,r['driver'][0:20],r['chipset'][0:20],
+                                        [int(c) for c in r['channels']],
+                                        r['standards'][0:20],r['desc'][0:200]))
 
             # add a using_radio record
             sql = """
                    insert into using_radio (sid,mac,phy,nic,vnic,hop,ival,role,period)
                    values (%s,%s,%s,%s,%s,%s,%s,%s,tstzrange(%s,NULL,'[]'));
                   """
-            self._curs.execute(sql,(self._sid,r['mac'],r['phy'],r['nic'],r['vnic'],
+            self._curs.execute(sql,(self._sid,mac,r['phy'],r['nic'],r['vnic'],
                                     r['hop'],r['ival'],r['role'],ts))
 
             # add a txpwr event
             sql = "insert into radio_event (mac,state,params,ts) values (%s,%s,%s,%s);"
-            self._curs.execute(sql,(r['mac'],'txpwr',r['txpwr'],ts))
+            self._curs.execute(sql,(mac,'txpwr',r['txpwr'],ts))
 
              # add a spoof event (if necessary)
-            if r['spoofed']: self._curs.execute(sql,(r['mac'],'spoof',r['spoofed'],ts))
+            if r['spoofed']: self._curs.execute(sql,(mac,'spoof',r['spoofed'],ts))
         else:
             sql = """
                    update using_radio set period = tstzrange(lower(period),%s)
                    where sid = %s and mac =%s;
                   """
-            self._curs.execute(sql,(ts,self._sid,r['mac']))
+            self._curs.execute(sql,(ts,self._sid,mac))
         self._conn.commit()
 
     def _submitantenna(self,ts,a):

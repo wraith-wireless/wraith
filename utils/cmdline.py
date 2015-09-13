@@ -24,7 +24,8 @@ def runningprocess(process):
 
 def runningservice(pidfile):
     """
-     determines if the service referenced by pidfile is running
+     determines if the service referenced by pidfile is running. NOTE: only checks
+     if pidfile exists
     """
     try:
         with open(pidfile): return True
@@ -41,16 +42,26 @@ def iyrirunning(pidfile):
     except (TypeError,IOError,OSError):
         return False
 
-def service(process,pwd,start=True):
+def service(process,pwd=None,start=True):
     """
      executes 'service process arg1' as sudo if pwd with arg1 =
-    'start' if start is True otherwise 'stop'
+    'start' if start is True otherwise 'stop'. Executes with sudo if caller
+    is not root
     """
     state = 'start' if start else 'stop'
-    cmd = ['sudo','-S','service',process,state]
-    p = sp.Popen(cmd,stdout=sp.PIPE,stdin=sp.PIPE,stderr=sp.PIPE,universal_newlines=True)
-    _,err = p.communicate(pwd+'\n')
-    if err: raise RuntimeError(err)
+    if os.getuid() != 0:
+        if pwd is None: raise RuntimeError("service requires pwd to execute")
+        cmd = ['sudo','-S','service',process,state]
+        p = sp.Popen(cmd,stdout=sp.PIPE,stdin=sp.PIPE,
+                     stderr=sp.PIPE,universal_newlines=True)
+        _,err = p.communicate(pwd+'\n')
+        if err: raise RuntimeError(err)
+    else:
+        cmd = ['service',process,state]
+        p = sp.Popen(cmd,stdout=sp.PIPE,stdin=sp.PIPE,
+                     stderr=sp.PIPE,universal_newlines=True)
+        _,err = p.communicate()
+        if err: raise RuntimeError(err)
 
 def testsudopwd(pwd):
     """ tests the pwd for sudo rights using a simple sudo ls -l """

@@ -29,14 +29,14 @@ Note: Iryi only allows one client connection at a time
 #__name__ = 'iyri'
 __license__ = 'GPL v3.0'
 __version__ = '0.1.0'
-__date__ = 'August 2015'
+__date__ = 'September 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import os                                       # for path validations
-import re                                       # for reg expr
+import re                                       # for regular expressions
 import signal                                   # signal processing
 import time                                     # for sleep, timestamps
 import logging                                  # log
@@ -50,6 +50,7 @@ import select                                   # c2c & main loop
 from wraith import iyri                         # for rev number, author
 from wraith.iyri.collate import Collator        # the collator
 from wraith.iyri.rdoctl import RadioController  # Radio object etc
+from wraith.iyri.gpsctl import GPSController    # gps device
 from wraith.radio import channels               # channel specifications
 from wraith.radio import iw                     # channel widths and region set/get
 from wraith.radio.iwtools import wifaces        # check for interface presents
@@ -257,6 +258,7 @@ class Iryi(object):
         self._abuffer = None        # abad radio buffer
         self._sr = None             # shama radio
         self._sbuffer = None        # shama radio buffer
+        self._gpsd = None           # gps device
         self._rd = None             # regulatory domain
         self._c2c = None            # our c2c
 
@@ -363,13 +365,22 @@ class Iryi(object):
             if self._conf['shama']:
                 self._sbuffer = memoryview(mp.Array('B',M*N,lock=False))
 
-            # start Collator first (IOT accept comms from the radios)
+            # start Collator first (IOT accept comms
             logging.info("Initializing subprocess...")
             logging.info("Starting Collator...")
             (conn1,conn2) = mp.Pipe()
             self._pConns['collator'] = conn1
             self._collator = Collator(self._ic,conn2,self._abuffer,self._sbuffer,self._conf)
-            logging.info("Collator started")
+
+            # start the gps
+            logging.info("Starting GPS...")
+            try:
+                (conn1,conn2) = mp.Pipe()
+                self._gpsd = GPSController(self._ic,conn2,self._conf['gps'])
+            except RuntimeError as e:
+                logging.warning("GPSD failed: %s, continuing w/out" % e)
+            else:
+                self._pConns['gpsd'] = conn1
 
             # set the region? if so, do it prior to starting the radio(s)
             rd = self._conf['local']['region']
@@ -383,39 +394,36 @@ class Iryi(object):
                     logging.info("Regulatory domain set to %s",rd)
 
             # abad radio is mandatory
-            mode = 'paused' if self._conf['abad']['paused'] else 'scan'
+            amode = smode = None
+            amode = 'paused' if self._conf['abad']['paused'] else 'scan'
             logging.info("Starting Abad...")
             (conn1,conn2) = mp.Pipe()
             self._pConns['abad'] = conn1
             self._ar = RadioController(self._ic,conn2,self._abuffer,self._conf['abad'])
-            logging.info("Abad started in %s mode",mode)
 
             # shama if present
             if self._conf['shama']:
                 try:
-                    mode = 'paused' if self._conf['shama']['paused'] else 'scan'
+                    smode = 'paused' if self._conf['shama']['paused'] else 'scan'
                     logging.info("Starting Shama...")
                     (conn1,conn2) = mp.Pipe()
-                    self._pConns['shama'] = conn1
-                    self._sr = RadioController(self._ic,conn2,
-                                               self._sbuffer,self._conf['shama'])
+                    self._sr = RadioController(self._ic,conn2,self._sbuffer,self._conf['shama'])
                 except RuntimeError as e:
                     # continue without collector, but log it
                     logging.warning("Shama failed: %s, continuing w/out",e)
                 else:
-                    logging.info("Shama started in %s mode",mode)
+                    self._pConns['shama'] = conn1
 
             # c2c socket -> on failure log it and keep going
             logging.info("Starting C2C...")
             try:
                 (conn1,conn2) = mp.Pipe()
-                self._pConns['c2c'] = conn1
                 self._c2c = C2C(conn2,self._conf['local']['c2c'])
-                self._c2c.start()
             except Exception as e:
                 logging.warn("C2C failed: %s, continuing without" % e)
             else:
-                 logging.info("C2C listening on port %d" % self._conf['local']['c2c'])
+                self._pConns['c2c'] = conn1
+
         except RuntimeError as e:
             # e should have the form "Major:Minor:Description"
             ms = e.message.split(':')
@@ -429,9 +437,18 @@ class Iryi(object):
         else:
             # start children execution
             self._state = IYRI_CREATED
-            self._ar.start()
-            if self._sr: self._sr.start()
             self._collator.start()
+            logging.info("Collator started")
+            if self._gpsd:
+                self._gpsd.start()
+                logging.info("GPS started")
+            self._ar.start()
+            logging.info("Abad started in %s mode",amode)
+            if self._sr:
+                self._sr.start()
+                logging.info("Shama started in %s mode",smode)
+            if self._c2c:
+                logging.info("C2C listening on port %d" % self._conf['local']['c2c'])
 
     def _destroy(self):
         """ destroy Iryi cleanly """
@@ -710,8 +727,8 @@ class Iryi(object):
 if __name__ == '__main__':
     try:
         logging.info("Iryi %s",iyri.__version__)
-        skt = Iryi()
-        skt.run()
+        sensor = Iryi()
+        sensor.run()
     except IryiConfException as err:
         logging.error("Configuration Error: %s",err)
     except IryiParamException as err:
