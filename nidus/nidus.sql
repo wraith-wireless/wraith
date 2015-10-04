@@ -220,12 +220,10 @@ CREATE INDEX using_radio_period_idx ON using_radio USING GIST (period);
 -- NOTE:
 -- capture header and mpdu layers are defined in a set of tables. The phy layer 
 -- is defined (partially) in frame, source, ampdu and signal. The mac layer 
--- is defined in traffic and wepcrypt, tkipcrypt and ccmpcrypt
+-- is defined in traffic, wepcrypt, tkipcrypt and ccmpcrypt
 
 -- frame table
--- each traffic is defined by its id, timestampe and src and describes basic
--- details of the signal to include the type of frame header, and type/subtype
--- of the mpdu layer
+-- metadata related to a collected frame
 DROP TABLE IF EXISTS frame;
 CREATE TABLE frame(
    frame_id bigserial NOT NULL,      -- frame primary key
@@ -278,7 +276,7 @@ CREATE TABLE ampdu(
 );
 
 -- source table
--- defines the collecting source of a frame
+-- defines the collecting source
 DROP TABLE IF EXISTS source;
 CREATE TABLE source(
    fid bigint NOT NULL,          -- foreign key to frame

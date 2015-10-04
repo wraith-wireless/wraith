@@ -18,9 +18,9 @@ drill down as necessary to a single device. Wraith allows the user to decide wha
 data to view, how to view it and 'when' to view it.
 
 ## 2. REQUIREMENTS: 
- * linux (preferred 3.x kernel, tested on 3.13.0-43)
+ * linux (preferred 3.x kernel, tested on 3.13.0-65)
    - NOTE: some cards i.e. rosewill usb nics were not fully supported through iw
-     on earlier kernels
+     on earlier 3.13.x kernels
  * Python 2.7
  * iw 3.17
  * postgresql 9.x (tested on 9.3.5)
@@ -30,7 +30,7 @@ data to view, how to view it and 'when' to view it.
 
 ## 3. MODULES: Currently consists of three components/modules
 
-###  a. Radio (v 0.0.4): 802.11 network interface objects and functions
+###  a. Radio (v 0.0.5): 802.11 network interface objects and functions
 
 Objects/functions to manipulate wireless nics and parse 802.11 captures.
 Partial support of 802.11-2012
@@ -40,12 +40,24 @@ Partial support of 802.11-2012
 * Partially Supported: 802.11n
 * Not Supported: 802.11s\y\u\ac\ad\af
 
-### b. Iryi (v 0.1.5) : Wraith Sensor
+### b. Iryi (v 0.2.0) : Wraith Sensor
 
-Iryi is a 802.11 sensor consisting of an optional surveillance radio, a mandatory
-reconnaissance radio and an Collator which relays collected data to the backend
-database. Iryi collects data in the form of raw 802.11 packets, along with any
-geolocational data (if a gps device is present).
+Iryi is a 802.11 sensor consisting of an optional radio (shama), a mandatory
+radio (abad) and a Collator which relays collected data to the backend database.
+802.11 packets are stored in a circular buffer, parsed and inserted in the database.
+Any geolocational data is also stored (if a gps device is present).
+
+NOTE:
+In earlier versions < 0.1.x, Iyri did not handle database writes/updates. Rather
+this was handled by a an additional module that the sensor would pass data to. It
+was with great relunctance that I removed this 'mediator', and moved database
+functionality directly to the sensor, primarily as it would restrict wraith to
+a single platform i.e. expanding to a central database and multiple sensors will
+be near impossible. However, there were two primary reasons for doing so:
+* I wanted to push more autonomy and intelligence into the sensor which would
+  require the sensor to parse out radiotap and mpdu (no point in doing this twice)
+* frames were being passed through multiple connection, queues and sockets before
+  they eventually made their way to the mediator causing a major delay in processing
 
 ### d. wraith-rt: GUI
 
@@ -89,6 +101,9 @@ and editing of configuration files, some manipulation of backened storage.
      - iyri.conf        configuration file for iyri
      - iyri.log.conf    configuration file for iyri logging
      - iyri.py          primary module
+     - constants.py     defines several constants used by iryi
+     - gpsctl.py        GPS device handler
      - rdoctl.py        radio controler with tuner, sniffer
-     - rto.py           data collation and forwarding
+     - collate.py       data collation and forwarding
+     - thresh.py        Thresher process for parsing/writing frames
      - iyrid            iyri daemon

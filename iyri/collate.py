@@ -19,16 +19,15 @@ import sys                                 # python intepreter details
 import signal                              # signal processing
 import time                                # sleep and timestamps
 import socket                              # connection to gps device
-from Queue import Empty                    # thread-safe queue
+from Queue import Empty                    # queue empty exception
 import multiprocessing as mp               # multiprocessing
 import psycopg2 as psql                    # postgresql api
 from wraith.utils.timestamps import ts2iso # timestamp conversion
 from wraith.radio.iw import regget         # regulatory domain
 from wraith.utils.cmdline import ipaddr    # returns ip address
 from wraith.radio.oui import parseoui      # parse out oui dict
-#import wraith.radio.radiotap as rtap
-#from wraith.iyri.constants import N        # buffer length
-
+from wraith.iyri.thresh import Thresher    # thresher process
+from wraith.iyri.constants import NTHRESH  # num thresher processes
 
 class Collator(mp.Process):
     """ Collator - handles further processing of raw frames from the sniffer """
@@ -47,7 +46,6 @@ class Collator(mp.Process):
         self._icomms = comms       # communications queue
         self._cI = conn            # message connection to/from Iyri
         self._gconf = conf['gps']  # configuration for gps/datastore
-        self._cG = None            # internal connection for gps poller
         self._conn = None          # conn to backend db
         self._curs = None          # primary db cursors
         self._sid = None           # our session id (from the backend)
@@ -65,9 +63,11 @@ class Collator(mp.Process):
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
         # basic variables
-        ouis = parseoui()
-        rmap = {}    # radio map: maps callsigns to mac addr
-        buffers = {} # buffer map
+        q = mp.Queue()    # internal queue for tasks to threshers
+        ouis = parseoui() # oui dict
+        rmap = {}         # radio map: maps callsigns to mac addr
+        buffers = {}      # buffer map
+        threshers = {}    # thresher map
 
         # send sensor up notification, platform details and gpsid
         try:
@@ -86,18 +86,43 @@ class Collator(mp.Process):
             self._conn.rollback()
             self._cI.send(('err','Collator','Unknown',e))
 
+        # create threshers
+        a = (self._ab,None)
+        for _ in xrange(NTHRESH):
+            try:
+                t = Thresher(self._icomms,q,self._conn,ouis,
+                             (self._ab,None),(self._sb,None),None)
+                t.start()
+                threshers[t.pid] = t
+            except RuntimeError as e:
+                self._cI.send(('warn','Collator','Thresher',e))
+        if not len(threshers):
+            self._cI.send(('err','Collator','Thresher',"No threshers started. Quitting..."))
+
         # execution loop
-        while True:
-            # 1. anything from Iyri
+        while len(threshers):
+            # 1. check for stop token
             if self._cI.poll() and self._cI.recv() == '!STOP!': break
 
-            # 3. queued data from internal comms
+            # get any queued data from internal comms
             cs = ts = ev = msg = None
             try:
                 # pull off data
                 cs,ts,ev,msg = self._icomms.get(True,0.5)
-                #print cs,ts,ev,msg
-                if ev == '!GPSD!':
+
+                # events from thresher(s)
+                if ev == '!THRESH!':
+                    # thresher process up/down message
+                    if msg is not None:
+                        if msg not in threshers:
+                            self._cI.send(('warn','Collator','Thresher',"%s not recognized" % cs))
+                        else:
+                            self._cI.send(('info','Collator','Thresher',"%s initiated" % cs))
+                    else:
+                        pid = cs.split('-')[1]
+                        del threshers[pid]
+                # events from gps device
+                elif ev == '!GPSD!':
                     # updown message from gpsd (if down delete the gps id)
                     self._submitgpsd(ts,msg)
                     if msg is not None:
@@ -105,8 +130,8 @@ class Collator(mp.Process):
                     else:
                         self._gid = None
                         self._cI.send(('info','Collator','GPSD',"%s shutdown" % cs))
-                elif ev == '!FLT!':
-                    self._submitflt(ts,msg)
+                elif ev == '!FLT!': self._submitflt(ts,msg)
+                # events from radio(s)
                 elif ev == '!RADIO!': #
                     # up/down message from radio(s).
                     if msg is not None:
@@ -115,6 +140,9 @@ class Collator(mp.Process):
                         elif msg['role'] == 'shama': buffers['cs'] = self._sb
                         else:
                             raise RuntimeError("Invalid role %s" % msg['role'])
+
+                        # update threshers
+                        for _ in threshers: q.put(('!RADIO!',ts,[msg['role'],cs]))
 
                         # add to radio map, submit radio & submit antenna(s)
                         self._cI.send(('info','Collator','Radio',"%s (%s) initiated" % (cs,msg['role'])))
@@ -134,7 +162,7 @@ class Collator(mp.Process):
                         del rmap[cs]
                 elif ev == '!FAIL!':
                     # notify Iyri, submit fail & delete cs
-                    self._cI.send(('err','Collator',"Deleting radio %s" % cs,msg))
+                    self._cI.send(('err','Collator','Radio',"Deleting radio %s" % cs,msg))
                     self._submitradioevent(ts,[rmap[cs],'fail',msg])
                     del rmap[cs]
                 elif ev == '!SCAN!':
@@ -159,10 +187,7 @@ class Collator(mp.Process):
                     self._submitradioevent(ts,[rmap[cs],'txpwr',msg])
                 elif ev == '!FRAME!':
                     ix,l = msg
-                    #b = buffers[cs][(ix*N):(ix*N)+l]
-                    #bytes = b.tobytes()
-                    #dR = rtap.parse(bytes)
-                    #print dR
+                    q.put(('!FRAME!',ts,[rmap[cs],ix,l]))
                 else: # unidentified event type, notify iyri
                     self._cI.send(('warn','Collator','Radio',"unknown event %s from %s" % (ev,cs)))
             except Empty: continue
@@ -180,19 +205,34 @@ class Collator(mp.Process):
             except Exception as e: # handle catchall error
                 self._cI.send(('err','Collator','Unknown',e))
 
-        # notify Nidus of sensor - check if radio(s), gpsd closed out
+        # clean & shut down
         ts = ts2iso(time.time())
-        for cs in rmap: self._submitradio(ts,rmap[cs],None)
-        if self._gid: self._submitgpsd(ts,None)
-        self._submitsensor(ts,False)
-
-        # shut down
-        if not self._shutdown():
+        try:
             try:
-                self._cI.send(('warn','Collator','Shutdown',"Incomplete shutdown"))
-            except EOFError:
-                # most likely Iyri closed its side of the pipe
-                pass
+                # notify Nidus of sensor - check if radio(s), gpsd closed out
+                for cs in rmap: self._submitradio(ts,rmap[cs],None)
+                if self._gid: self._submitgpsd(ts,None)
+                self._submitsensor(ts,False)
+            except psql.Error as e:
+                self._conn.rollback()
+                if self._cI:
+                    self._cI.send(('warn','Collator','shutdown',"Failed to close cleanly - corrupted DB %s: %s" % (e.pgcode,e.pgerror)))
+
+            # stop children and close communications. active_children has side
+            # effect of joining
+            for _ in threshers:
+                try:
+                    q.put(('!STOP!',None,None))
+                except EOFError: pass
+            while mp.active_children(): time.sleep(0.5)
+
+            if self._curs: self._curs.close()
+            if self._conn: self._conn.close()
+            self._cI.close()
+        except EOFError: pass
+        except Exception as e:
+            if self._cI:
+                self._cI.send(('warn','Collator','shutdown',"Failed to clean up: %s" % e))
 
 #### private helper functions
 
@@ -216,23 +256,6 @@ class Collator(mp.Process):
                 raise RuntimeError('Collator:PostgreSQL:DB error: %s' % e)
         except Exception as e:
             raise RuntimeError("Collator:Unknown:%s" % e)
-
-    def _shutdown(self):
-        """ clean up. returns whether a full reset or not occurred """
-        # try shutting down & resetting radio (if it failed we may not be able to)
-        clean = True
-        try:
-            # stop GPSPoller
-            self._cG.send('!STOP!')
-            while mp.active_children(): time.sleep(0.5)
-
-            # close backend connection and connection to Iyri
-            if self._curs: self._curs.close()
-            if self._conn: self._conn.close()
-            self._cI.close()
-        except:
-            clean = False
-        return clean
 
     #### DB functionality ####
     def _submitsensor(self,ts,state):

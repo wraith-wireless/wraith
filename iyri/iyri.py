@@ -267,7 +267,7 @@ class Iryi(object):
 
     def run(self):
         """ start execution """
-        # setup signal handlers for pause(s),resume(s),stop
+        # setup signal handlers for stop
         signal.signal(signal.SIGINT,self.stop)   # CTRL-C and kill -INT stop
         signal.signal(signal.SIGTERM,self.stop)  # kill -TERM stop
 

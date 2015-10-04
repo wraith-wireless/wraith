@@ -16,7 +16,10 @@ import re
 
 # define the m x n array size for the cirular buffer
 M = 1000     # number of rows for memory view
-N = MAX_MPDU # number of cols
+N = MAX_MPDU # number of cols (bytes)
+
+# number of threshers
+NTHRESH = 5
 
 # iyri states
 IYRI_INVALID         = -1 # iyri is unuseable

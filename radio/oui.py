@@ -52,7 +52,7 @@ def fetch():
     ouipath = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            os.path.abspath('../'+OUI))
     if not os.path.isdir(os.path.dirname(ouipath)):
-        print 'Path to data is incorrect %s' % oupath
+        print 'Path to data is incorrect %s' % ouipath
         sys.exit(1)
 
     # fetch oui file from ieee
