@@ -27,8 +27,8 @@ REVISIONS:
 """
 __name__ = 'iyri'
 __license__ = 'GPL v3.0'
-__version__ = '0.2.0'
-__date__ = 'September 2015'
+__version__ = '0.2.1'
+__date__ = 'October 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'

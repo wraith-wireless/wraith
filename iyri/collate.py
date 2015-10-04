@@ -7,8 +7,8 @@ by a pf and 3) messages from tuner(s) and sniffer(s0
 """
 __name__ = 'collate'
 __license__ = 'GPL v3.0'
-__version__ = '0.1.1'
-__date__ = 'September 2015'
+__version__ = '0.1.2'
+__date__ = 'October 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
