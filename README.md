@@ -86,6 +86,7 @@ and editing of configuration files, some manipulation of backened storage.
     - landnav.py        land navigation utilities
     - cmdline.py        various cmdline utilities for testing processes
     - simplepcap.py     pcap writer
+    - brine.py          support for pickling connection objects
  *  radio               subpackage for radio/radiotap
      - \_\_init\_\_.py  initialize radio subpackage
      - iwtools.py       iwconfig, ifconfig interface and nic utilities

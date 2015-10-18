@@ -18,8 +18,11 @@ import re
 M = 1000     # number of rows for memory view
 N = MAX_MPDU # number of cols (bytes)
 
-# number of threshers
+# number of (initial) threshers
 NTHRESH = 5
+
+# BULK WRITE NUMBER
+NWRITE = 20
 
 # iyri states
 IYRI_INVALID         = -1 # iyri is unuseable

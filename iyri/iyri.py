@@ -497,7 +497,7 @@ class Iryi(object):
         self._conf = {}
 
         try:
-            # read in the abad radio configuration
+            # read in the abad & sham radio configurations
             self._conf['abad'] = self._readradio(cp,'Abad')
             try:
                 # catch any shama exceptions and log a warning
@@ -527,16 +527,27 @@ class Iryi(object):
                 self._conf['gps']['epy'] = cp.getfloat('GPS','epy')
 
             # Storage section
-            self._conf['store'] = {
-                                   'host':cp.get('Storage','host').lower(),
+            self._conf['store'] = {'host':cp.get('Storage','host').lower(),
                                    'port':cp.getint('Storage','port'),
                                    'db':cp.get('Storage','db'),
                                    'user':cp.get('Storage','user'),
-                                   'pwd':cp.get('Storage','pwd')
-                                  }
+                                   'pwd':cp.get('Storage','pwd')}
             if re.match(IPADDR,self._conf['store']['host']) is None and\
                self._conf['store']['host'] != 'localhost':
                 raise RuntimeError("Invalid IP address for storage host")
+
+            # Save Section
+            self._conf['save'] = {'on':False,'private':False,
+                                  'path':'data/frames','sz':67108864}
+            if cp.has_section('Save'):
+                self._conf['save']['on'] = cp.getboolean('Save','save')
+                if self._conf['save']['on']:
+                    if self._conf['save']['private']:
+                        self._conf['save']['private'] = cp.get('SSE','save_private')
+                    if self._conf['save']['path']:
+                        self._conf['save']['path'] = cp.get('SSE','save_path')
+                    if self._conf['save']['sz']:
+                        self._conf['save']['sz'] = cp.getint('SSE','save_maxsize') * 1048576
 
             # Local section
             self._conf['local'] = {'region':None,'c2c':2526}

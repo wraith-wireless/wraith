@@ -21,9 +21,10 @@ REVISIONS:
   includes: iyri 0.1.0 collator 0.1.1 rdoctl 0.1.0 geo 0.0.1 iyri.conf iyri.log.conf
   iyrid
   changes:
-   - no longer passes data to storage manager, rather writes directly to db
-   - now uses a process for the  GPSController rather than a thread
+   - Uses a process for the GPSController rather than a thread
    - uses a memoryview to hold captured frames in a circular buffer
+   - pushed both processing of frames and data management (db writes) into the
+     sensor i.e. no longer passes data to storage manager
 """
 __name__ = 'iyri'
 __license__ = 'GPL v3.0'

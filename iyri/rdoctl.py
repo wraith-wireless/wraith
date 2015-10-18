@@ -218,7 +218,7 @@ class RadioController(mp.Process):
                     break
                 except Exception as e:
                     # blanket 'don't know what happened' exception
-                    self._cI.send(('err',self._role,'Unknown',e))
+                    self._cI.send(('err',self._role,type(e).__name__,e))
                     self._icomms.put((self._vnic,ts2iso(time.time()),'!FAIL!',e))
                     break
             else:
