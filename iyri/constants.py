@@ -19,7 +19,7 @@ M = 1000     # number of rows for memory view
 N = MAX_MPDU # number of cols (bytes)
 
 # number of (initial) threshers
-NTHRESH = 5
+NTHRESH = 2
 
 # BULK WRITE NUMBER
 NWRITE = 20

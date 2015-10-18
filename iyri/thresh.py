@@ -269,37 +269,42 @@ class Thresher(mp.Process):
                                   rtap.flags_get(dR['flags'],'fcs'))
 
                         # insert the frame. psql exceptions will be cught in outer try
-                        sql = """
-                               insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
-                               values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning frame_id;
-                              """
-                        self._curs.execute(sql,vs)
-                        fid = self._curs.fetchone()[0]
-                        self._conn.commit()
+                        #sql = """
+                        #       insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
+                        #       values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning frame_id;
+                        #      """
+                        #try:
+                        #    self._curs.execute(sql,vs)
+                        #    fid = self._curs.fetchone()[0]
+                        #except psql.OperationalError as e: # unrecoverable
+                        #    self._icomms.put((cs,ts1,'!THRESH_ERR!',"DB. %s: %s" % (e.pgcode,e.pgerror)))
+                        #    continue
+                        #except psql.Error as e:
+                        #    self._conn.rollback()
+                        #    self._icomms.put((cs,ts1,'!THRESH_WARN!',"SQL. %s: %s" % (e.pgcode,e.pgerror)))
+                        #    continue
+                        #else:
+                        #    self._conn.commit()
 
                         # pass to writer
-                        if self._write:
-                            l = r = 0
-                            if validRTAP: l += dR['sz']
-                            if validMPDU:
-                                l += dM.offset
-                                r = lF-dM.stripped
-                            rdos[src]['writer'].put(('!FRAME!',ts,[fid,f,l,r]))
+                        #if self._write:
+                        #    l = r = 0
+                        #    if validRTAP: l += dR['sz']
+                        #    if validMPDU:
+                        #        l += dM.offset
+                        #        r = lF-dM.stripped
+                        #    rdos[src]['writer'].put(('!FRAME!',ts,[fid,f,l,r]))
                     else:
                         self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid token %s" % tkn))
-                except psql.OperationalError as e: # unrecoverable
-                    self._icomms.put((cs,ts1,'!THRESH_ERR!',"DB. %s: %s" % (e.pgcode,e.pgerror)))
                 except (IndexError,ValueError):
                     self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid arguments for %s" % tkn))
                 except KeyError as e:
                     self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid radio mac: %s" % cs))
-                except psql.Error as e:
-                    self._conn.rollback()
-                    self._icomms.put((cs,ts1,'!THRESH_WARN!',"SQL. %s: %s" % (e.pgcode,e.pgerror)))
                 except Exception as e:
                     self._icomms.put((cs,ts1,'!THRESH_WARN!',"%s: %s" % (type(e).__name__,e)))
 
         # notify collector we're down
+        self._curs.close()
         self._icomms.put((cs,ts2iso(time.time()),'!THRESH!',None))
 
     def stop(self,signum=None,stack=None): self._stop = True

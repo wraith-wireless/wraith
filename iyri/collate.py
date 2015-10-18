@@ -205,7 +205,7 @@ class Collator(mp.Process):
 
                         # update threshers
                         for pid in threshers:
-                            threshers[pid]['conn'].put(('!RADIO!',ts,[msg['mac'],msg['role']]))
+                            threshers[pid]['conn'].send(('!RADIO!',ts,[msg['mac'],msg['role']]))
 
                         # add to radio & role maps, submit radio & submit antenna(s)
                         self._cI.send(('info','Collator','Radio',"%s (%s) initiated" % (cs,msg['role'])))
