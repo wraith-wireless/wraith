@@ -2,6 +2,9 @@
 
 """ brine: support for pickling/unpickling connection objects
 
+This was added to send connection objects from the Collator to Threshers but
+without being able to pickle Locks, is not helpful at this point
+
 see http://stackoverflow.com/questions/1446004/python-2-6-send-connection-object-over-queue-pipe-etc
 """
 

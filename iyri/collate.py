@@ -131,13 +131,13 @@ class Collator(mp.Process):
                         else:
                             self._cI.send(('warn','Collator','Thresher',"%s not recognized" % cs))
                     else:
-                        pid = cs.split('-')[1]
+                        pid = int(cs.split('-')[1])
                         threshers[pid]['conn'].close()
                         del threshers[pid]
                 elif ev == '!THRESH_WARN!': self._cI.send(('warn','Collator','Thresher',msg))
                 elif ev == '!THRESH_ERR!':
                     # tell process to stop
-                    ptype,pid = cs.split('-')
+                    pid = int(cs.split('-')[1])
                     self._cI.send(('warn','Collator','Thresher',"%s->%s" % (cs,msg)))
                     threshers[pid]['conn'].send(('!STOP!',ts2iso(time.time()),None))
                 # events from writer(s)
@@ -149,7 +149,7 @@ class Collator(mp.Process):
                         else:
                             self._cI.send(('warn','Collator','Writer',"%s not recognized" % cs))
                     else:
-                        pid = cs.split('-')[1]
+                        pid = int(cs.split('-')[1])
                         del writers[pid]
 
                         # for now, tell thresher's to stop writing (should add
@@ -157,11 +157,11 @@ class Collator(mp.Process):
                         for pid in threshers:
                             threshers[pid]['conn'].send(('!WRITE!',ts2iso(time.time()),False))
                 elif ev == '!WRITE_WARN!':
-                    pid = cs.split('-')[1]
+                    pid = int(cs.split('-')[1])
                     self._cI.send(('warn','Collator',"%s Writer" % writers[pid]['role'],msg))
                 elif ev == '!WRITE_ERR!':
                     # tell process to stop
-                    ptype,pid = cs.split('-')
+                    pid = int(cs.split('-')[1])
                     self._cI.send(('warn','Collator',"%s Writer" % writers[pid]['role'],msg))
                     writers[pid]['conn'].send(('!STOP!',ts2iso(time.time()),None))
                 elif ev == '!WRITE_OPEN!' or ev == '!WRITE_DONE!':

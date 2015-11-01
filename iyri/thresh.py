@@ -61,7 +61,7 @@ class PCAPWriter(mp.Process):
         self._private = False # data private
         self._sz = 0          # size limit
         self._pkts = []       # bulked packets
-        self._npkt = 0        # cur packet number in file
+        self._npkt = 1        # cur packet number in file
         self._fout = None
         self._setup(dbstr,conf)
 
@@ -87,17 +87,17 @@ class PCAPWriter(mp.Process):
                 tkn,ts,d = self._tasks.get(1.0)
                 if tkn == '!STOP!': self._stop = True
                 elif tkn == '!FRAME!':
-                    ts,fid,f,l,r = d
+                    fid,f,l,r = d
                     if self._private and l < r: f = f[:l] + f[r:]
                     self._pkts.append((ts,fid,f))
                     if len(self._pkts) > NWRITE: self._writepkts()
                 else:
-                    self._icomms.put((cs,ts1,'!WRITE_WARN!',"invalid token %s" % tkn))
+                    self._icomms.put((cs,ts1,'!WRITE_ERR!',"invalid token %s" % tkn))
             except Empty: pass
             except (IndexError,ValueError):
-                self._icomms.put((cs,ts1,'!WRITE_WARN!',"Invalid arguments"))
+                self._icomms.put((cs,ts1,'!WRITE_ERR!',"Invalid arguments"))
             except Exception as e:
-                self._icomms.put((cs,ts1,'!WRITE_WARN!',"%s: %s" % (type(e).__name__,e)))
+                self._icomms.put((cs,ts1,'!WRITE_ERR!',"%s: %s" % (type(e).__name__,e)))
 
         # are there unwritten packets?
         if len(self._pkts) > 0: self._writepkts()
@@ -112,7 +112,7 @@ class PCAPWriter(mp.Process):
     def _writepkts(self):
         """ write all packets to file """
         # get a timestamp & cs
-        cs = 'writer-d' % self.pid
+        cs = 'writer-%d' % self.pid
         ts = ts2iso(time.time())
 
         # wrap everything in a try block& reset all when done
@@ -138,7 +138,7 @@ class PCAPWriter(mp.Process):
                 self._fout.close()
                 self._fout = None
                 self._pkts = []
-                self._npkt = 0
+                self._npkt = 1
         except psql.OperationalError as e: # unrecoverable
             self._icomms.put((cs,ts,'!THRESH_ERR!',"DB: %s->%s" % (e.pgcode,e.pgerror)))
         except pcap.PCAPException as e:
@@ -154,7 +154,7 @@ class PCAPWriter(mp.Process):
     def _setup(self,dbstr,conf):
         """ initialize """
         try:
-             # connect to db
+            # connect to db
             self._conn = psql.connect(host=dbstr['host'],
                                       port=dbstr['port'],
                                       dbname=dbstr['db'],

@@ -342,6 +342,7 @@ class Iryi(object):
         # read in and validate the conf file
         self._readconf()
 
+
         # intialize shared objects
         self._halt = mp.Event() # our stop event
         self._ic = mp.Queue()   # comms for children
@@ -538,16 +539,23 @@ class Iryi(object):
 
             # Save Section
             self._conf['save'] = {'on':False,'private':False,
-                                  'path':'data/frames','sz':67108864}
+                                  'path':'..data/frames','sz':67108864}
             if cp.has_section('Save'):
                 self._conf['save']['on'] = cp.getboolean('Save','save')
                 if self._conf['save']['on']:
                     if self._conf['save']['private']:
-                        self._conf['save']['private'] = cp.get('SSE','save_private')
+                        self._conf['save']['private'] = cp.get('Save','save_private')
                     if self._conf['save']['path']:
-                        self._conf['save']['path'] = cp.get('SSE','save_path')
+                        self._conf['save']['path'] = cp.get('Save','save_path')
                     if self._conf['save']['sz']:
-                        self._conf['save']['sz'] = cp.getint('SSE','save_maxsize') * 1048576
+                        self._conf['save']['sz'] = cp.getint('Save','save_maxsize') * 1048576
+
+                    # confirm save path exists
+                    if not os.path.abspath(self._conf['save']['path']):
+                        self._conf['save']['path'] = os.path.realpath(self._conf['save']['path'])
+                    if not os.path.isdir(self._conf['save']['path']):
+                        msg = "Save Path %s does not exist" % self._conf['save']['path']
+                        raise IryiConfException(msg)
 
             # Local section
             self._conf['local'] = {'region':None,'c2c':2526}
