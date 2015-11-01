@@ -46,7 +46,6 @@ class Collator(mp.Process):
         mp.Process.__init__(self)
         self._icomms = comms       # communications queue
         self._cI = conn            # message connection to/from Iyri
-        self._gconf = conf['gps']  # configuration for gps/datastore
         self._conn = None          # conn to backend db
         self._curs = None          # primary db cursors
         self._sid = None           # our session id (from the backend)
@@ -56,6 +55,7 @@ class Collator(mp.Process):
         self._writea = False       # write abad pcap
         self._writes = False       # write shama pcap
         self._save = None          # save options
+        self._dbstr = {}           # db connection string
         self._setup(conf)
 
     def terminate(self): pass
@@ -99,7 +99,7 @@ class Collator(mp.Process):
                 t = Thresher(self._icomms,qT,recv,
                              (self._ab,qWA),
                              (self._sb,qWS),
-                             self._conn,ouis)
+                             self._dbstr,ouis)
                 t.start()
                 threshers[t.pid] = {'obj':t,'conn':send}
                 send.send(('!SID!',ts2iso(time.time()),[self._sid]))
@@ -188,16 +188,16 @@ class Collator(mp.Process):
                         # create a file writer (if saving) & update threshers
                         if msg['role'] == 'abad' and self._writea:
                             try:
-                                p = PCAPWriter(self._icomms,qWA,self._conn,
-                                               self._sid,msg['mac'],self._save)
+                                p = PCAPWriter(self._icomms,qWA,self._sid,
+                                               msg['mac'],self._dbstr,self._save)
                                 p.start()
                                 writers[p.pid] = {'obj':p,'q':qWA,'role':'abad'}
                             except RuntimeError as e:
                                 self._cI.send(('warn','Collator',"Abad Writer",e))
                         elif msg['role'] == 'shama' and self._writes:
                             try:
-                                p = PCAPWriter(self._icomms,qWS,self._conn,
-                                               self._sid,msg['mac'],self._save)
+                                p = PCAPWriter(self._icomms,qWS,self._sid,
+                                               msg['mac'],self._dbstr,self._save)
                                 p.start()
                                 writers[p.pid] = {'obj':p,'q':qWS,'role':'shama'}
                             except RuntimeError as e:
@@ -316,12 +316,13 @@ class Collator(mp.Process):
     def _setup(self,conf):
         """ connect to db w/ params in store & pass sensor up event """
         try:
+            self._dbstr = conf['store']
             # connect to db
-            self._conn = psql.connect(host=conf['store']['host'],
-                                      port=conf['store']['port'],
-                                      dbname=conf['store']['db'],
-                                      user=conf['store']['user'],
-                                      password=conf['store']['pwd'])
+            self._conn = psql.connect(host=self._dbstr['host'],
+                                      port=self._dbstr['port'],
+                                      dbname=self._dbstr['db'],
+                                      user=self._dbstr['user'],
+                                      password=self._dbstr['pwd'])
             self._curs = self._conn.cursor()
             self._curs.execute("set time zone 'UTC';")
             self._conn.commit()

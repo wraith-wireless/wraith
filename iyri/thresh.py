@@ -40,19 +40,19 @@ from wraith.utils import simplepcap as pcap # write frames to file
 
 class PCAPWriter(mp.Process):
     """ saves frmes to file """
-    def __init__(self,comms,q,dbconn,sid,mac,conf):
+    def __init__(self,comms,q,sid,mac,dbstr,conf):
         """
          comms: internal communication (to Collator)
          q: task queue i.e frames to write
-         dbconn: db connection
          sid: current session id
          mac: hwaddr of collecting radio
+         dbstr: db connection string
          conf: configuration details
         """
         mp.Process.__init__(self)
         self._icomms = comms  # communications queue
         self._tasks = q       # write to/from Thresher and/or Collator
-        self._conn = dbconn   # db connection
+        self._conn = None     # db connection
         self._curs = None     # our cursor
         self._sid = sid       # current session id
         self._mac = mac       # hw addr of collecting src
@@ -63,7 +63,7 @@ class PCAPWriter(mp.Process):
         self._pkts = []       # bulked packets
         self._npkt = 0        # cur packet number in file
         self._fout = None
-        self._setup(conf)
+        self._setup(dbstr,conf)
 
     def terminate(self): pass
 
@@ -103,6 +103,8 @@ class PCAPWriter(mp.Process):
         if len(self._pkts) > 0: self._writepkts()
 
         # notify Collator we're down
+        if self._curs: self._curs.close()
+        if self._conn: self._conn.close()
         self._icomms.put((cs,ts2iso(time.time()),'!WRITE!',None))
 
     def stop(self,signum=None,stack=None): self._stop = True
@@ -149,25 +151,33 @@ class PCAPWriter(mp.Process):
         else:
             self._conn.commit()
 
-    def _setup(self,conf):
+    def _setup(self,dbstr,conf):
         """ initialize """
         try:
-            # db stuff
+             # connect to db
+            self._conn = psql.connect(host=dbstr['host'],
+                                      port=dbstr['port'],
+                                      dbname=dbstr['db'],
+                                      user=dbstr['user'],
+                                      password=dbstr['pwd'])
             self._curs = self._conn.cursor()
             self._curs.execute("set time zone 'UTC';")
             self._conn.commit()
 
-            # set priavte variables
+            # set save parameters
             self._path = conf['path']
             self._private = conf['private']
             self._sz = conf['sz']
-        except psql.Error as e:
-            self._conn.rollback()
+        except Exception as e:
+            if self._curs:
+                self._conn.rollback()
+                self._curs.close()
+            if self._conn: self._conn.close()
             raise RuntimeError(e)
 
 class Thresher(mp.Process):
     """ inserts frames (and saves if specified) in db """
-    def __init__(self,comms,q,conn,abad,shama,dbconn,ouis):
+    def __init__(self,comms,q,conn,abad,shama,dbstr,ouis):
         """
          comms - internal info-message communication (to Collator)
          q - task queue from Collator
@@ -183,12 +193,12 @@ class Thresher(mp.Process):
         self._cC = conn      # token connection from Collator
         self._abad = abad    # abad tuple
         self._shama = shama  # shama tuple
-        self._conn = dbconn  # db connection
+        self._conn = None    # db connection
         self._curs = None    # our cursor
         self._ouis = ouis    # oui dict
         self._stop = False   # stop flag
         self._write = False  # write flag
-        self._setup()
+        self._setup(dbstr)
 
     def terminate(self): pass
 
@@ -215,10 +225,8 @@ class Thresher(mp.Process):
                 ts1 = ts2iso(time.time()) # get timestamp for this data read
                 try:
                     # get data
-                    if r == self._cC:
-                        tkn,ts,d = self._cC.recv()
-                    else: # tasks._reader
-                        tkn,ts,d = self._tasks.get(0.5)
+                    if r == self._cC: tkn,ts,d = self._cC.recv()
+                    else: tkn,ts,d = self._tasks.get(0.5)
 
                     # & process it
                     if tkn == '!STOP!': self._stop = True
@@ -243,6 +251,7 @@ class Thresher(mp.Process):
                         f = rdos[src]['buffer'][(ix*N):(ix*N)+l].tobytes()
 
                         # parse the frame
+                        fid = None       # current frame id
                         vs = ()          # values for db insert
                         lF = len(f)      # & get the total length
                         dR = {}          # make an empty rtap dict
@@ -268,32 +277,36 @@ class Thresher(mp.Process):
                                   int('a-mpdu' in dR['present']),
                                   rtap.flags_get(dR['flags'],'fcs'))
 
-                        # insert the frame. psql exceptions will be cught in outer try
-                        #sql = """
-                        #       insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
-                        #       values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning frame_id;
-                        #      """
-                        #try:
-                        #    self._curs.execute(sql,vs)
-                        #    fid = self._curs.fetchone()[0]
-                        #except psql.OperationalError as e: # unrecoverable
-                        #    self._icomms.put((cs,ts1,'!THRESH_ERR!',"DB. %s: %s" % (e.pgcode,e.pgerror)))
-                        #    continue
-                        #except psql.Error as e:
-                        #    self._conn.rollback()
-                        #    self._icomms.put((cs,ts1,'!THRESH_WARN!',"SQL. %s: %s" % (e.pgcode,e.pgerror)))
-                        #    continue
-                        #else:
-                        #    self._conn.commit()
+                        # insert the frame
+                        sql = """
+                               insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
+                               values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning frame_id;
+                              """
+                        try:
+                            self._curs.execute(sql,vs)
+                            fid = self._curs.fetchone()[0]
+                        except psql.OperationalError as e: # unrecoverable
+                            self._icomms.put((cs,ts1,'!THRESH_ERR!',"DB. %s: %s" % (e.pgcode,e.pgerror)))
+                            continue
+                        except psql.Error as e:
+                            self._conn.rollback()
+                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"SQL. %s: %s" % (e.pgcode,e.pgerror)))
+                            continue
+                        except Exception as e:
+                            self._conn.rollback()
+                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"Unknown: %s" % e))
+                        else:
+                            self._conn.commit()
 
                         # pass to writer
-                        #if self._write:
-                        #    l = r = 0
-                        #    if validRTAP: l += dR['sz']
-                        #    if validMPDU:
-                        #        l += dM.offset
-                        #        r = lF-dM.stripped
-                        #    rdos[src]['writer'].put(('!FRAME!',ts,[fid,f,l,r]))
+                        if fid:
+                            if self._write:
+                                l = r = 0
+                                if validRTAP: l += dR['sz']
+                                if validMPDU:
+                                    l += dM.offset
+                                    r = lF-dM.stripped
+                                rdos[src]['writer'].put(('!FRAME!',ts,[fid,f,l,r]))
                     else:
                         self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid token %s" % tkn))
                 except (IndexError,ValueError):
@@ -304,17 +317,27 @@ class Thresher(mp.Process):
                     self._icomms.put((cs,ts1,'!THRESH_WARN!',"%s: %s" % (type(e).__name__,e)))
 
         # notify collector we're down
-        self._curs.close()
+        if self._curs: self._curs.close()
+        if self._conn: self._conn.close()
         self._icomms.put((cs,ts2iso(time.time()),'!THRESH!',None))
 
     def stop(self,signum=None,stack=None): self._stop = True
 
-    def _setup(self):
-        """ initialize """
+    def _setup(self,dbstr):
+        """ initialize db connection """
         try:
+            # connect to db
+            self._conn = psql.connect(host=dbstr['host'],
+                                      port=dbstr['port'],
+                                      dbname=dbstr['db'],
+                                      user=dbstr['user'],
+                                      password=dbstr['pwd'])
             self._curs = self._conn.cursor()
             self._curs.execute("set time zone 'UTC';")
             self._conn.commit()
-        except psql.Error as e:
-            self._conn.rollback()
+        except Exception as e:
+            if self._curs:
+                self._conn.rollback()
+                self._curs.close()
+            if self._conn: self._conn.close()
             raise RuntimeError(e)
