@@ -29,13 +29,13 @@ class Tuner(threading.Thread):
     """ 'tunes' the radio's current channel and width """
     def __init__(self,q,conn,iface,scan,dwell,i,pause=False):
         """
-         q: msg queue between RadioController and this Thread
-         conn: iyri token connnection
-         iface: interface name of card
-         scan: scan list of channel tuples (ch,chw)
-         dwell: dwell list. for each i stay on ch in scan[i] for dwell[i]
-         i: initial channel index
-         pause: start paused?
+         :param q: msg queue between RadioController and this Thread
+         :param conn: token connnection from iyri
+         :param iface: interface name of card
+         :param scan: scan list of channel tuples (ch,chw)
+         :param dwell: dwell list. for each i stay on ch in scan[i] for dwell[i]
+         :param i: initial channel index
+         :param pause: start paused?
         """
         threading.Thread.__init__(self)
         self._qR = q        # event queue to RadioController
@@ -138,15 +138,17 @@ class Tuner(threading.Thread):
                     self._qR.put(('!FAIL!',ts2iso(time.time()),(-1,e)))
 
 class RadioController(mp.Process):
-    """ Radio - primarily placeholder for radio details """
+    """ RadioController - handles radio initialization and collection """
     def __init__(self,comms,conn,buff,conf):
-        """ initialize radio
-         comms - internal communications
-         conn - connection to/from Iyri
-         buff - the circular buffer
-         conf - radio configuration dict. Must have key->value pairs for keys role,
-          nic, dwell, scan and pass and optionally for keys spoof, ant_gain, ant_type,
-          ant_loss, desc
+        """
+         initialize radio for collection
+
+         :param comms: internal communication to Collator
+         :param conn: connection to/from Iyri
+         :param buff: the circular buffer for frames
+         :param conf: radio configuration dict. Must have key->value pairs for
+          keys = role,nic,dwell,scan and pass and optionally for keys = spoof,
+          ant_gain,ant_type,ant_loss,desc
         """
         mp.Process.__init__(self)
         self._icomms = comms      # communications queue
@@ -290,6 +292,8 @@ class RadioController(mp.Process):
          1) sets radio properties as specified in conf
          2) prepares specified nic for monitoring and binds it
          3) creates a scan list and compile statistics
+
+         :param conf: radio configuration
         """
         # 1) set radio properties as specified in conf
         if conf['nic'] not in iwt.wifaces():

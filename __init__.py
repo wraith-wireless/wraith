@@ -63,6 +63,7 @@ wraith 0.0.4
   - removed nidus service
   - renamed iyri to iyri
   - moved db writes to iyri
+  - tried commenting code (specifically functions) better
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

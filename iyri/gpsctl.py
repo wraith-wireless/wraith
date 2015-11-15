@@ -25,9 +25,9 @@ class GPSController(mp.Process):
     """ periodically checks gps for current location """
     def __init__(self,comms,conn,conf):
         """
-         comms - internal communication
-         conn - connection to/from Iyri
-         conf - config file for gps
+         :param comms: internal communication for data to Collator
+         :param conn: connection pipe to/from Iyri
+         :param conf: gps configuration s dict
         """
         mp.Process.__init__(self)
         self._icomms = comms          # communications queue
@@ -127,7 +127,11 @@ class GPSController(mp.Process):
         return True
 
     def _setup(self,conf):
-        """ attempt to connect to device if fixed is off """
+        """
+         attempt to connect to device if fixed is off
+
+         :param conf: gps configuration
+        """
         # if dynamic, attempt connect to device otherwise configure static flt
         self._fixed = True if conf['fixed'] else False
         self._m = mgrs.MGRS()

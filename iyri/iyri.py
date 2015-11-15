@@ -61,8 +61,11 @@ from wraith.iyri.constants import *             # buffer dims
 # with minimal hassle
 def parsechlist(pattern,ptype):
     """
-      parse channel list pattern of type ptype = oneof {'scan'|'pass'} and return
-      a list of tuples (ch,chwidth)
+      parses a channel list pattern
+
+      :param pattern: see iyri.conf for  channel list definition
+      :param ptype: oneof {'scan'|'pass'}
+      :returns: a list of tuples t = (channel,chwidth) defined in pattern
     """
     if not pattern: chs,ws = [],[]
     else:
@@ -123,9 +126,9 @@ class C2C(threading.Thread):
     """
     def __init__(self,conn,port):
         """
-         initialize
-          conn: connection pipe
-          port: port to listen for connections on
+         initialize C2C Server
+          :param conn: connection pipe from/to iyri
+          :param port: port to listen for connections on
         """
         threading.Thread.__init__(self)
         self._cD = conn     # connection to/from Iryi
@@ -243,7 +246,11 @@ class IryiRuntimeException(IryiException): pass
 class Iryi(object):
     """ Iryi - primary process of the Wraith sensor """
     def __init__(self,conf=None):
-        """ initialize variables """
+        """
+         initialize Iyri
+
+         :param conf: path to configuration file
+        """
         # get parameters
         self._cpath = conf if conf else os.path.join(GPATH,'iyri.conf')
         
@@ -330,7 +337,12 @@ class Iryi(object):
 
     # noinspection PyUnusedLocal
     def stop(self,signum=None,stack=None):
-        """ stop execution """
+        """
+         stop execution
+
+         :param signum: signal number, ignored
+         :param stack: stack frame at point of interruption, ignored
+        """
         if IYRI_RUNNING <= self.state < IYRI_EXITING:
             logging.info("**** Stopping Iryi ****")
             self._destroy()
@@ -578,8 +590,12 @@ class Iryi(object):
 
     # noinspection PyMethodMayBeStatic
     def _readradio(self,cp,rtype='Abad'):
-        """ read in the rtype radio configuration from conf and return parsed dict """
-        # don't bother if specified radio is not present
+        """
+         read in the rtype radio configuration from conf and return parsed dict
+
+         :param cp: ConfigParser object
+         :param rtype: radio type onoeof {'Abad'|'Shama'}
+        """
         if not cp.get(rtype,'nic') in wifaces():
             raise RuntimeError("Radio %s not present/not wireless" % cp.get(rtype,'nic'))
 
@@ -672,7 +688,11 @@ class Iryi(object):
         return r
 
     def _processcmd(self,msg):
-        """ parse and process command from c2c socket """
+        """
+         parse and process command from c2c socket
+
+         :param msg: the commnd from user
+        """
         # ensure there are at least 3 tokens
         tkns = None
         try:

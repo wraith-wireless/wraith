@@ -34,14 +34,13 @@ class Collator(mp.Process):
     """ Collator - handles further processing of raw frames from the sniffer """
     def __init__(self,comms,conn,ab,sb,conf):
         """
-         initializes Collator
-         comms - internal communication
-          NOTE: all messages sent on internal comms must be a tuple T where
-           T = (sender callsign,timestamp of event,type of message,event message)
-         conn - connection to/from Iyri
-         ab - Abad's circular buffer
-         sb - Shama's circular buffer
-         conf - necessary config details
+         :param comms: internal communication all data sent here
+          NOTE: all messages sent on internal comms must be a tuple t where
+           t = (sender callsign,timestamp of event,type of message,event message)
+         :param conn: connection pipe to/from Iyri
+         :param ab: Abad's circular buffer
+         :param sb: Shama's circular buffer
+         :param conf: configuration dict
         """
         mp.Process.__init__(self)
         self._icomms = comms       # communications queue
@@ -314,7 +313,11 @@ class Collator(mp.Process):
 #### private helper functions
 
     def _setup(self,conf):
-        """ connect to db w/ params in store & pass sensor up event """
+        """
+         connect to db w/ params in store & pass sensor up event
+
+         :param conf: configuration details
+        """
         try:
             self._dbstr = conf['store']
             # connect to db
@@ -344,7 +347,12 @@ class Collator(mp.Process):
 
     #### DB functionality ####
     def _submitsensor(self,ts,state):
-        """ submit sensor at ts having state """
+        """
+         submit sensor at ts having state
+
+         :param ts: timestamp of event
+         :param state: state of event
+        """
         if state:
             sql = """
                    insert into sensor (hostname,ip,period)
@@ -362,9 +370,6 @@ class Collator(mp.Process):
 
     def _submitplatform(self):
         """ submit platform details """
-        assert self._sid
-
-        # get platform details
         os = platform.system()
         try:
             dist,osvers,name = platform.linux_distribution()
@@ -395,8 +400,12 @@ class Collator(mp.Process):
         self._conn.commit()
 
     def _submitgpsd(self,ts,g):
-        """ submit gps device having state w/ details """
-        assert self._sid
+        """
+         submit gps device at gs
+
+         :param ts: timestamp of event
+         :param g: gps device details
+        """
         if g is not None:
             # insert if gpsd does not already exist
             self._curs.execute("select gpsd_id from gpsd where devid=%s;",(g['id'],))
@@ -418,7 +427,6 @@ class Collator(mp.Process):
                   """
             self._curs.execute(sql,(self._sid,self._gid,ts))
         else:
-            assert self._gid
             sql = """
                    update using_gpsd set period = tstzrange(lower(period),%s)
                    where sid = %s and gid = %s;
@@ -427,8 +435,12 @@ class Collator(mp.Process):
         self._conn.commit()
 
     def _submitflt(self,ts,flt):
-        """ submit the flt at ts """
-        assert self._sid
+        """
+         submit the flt at ts
+
+         :param ts: timestamp of frontline trace
+         :param flt: frontline trace dict
+        """
         sql = """
                insert into flt (sid,ts,coord,alt,spd,dir,fix,xdop,ydop,pdop,epx,epy)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
@@ -440,8 +452,13 @@ class Collator(mp.Process):
         self._conn.commit()
 
     def _submitradio(self,ts,mac,r):
-        """ submit gps device having state w/ details """
-        assert self._sid
+        """
+         submit radio
+
+         :param ts: timestamp of radio event
+         :param mac: mac hw address
+         :param r: radio details
+        """
         if r is not None:
             # add radio if it does not exist
             self._curs.execute("select * from radio where mac=%s;",(mac,))
@@ -477,8 +494,12 @@ class Collator(mp.Process):
         self._conn.commit()
 
     def _submitantenna(self,ts,a):
-        """ submit antenna at ts """
-        assert self._sid
+        """
+         submit antenna
+
+         :param ts: timestamp of antenna submit
+         :param a: antenna details
+        """
         sql = """
                insert into antenna (mac,ind,gain,loss,x,y,z,type,ts)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
@@ -488,8 +509,12 @@ class Collator(mp.Process):
         self._conn.commit()
 
     def _submitradioevent(self,ts,m):
-        """ submit radioevent at ts """
-        assert self._sid
+        """
+         submit radioevent at ts
+
+         :param ts: timestamp of radio event
+         :param m: event details
+        """
         sql = """
                insert into radio_event (mac,state,params,ts)
                values (%s,%s,%s,%s);

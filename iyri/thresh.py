@@ -40,16 +40,20 @@ from wraith.radio import channels           # 802.11 channels/RFs
 from wraith.utils import simplepcap as pcap # write frames to file
 
 class PCAPWriter(mp.Process):
-    """ saves frames to file """
+    """
+     A PCAP writer is responsible for saving frames from one radio. This can be
+     a bottleneck as multiple Threshers will be sending data and the frames
+     will be out of order.
+    """
     def __init__(self,comms,q,sid,mac,buff,dbstr,conf):
         """
          :param comms: internal communication (to Collator)
-         q: task queue i.e frames to write
-         sid: current session id
-         mac: hwaddr of collecting radio
-         buffer: the buffer of frames to write
-         dbstr: db connection string
-         conf: configuration details
+         :param q: task queue i.e frames to write
+         :param sid: current session id
+         :param mac: hwaddr of collecting radio
+         :param buffer: the buffer of frames to write
+         :param dbstr: db connection string
+         :param conf: configuration details
         """
         mp.Process.__init__(self)
         self._icomms = comms  # communications queue
@@ -156,7 +160,12 @@ class PCAPWriter(mp.Process):
             self._conn.commit()
 
     def _setup(self,dbstr,conf):
-        """ initialize """
+        """
+         connect to database & initialize variables
+
+         :param dbstr: database connection string
+         :param conf: configuration database
+        """
         try:
             # connect to db
             self._conn = psql.connect(host=dbstr['host'],
@@ -180,16 +189,18 @@ class PCAPWriter(mp.Process):
             raise RuntimeError(e)
 
 class Thresher(mp.Process):
-    """ inserts frames (and saves if specified) in db """
+    """
+     Thresher process frames and inserts frame data in database
+    """
     def __init__(self,comms,q,conn,abad,shama,dbstr,ouis):
         """
-         comms - internal info-message communication (to Collator)
-         q - task queue from Collator
-         conn - token connection from Collator
-         abad: tuple t = (AbadBuffer,AbadWriterQueue)
-         shama: tuple t = (ShamaBuffer,ShamaWriterQueue)
-         dbconn - db connection
-         ouis - oui dict
+         :param comms: internal communication (to Collator)
+         :param q: task queue from Collator
+         :param conn: token connection from Collator
+         :param abad: tuple t = (AbadBuffer,AbadWriterQueue)
+         :param shama: tuple t = (ShamaBuffer,ShamaWriterQueue)
+         :param dbstr: db connection string
+         :param ouis: oui dict
         """
         mp.Process.__init__(self)
         self._icomms = comms # communications queue
@@ -360,7 +371,11 @@ class Thresher(mp.Process):
     def stop(self,signum=None,stack=None): self._stop = True
 
     def _setup(self,dbstr):
-        """ initialize db connection """
+        """
+         initialize db connection
+
+         :param dbstr: db connection string
+        """
         try:
             # connect to db
             self._conn = psql.connect(host=dbstr['host'],
@@ -379,11 +394,15 @@ class Thresher(mp.Process):
             raise RuntimeError(e)
 
     def _insertrtap(self,fid,src,dR):
-        """ insert radiotap data into db """
-        #if 'a-mpdu' in dR['present']: self._insertampdu(fid,dR)
-                            #self._insertsource(fid,dR)
-                            #self._insertsiganl(fid,dR)
-        # NOTE: all exceptions are caught in caller
+        """
+         insert radiotap data into db
+
+         :param fid: frame id
+         :param src: collectors hw addr
+         :param dR: parsed radiotap dict
+
+         NOTE: allows exceptions to pass through for caller to catch
+        """
         # ampdu info
         if 'a-mpdu' in dR['present']:
             sql = "insert into ampdu fid,refnum,flags) values (%s,%s,%s);"

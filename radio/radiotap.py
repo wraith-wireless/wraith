@@ -24,14 +24,14 @@ FMT_BO = "@" # struct format byte order specifier
 
 def parse(f):
     """
-     parses the radiotap in f returning a dict d where d will always have
-      key->value pairs for:
-       vers: the radiotap version
-       sz: bytes of radiotap header
-       present: an ordered list of fields present in this frame
-     and key->value pairs for each field in present
-     NOTE: tried unpacking individually (concise code) but it failed to align
-     the individual fields
+     parses the radiotap header in frame f
+
+     :param f: the frame
+     :returns: dict d where d will always have key->value pairs for:
+      vers -> the radiotap version
+      sz -> bytes of radiotap header
+      present -> an ordered list of fields present in this frame
+      and key->value pairs for each field in present
     """
     # parse header and present flags
     (v,l,p) = header(f)
@@ -70,7 +70,10 @@ def parse(f):
 _HDR_ = FMT_BO + "BxHI"
 _HDR_SZ_ = struct.calcsize(_HDR_)
 def header(f):
-    """  parse/return tuple = (version,length,present) from frame f """
+    """
+     :param f: the frame
+     :returns: tuple t = (version,length,present)
+    """
     try:
         return struct.unpack(_HDR_,f[:_HDR_SZ_])
     except struct.error:
@@ -80,7 +83,8 @@ _VER_ =  FMT_BO + "B"
 _VER_SZ_ = struct.calcsize(_VER_)
 def version(f):
     """
-     parse/return it_version of the radio tap frame in frame f
+     :param f: the frame
+     :returns: it_version of the radio tap frame
      NOTE: does throw exception on invalid version
     """
     try:
@@ -92,7 +96,8 @@ _LEN_ =  FMT_BO + "BxH"
 _LEN_SZ_ = struct.calcsize(_LEN_)
 def length(f):
     """
-     parse/return the it_len of the radio tap frame (if valid) in frame f
+     :param f: the frame
+     :returns: it_len of the radio tap frame
      NOTE: this will raise an exception if, the header does not have a vers,
       length and present flags and if the v is not 0
     """
@@ -105,7 +110,9 @@ def length(f):
 
 def pflags(f):
     """
-     parse/return the it_present of the radio tap frame f (if valid) in frame f
+     :param f: the frame
+
+     :returns: it_present of the radio tap frame f
      NOTE: this will raise an exception if, the header does not have a vers,
       length and present flags and if the v is not 0
     """    
@@ -303,8 +310,9 @@ MCS_FEC_TYPE_LDPC   = 1
 _MCS_FLAGS_ = {'bw':0x03,'gi':0x04,'ht':0x08,'fec':0x10,'stbc':0x60,'ness':0x80}
 def mcsflags_params(kn,fn):
     """
-     given the flags number fn and known number kn returns the corresponding
-     values for all known flags 
+     :param kn: known number
+     :param fn: flags number
+     :returns: corresponding values for all known flags of mcs field
     """
     return {n:_MCS_FLAGS_[n] & fn for n in _MCS_FLAGS_ if n in mcsknown(kn)}
 
@@ -360,8 +368,9 @@ def vhtknown_get(mn,f):
 _VHT_FLAGS_ = {'stbc':0x01,'txop':0x02,'gi':0x04,'short':0x08,'ldpc':0x10,'beam':0x20}        
 def vhtflags_params(kn,fn):
     """
-     given the flags number fn and known number kn returns the corresponding
-     values for all known flags 
+     :param kn: known number
+     :param fn: flags number
+     :returns: corresponding values for all known flags of vht field
     """
     return {name:_VHT_FLAGS_[name] & fn for name in _VHT_FLAGS_ if name in vhtknown(kn)}    
 
@@ -377,5 +386,4 @@ def vhtcoding_get(mn,f):
     try:
         return bitmask_get(_VHT_CODING_,mn,f)
     except KeyError:
-        raise RadiotapException("invalid VHT Coding flag '%s'" % f) 
-
+        raise RadiotapException("invalid VHT Coding flag '%s'" % f)
