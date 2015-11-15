@@ -43,7 +43,7 @@ class PCAPWriter(mp.Process):
     """ saves frames to file """
     def __init__(self,comms,q,sid,mac,buff,dbstr,conf):
         """
-         comms: internal communication (to Collator)
+         :param comms: internal communication (to Collator)
          q: task queue i.e frames to write
          sid: current session id
          mac: hwaddr of collecting radio

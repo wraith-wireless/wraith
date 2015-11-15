@@ -67,7 +67,7 @@ class MPDU(dict):
 
     @property
     def offset(self):
-        # offset is the number of bytes read from byte 0
+        """ :return: number of bytes read from byte 0 """
         try:
             return self['offset']
         except:
@@ -75,7 +75,7 @@ class MPDU(dict):
 
     @property
     def stripped(self):
-        # number of bytes read from the last byte of the frame
+        """ :return: # of bytes read from the last byte of the frame """
         try:
             return self['stripped']
         except:
@@ -83,8 +83,7 @@ class MPDU(dict):
 
     @property
     def size(self):
-        # size is the total number of bytes read (includes fcs and any icv, etc)
-        # that are at the end of the frame
+        """ :return: ttl # of bytes read (includes fcs and any icv, etc) """
         try:
             return self['offset'] + self['stripped']
         except:
@@ -92,6 +91,7 @@ class MPDU(dict):
 
     @property
     def present(self):
+        """ :return: list of fields that are present """
         try:
             return self['present']
         except:
@@ -102,6 +102,7 @@ class MPDU(dict):
 
     @property
     def framectrl(self):
+        """ :return: mpdu frame control """
         try:
             return self['framectrl']
         except KeyError:
@@ -109,6 +110,7 @@ class MPDU(dict):
 
     @property
     def vers(self):
+        """ :return: version as specified in frame control """
         try:
             return self['framectrl']['vers']
         except KeyError:
@@ -116,6 +118,7 @@ class MPDU(dict):
 
     @property
     def type(self):
+        """ :return: type as specified in frame control """
         try:
             return self['framectrl']['type']
         except KeyError:
@@ -123,6 +126,7 @@ class MPDU(dict):
 
     @property
     def subtype(self):
+        """ :return: subtype as specified in frame control """
         try:
             return self['framectrl']['subtype']
         except KeyError:
@@ -130,6 +134,7 @@ class MPDU(dict):
 
     @property
     def subtype_desc(self):
+        """ :return: string repr of type as specified in frame control """
         try:
             if self.type == FT_MGMT: return ST_MGMT_TYPES[self.subtype]
             elif self.type == FT_CTRL: return ST_CTRL_TYPES[self.subtype]
@@ -139,21 +144,24 @@ class MPDU(dict):
             raise MPDUUninstantiatedException
 
     @property
-    def flags(self): # mpdu flags
+    def flags(self):
+        """ :return: flags as specified in frame control """
         try:
             return self['framectrl']['flags']
         except KeyError:
             raise MPDUUninstantiatedException
 
-    @property # mpdu duration
+    @property
     def duration(self):
+        """ :return: durtion of mpdu """
         try:
             return self['duration']
         except KeyError:
             raise MPDUUninstantiatedException
 
-    @property # mpdu address 1
+    @property
     def addr1(self):
+        """ :return: addr1 of mpdu """
         try:
             return self['addr1']
         except KeyError:
@@ -185,11 +193,14 @@ class MPDU(dict):
 
 def parse(frame,hasFCS=False):
     """
-     parses the mpdu in frame (where frame is stripped of any layer 1 header)
-     and returns a dict d where d will always have key->value pairs for:
-      vers: mpdu version (always 0)
-      sz: offset of last bytes read from mpdu (not including fcs).
-      present: an ordered list of fields present in the frame
+     parse the mpdu in frame (where frame is stripped of any layer 1 header)
+
+     :param frame: the frame to parse
+     :param hasFCS: fcs is present in frame
+     :returns: dict d where d will always have key->value pairs for:
+      vers -> mpdu version (always 0)
+      sz -> offset of last bytes read from mpdu (not including fcs).
+      present -> an ordered list of fields present in the frame
       and key->value pairs for each field in present
     """
     # at a minimum, frames will be FRAMECTRL|DURATION|ADDR1 (and fcs if not
@@ -372,7 +383,6 @@ def datasubtype_get(mn,f):
         raise MPDUException("invalid data subtype flag '%s'" % f)
 
 def subtypes(ft,st):
-    """ returns the subtype description given the values ft and st """
     if ft == FT_MGMT: return ST_MGMT_TYPES[st]
     elif ft == FT_CTRL: return ST_CTRL_TYPES[st]
     elif ft == FT_DATA: return ST_DATA_TYPES[st]
