@@ -49,11 +49,11 @@ Any geolocational data is also stored (if a gps device is present).
 
 NOTE:
 In earlier versions < 0.1.x, Iyri did not handle database writes/updates. Rather
-this was handled by a an additional module that the sensor would pass data to. It
-was with great relunctance that I removed this 'mediator', and moved database
-functionality directly to the sensor, primarily as it would restrict wraith to
-a single platform i.e. expanding to a central database and multiple sensors will
-be near impossible. However, there were two primary reasons for doing so:
+this was handled by a an additional module colocated with the database (on the same
+system) that the sensor would pass data to. It was with great relunctance that I
+removed this 'mediator', and moved database functionality directly to the sensor,
+primarily as it would restrict wraith to a single platform i.e. expanding to a
+central database and multiple sensors will be very difficult. However, there were two primary reasons for doing so:
 * I wanted to push more autonomy and intelligence into the sensor which would
   require the sensor to parse out radiotap and mpdu (no point in doing this twice)
 * frames were being passed through multiple connection, queues and sockets before
