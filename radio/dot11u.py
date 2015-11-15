@@ -90,4 +90,3 @@ VENUE_TYPE_ASSIGN = {VENUE_UNSPECIFIED:{0,"UNSPECIFIED"},
                                     4:"TRAFFIC CONTROL",
                                     5:"BUS STOP",
                                     6:"KIOSK"}}
-

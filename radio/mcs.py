@@ -59,8 +59,11 @@ MCS_HT_RATES = [{20:{0:6.5,1:7.2},40:{0:13.5,1:15}},
 
 def mcs_coding(i):
     """
-     given the mcs index i, returns a tuple (m=modulation & coding rate,s= # of 
+     given the mcs index i, returns a tuple (m=modulation & coding rate,s= # of
      spatial streams)
+
+     :param i: mcs index
+     :returns: tuple t = (modulation & coding rate,number of spatial streams)
     """
     if i < 0 or i > 31: raise ValueError("mcs index '%d' must be 0 <= i <= 32" % i)
     (m,n) = divmod(i,8)
@@ -70,6 +73,11 @@ def mcs_rate(i,w,gi):
     """
      given the mcs index i, channel width w and guard interval (0 for short, 1 
      for long), returns the data rate
+
+     :param i: mcs index
+     :param w: channel width
+     :param gi: guard interval (s for short, l for long
+     :returns: data rate
     """
     if i < 0 or i > 31: raise ValueError("mcs index '%d' must be 0 <= i <= 32" % i)
     if not(w == 20 or w == 40): raise ValueError("mcs width '%d' must be 20 or 40" % w)
@@ -79,6 +87,10 @@ def mcs_rate(i,w,gi):
 def mcs_width(i,dr):
     """
      given mcs index i & data rate dr, returns channel width and guard interval
+
+     :param i: mcs index
+     :param dr: data rate
+     :returns: tuple t = (channel width,guard interval)
     """
     if i < 0 or i > 31: raise ValueError("mcs index '%d' must be 0 <= i <= 32" % i)
     for w in MCS_HT_RATES[i]:
@@ -86,4 +98,3 @@ def mcs_width(i,dr):
             if MCS_HT_RATES[i][w][gi] == dr:
                 return w,gi
     return None
-

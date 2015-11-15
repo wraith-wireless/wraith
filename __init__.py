@@ -74,8 +74,6 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os
-
 #### CONSTANTS
 
 BINS       = "ABCDEFG"                  # data bin ids

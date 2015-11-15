@@ -22,7 +22,12 @@ class PCAPIOException(PCAPException): pass   # pcap IO error
 class PCAPPackException(PCAPException): pass # pcap struct errors
 
 def pcapopen(fname):
-    """ opens fname and writes pcap header, returning open file object """
+    """
+     opens and writes pcap header to file
+
+     :param fname: pcap file path
+     :returns: opend file object
+    """
     try:
         fout = open(fname,'wb')
         fout.write(pcaphdr())
@@ -35,7 +40,13 @@ def pcapopen(fname):
 
     
 def pktwrite(fout,ts,pkt):
-    """ writes packet pkt with timestamp ts to pcap file object fout """
+    """
+     writes packet pkt with timestamp ts to pcap file object fout
+
+     :param fout: pcap file object
+     :param ts: timestamp of packet
+     :param pkt: packet
+    """
     try:
         pkt = pcappkt(ts,pkt)
         fout.write(pkt)
@@ -82,8 +93,11 @@ def pcaphdr():
 _PCAP_PKT_FMT_ = "<llII"
 def pcappkt(ts,pkt):
     """
-     returns a pcap packet (pkt_hdr+pkt) for writing
-     ts must be an isoformat string, pkt is the hex packet for writing 
+     builds pcap packet for writing
+
+     :param ts: timestamp of packet (isostring)
+     :param pkt: the packet
+     :returns: pcap packet pkt_hdr + pkt
     """
     # is there an easier/better/more efficient way of extracting seconds and
     # microseconds from a timestamp

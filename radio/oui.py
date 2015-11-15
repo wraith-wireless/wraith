@@ -14,14 +14,18 @@ __status__ = 'Development'
 
 import urllib2
 import os
-import re
 import sys
 import time
 from wraith import OUI, __version__ as v
 from wraith.utils.timestamps import ts2iso
 
 def parseoui(path = None):
-    """ parse oui.txt file at path filling in oui dict oui->manuf """
+    """
+     parse oui.txt file
+
+     :param path: path of oui text file
+     :returns: oui dict {oui:manuf} for each oui in path
+    """
     fin = None
     ouis = {}
 
@@ -40,14 +44,20 @@ def parseoui(path = None):
     return ouis
 
 def manufacturer(oui,mac):
-    """ returns the manufacturer of the mac address if exists, otherwise 'unknown' """
+    """
+     returns the manufacturer of the mac address if exists, otherwise 'unknown'
+
+     :param oui: oui dict
+     :param mac: hw addr to search up
+     :returns: manufacturer
+    """
     try:
         return oui[mac[:8]]
     except KeyError:
         return "unknown"
 
 def fetch():
-    """retrieves oui.txt from IEEE and write to data file """
+    """ retrieves oui.txt from IEEE and writes to data file """
     ouiurl = 'http://standards-oui.ieee.org/oui.txt'
     ouipath = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            os.path.abspath('../'+OUI))

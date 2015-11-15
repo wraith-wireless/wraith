@@ -24,14 +24,24 @@ import pickle
 class BrineException(Exception): pass
 
 def pack(conn):
-    """ pickle conn for transport over connection """
+    """
+      pickle a connection for transport over connection
+
+     :param conn: connection obj to pickle
+     :returns: pickled connection
+    """
     try:
         return pickle.dumps(reduction.reduce_connection(conn))
     except Exception as e:
         raise BrineException(e)
 
 def unpack(pickled):
-    """ unpacks the pickled connection """
+    """
+     unpacks the pickled connection
+
+     :param pickled: a pickled connection
+     :returns: unpickled connection
+    """
     try:
         p = pickle.loads(pickled)
         return p[0](p[1][0],p[1][1],p[1][2])

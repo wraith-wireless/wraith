@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """ channels.py: 802.11 channel/freq utilities
+
 Only defines ISM 2.4Ghz and UNII 5Ghz
 """
 __name__ = 'channels'
@@ -28,27 +29,36 @@ UNII_5_F2C={5765:153,5640:128,5260:52,5520:104,5785:157,5660:132,5280:56,
             5700:140,5190:38,5320:64,5580:116,5200:40,5210:42,5600:120,
             5220:44,5230:46,5745:149,5620:124,5240:48,5500:100}
 
-
 # UNII 4 Bands
 #UNII_4_C2F={183:4915,184:4920,185:4925,187:4935,188:4940,189:4945,192:4960,196:4980}
 #UNII_4_F2C={4960:192,4935:187,4940:188,4945:189,4915:183,4980:196,4920:184,4925:185}
 
 def channels():
-    """ returns a list of all channels """
+    """ :returns: list of all channels """
     return sorted(ISM_24_C2F.keys() + UNII_5_C2F.keys())
 
 def freqs():
-    """ returns a list of frequencies """
+    """ :returns: list of frequencies """
     return sorted(ISM_24_F2C.keys() + UNII_5_F2C.keys())
 
 def c2f(c): 
-    """ return frequency in MHZ given channel number """
+    """
+     channel to frequency conversion
+
+     :param c: channel
+     :returns: frequency in MHz corresponding to channel
+    """
     if c in ISM_24_C2F: return ISM_24_C2F[c]
     if c in UNII_5_C2F: return UNII_5_C2F[c]
     return None
 
 def f2c(f): 
-    """ return channel number given frequency in MHZ """
+    """
+     frequency to channel conversion
+
+     :param f: frequency (in MHz)
+     :returns: channel number corresponding to frequency
+    """
     if f in ISM_24_F2C: return ISM_24_F2C[f]
     if f in UNII_5_F2C: return UNII_5_F2C[f]
     return None

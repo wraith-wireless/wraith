@@ -15,7 +15,10 @@ import psycopg2 as psql           # postgres API
 import subprocess as sp           # subprcess stuff
 
 def runningprocess(process):
-    """ returns the pid(s) of process if running or the empty list """
+    """
+     :param process: nme of process
+     :returns: the pid(s) of process if running or the empty list
+    """
     pids = []
     for proc in os.popen("ps -ef"):
         fields = proc.split()
@@ -24,8 +27,10 @@ def runningprocess(process):
 
 def runningservice(pidfile):
     """
-     determines if the service referenced by pidfile is running. NOTE: only checks
-     if pidfile exists
+     determines if the service referenced by pidfile is running.
+      NOTE: only checks if pidfile exists
+     :param pidfile: path of pid in file
+     :returns: process is running
     """
     try:
         with open(pidfile): return True
@@ -34,7 +39,10 @@ def runningservice(pidfile):
 
 ## deprecated
 def iyrirunning(pidfile):
-    """ see nidusrunning """
+    """
+     :param pidfile: pidfile of iyri process
+     :returns: True if iyri is running otherwise False
+    """
     try:
         # open the pid file and check running status with signal = 0
         with open(pidfile) as fin: os.kill(int(fin.read()),0)
@@ -44,9 +52,11 @@ def iyrirunning(pidfile):
 
 def service(process,pwd=None,start=True):
     """
-     executes 'service process arg1' as sudo if pwd with arg1 =
-    'start' if start is True otherwise 'stop'. Executes with sudo if caller
-    is not root
+     starts/stops service
+
+     :param process: process name to start/stop
+     :param pwd: sudo pwd (must be supplied if not running as root)
+     :param start: start or stop
     """
     state = 'start' if start else 'stop'
     if os.getuid() != 0:
@@ -64,14 +74,18 @@ def service(process,pwd=None,start=True):
         if err: raise RuntimeError(err)
 
 def testsudopwd(pwd):
-    """ tests the pwd for sudo rights using a simple sudo ls -l """
+    """
+     tests the pwd for sudo rights using a simple sudo ls -l
+
+     :param pwd: pwd to test
+    """
     p = sp.Popen(['sudo','-S','ls','-l'],stdout=sp.PIPE,stdin=sp.PIPE,stderr=sp.PIPE,universal_newlines=True)
     out,err = p.communicate(pwd+'\n')
     if out: return True
     return False
 
 def ipaddr():
-    """ returns the local ip address """
+    """ :returns: local ip address """
     # TODO: not tested on machine w/ multiple connected interfaces
     p = sp.Popen(['hostname','-I'],stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -81,8 +95,10 @@ def ipaddr():
 def psqlconnect(c):
     """
      connect to postgresql db with connect string returning connection obj
-     c: a dict with key->values for keys: 'host','port','db','user','pwd'
-     returns a tuple (conn,msg) where conn = None and msg = error string
+
+     :param c: connection string = dict with key->values for keys = 'host',
+     'port','db','user','pwd'
+     :returns: tuple t = (conn,msg) where conn = None and msg = error string
      on failure otherwise conn = psql connection and msg = ''
     """
     conn = None
@@ -91,7 +107,7 @@ def psqlconnect(c):
         conn = psql.connect(host=c['host'],port=c['port'],dbname=c['db'],
                             user=c['user'],password=c['pwd'])
 
-        # set to use UTC
+        # set to use UTC (side effect of testing the conn string
         curs = conn.cursor()
         curs.execute("set time zone 'UTC';")
     except psql.OperationalError as e:

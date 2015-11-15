@@ -40,7 +40,7 @@ class IWToolsException(Exception): pass
 # the following functions assist in determining available network interfaces
 
 def ifaces():
-    """ ifaces: returns a list of names of current network interfaces cards """
+    """ :returns: a list of names of current network interfaces cards """
     # read in devices from /proc/net/dev. After splitting on newlines, the first 
     # 2 lines are headers and the last line is empty so we remove them
     try:
@@ -56,7 +56,7 @@ def ifaces():
     return nics
 
 def wifaces():
-    """ wifaces: returns a list of names of current wireless network interface cards """
+    """ :returns: a list of names of current wireless network interface cards """
     wics = []
     for nic in ifaces():
         p = sp.Popen(["iwconfig",nic],stdout=sp.PIPE,stderr=sp.PIPE)
@@ -65,6 +65,8 @@ def wifaces():
     return wics
 
 #### IFCONFIG
+# not a full interface. This limited function allows user to turn specified
+# card on or off or view output about card
 
 """
  IFPatterns - change these if necessary to fit system output defined as a 
@@ -91,8 +93,13 @@ IFPatterns = [('Link encap',r'Link encap:([\w]*) '),
 
 def ifconfig(nic,setto=None):
     """
-     ifconfig - not a full interface. This limited function allows user to turn
-     specified card on or off or view output about card
+     will either return details about nic if setto is None otherwise will turn
+     device on or off based on setto value
+
+     :param nic: nic name
+     :param setto: None or oneof {'up'|'down'}
+     :returns: if setto is not None returns a dict d with key->value pairs for
+      each key defined in IFPatterns above
     """
     if not setto:
         # return dictionary of paramater:value for <nic>
@@ -109,7 +116,6 @@ def ifconfig(nic,setto=None):
                     details[key] = None
             return details
         else:
-            # raise exception with err as msg
             raise IWToolsException(err)
     else:
         cmd = ['ifconfig',nic]
@@ -125,16 +131,15 @@ def ifconfig(nic,setto=None):
 
 def sethwaddr(nic,setto=None):
     """
-     nic: nic identifier
-     setto: if None will set to a random mac address, otherwise will use setto
+     uses macchanger to set the hw addr as iwconfig was more 'finicky'
+
+     :param nic: name of nic
+     :param setto: if None will set to a random mac address, otherwise will use setto
       as new mac to assume
-     uses macchanger to set the hw addr. iwconfig was more 'finicky'
-     will return the new mac
+     :returns: new mac address
     """
-    if not setto:
-        cmd = ['macchanger','-A',nic]
-    else:
-        cmd = ['macchanger','-m',setto,nic]
+    if not setto: cmd = ['macchanger','-A',nic]
+    else: cmd = ['macchanger','-m',setto,nic]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stderr=sp.PIPE,stdout=sp.PIPE)
     out,err = p.communicate()
@@ -149,7 +154,11 @@ def sethwaddr(nic,setto=None):
     return r.groups()[0]
 
 def resethwaddr(nic):
-    """ reset macaddr of nic to permanent addr """
+    """
+     reset hw addr of nic to actual address
+
+     :param nic: name of nic
+    """
     cmd = ['macchanger','-p',nic]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stderr=sp.PIPE,stdout=sp.PIPE)
@@ -184,17 +193,18 @@ IWPatterns = [('ESSID',r'ESSID:([^\s]*) '),
 
 def iwconfig(nic,param=None,val=None):
     """
-     iwconfig - python interface to iwconfig (kind of) unlike iwconfig, this
-     expects the name of card and is not a true interface, merely parses the
-     output from the iwconfig command.
-     ARGUMENTS:
-       nic: name of interface
-       p: parameter to set
-       v: value to set p to
-     uses:
-        p and v are None: returns a dict of property->value 
-        v is None: returns the value of property p
-        p and v are instantiated: sets the value of property to value v
+     interface to iwconfig (kind of) unlike iwconfig, this expects the name of
+     card and is not a true interface, merely parses the output from the iwconfig
+     command.
+
+     :param nic: name of nic
+     :param param: parameter to set
+     :param val: value to set parameter to
+
+     Usage:
+      param and val are None -> returns a dict of property->value
+      val is None: returns the value of property param
+      param and val are instantiated: sets param to val
     """
     if not param and not val:
         # return dictionary of paramater:value for <nic>
@@ -250,7 +260,11 @@ def iwconfig(nic,param=None,val=None):
 #### ADDITIONAL CARD DETAILS
 
 def getdriver(nic):
-    """ returns the driver for given nic """
+    """
+     returns the driver
+
+     :param nic: name of nic
+    """
     try:
         # find the driver for nic in driver's module, split on ':' and return
         ds = os.listdir('/sys/class/net/%s/device/driver/module/drivers' % nic)
@@ -264,6 +278,8 @@ def getchipset(driver):
      returns the chipset for given driver (Thanks aircrack-ng team)
      NOTE: does not fully implement the airmon-ng getChipset where identification
       requires system commands
+
+     :param driver: driver of device
     """
     if not driver: return "Unknown"
     if driver == "Unknown": return "Unknown"
@@ -296,4 +312,3 @@ def getchipset(driver):
     if driver == "wl12xx": return "TI WL1251/WL1271"
     if driver == "r871x_usb_drv": return "Realtek 81XX"
     return "Unknown"
-

@@ -67,7 +67,7 @@ class MPDU(dict):
 
     @property
     def offset(self):
-        """ :return: number of bytes read from byte 0 """
+        """ :returns: number of bytes read from byte 0 """
         try:
             return self['offset']
         except:
@@ -75,7 +75,7 @@ class MPDU(dict):
 
     @property
     def stripped(self):
-        """ :return: # of bytes read from the last byte of the frame """
+        """ :returns: # of bytes read from the last byte of the frame """
         try:
             return self['stripped']
         except:
@@ -83,7 +83,7 @@ class MPDU(dict):
 
     @property
     def size(self):
-        """ :return: ttl # of bytes read (includes fcs and any icv, etc) """
+        """ :returns: ttl # of bytes read (includes fcs and any icv, etc) """
         try:
             return self['offset'] + self['stripped']
         except:
@@ -91,7 +91,7 @@ class MPDU(dict):
 
     @property
     def present(self):
-        """ :return: list of fields that are present """
+        """ :returns: list of fields that are present """
         try:
             return self['present']
         except:
@@ -102,7 +102,7 @@ class MPDU(dict):
 
     @property
     def framectrl(self):
-        """ :return: mpdu frame control """
+        """ :returns: mpdu frame control """
         try:
             return self['framectrl']
         except KeyError:
@@ -110,7 +110,7 @@ class MPDU(dict):
 
     @property
     def vers(self):
-        """ :return: version as specified in frame control """
+        """ :returns: version as specified in frame control """
         try:
             return self['framectrl']['vers']
         except KeyError:
@@ -118,7 +118,7 @@ class MPDU(dict):
 
     @property
     def type(self):
-        """ :return: type as specified in frame control """
+        """ :returns: type as specified in frame control """
         try:
             return self['framectrl']['type']
         except KeyError:
@@ -126,7 +126,7 @@ class MPDU(dict):
 
     @property
     def subtype(self):
-        """ :return: subtype as specified in frame control """
+        """ :returns: subtype as specified in frame control """
         try:
             return self['framectrl']['subtype']
         except KeyError:
@@ -134,7 +134,7 @@ class MPDU(dict):
 
     @property
     def subtype_desc(self):
-        """ :return: string repr of type as specified in frame control """
+        """ :returns: string repr of type as specified in frame control """
         try:
             if self.type == FT_MGMT: return ST_MGMT_TYPES[self.subtype]
             elif self.type == FT_CTRL: return ST_CTRL_TYPES[self.subtype]
@@ -145,7 +145,7 @@ class MPDU(dict):
 
     @property
     def flags(self):
-        """ :return: flags as specified in frame control """
+        """ :returns: flags as specified in frame control """
         try:
             return self['framectrl']['flags']
         except KeyError:
@@ -153,7 +153,7 @@ class MPDU(dict):
 
     @property
     def duration(self):
-        """ :return: durtion of mpdu """
+        """ :returns: durtion of mpdu """
         try:
             return self['duration']
         except KeyError:
@@ -161,14 +161,13 @@ class MPDU(dict):
 
     @property
     def addr1(self):
-        """ :return: addr1 of mpdu """
+        """ :returns: addr1 of mpdu """
         try:
             return self['addr1']
         except KeyError:
             raise MPDUUninstantiatedException
 
-    # the following may or may not be present and will return
-    # None if not present
+    # the following may or may not be present. returns  None if not present
 
     @property
     def addr2(self): return self['addr2'] if 'addr2' in self else None

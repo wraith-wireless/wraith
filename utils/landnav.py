@@ -20,7 +20,12 @@ _GEOD = pyproj.Geod(ellps='WGS84')
 _MGRS = mgrs.MGRS()
 
 def validMGRS(location):
-    """ attempts to convert mgrs location to lat lon, returns false on failure """
+    """
+     deterimes if location is valid
+
+     :param location: location in mgrs coordinate system
+     :returns: True if location is valid
+    """
     try:
         _MGRS.toLatLon(location)
     except:
@@ -30,12 +35,15 @@ def validMGRS(location):
 
 def convertazimuth(fNorth,tNorth,azimuth,dd):
     """
-     converts an azimuth from one north to another
-     fNorth,tNorth are one of {'true','grid','magnetic'}
-     azimuth is 0 <-> 360
-     dd is the declination diagram, a dict of the form:
-      {'decl'->angledir,'g2m':grid to magnetic angle'g2t':grid to true angle}
-     NOTE: no error checking is done on validity of parameters
+     converts an azimuth from one north to another NOTE: no error checking is
+      done on validity of parameters
+
+     :param fNorth: from north oneof {'true|'grid'|'magnetic'}
+     :param tNorth: to north oneof {'true|'grid'|'magnetic'}
+     :param azimuth: direction in degrees 0 <-> 360
+     :param dd: declination diagram a dict of the form:
+      {'decl'->angledir,'g2m':grid to magnetic angle,'g2t':grid to true angle}
+     :returns: the converted azimuth
     """
     if dd['decl'] == 'easterly':
         # mag to grid, add g2m, grid to mag subtract g2m
@@ -65,8 +73,11 @@ def convertazimuth(fNorth,tNorth,azimuth,dd):
 
 def dist(sp,ep):
     """
-     determines the distance (in meters) between pts sp and ep and the bearing
-     from sp to ep sp and ep must be in mgrs coordinates
+     determines the distance (in meters) and bearing between two pts sp and ep
+
+     :param sp: start point in mgrs
+     :param ep: end point in mgrs
+     :returns: distnce in meters
     """
     try:
         (sLat,sLon) = _MGRS.toLatLon(sp)
@@ -80,11 +91,12 @@ def dist(sp,ep):
 def terminus(pt,lob,dist):
     """
      determines the end point and back azimuth given a distance in meters from 
-     the collection site location and this lob
-       pt is a mgrs coordinate
-       lob is a degree (True North)
-       dist is in meters
-     returns the tuple lat,lon,mgrs,backazimuth
+     location on the given line of bearing
+
+     :param pt: mgrs coordinate
+     :param lob: bearing in degrees (True North)
+     :param dist: distance in meters
+     :returns: the tuple t = (lat,lon,mgrs,backazimuth)
     """
     # convert site mgrs to (lat,lon) determine end point and convert back to
     # mgrs before returning
@@ -96,12 +108,17 @@ def findcut(p1,b1,p2,b2):
     """
      determines the cut, the intersection between two points p1 and p2 given bearings
      b1 and b2
-     Points p1 and p2 must be mgrs
-     Bearings b1 and b2 must be True North and in degrees between and 0 and 359.9999.....
      NOTE:
       if sin(angle1) or sin(angle2) = 0 there are infinite solutions
       if sin(angle1) * sin(angle2) < 0 the solution is ambiguous
      FROM Chris Veness at http://www.movable-type.co.uk/scripts/latlong.html
+
+     :param p1: point 1 in mgrs
+     :param b1: bearing 1 in degrees (True North)
+     :param p2: point 2 in mgrs
+     :param b2: bearing 2 in degress (True North)
+     :returns: location of cut or 'inf' if infinite solutions, or 'NaN' if ambiguous
+      solutions
     """
     # convert to lat/lon
     (lat1,lon1) = _MGRS.toLatLon(p1)
@@ -159,10 +176,15 @@ def quadrant(p1,b1,p2,b2,err=3):
      between points p1 and p2 given bearings b1 and b2 with err degrees of error
      calculated in. For example, given an err of 3, the quadrant will be formed
      by b1+3 & b2+3, b1-3 & b2+3, b1-3 & b2+3, b1-3 & b2-3
-     Points p1 and p2 must be tuples (lat,lon)
-     Bearings b1 and b2 must be in degrees between and 0 and 359.9999.....
-     NOTE:
-      It is assumed that it has been found that b1 and b2 intersect
+     NOTE: It is assumed that it has been found that b1 and b2 intersect
+     TODO: use mgrs for points to maintain consistency
+
+     :param p1: point 1 in (lat,lon) tuple
+     :param b1: bearing 1 in degrees (True North)
+     :param p2: point 2 in (;at,;on) tuple
+     :param b2: bearing 2 in degress (True North)
+     :param err: degrees of error
+     :returns: list of quadrant points
     """
     # get the error bearings
     b1Min = (b1-err) % 360
