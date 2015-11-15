@@ -105,7 +105,7 @@ def length(f):
 
 def pflags(f):
     """
-     parse/return the it_present of the radio tap frame (if valid) in frame f
+     parse/return the it_present of the radio tap frame f (if valid) in frame f
      NOTE: this will raise an exception if, the header does not have a vers,
       length and present flags and if the v is not 0
     """    

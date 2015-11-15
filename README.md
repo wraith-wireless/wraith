@@ -97,6 +97,9 @@ and editing of configuration files, some manipulation of backened storage.
      - channels.py      802.11 channel, freq utilities
      - mcs.py           mcs index functions
      - oui.py           oui/manuf related functions
+ * nidus                database schema
+     - \_\_init\_\_.py  initialize nidus subpackage
+     - nidus.sql        database definition
  *  iyri                subpackage for wraith sensor
      - \_\_init\_\_.py  initialize iyri package
      - iyri.conf        configuration file for iyri

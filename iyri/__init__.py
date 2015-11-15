@@ -8,6 +8,10 @@ Iyri relays collected data to the backend database nidus, collects/stores data
 from raw 802.11 packets and any geolocational data (if a gps device is present).
 
 REVISIONS:
+ 0.0.x
+  desc: kismet client
+ 0.1.x
+  desc: all data forwarded to Nidus process
  0.2.0
   desc: Renamed as former concept of operations no longer applied. Utilizes a
   "circular buffer" IOT remove the inherent inefficiency from

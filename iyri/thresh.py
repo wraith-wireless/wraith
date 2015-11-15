@@ -25,6 +25,7 @@ import os                                   # path/file functions
 import signal                               # handle signals
 import select                               # for select
 import time                                 # timestamps
+from struct import error as UnpackError     # struct unpack error
 import multiprocessing as mp                # multiprocessing
 import psycopg2 as psql                     # postgresql api
 from Queue import Empty                     # queue empty exception
@@ -33,8 +34,8 @@ from wraith.iyri.constants import NWRITE    # max packets to store before writin
 from wraith.iyri.constants import N         # row size in buffer
 import wraith.radio.radiotap as rtap        # 802.11 layer 1 parsing
 from wraith.radio import mpdu               # 802.11 layer 2 parsing
-#from wraith.radio import mcs                # mcs functions
-#from wraith.radio import channels           # 802.11 channels/RFs
+from wraith.radio import mcs                # mcs functions
+from wraith.radio import channels           # 802.11 channels/RFs
 #from wraith.radio.oui import manufacturer   # oui functions
 from wraith.utils import simplepcap as pcap # write frames to file
 
@@ -274,6 +275,10 @@ class Thresher(mp.Process):
                             vs = (sid,ts,lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
                                   int('a-mpdu' in dR['present']),
                                   rtap.flags_get(dR['flags'],'fcs'))
+                        except UnpackError as e:
+                            # parsing uncaught error (most likely mpdu)
+                            self._icomms.put((cs,ts1,'!THRESH_WARN!','bad frame at %d: %s' % (ix,f)))
+                            continue
                         else:
                             vs = (sid,ts,lF,dR['sz'],dM.offset,
                                   [(dR['sz']+dM.offset),(lF-dM.stripped)],dR['flags'],
@@ -297,7 +302,7 @@ class Thresher(mp.Process):
                             continue
                         except Exception as e:
                             self._conn.rollback()
-                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"Unknown: %s" % e))
+                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"%s: %s" % (type(e),e)))
                         else:
                             self._conn.commit()
 
@@ -310,12 +315,40 @@ class Thresher(mp.Process):
                                     l += dM.offset
                                     r = lF-dM.stripped
                                 rdos[src]['writer'].put(('!FRAME!',ts,[fid,ix,b,l,r]))
+
+                        # NOTE: the next two "parts" storing and extracting are
+                        # mutually exlusive and do not need to happen in any order
+                        # and could be handled by threads or other processes
+
+                        # store frame details in db
+                        try:
+                            # start with radiotap data
+                            self._insertrtap(fid,src,dR)
+
+                            # then mpdu data
+                            #if dM.offset > 0: self._insertmpdu(fid,dR)
+                            #if dM.offset > 0:
+                            #    self._inserttraffic(fid,dM)
+                            #    if dM.qosctrl: self._insertqos(fid,dM)
+                            #    if dM.crypt: self._insertcrypt(fid,dM)
+                        except psql.OperationalError as e: # unrecoverable
+                            self._icomms.put((cs,ts1,'!THRESH_ERR!',"DB. %s: %s" % (e.pgcode,e.pgerror)))
+                            continue
+                        except psql.Error as e:
+                            self._conn.rollback()
+                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"SQL. %s: %s" % (e.pgcode,e.pgerror)))
+                            continue
+                        except Exception as e:
+                            self._conn.rollback()
+                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"%s: %s" % (type(e).__name__,e)))
+                        else:
+                            self._conn.commit()
                     else:
                         self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid token %s" % tkn))
                 except (IndexError,ValueError):
-                    self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid arguments for %s" % tkn))
+                    self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid arguments (%s) for %s" % (','.join([str(x) for x in d]),tkn)))
                 except KeyError as e:
-                    self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid radio mac: %s" % cs))
+                    self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid radio hwaddr: %s" % cs))
                 except Exception as e:
                     self._icomms.put((cs,ts1,'!THRESH_WARN!',"%s: %s" % (type(e).__name__,e)))
 
@@ -344,3 +377,57 @@ class Thresher(mp.Process):
                 self._curs.close()
             if self._conn: self._conn.close()
             raise RuntimeError(e)
+
+    def _insertrtap(self,fid,src,dR):
+        """ insert radiotap data into db """
+        #if 'a-mpdu' in dR['present']: self._insertampdu(fid,dR)
+                            #self._insertsource(fid,dR)
+                            #self._insertsiganl(fid,dR)
+        # NOTE: all exceptions are caught in caller
+        # ampdu info
+        if 'a-mpdu' in dR['present']:
+            sql = "insert into ampdu fid,refnum,flags) values (%s,%s,%s);"
+            self._curs.execute(sql,(fid,dR['a-mpdu'][0],dR['a-mpdu'][1]))
+
+        # source info
+        ant = dR['antenna'] if 'antenna' in dR else 0
+        pwr = dR['antsignal'] if 'antsignal' in dR else 0
+        sql = "insert into source (fid,src,antenna,rfpwr) values (%s,%s,%s,%s);"
+        self._curs.execute(sql,(fid,src,ant,pwr))
+
+        # signal info - determine what standard, data rate and any mcs fields
+        # assuming channel info is always in radiotap
+        try:
+            std = 'n'
+            mcsflags = rtap.mcsflags_params(dR['mcs'][0],dR['mcs'][1])
+            if mcsflags['bw'] == rtap.MCS_BW_20: bw = '20'
+            elif mcsflags['bw'] == rtap.MCS_BW_40: bw = '40'
+            elif mcsflags['bw'] == rtap.MCS_BW_20L: bw = '20L'
+            else: bw = '20U'
+            width = 40 if bw == '40' else 20
+            stbc = mcsflags['stbc']
+            gi = 1 if 'gi' in mcsflags and mcsflags['gi'] > 0 else 0
+            ht = 1 if 'ht' in mcsflags and mcsflags['ht'] > 0 else 0
+            index = dR['mcs'][2]
+            rate = mcs.mcs_rate(index,width,gi)
+            hasMCS = 1
+        except:
+            if dR['channel'][0] in channels.ISM_24_F2C:
+                if rtap.chflags_get(dR['channel'][1],'cck'): std = 'b'
+                else: std = 'g'
+            else: std = 'a'
+            rate = dR['rate'] * 0.5 if 'rate' in dR else 0
+            bw = None
+            gi = None
+            ht = None
+            index = None
+            stbc = None
+            hasMCS = 0
+        sql = """
+               insert into signal (fid,std,rate,channel,chflags,rf,ht,mcs_bw,
+                                   mcs_gi,mcs_ht,mcs_index,mcs_stbc)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(fid,std,rate,channels.f2c(dR['channel'][0]),
+                                dR['channel'][1],dR['channel'][0],hasMCS,bw,gi,
+                                ht,index,stbc))
