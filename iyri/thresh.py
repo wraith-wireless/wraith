@@ -30,6 +30,7 @@ import multiprocessing as mp                # multiprocessing
 import psycopg2 as psql                     # postgresql api
 from Queue import Empty                     # queue empty exception
 from wraith.utils.timestamps import ts2iso  # timestamp conversion
+from dateutil import parser as dtparser     # parse out timestamps
 from wraith.iyri.constants import NWRITE    # max packets to store before writing
 from wraith.iyri.constants import N         # row size in buffer
 import wraith.wifi.radiotap as rtap         # 802.11 layer 1 parsing
@@ -360,10 +361,15 @@ class Thresher(mp.Process):
                                 if dM[a] in addrs: addrs[dM[a]]['loc'].append(i+1)
                                 else: addrs[dM[a]] = {'loc':[i+1],'id':None}
 
-                            # insert the sta and sta_activity
+                            # insert the sta, sta_activity
+                            # NOTE: insertsta modifies the addrs dict in place
+                            # assigning ids to each nonbroadcast address
                             self._insertsta(fid,sid,ts,addrs)
-                            # self._insertsta_activity
-                            # self._conn.commit()
+                            self._insertsta_activity(fid,sid,ts,addrs)
+
+                            # further process management frames
+                            if dM.type == mpdu.FT_MGMT:
+                                self._processmgmt(fid,sid,ts,addrs,dM)
                         except psql.OperationalError as e: # unrecoverable
                             msg = "frame %d insert failed at %s:. %s: %s" % (fid,self._next,e.pgcode,e.pgerror)
                             self._icomms.put((cs,ts1,'!THRESH_ERR!',msg))
@@ -446,6 +452,11 @@ class Thresher(mp.Process):
         # signal info - determine what standard, data rate and any mcs fields
         # assuming channel info is always in radiotap
         self._next = 'signal'
+        sql = """
+               insert into signal (fid,std,rate,channel,chflags,rf,ht,mcs_bw,
+                                   mcs_gi,mcs_ht,mcs_index,mcs_stbc)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
         try:
             std = 'n'
             mcsflags = rtap.mcsflags_params(dR['mcs'][0],dR['mcs'][1])
@@ -472,11 +483,6 @@ class Thresher(mp.Process):
             index = None
             stbc = None
             hasMCS = 0
-        sql = """
-               insert into signal (fid,std,rate,channel,chflags,rf,ht,mcs_bw,
-                                   mcs_gi,mcs_ht,mcs_index,mcs_stbc)
-               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
-              """
         self._curs.execute(sql,(fid,std,rate,channels.f2c(dR['channel'][0]),
                                 dR['channel'][1],dR['channel'][0],hasMCS,bw,gi,
                                 ht,index,stbc))
@@ -567,9 +573,11 @@ class Thresher(mp.Process):
          insert unique sta from frame into db
 
          :param fid: frame id
+         :param sid: session id
          :param ts: timestamp frame collected
          :param addrs: address dict
         """
+        self._next = 'sta'
         # get list of nonbroadcast address (exit if there are none)
         nonbroadcast = [addr for addr in addrs if addr != mpdu.BROADCAST]
         if not nonbroadcast: return
@@ -587,14 +595,279 @@ class Thresher(mp.Process):
                 if row[1] in addrs: addrs[row[1]]['id'] = row[0]
 
             # for each address
-            for a in nonbroadcast:
+            for addr in nonbroadcast:
                 # if this one doesnt have an id (not seen before) add it
-                if not addrs[a]['id']:
+                if not addrs[addr]['id']:
                     # insert the new sta
                     sql = """
                            insert into sta (sid,fid,spotted,mac,manuf)
                            values (%s,%s,%s,%s,%s) RETURNING sta_id;
                           """
-                    self._curs.execute(sql,(sid,fid,ts,a,manufacturer(self._ouis,a)))
-                    addrs[a]['id'] = self._curs.fetchone()[0]
+                    self._curs.execute(sql,(sid,fid,ts,addr,manufacturer(self._ouis,addr)))
+                    addrs[addr]['id'] = self._curs.fetchone()[0]
                     self._conn.commit()
+
+    def _insertsta_activity(self,fid,sid,ts,addrs):
+        """
+         inserts activity of all stas in db
+
+         :param fid: frame id
+         :param sid: session id
+         :param ts: timestamp frame collected
+         :param addrs: address dict
+        """
+        self._next = 'sta_activity'
+        # get list of nonbroadcast address (exit if there are none)
+        nonbroadcast = [addr for addr in addrs if addr != mpdu.BROADCAST]
+        if not nonbroadcast: return
+
+        #### sta Critical Section
+        with self._l:
+            for addr in nonbroadcast:
+                # check current sta activity
+                sql = """
+                       select firstSeen,lastSeen,firstHeard,lastHeard
+                       from sta_activity where sid=%s and staid=%s;
+                      """
+                self._curs.execute(sql,(sid,addrs[addr]['id']))
+                row = self._curs.fetchone()
+
+                # setup mode and timestamps (addr2 is transmitting i.e. heard)
+                mode = 'tx' if 2 in addrs[addr]['loc'] else 'rx'
+                fs = ls = fh = lh = None
+
+                if not row:
+                    # sta has not been seen this session
+                    # commit the transaction because we were experiencing
+                    # duplicate key issues w/o commit
+                    if mode == 'tx': fh = lh = ts
+                    else: fs = ls = ts
+                    sql = """
+                           insert into sta_activity (sid,staid,firstSeen,lastSeen,
+                                                     firstHeard,lastHeard)
+                           values (%s,%s,%s,%s,%s,%s);
+                          """
+                    self._curs.execute(sql,(sid,addrs[addr]['id'],fs,ls,fh,lh))
+                    self._conn.commit()
+                else:
+                    # sta has been seen this session
+                    # we have to convert the frame ts to a datatime obj w/ tx
+                    # to compare with the db's ts
+                    tstz = dtparser.parser(ts+"+00:00")
+                    if mode == 'tx':
+                        # check 'heard' activities
+                        if not row[2]: # 1st tx heard by sta, update first/lastHeard
+                            fh = lh = ts
+                        elif tstz > row[3]: # tx is later than lastHeard, update it
+                            lh = ts
+                    else:
+                        # check 'seen' activities
+                        if not row[0]: # 1st time sta seen, update first/lastSeen
+                            fs = ls = ts
+                        elif tstz > row[1]: # ts is later than lastSeen, update it
+                            ls = ts
+
+                    # build query if there is something to update
+                    us = ""
+                    vs = []
+                    if fs or ls or fh or lh:
+                        if fs:
+                            us = " firstSeen=%s"
+                            vs.append(fs)
+                        if ls:
+                            if not us: us = " lastSeen=%s"
+                            else: us += ", lastSeen=%s"
+                            vs.append(ls)
+                        if fh:
+                            if not us: us = " firstHeard=%s"
+                            else: us += ", firstHeard=%s"
+                            vs.append(fh)
+                        if lh:
+                            if not us: us = " lastHeard=%s"
+                            else: us += ", lastHeard=%s"
+                            vs.append(lh)
+                        sql = "update sta_activity set"
+                        sql += us
+                        sql += " where sid=%s and staid=%s;"
+                        self._curs.execute(sql,tuple(vs+[sid,addrs[addr]['id']]))
+                        self._conn.commit()
+
+    def _processmgmt(self,fid,sid,ts,addrs,dM):
+        """
+         insert individual mgmt frames
+
+         :param fid: frame id
+         :param sid: session id
+         :param sid: session id
+         :param ts: timestamp of frame
+         :param addrs: address dict
+         :param dM: mpdu dict
+        """
+        if dM.subtype == mpdu.ST_MGMT_ASSOC_REQ:
+            self._next = 'assocreq'
+            self._insertassocreq(fid,addrs[dM.addr2]['id'],
+                                 addrs[dM.addr1]['id'],dM)
+        elif dM.subtype == mpdu.ST_MGMT_ASSOC_RESP:
+            self._next = 'assocresp'
+            self._insertassocresp('assoc',fid,addrs[dM.addr2]['id'],
+                                  addrs[dM.addr1]['id'],dM)
+        elif dM.subtype == mpdu.ST_MGMT_REASSOC_REQ:
+            self._next = 'reassocreq'
+            self._insertreassocreq(fid,sid,ts,addrs[dM.addr2]['id'],
+                                   addrs[dM.addr1]['id'],dM)
+        elif dM.subtype == mpdu.ST_MGMT_REASSOC_RESP:
+            self._next = 'reassocresp'
+            self._insertassocresp('reassoc',fid,addrs[dM.addr2]['id'],
+                                  addrs[dM.addr1]['id'],dM)
+        elif dM.subtype == mpdu.ST_MGMT_PROBE_REQ:
+            self._next = 'probereq'
+            self._insertprobereq(fid,addrs[dM.addr2]['id'],
+                                 addrs[dM.addr3]['id'],dM)
+        elif dM.subtype == mpdu.ST_MGMT_PROBE_RESP:
+            self._next = 'proberesp'
+            self._insertproberesp(fid,addrs[dM.addr2]['id'],
+                                  addrs[dM.addr1]['id'],dM)
+        elif dM.subtype == mpdu.ST_MGMT_TIMING_ADV: pass
+        elif dM.subtype == mpdu.ST_MGMT_BEACON:
+            self._next = 'beacon'
+            self._insertbeacon(fid,addrs[dM.addr2]['id'],dM)
+        elif dM.subtype == mpdu.ST_MGMT_ATIM: pass
+        elif dM.subtype == mpdu.ST_MGMT_DISASSOC:
+            self._next = 'disassoc'
+            self._insertdisassaoc(fid,addrs[dM.addr1]['id'],
+                                  addrs[dM.addr2]['id'],dM)
+        elif dM.subtype == mpdu.ST_MGMT_AUTH:
+            self._next = 'auth'
+            self._insertauth(fid,addrs[dM.addr1]['id'],
+                             addrs[dM.addr2]['id'],dM)
+        elif dM.subtype == mpdu.ST_MGMT_DEAUTH:
+            self._next = 'deauth'
+            self._insertdeauth(fid,addrs[dM.addr1]['id'],
+                               addrs[dM.addr2]['id'],dM)
+        elif dM.subtype == mpdu.ST_MGMT_ACTION:
+            self._next = 'action'
+            self._insertaction(fid,addrs[dM.addr1]['id'],addrs[dM.addr2]['id'],
+                               addrs[dM.addr3]['id'],False,dM)
+        elif dM.subtype == mpdu.ST_MGMT_ACTION_NOACK:
+            self._next = 'actionoack'
+            self._insertaction(fid,addrs[dM.addr1]['id'],addrs[dM.addr2]['id'],
+                               addrs[dM.addr3]['id'],True,dM)
+
+    def _insertassocreq(self,fid,client,ap,dM):
+        """
+         inserts the association req from client ot ap
+
+         :param fid: frame id
+         :param client: associating client
+         :param ap: access point
+         :param dM: mpdu dict
+        """
+        sql = """
+               insert into assocreq (fid,client,ap,ess,ibss,cf_pollable,
+                                     cf_poll_req,privacy,short_pre,pbcc,
+                                     ch_agility,spec_mgmt,qos,short_slot,
+                                     apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
+                                     listen_int,ssid,sup_rates,ext_rates,vendors)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        ssid = None
+        sup_rs = []
+        ext_rs = []
+        vendors = []
+        for ie in dM.info_els:
+            if ie[0] == mpdu.EID_SSID: ssid = ie[1]
+            if ie[0] == mpdu.EID_SUPPORTED_RATES: sup_rs = ie[1]
+            if ie[0] == mpdu.EID_EXTENDED_RATES: ext_rs = ie[1]
+            if ie[0] == mpdu.EID_VEND_SPEC: vendors.append(ie[1][0])
+        self._curs.execute(sql,(fid,client,ap,
+                                dM.fixed_params['capability']['ess'],
+                                dM.fixed_params['capability']['ibss'],
+                                dM.fixed_params['capability']['cfpollable'],
+                                dM.fixed_params['capability']['cf-poll-req'],
+                                dM.fixed_params['capability']['privacy'],
+                                dM.fixed_params['capability']['short-pre'],
+                                dM.fixed_params['capability']['pbcc'],
+                                dM.fixed_params['capability']['ch-agility'],
+                                dM.fixed_params['capability']['spec-mgmt'],
+                                dM.fixed_params['capability']['qos'],
+                                dM.fixed_params['capability']['time-slot'],
+                                dM.fixed_params['capability']['apsd'],
+                                dM.fixed_params['capability']['rdo-meas'],
+                                dM.fixed_params['capability']['dsss-ofdm'],
+                                dM.fixed_params['capability']['delayed-ba'],
+                                dM.fixed_params['capability']['immediate-ba'],
+                                dM.fixed_params['listen-int'],
+                                ssid,sup_rs,ext_rs,vendors))
+        self._conn.commit()
+
+    def _insertreassocreq(self,fid,sid,ts,client,ap,dM):
+        """
+         inserts the reassociation req from the sta with id client to the ap with
+         id ap, seen in frame fid w/ further details in dM into the db using the
+         cursors curs
+
+         :param fid: frame id
+         :param sid: session id
+         :param ts: frame timestamp
+         :param client: requesting client
+         :param ap: access point
+         :param dM: mpdu dict
+        """
+        # entering sta CS
+        # if we have a matching sta for cur ap or if we need to add one
+        with self._l:
+            curAP = dM.fixed_params['current-ap']
+            self._curs.execute("select id from sta where mac=%s;",(curAP,))
+            row = self._curs.fetchone()
+            if row: curid = row[0]
+            else:
+                # not present, need to add it
+                sql = """
+                       insert into sta (sid,fid,spotted,mac,manuf)
+                       values (%s,%s,%s,%s,%s) RETURNING id;
+                      """
+                self._curs.execute(sql,(sid,fid,ts,curAP,manufacturer(self._ouis,curAP)))
+                curid = self._curs.fetchone()[0]
+                self._conn.commit()
+
+        # now insert the reassoc request
+        sql = """
+               insert into reassocreq (fid,client,ap,ess,ibss,cf_pollable,
+                                       cf_poll_req,privacy,short_pre,pbcc,
+                                       ch_agility,spec_mgmt,qos,short_slot,
+                                       apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
+                                       listen_int,cur_ap,ssid,sup_rates,ext_rates,
+                                       vendors)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        ssid = None
+        sup_rs = []
+        ext_rs = []
+        vendors = []
+        for ie in dM.info_els:
+            if ie[0] == mpdu.EID_SSID: ssid = ie[1]
+            if ie[0] == mpdu.EID_SUPPORTED_RATES: sup_rs = ie[1]
+            if ie[0] == mpdu.EID_EXTENDED_RATES: ext_rs = ie[1]
+            if ie[0] == mpdu.EID_VEND_SPEC: vendors.append(ie[1][0])
+        self._curs.execute(sql,(fid,client,ap,
+                                dM.fixed_params['capability']['ess'],
+                                dM.fixed_params['capability']['ibss'],
+                                dM.fixed_params['capability']['cfpollable'],
+                                dM.fixed_params['capability']['cf-poll-req'],
+                                dM.fixed_params['capability']['privacy'],
+                                dM.fixed_params['capability']['short-pre'],
+                                dM.fixed_params['capability']['pbcc'],
+                                dM.fixed_params['capability']['ch-agility'],
+                                dM.fixed_params['capability']['spec-mgmt'],
+                                dM.fixed_params['capability']['qos'],
+                                dM.fixed_params['capability']['time-slot'],
+                                dM.fixed_params['capability']['apsd'],
+                                dM.fixed_params['capability']['rdo-meas'],
+                                dM.fixed_params['capability']['dsss-ofdm'],
+                                dM.fixed_params['capability']['delayed-ba'],
+                                dM.fixed_params['capability']['immediate-ba'],
+                                dM.fixed_params['listen-int'],
+                                curid,ssid,sup_rs,ext_rs,vendors))
+        self._conn.commit()
