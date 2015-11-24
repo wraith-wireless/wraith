@@ -36,7 +36,7 @@ import wraith.wifi.radiotap as rtap         # 802.11 layer 1 parsing
 from wraith.wifi import mpdu                # 802.11 layer 2 parsing
 from wraith.wifi import mcs                 # mcs functions
 from wraith.wifi import channels            # 802.11 channels/RFs
-from wraith.wifi import oui                 # oui functions
+from wraith.wifi.oui import manufacturer    # oui functions
 from wraith.utils import simplepcap as pcap # write frames to file
 
 class PCAPWriter(mp.Process):
