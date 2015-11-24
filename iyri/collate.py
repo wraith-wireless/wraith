@@ -23,12 +23,13 @@ from Queue import Empty                    # queue empty exception
 import multiprocessing as mp               # multiprocessing
 import psycopg2 as psql                    # postgresql api
 from wraith.utils.timestamps import ts2iso # timestamp conversion
-from wraith.radio.iw import regget         # regulatory domain
+from wraith.wifi.iw import regget          # regulatory domain
 from wraith.utils.cmdline import ipaddr    # returns ip address
-from wraith.radio.oui import parseoui      # parse out oui dict
+from wraith.wifi.oui import parseoui       # parse out oui dict
 from wraith.iyri.thresh import Thresher    # thresher process
 from wraith.iyri.thresh import PCAPWriter  # & the pcap writer process
 from wraith.iyri.constants import NTHRESH  # num thresher processes
+from wraith.iyri.constants import OUIPATH  # location of oui text file
 
 class Collator(mp.Process):
     """ Collator - handles further processing of raw frames from the sniffer """
@@ -66,10 +67,11 @@ class Collator(mp.Process):
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
         # function local variables
+        lSta = mp.Lock()                           # sta lock
         qT = mp.Queue()                            # queue for tasks to threshers
         qWA = mp.Queue() if self._writea else None # queue for abad writer
         qWS = mp.Queue() if self._writes else None # queue for shama writer
-        ouis = parseoui()                          # oui dict
+        ouis = parseoui(OUIPATH)                   # oui dict
         rmap = {}                                  # maps callsigns (vnic) to hwaddr
         roles = {}                                 # maps roles to callsigns (vnics)
         buffers = {}                               # buffer map
@@ -82,7 +84,7 @@ class Collator(mp.Process):
             self._submitplatform()
         except psql.Error as e:
             # sensor submit failed, no point continuing
-            if e.pgcode == '23P01': errmsg = "Sensor failed to close correctly last session"
+            if e.pgcode == '23P01': errmsg = "Last session closed incorrectly"
             else: errmsg = "%s: %s" % (e.pgcode,e.pgerror)
             self._conn.rollback()
             self._cI.send(('err','Collator','DB',errmsg))
@@ -95,10 +97,8 @@ class Collator(mp.Process):
         for _ in xrange(NTHRESH):
             try:
                 recv,send = mp.Pipe(False)
-                t = Thresher(self._icomms,qT,recv,
-                             (self._ab,qWA),
-                             (self._sb,qWS),
-                             self._dbstr,ouis)
+                t = Thresher(self._icomms,qT,recv,lSta,(self._ab,qWA),
+                             (self._sb,qWS),self._dbstr,ouis)
                 t.start()
                 threshers[t.pid] = {'obj':t,'conn':send}
                 send.send(('!SID!',ts2iso(time.time()),[self._sid]))

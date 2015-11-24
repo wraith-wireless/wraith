@@ -32,11 +32,11 @@ from Queue import Empty                     # queue empty exception
 from wraith.utils.timestamps import ts2iso  # timestamp conversion
 from wraith.iyri.constants import NWRITE    # max packets to store before writing
 from wraith.iyri.constants import N         # row size in buffer
-import wraith.radio.radiotap as rtap        # 802.11 layer 1 parsing
-from wraith.radio import mpdu               # 802.11 layer 2 parsing
-from wraith.radio import mcs                # mcs functions
-from wraith.radio import channels           # 802.11 channels/RFs
-#from wraith.radio.oui import manufacturer   # oui functions
+import wraith.wifi.radiotap as rtap         # 802.11 layer 1 parsing
+from wraith.wifi import mpdu                # 802.11 layer 2 parsing
+from wraith.wifi import mcs                 # mcs functions
+from wraith.wifi import channels            # 802.11 channels/RFs
+from wraith.wifi import oui                 # oui functions
 from wraith.utils import simplepcap as pcap # write frames to file
 
 class PCAPWriter(mp.Process):
@@ -51,7 +51,7 @@ class PCAPWriter(mp.Process):
          :param q: task queue i.e frames to write
          :param sid: current session id
          :param mac: hwaddr of collecting radio
-         :param buffer: the buffer of frames to write
+         :param buff: the buffer of frames to write
          :param dbstr: db connection string
          :param conf: configuration details
         """
@@ -192,11 +192,12 @@ class Thresher(mp.Process):
     """
      Thresher process frames and inserts frame data in database
     """
-    def __init__(self,comms,q,conn,abad,shama,dbstr,ouis):
+    def __init__(self,comms,q,conn,lSta,abad,shama,dbstr,ouis):
         """
          :param comms: internal communication (to Collator)
          :param q: task queue from Collator
          :param conn: token connection from Collator
+         :param lSta: lock for sta and sta activity inserts/updates
          :param abad: tuple t = (AbadBuffer,AbadWriterQueue)
          :param shama: tuple t = (ShamaBuffer,ShamaWriterQueue)
          :param dbstr: db connection string
@@ -209,10 +210,12 @@ class Thresher(mp.Process):
         self._abad = abad    # abad tuple
         self._shama = shama  # shama tuple
         self._conn = None    # db connection
+        self._l = lSta       # sta lock
         self._curs = None    # our cursor
         self._ouis = ouis    # oui dict
         self._stop = False   # stop flag
         self._write = False  # write flag
+        self._next = None    # next operation to execute
         self._setup(dbstr)
 
     def terminate(self): pass
@@ -228,6 +231,7 @@ class Thresher(mp.Process):
         cs = 'thresher-%d' % self.pid # our callsign
         sid = None                    # current session id
         rdos = {}                     # radio map hwaddr{'role','buffer','writer'}
+        ouis = {}                     # oui dict
 
         # notify collator we're up
         self._icomms.put((cs,ts2iso(time.time()),'!THRESH!',self.pid))
@@ -236,6 +240,8 @@ class Thresher(mp.Process):
             # check for tasks or messages
             tkn = ts = d = None
             rs,_,_ = select.select([self._cC,self._tasks._reader],[],[])
+
+            # get each message
             for r in rs:
                 ts1 = ts2iso(time.time()) # get timestamp for this data read
                 try:
@@ -288,7 +294,8 @@ class Thresher(mp.Process):
                                   rtap.flags_get(dR['flags'],'fcs'))
                         except UnpackError as e:
                             # parsing uncaught error (most likely mpdu)
-                            self._icomms.put((cs,ts1,'!THRESH_WARN!','bad frame at %d: %s' % (ix,f)))
+                            msg = 'bad frame at %d: %s' % (ix,f)
+                            self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
                             continue
                         else:
                             vs = (sid,ts,lF,dR['sz'],dM.offset,
@@ -297,28 +304,26 @@ class Thresher(mp.Process):
                                   rtap.flags_get(dR['flags'],'fcs'))
 
                         # insert the frame
-                        sql = """
-                               insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
-                               values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning frame_id;
-                              """
+                        fid = None
+
+                        # In the below, individual helper functions will commit
+                        # database inserts/updates. All db errors will be caught
+                        # in this try block and rollbacks will be executed here
                         try:
+                            # setup next and fake fid
+                            self._next = 'frame'
+
+                            # insert the frame and get frame's id
+                            sql = """
+                                   insert into frame (sid,ts,bytes,bRTAP,bMPDU,
+                                                      data,flags,ampdu,fcs)
+                                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning frame_id;
+                                  """
                             self._curs.execute(sql,vs)
                             fid = self._curs.fetchone()[0]
-                        except psql.OperationalError as e: # unrecoverable
-                            self._icomms.put((cs,ts1,'!THRESH_ERR!',"DB. %s: %s" % (e.pgcode,e.pgerror)))
-                            continue
-                        except psql.Error as e:
-                            self._conn.rollback()
-                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"SQL. %s: %s" % (e.pgcode,e.pgerror)))
-                            continue
-                        except Exception as e:
-                            self._conn.rollback()
-                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"%s: %s" % (type(e),e)))
-                        else:
                             self._conn.commit()
 
-                        # pass fid, index, nBytes, left, right indices to writer
-                        if fid:
+                            # pass fid, index, nBytes, left, right indices to writer
                             if self._write:
                                 l = r = 0
                                 if validRTAP: l += dR['sz']
@@ -327,41 +332,61 @@ class Thresher(mp.Process):
                                     r = lF-dM.stripped
                                 rdos[src]['writer'].put(('!FRAME!',ts,[fid,ix,b,l,r]))
 
-                        # NOTE: the next two "parts" storing and extracting are
-                        # mutually exlusive and do not need to happen in any order
-                        # and could be handled by threads or other processes
+                            # NOTE: the next two "parts" storing and extracting
+                            # are mutually exlusive and do not need to happen in
+                            # any order & could be handled by threads/processes
 
-                        # store frame details in db
-                        try:
-                            # start with radiotap data
-                            self._insertrtap(fid,src,dR)
+                            # store frame details in db
+                            self._next = 'store'
+                            self._insertrtap(fid,src,dR)           # radiotap related
+                            if dM.offset: self._insertmpdu(fid,dM) # mpdu related
 
-                            # then mpdu data
-                            #if dM.offset > 0: self._insertmpdu(fid,dR)
-                            #if dM.offset > 0:
-                            #    self._inserttraffic(fid,dM)
-                            #    if dM.qosctrl: self._insertqos(fid,dM)
-                            #    if dM.crypt: self._insertcrypt(fid,dM)
+                            # store extracted 'metadata'
+                            self._next = 'extract'
+                            # sta addresses
+                            # Fct        To From    Addr1    Addr2  Addr3  Addr4
+                            # IBSS/Intra  0    0    RA=DA    TA=SA  BSSID    N/A
+                            # From AP     0    1    RA=DA TA=BSSID     SA    N/A
+                            # To AP       1    0 RA=BSSID    TA=SA     DA    N/A
+                            # Wireless DS 1    1 RA=BSSID TA=BSSID DA=WDS SA=WDS
+
+                            # extract unique addresses of stas in the mpdu into the
+                            # addr dict having the form:
+                            # <hwaddr>->{'loc:[<i..n>], where i=1..4
+                            #            'id':<sta_id>}
+                            addrs = {}
+                            for i,a in enumerate(['addr1','addr2','addr3','addr4']):
+                                if not a in dM: break
+                                if dM[a] in addrs: addrs[dM[a]]['loc'].append(i+1)
+                                else: addrs[dM[a]] = {'loc':[i+1],'id':None}
+
+                            # insert the sta and sta_activity
+                            self._insertsta(fid,sid,ts,addrs)
+                            # self._insertsta_activity
+                            # self._conn.commit()
                         except psql.OperationalError as e: # unrecoverable
-                            self._icomms.put((cs,ts1,'!THRESH_ERR!',"DB. %s: %s" % (e.pgcode,e.pgerror)))
-                            continue
+                            msg = "frame %d insert failed at %s:. %s: %s" % (fid,self._next,e.pgcode,e.pgerror)
+                            self._icomms.put((cs,ts1,'!THRESH_ERR!',msg))
                         except psql.Error as e:
                             self._conn.rollback()
-                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"SQL. %s: %s" % (e.pgcode,e.pgerror)))
-                            continue
+                            msg = "frame %d failed at %s. %s: %s" % (fid,self._next,e.pgcode,e.pgerror)
+                            self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
                         except Exception as e:
                             self._conn.rollback()
-                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"%s: %s" % (type(e).__name__,e)))
-                        else:
-                            self._conn.commit()
+                            msg = "frame %d failed at %s. %s: %s" % (fid,self._next,type(e).__name__,e)
+                            self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
                     else:
-                        self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid token %s" % tkn))
+                        msg = "invalid token %s" % tkn
+                        self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
                 except (IndexError,ValueError):
-                    self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid arguments (%s) for %s" % (','.join([str(x) for x in d]),tkn)))
+                    msg = "invalid arguments (%s) for %s" % (','.join([str(x) for x in d]),tkn)
+                    self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
                 except KeyError as e:
-                    self._icomms.put((cs,ts1,'!THRESH_WARN!',"invalid radio hwaddr: %s" % cs))
+                    msg = "invalid radio hwaddr: %s" % cs
+                    self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
                 except Exception as e:
-                    self._icomms.put((cs,ts1,'!THRESH_WARN!',"%s: %s" % (type(e).__name__,e)))
+                    msg = "%s: %s" % (type(e).__name__,e)
+                    self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
 
         # notify collector we're down
         if self._curs: self._curs.close()
@@ -393,6 +418,8 @@ class Thresher(mp.Process):
             if self._conn: self._conn.close()
             raise RuntimeError(e)
 
+    #### All below _insert functions will allow db exceptions to pass through to caller
+
     def _insertrtap(self,fid,src,dR):
         """
          insert radiotap data into db
@@ -400,22 +427,25 @@ class Thresher(mp.Process):
          :param fid: frame id
          :param src: collectors hw addr
          :param dR: parsed radiotap dict
-
-         NOTE: allows exceptions to pass through for caller to catch
         """
         # ampdu info
+        self._next = 'a-mpdu'
         if 'a-mpdu' in dR['present']:
             sql = "insert into ampdu fid,refnum,flags) values (%s,%s,%s);"
             self._curs.execute(sql,(fid,dR['a-mpdu'][0],dR['a-mpdu'][1]))
+            self._conn.commit()
 
         # source info
+        self._next = 'source'
         ant = dR['antenna'] if 'antenna' in dR else 0
         pwr = dR['antsignal'] if 'antsignal' in dR else 0
         sql = "insert into source (fid,src,antenna,rfpwr) values (%s,%s,%s,%s);"
         self._curs.execute(sql,(fid,src,ant,pwr))
+        self._conn.commit()
 
         # signal info - determine what standard, data rate and any mcs fields
         # assuming channel info is always in radiotap
+        self._next = 'signal'
         try:
             std = 'n'
             mcsflags = rtap.mcsflags_params(dR['mcs'][0],dR['mcs'][1])
@@ -450,3 +480,121 @@ class Thresher(mp.Process):
         self._curs.execute(sql,(fid,std,rate,channels.f2c(dR['channel'][0]),
                                 dR['channel'][1],dR['channel'][0],hasMCS,bw,gi,
                                 ht,index,stbc))
+        self._conn.commit()
+
+    def _insertmpdu(self,fid,dM):
+        """
+         insert mpdu data into db
+
+         :param fid: frame id
+         :param dM: parsed mpdu dict
+        """
+        # insert the traffic
+        dVal = None
+        if dM.duration['type'] == 'vcs': dVal = dM.duration['dur']
+        elif dM.duration['type'] == 'aid': dVal = dM.duration['aid']
+
+        self._next = 'traffic'
+        sql = """
+               insert into traffic (fid,type,subtype,td,fd,mf,rt,pm,md,pf,so,
+                                    dur_type,dur_val,addr1,addr2,addr3,
+                                    fragnum,seqnum,addr4,crypt)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(fid,mpdu.FT_TYPES[dM.type],
+                                mpdu.subtypes(dM.type,dM.subtype),
+                                dM.flags['td'],dM.flags['fd'],
+                                dM.flags['mf'],dM.flags['r'],
+                                dM.flags['pm'],dM.flags['md'],
+                                dM.flags['pf'],dM.flags['o'],
+                                dM.duration['type'],dVal,
+                                dM.addr1,dM.addr2,dM.addr3,
+                                dM.seqctrl['fragno'] if dM.seqctrl else None,
+                                dM.seqctrl['seqno'] if dM.seqctrl else None,
+                                dM.addr4,
+                                dM.crypt['type'] if dM.crypt else 'none',))
+        self._conn.commit()
+
+        # qos
+        self._next = 'qos'
+        sql = """
+               insert into qosctrl (fid,tid,eosp,ackpol,amsdu,txop)
+               values (%s,%s,%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(fid,dM.qosctrl['tid'],dM.qosctrl['eosp'],
+                                dM.qosctrl['ack-policy'],dM.qosctrl['a-msdu'],
+                                dM.qosctrl['txop']))
+        self._conn.commit()
+
+        # encryption
+        self._next = 'crypt'
+        if dM.crypt['type'] == 'wep':
+            sql = "insert into wepcrypt (fid,iv,key_id,icv) values (%s,%s,%s,%s);"
+            self._curs.execute(sql,(fid,dM.crypt['iv'],dM.crypt['key-id'],dM.crypt['icv']))
+        elif dM.crypt['type'] == 'tkip':
+            sql = """
+                   insert into tkipcrypt (fid,tsc1,wepseed,tsc0,key_id,
+                                          tsc2,tsc3,tsc4,tsc5,mic,icv)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                  """
+            self._curs.execute(sql,(fid,dM.crypt['iv']['tsc1'],
+                                        dM.crypt['iv']['wep-seed'],
+                                        dM.crypt['iv']['tsc0'],
+                                        dM.crypt['iv']['key-id']['key-id'],
+                                        dM.crypt['ext-iv']['tsc2'],
+                                        dM.crypt['ext-iv']['tsc3'],
+                                        dM.crypt['ext-iv']['tsc4'],
+                                        dM.crypt['ext-iv']['tsc5'],
+                                        dM.crypt['mic'],
+                                        dM.crypt['icv']))
+        elif dM.crypt['type'] == 'ccmp':
+            sql = """
+                   insert into ccmpcrypt (fid,pn0,pn1,key_id,pn2,pn3,pn4,pn5,mic)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                  """
+            self._curs.execute(sql,(fid,dM.crypt['pn0'],
+                                        dM.crypt['pn1'],
+                                        dM.crypt['key-id']['key-id'],
+                                        dM.crypt['pn2'],
+                                        dM.crypt['pn3'],
+                                        dM.crypt['pn4'],
+                                        dM.crypt['pn5'],
+                                        dM.crypt['mic']))
+        self._conn.commit()
+
+    def _insertsta(self,fid,sid,ts,addrs):
+        """
+         insert unique sta from frame into db
+
+         :param fid: frame id
+         :param ts: timestamp frame collected
+         :param addrs: address dict
+        """
+        # get list of nonbroadcast address (exit if there are none)
+        nonbroadcast = [addr for addr in addrs if addr != mpdu.BROADCAST]
+        if not nonbroadcast: return
+
+        # create our sql statement
+        sql = "select sta_id, mac from sta where "
+        sql += " or ".join(["mac=%s" for _ in nonbroadcast])
+        sql += ';'
+
+        #### sta Critical Section
+        with self._l:
+            # get all rows with current sta(s) & add sta id if it is not new
+            self._curs.execute(sql,tuple(nonbroadcast))
+            for row in self._curs.fetchall():
+                if row[1] in addrs: addrs[row[1]]['id'] = row[0]
+
+            # for each address
+            for a in nonbroadcast:
+                # if this one doesnt have an id (not seen before) add it
+                if not addrs[a]['id']:
+                    # insert the new sta
+                    sql = """
+                           insert into sta (sid,fid,spotted,mac,manuf)
+                           values (%s,%s,%s,%s,%s) RETURNING sta_id;
+                          """
+                    self._curs.execute(sql,(sid,fid,ts,a,manufacturer(self._ouis,a)))
+                    addrs[a]['id'] = self._curs.fetchone()[0]
+                    self._conn.commit()

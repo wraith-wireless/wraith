@@ -30,7 +30,7 @@ data to view, how to view it and 'when' to view it.
 
 ## 3. MODULES: Currently consists of three components/modules
 
-###  a. Radio (v 0.0.5): 802.11 network interface objects and functions
+###  a. Wifi (v 0.0.5): 802.11 network interface objects and functions
 
 Objects/functions to manipulate wireless nics and parse 802.11 captures.
 Partial support of 802.11-2012
@@ -87,7 +87,7 @@ and editing of configuration files, some manipulation of backened storage.
     - cmdline.py        various cmdline utilities for testing processes
     - simplepcap.py     pcap writer
     - brine.py          support for pickling connection objects
- *  radio               subpackage for radio/radiotap
+ *  wifi                subpackage for wifi related
      - \_\_init\_\_.py  initialize radio subpackage
      - iwtools.py       iwconfig, ifconfig interface and nic utilities
      - iw.py            iw 3.17 interface

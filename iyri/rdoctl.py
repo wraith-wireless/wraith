@@ -20,8 +20,8 @@ import socket                              # reading frames
 import threading                           # for the tuner thread
 from Queue import Queue, Empty             # thread-safe queue
 import multiprocessing as mp               # for Process
-from wraith.radio import iw                # iw command line interface
-import wraith.radio.iwtools as iwt         # nic command line interaces
+from wraith.wifi import iw                 # iw command line interface
+import wraith.wifi.iwtools as iwt          # nic command line interaces
 from wraith.iyri.constants import *        # tuner states & buffer dims
 from wraith.utils.timestamps import ts2iso # time stamp conversion
 

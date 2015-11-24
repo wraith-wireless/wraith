@@ -24,9 +24,9 @@ import psycopg2.extras as pextras          # cursors and such
 import ConfigParser                        # config file parsing
 import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
-from wraith.radio import iw                # wireless interface details
-from wraith.radio import iwtools as iwt    # interface details
-from wraith.radio import mpdu              # for 802.11 types/subtypes
+from wraith.wifi import iw                 # wireless interface details
+from wraith.wifi import iwtools as iwt     # interface details
+from wraith.wifi import mpdu               # for 802.11 types/subtypes
 from wraith.iyri.iyri import parsechlist   # channelist validity check
 from wraith.utils import timestamps        # valid data/time
 from wraith.utils import landnav           # lang nav utilities

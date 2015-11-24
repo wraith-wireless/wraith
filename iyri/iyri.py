@@ -51,9 +51,9 @@ from wraith import iyri                         # for rev number, author
 from wraith.iyri.collate import Collator        # the collator
 from wraith.iyri.rdoctl import RadioController  # Radio object etc
 from wraith.iyri.gpsctl import GPSController    # gps device
-from wraith.radio import channels               # channel specifications
-from wraith.radio import iw                     # channel widths and region set/get
-from wraith.radio.iwtools import wifaces        # check for interface presents
+from wraith.wifi import channels                # channel specifications
+from wraith.wifi import iw                      # channel widths and region set/get
+from wraith.wifi.iwtools import wifaces         # check for interface presents
 from wraith.utils.cmdline import runningprocess # check for psql running
 from wraith.iyri.constants import *             # buffer dims
 
