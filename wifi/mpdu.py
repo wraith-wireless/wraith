@@ -97,6 +97,11 @@ class MPDU(dict):
         except:
             return []
 
+    @property
+    def isempty(self):
+        """ :returns: True if mpdu is 'uninstantiated' """
+        return not self.present
+
     # The following are the minimum required fields of a mpdu frame
     # and will raise an unistantiated error if not present
 
@@ -106,7 +111,7 @@ class MPDU(dict):
         try:
             return self['framectrl']
         except KeyError:
-            raise MPDUUninstantiatedException
+            raise MPDUUninstantiatedException('framectrl')
 
     @property
     def vers(self):
@@ -114,7 +119,7 @@ class MPDU(dict):
         try:
             return self['framectrl']['vers']
         except KeyError:
-            raise MPDUUninstantiatedException
+            raise MPDUUninstantiatedException('version')
 
     @property
     def type(self):
@@ -122,7 +127,7 @@ class MPDU(dict):
         try:
             return self['framectrl']['type']
         except KeyError:
-            raise MPDUUninstantiatedException
+            raise MPDUUninstantiatedException('type')
 
     @property
     def subtype(self):
@@ -130,7 +135,7 @@ class MPDU(dict):
         try:
             return self['framectrl']['subtype']
         except KeyError:
-            raise MPDUUninstantiatedException
+            raise MPDUUninstantiatedException('subtype')
 
     @property
     def subtype_desc(self):
@@ -141,7 +146,7 @@ class MPDU(dict):
             elif self.type == FT_DATA: return ST_DATA_TYPES[self.subtype]
             else: return 'rsrv'
         except KeyError:
-            raise MPDUUninstantiatedException
+            raise MPDUUninstantiatedException('subtype_desc')
 
     @property
     def flags(self):
@@ -149,7 +154,7 @@ class MPDU(dict):
         try:
             return self['framectrl']['flags']
         except KeyError:
-            raise MPDUUninstantiatedException
+            raise MPDUUninstantiatedException('flags')
 
     @property
     def duration(self):
@@ -157,7 +162,7 @@ class MPDU(dict):
         try:
             return self['duration']
         except KeyError:
-            raise MPDUUninstantiatedException
+            raise MPDUUninstantiatedException('duration')
 
     @property
     def addr1(self):
@@ -165,7 +170,7 @@ class MPDU(dict):
         try:
             return self['addr1']
         except KeyError:
-            raise MPDUUninstantiatedException
+            raise MPDUUninstantiatedException('addr1')
 
     # the following may or may not be present. returns  None if not present
 

@@ -264,7 +264,7 @@ class Collator(mp.Process):
                 self._conn.rollback()
                 self._cI.send(('warn','Collator','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
             except ValueError as e: # a tuple did not unpack
-                self._cI.send(('warn','Collator','Unpack',e))
+                self._cI.send(('warn','Collator','Unpack',x))
             except IndexError: # something wrong with antenna indexing
                 self._cI.send(('err','Collator',"Radio","misconfigured antennas"))
             except KeyError as e: # (most likely) a radio sent a message without initiating

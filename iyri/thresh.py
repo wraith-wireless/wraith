@@ -124,7 +124,7 @@ class PCAPWriter(mp.Process):
         cs = 'writer-%d' % self.pid
         ts = ts2iso(time.time())
 
-        # wrap everything in a try block& reset all when done
+        # wrap everything in a try block & reset all when done
         try:
             # open a new file sid_timestamp_hwaddr.pcap
             if not self._fout:
@@ -313,7 +313,10 @@ class Thresher(mp.Process):
                                   rtap.flags_get(dR['flags'],'fcs'))
                         except UnpackError as e:
                             # parsing uncaught error (most likely mpdu)
-                            msg = 'bad frame at %d: %s' % (ix,f)
+                            if not dR:
+                                msg = 'Unpack error in radiotap at %d: %s' % (ix,f)
+                            else:
+                                msg = 'Unpack error in mpdu at %d: %s' % (ix,f)
                             self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
                             continue
                         else:
@@ -325,9 +328,9 @@ class Thresher(mp.Process):
                         # insert the frame
                         fid = None
 
-                        # In the below, individual helper functions will commit
-                        # database inserts/updates. All db errors will be caught
-                        # in this try block and rollbacks will be executed here
+                        # individual helper functions will commit database inserts
+                        # /updates. All db errors will be caught in this try block
+                        # and rollbacks will be executed here
                         try:
                             # setup next and fake fid
                             self._next = 'frame'
@@ -386,18 +389,33 @@ class Thresher(mp.Process):
                             self._insertsta_activity(fid,sid,ts,addrs)
 
                             # further process management frames
+                            if dM.isempty:
+                                self._icomms.put((cs,ts1,'!THRESH_WARN!','Malformed MPDU in frame %d: %s' % (fid,f)))
+                                continue
+
+                            # further process mgmt frames
+                            self._next = 'mgmt'
                             if dM.type == mpdu.FT_MGMT:
                                 self._processmgmt(fid,sid,ts,addrs,dM)
                         except psql.OperationalError as e: # unrecoverable
-                            msg = "frame %d insert failed at %s:. %s: %s" % (fid,self._next,e.pgcode,e.pgerror)
+                            if not fid:
+                                msg = "Failed to insert frame: %s: %s. %s" % (e.pgcode,e.pgerror,f)
+                            else:
+                                msg = "Frame %d insert failed at %s:. %s: %s. %s" % (fid,self._next,e.pgcode,e.pgerror,f)
                             self._icomms.put((cs,ts1,'!THRESH_ERR!',msg))
                         except psql.Error as e:
                             self._conn.rollback()
-                            msg = "frame %d failed at %s. %s: %s" % (fid,self._next,e.pgcode,e.pgerror)
+                            if not fid:
+                                msg = "Failed to insert frame: %s: %s. %s" % (e.pgcode,e.pgerror,f)
+                            else:
+                                msg = "Frame %d failed at %s. %s: %s. %s" % (fid,self._next,e.pgcode,e.pgerror,f)
                             self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
                         except Exception as e:
                             self._conn.rollback()
-                            msg = "frame %d failed at %s. %s: %s" % (fid,self._next,type(e).__name__,e)
+                            if not fid:
+                                msg = "Failed to insert frame: %s: %s. %s" % (type(e).__name__,e,f)
+                            else:
+                                msg = "Frame %d failed at %s. %s: %s. %s" % (fid,self._next,type(e).__name__,e,f)
                             self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
                     else:
                         msg = "invalid token %s" % tkn
@@ -540,51 +558,57 @@ class Thresher(mp.Process):
         self._conn.commit()
 
         # qos
-        self._next = 'qos'
-        sql = """
-               insert into qosctrl (fid,tid,eosp,ackpol,amsdu,txop)
-               values (%s,%s,%s,%s,%s,%s);
-              """
-        self._curs.execute(sql,(fid,dM.qosctrl['tid'],dM.qosctrl['eosp'],
-                                dM.qosctrl['ack-policy'],dM.qosctrl['a-msdu'],
-                                dM.qosctrl['txop']))
-        self._conn.commit()
+        if dM.qosctrl:
+            self._next = 'qos'
+            sql = """
+                   insert into qosctrl (fid,tid,eosp,ackpol,amsdu,txop)
+                   values (%s,%s,%s,%s,%s,%s);
+                  """
+            self._curs.execute(sql,(fid,dM.qosctrl['tid'],
+                                        dM.qosctrl['eosp'],
+                                        dM.qosctrl['ack-policy'],
+                                        dM.qosctrl['a-msdu'],
+                                        dM.qosctrl['txop']))
+            self._conn.commit()
 
         # encryption
-        self._next = 'crypt'
-        if dM.crypt['type'] == 'wep':
-            sql = "insert into wepcrypt (fid,iv,key_id,icv) values (%s,%s,%s,%s);"
-            self._curs.execute(sql,(fid,dM.crypt['iv'],dM.crypt['key-id'],dM.crypt['icv']))
-        elif dM.crypt['type'] == 'tkip':
-            sql = """
-                   insert into tkipcrypt (fid,tsc1,wepseed,tsc0,key_id,
-                                          tsc2,tsc3,tsc4,tsc5,mic,icv)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
-                  """
-            self._curs.execute(sql,(fid,dM.crypt['iv']['tsc1'],
-                                        dM.crypt['iv']['wep-seed'],
-                                        dM.crypt['iv']['tsc0'],
-                                        dM.crypt['iv']['key-id']['key-id'],
-                                        dM.crypt['ext-iv']['tsc2'],
-                                        dM.crypt['ext-iv']['tsc3'],
-                                        dM.crypt['ext-iv']['tsc4'],
-                                        dM.crypt['ext-iv']['tsc5'],
-                                        dM.crypt['mic'],
-                                        dM.crypt['icv']))
-        elif dM.crypt['type'] == 'ccmp':
-            sql = """
-                   insert into ccmpcrypt (fid,pn0,pn1,key_id,pn2,pn3,pn4,pn5,mic)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
-                  """
-            self._curs.execute(sql,(fid,dM.crypt['pn0'],
-                                        dM.crypt['pn1'],
-                                        dM.crypt['key-id']['key-id'],
-                                        dM.crypt['pn2'],
-                                        dM.crypt['pn3'],
-                                        dM.crypt['pn4'],
-                                        dM.crypt['pn5'],
-                                        dM.crypt['mic']))
-        self._conn.commit()
+        if dM.crypt:
+            self._next = 'crypt'
+            if dM.crypt['type'] == 'wep':
+                sql = "insert into wepcrypt (fid,iv,key_id,icv) values (%s,%s,%s,%s);"
+                self._curs.execute(sql,(fid,dM.crypt['iv'],
+                                            dM.crypt['key-id'],
+                                            dM.crypt['icv']))
+            elif dM.crypt['type'] == 'tkip':
+                sql = """
+                       insert into tkipcrypt (fid,tsc1,wepseed,tsc0,key_id,
+                                              tsc2,tsc3,tsc4,tsc5,mic,icv)
+                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                      """
+                self._curs.execute(sql,(fid,dM.crypt['iv']['tsc1'],
+                                            dM.crypt['iv']['wep-seed'],
+                                            dM.crypt['iv']['tsc0'],
+                                            dM.crypt['iv']['key-id']['key-id'],
+                                            dM.crypt['ext-iv']['tsc2'],
+                                            dM.crypt['ext-iv']['tsc3'],
+                                            dM.crypt['ext-iv']['tsc4'],
+                                            dM.crypt['ext-iv']['tsc5'],
+                                            dM.crypt['mic'],
+                                            dM.crypt['icv']))
+            elif dM.crypt['type'] == 'ccmp':
+                sql = """
+                       insert into ccmpcrypt (fid,pn0,pn1,key_id,pn2,pn3,pn4,pn5,mic)
+                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                      """
+                self._curs.execute(sql,(fid,dM.crypt['pn0'],
+                                            dM.crypt['pn1'],
+                                            dM.crypt['key-id']['key-id'],
+                                            dM.crypt['pn2'],
+                                            dM.crypt['pn3'],
+                                            dM.crypt['pn4'],
+                                            dM.crypt['pn5'],
+                                            dM.crypt['mic']))
+            self._conn.commit()
 
     def _insertsta(self,fid,sid,ts,addrs):
         """
@@ -671,7 +695,7 @@ class Thresher(mp.Process):
                     # sta has been seen this session
                     # we have to convert the frame ts to a datatime obj w/ tx
                     # to compare with the db's ts
-                    tstz = dtparser.parser(ts+"+00:00")
+                    tstz = dtparser.parse(ts+"+00:00")
                     if mode == 'tx':
                         # check 'heard' activities
                         if not row[2]: # 1st tx heard by sta, update first/lastHeard
