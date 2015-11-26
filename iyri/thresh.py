@@ -189,6 +189,24 @@ class PCAPWriter(mp.Process):
             if self._conn: self._conn.close()
             raise RuntimeError(e)
 
+def extractie(dM):
+    """
+     extracts info-elements for ssid, supported rates, extended rates & vendors
+
+     :param dM: mpdu dict
+     :returns: ssid,supported_rates,extended_rates,vendors
+    """
+    ssid = None
+    ss = []
+    es = []
+    vs = []
+    for ie in dM.info_els:
+        if ie[0] == mpdu.EID_SSID: ssid = ie[1]
+        if ie[0] == mpdu.EID_SUPPORTED_RATES: ss = ie[1]
+        if ie[0] == mpdu.EID_EXTENDED_RATES: es = ie[1]
+        if ie[0] == mpdu.EID_VEND_SPEC: vs.append(ie[1][0])
+    return ssid,ss,es,vs
+
 class Thresher(mp.Process):
     """
      Thresher process frames and inserts frame data in database
@@ -758,8 +776,8 @@ class Thresher(mp.Process):
          inserts the association req from client ot ap
 
          :param fid: frame id
-         :param client: associating client
-         :param ap: access point
+         :param client: associating client id
+         :param ap: access point id
          :param dM: mpdu dict
         """
         sql = """
@@ -771,15 +789,7 @@ class Thresher(mp.Process):
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
               """
-        ssid = None
-        sup_rs = []
-        ext_rs = []
-        vendors = []
-        for ie in dM.info_els:
-            if ie[0] == mpdu.EID_SSID: ssid = ie[1]
-            if ie[0] == mpdu.EID_SUPPORTED_RATES: sup_rs = ie[1]
-            if ie[0] == mpdu.EID_EXTENDED_RATES: ext_rs = ie[1]
-            if ie[0] == mpdu.EID_VEND_SPEC: vendors.append(ie[1][0])
+        ssid,sup_rs,ext_rs,vendors = extractie(dM)
         self._curs.execute(sql,(fid,client,ap,
                                 dM.fixed_params['capability']['ess'],
                                 dM.fixed_params['capability']['ibss'],
@@ -798,6 +808,50 @@ class Thresher(mp.Process):
                                 dM.fixed_params['capability']['delayed-ba'],
                                 dM.fixed_params['capability']['immediate-ba'],
                                 dM.fixed_params['listen-int'],
+                                ssid,sup_rs,ext_rs,vendors))
+        self._conn.commit()
+
+    def _insertassocresp(self,assoc,fid,ap,client,dM):
+        """
+         inserts the (re)association resp from ap to client NOTE: Since both
+         association response and reassociation response have the same format,
+         they are saved to the same table identified by the type 'assoc'
+
+         :param fid: frame id
+         :param assoc: association type
+         :param client: associating client id
+         :param ap: access point id
+         :param dM: mpdu dict
+        """
+        sql = """
+               insert into assocresp (fid,client,ap,type,ess,ibss,cf_pollable,
+                                      cf_poll_req,privacy,short_pre,pbcc,
+                                      ch_agility,spec_mgmt,qos,short_slot,
+                                      apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
+                                      status,aid,ssid,sup_rates,ext_rates,vendors)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        aid = dM.fixed_params['status-code'] if 'status-code' in dM.fixed_params else None
+        ssid,sup_rs,ext_rs,vendors = extractie(dM)
+        self._curs.execute(sql,(fid,client,ap,assoc,
+                                dM.fixed_params['capability']['ess'],
+                                dM.fixed_params['capability']['ibss'],
+                                dM.fixed_params['capability']['cfpollable'],
+                                dM.fixed_params['capability']['cf-poll-req'],
+                                dM.fixed_params['capability']['privacy'],
+                                dM.fixed_params['capability']['short-pre'],
+                                dM.fixed_params['capability']['pbcc'],
+                                dM.fixed_params['capability']['ch-agility'],
+                                dM.fixed_params['capability']['spec-mgmt'],
+                                dM.fixed_params['capability']['qos'],
+                                dM.fixed_params['capability']['time-slot'],
+                                dM.fixed_params['capability']['apsd'],
+                                dM.fixed_params['capability']['rdo-meas'],
+                                dM.fixed_params['capability']['dsss-ofdm'],
+                                dM.fixed_params['capability']['delayed-ba'],
+                                dM.fixed_params['capability']['immediate-ba'],
+                                dM.fixed_params['status-code'],aid,
                                 ssid,sup_rs,ext_rs,vendors))
         self._conn.commit()
 
@@ -842,15 +896,7 @@ class Thresher(mp.Process):
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
               """
-        ssid = None
-        sup_rs = []
-        ext_rs = []
-        vendors = []
-        for ie in dM.info_els:
-            if ie[0] == mpdu.EID_SSID: ssid = ie[1]
-            if ie[0] == mpdu.EID_SUPPORTED_RATES: sup_rs = ie[1]
-            if ie[0] == mpdu.EID_EXTENDED_RATES: ext_rs = ie[1]
-            if ie[0] == mpdu.EID_VEND_SPEC: vendors.append(ie[1][0])
+        ssid,sup_rs,ext_rs,vendors = extractie(dM)
         self._curs.execute(sql,(fid,client,ap,
                                 dM.fixed_params['capability']['ess'],
                                 dM.fixed_params['capability']['ibss'],
@@ -870,4 +916,209 @@ class Thresher(mp.Process):
                                 dM.fixed_params['capability']['immediate-ba'],
                                 dM.fixed_params['listen-int'],
                                 curid,ssid,sup_rs,ext_rs,vendors))
+        self._conn.commit()
+
+    def _insertprobereq(self,fid,client,ap,dM):
+        """
+         inserts a probe request from sta. NOTE: the ap is usually a broadcast
+         address and will not have an id
+
+         :param fid: frame id
+         :param client: requesting client id
+         :param ap: access point id
+         :param dM: mpdu dict
+        """
+        sql = """
+               insert into probereq (fid,client,ap,ssid,sup_rates,ext_rates,vendors)
+               values (%s,%s,%s,%s,%s,%s,%s);
+              """
+        ssid,sup_rs,ext_rs,vendors = extractie(dM)
+        self._curs.execute(sql,(fid,client,ap,ssid,sup_rs,ext_rs,vendors))
+        self._conn.commit()
+
+    def _insertproberesp(self,fid,ap,client,dM):
+        """
+         inserts the proberesp from the ap to the client
+
+         :param fid: frame id
+         :param client: requesting client id
+         :param ap: access point id
+         :param dM: mpdu dict
+        """
+        sql = """
+               insert into proberesp (fid,client,ap,beacon_ts,beacon_int,
+                                      ess,ibss,cf_pollable,cf_poll_req,privacy,
+                                      short_pre,pbcc,ch_agility,spec_mgmt,qos,
+                                      short_slot,apsd,rdo_meas,dsss_ofdm,del_ba,
+                                      imm_ba,ssid,sup_rates,ext_rates,vendors)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        beaconts = hex(dM.fixed_params['timestamp'])[2:] # store the hex (minus '0x')
+        ssid,sup_rs,ext_rs,vendors = extractie(dM)
+        self._curs.execute(sql,(fid,client,ap,beaconts,
+                                dM.fixed_params['beacon-int'],
+                                dM.fixed_params['capability']['ess'],
+                                dM.fixed_params['capability']['ibss'],
+                                dM.fixed_params['capability']['cfpollable'],
+                                dM.fixed_params['capability']['cf-poll-req'],
+                                dM.fixed_params['capability']['privacy'],
+                                dM.fixed_params['capability']['short-pre'],
+                                dM.fixed_params['capability']['pbcc'],
+                                dM.fixed_params['capability']['ch-agility'],
+                                dM.fixed_params['capability']['spec-mgmt'],
+                                dM.fixed_params['capability']['qos'],
+                                dM.fixed_params['capability']['time-slot'],
+                                dM.fixed_params['capability']['apsd'],
+                                dM.fixed_params['capability']['rdo-meas'],
+                                dM.fixed_params['capability']['dsss-ofdm'],
+                                dM.fixed_params['capability']['delayed-ba'],
+                                dM.fixed_params['capability']['immediate-ba'],
+                                ssid,sup_rs,ext_rs,vendors))
+        self._conn.commit()
+
+    def _insertbeacon(self,fid,ap,dM):
+        """
+         inserts the beacon from the ap
+
+         :param fid: fame id
+         :param ap: access point id
+         :param dM: mpdu dict
+        """
+        sql = """
+               insert into beacon (fid,ap,beacon_ts,beacon_int,ess,ibss,
+                                   cf_pollable,cf_poll_req,privacy,short_pre,
+                                   pbcc,ch_agility,spec_mgmt,qos,short_slot,
+                                   apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
+                                   ssid,sup_rates,ext_rates,vendors)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        beaconts = hex(dM.fixed_params['timestamp'])[2:] # store the hex (minus '0x')
+        ssid,sup_rs,ext_rs,vendors = extractie(dM)
+        self._curs.execute(sql,(fid,ap,beaconts,
+                                dM.fixed_params['beacon-int'],
+                                dM.fixed_params['capability']['ess'],
+                                dM.fixed_params['capability']['ibss'],
+                                dM.fixed_params['capability']['cfpollable'],
+                                dM.fixed_params['capability']['cf-poll-req'],
+                                dM.fixed_params['capability']['privacy'],
+                                dM.fixed_params['capability']['short-pre'],
+                                dM.fixed_params['capability']['pbcc'],
+                                dM.fixed_params['capability']['ch-agility'],
+                                dM.fixed_params['capability']['spec-mgmt'],
+                                dM.fixed_params['capability']['qos'],
+                                dM.fixed_params['capability']['time-slot'],
+                                dM.fixed_params['capability']['apsd'],
+                                dM.fixed_params['capability']['rdo-meas'],
+                                dM.fixed_params['capability']['dsss-ofdm'],
+                                dM.fixed_params['capability']['delayed-ba'],
+                                dM.fixed_params['capability']['immediate-ba'],
+                                ssid,sup_rs,ext_rs,vendors))
+        self._conn.commit()
+
+    def _insertdisassaoc(self,fid,rx,tx,dM):
+        """
+         inserts the disassociation from tx to tx
+
+         :param fid: frame id
+         :param rx: id of receiving sta
+         :param tx: id of transmitting sta
+         :param dM: mpdu dict
+        """
+        # have to determine if this is coming from ap or from client and
+        # set ap, client appropriately
+        if dM.addr3 == dM.addr2:
+            fromap = 1
+            client = rx
+            ap = tx
+        else:
+            fromap = 0
+            client = tx
+            ap = rx
+        sql = """
+               insert into disassoc (fid,client,ap,fromap,reason)
+               values (%s,%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(fid,client,ap,fromap,dM.fixed_params['reason-code']))
+        self._conn.commit()
+
+    def _insertdeauth(self,fid,rx,tx,dM):
+        """
+         inserts the deauthentication frame from tx to rx
+
+         :param fid: frame id
+         :param rx: id of receiving sta
+         :param tx: id of transmitting sta
+         :param dM: mpdu dict
+        """
+        # have to determine if this is coming from ap or from client and
+        # set ap, client appropriately
+        if dM.addr3 == dM.addr2:
+            fromap = 1
+            client = rx
+            ap = tx
+        else:
+            fromap = 0
+            client = tx
+            ap = rx
+        sql = """
+               insert into deauth (fid,client,ap,fromap,reason)
+               values (%s,%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(fid,client,ap,fromap,dM.fixed_params['reason-code']))
+        self._conn.commit()
+
+    def _insertauth(self,fid,rx,tx,dM):
+        """
+         inserts the deauthentication frame from tx to rx
+
+         :param fid: frame id
+         :param rx: id of receiving sta
+         :param tx: id of transmitting sta
+         :param dM: mpdu dict
+        """
+        # have to determine if this is coming from ap or from client and
+        # set ap, client appropriately
+        if dM.addr3 == dM.addr2:
+            fromap = 1
+            client = rx
+            ap = tx
+        else:
+            fromap = 0
+            client = tx
+            ap = rx
+        sql = """
+               insert into auth (fid,client,ap,fromap,auth_alg,auth_trans,status)
+               values (%s,%s,%s,%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(fid,client,ap,fromap,dM.fixed_params['algorithm-no'],
+                                dM.fixed_params['auth-seq'],
+                                dM.fixed_params['status-code']))
+        self._conn.commit()
+
+    def _insertaction(self,fid,rx,tx,ap,noack,dM):
+        """
+         inserts the action frame
+
+         :param fid: frame id
+         :param rx: id of receiving sta
+         :param tx: id of transmitting sta
+         :param ap: access point id
+         :param noack:
+         :param dM: mpdu dict
+        """
+        # determine if this is from ap, to ap or intra sta
+        if tx == ap: fromap = 1
+        elif rx == ap: fromap = 0
+        else: fromap = 2
+        noack = int(noack)
+        sql = """
+               insert into action (fid,rx,tx,ap,fromap,noack,category,action,has_el)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
+              """
+        self._curs.execute(sql,(fid,rx,tx,ap,fromap,noack,
+                                dM.fixed_params['category'],
+                                dM.fixed_params['action'],
+                                int('action-els' in dM.present)))
         self._conn.commit()
