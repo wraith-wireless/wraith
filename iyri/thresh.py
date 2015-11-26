@@ -33,6 +33,7 @@ from wraith.utils.timestamps import ts2iso  # timestamp conversion
 from dateutil import parser as dtparser     # parse out timestamps
 from wraith.iyri.constants import NWRITE    # max packets to store before writing
 from wraith.iyri.constants import N         # row size in buffer
+from wraith.iyri.constants import MPDUPATH  # path to store bad frames
 import wraith.wifi.radiotap as rtap         # 802.11 layer 1 parsing
 from wraith.wifi import mpdu                # 802.11 layer 2 parsing
 from wraith.wifi import mcs                 # mcs functions
@@ -432,7 +433,16 @@ class Thresher(mp.Process):
 
             # further process management frames
             if dM.isempty:
-                self._icomms.put((self.cs,ts1,'!THRESH_WARN!',"Bad MPDU in %d. %s" % (fid,f)))
+                msg = ''
+                try:
+                    fname = os.path.join(MPDUPATH,"bad%d.pcap" % fid)
+                    fout = pcap.pcapopen(fname)
+                    pcap.pktwrite(fout,ts,f)
+                    fout.close()
+                    msg = "Bad MPDU in %d. Wrote to %s" % (fid,fname)
+                except:
+                    msg = "Bad MPDU in %d. %s" % (fid,f)
+                self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
                 return
 
             # further process mgmt frames
