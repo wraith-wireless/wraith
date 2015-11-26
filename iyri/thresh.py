@@ -75,6 +75,9 @@ class PCAPWriter(mp.Process):
 
     def terminate(self): pass
 
+    @property
+    def cs(self): return 'writer-%d' % self.pid
+
     def run(self):
         """ execution loop """
         # ignore signals used by main program
@@ -82,11 +85,8 @@ class PCAPWriter(mp.Process):
         signal.signal(signal.SIGTERM,signal.SIG_IGN)  # kill -TERM stop
         signal.signal(signal.SIGUSR1,self.stop)       # kill signal from Collator
 
-        # local variables
-        cs = 'writer-%d' % self.pid # our callsign
-
         # notify collator we're up
-        self._icomms.put((cs,ts2iso(time.time()),'!WRITE!',self.pid))
+        self._icomms.put((self.cs,ts2iso(time.time()),'!WRITE!',self.pid))
 
         # loop until told to quit
         while not self._stop:
@@ -101,12 +101,14 @@ class PCAPWriter(mp.Process):
                     self._pkts.append((ts,fid,f))
                     if len(self._pkts) > NWRITE: self._writepkts()
                 else:
-                    self._icomms.put((cs,ts1,'!WRITE_ERR!',"invalid token %s" % tkn))
+                    msg = "invalid token %s" % tkn
+                    self._icomms.put((self.cs,ts1,'!WRITE_ERR!',msg))
             except Empty: pass
             except (IndexError,ValueError):
-                self._icomms.put((cs,ts1,'!WRITE_ERR!',"Invalid arguments"))
+                self._icomms.put((self.cs,ts1,'!WRITE_ERR!',"Invalid arguments"))
             except Exception as e:
-                self._icomms.put((cs,ts1,'!WRITE_ERR!',"%s: %s" % (type(e).__name__,e)))
+                msg = "%s: %s" % (type(e).__name__,e)
+                self._icomms.put((self.cs,ts1,'!WRITE_ERR!',msg))
 
         # are there unwritten packets?
         if len(self._pkts) > 0: self._writepkts()
@@ -114,7 +116,7 @@ class PCAPWriter(mp.Process):
         # notify Collator we're down
         if self._curs: self._curs.close()
         if self._conn: self._conn.close()
-        self._icomms.put((cs,ts2iso(time.time()),'!WRITE!',None))
+        self._icomms.put((self.cs,ts2iso(time.time()),'!WRITE!',None))
 
     def stop(self,signum=None,stack=None): self._stop = True
 
@@ -239,6 +241,9 @@ class Thresher(mp.Process):
 
     def terminate(self): pass
 
+    @property
+    def cs(self): return 'thresher-%d' % self.pid
+
     def run(self):
         """ execute frame process loop """
         # ignore signals used by main program
@@ -247,13 +252,12 @@ class Thresher(mp.Process):
         signal.signal(signal.SIGUSR1,self.stop)       # kill signal from Collator
 
         # local variables
-        cs = 'thresher-%d' % self.pid # our callsign
         sid = None                    # current session id
         rdos = {}                     # radio map hwaddr{'role','buffer','writer'}
         ouis = {}                     # oui dict
 
         # notify collator we're up
-        self._icomms.put((cs,ts2iso(time.time()),'!THRESH!',self.pid))
+        self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH!',self.pid))
 
         while not self._stop:
             # check for tasks or messages
@@ -281,159 +285,29 @@ class Thresher(mp.Process):
                             rdos[d[0]]['buffer'] = self._shama[0]
                             rdos[d[0]]['writer'] = self._shama[1]
                         else:
-                            self._icomms.put((cs,ts1,'!THRESH_WARN!',"Invalid role %s" %d[1]))
+                            self._icomms.put((self.cs,ts1,'!THRESH_WARN!',"Role %s" %d[1]))
                     elif tkn == '!WRITE!':
                         if d[0]: self._write = True
                         elif not d[0]: self._write = False
                     elif tkn == '!FRAME!':
-                        # extract frame details & get frame from buffer
-                        src,ix,b = d[0],d[1],d[2] # hwaddr,index,nBytes
-                        f = rdos[src]['buffer'][(ix*N):(ix*N)+b].tobytes()
-
-                        # parse the frame
-                        fid = None       # current frame id
-                        vs = ()          # values for db insert
-                        lF = len(f)      # & get the total length
-                        dR = {}          # make an empty rtap dict
-                        dM = mpdu.MPDU() # & an empty mpdu dict
-                        validRTAP = True # rtap was parsed correctly
-                        validMPDU = True # mpdu was parsed correctly
-                        try:
-                            dR = rtap.parse(f)
-                            dM = mpdu.parse(f[dR['sz']:],rtap.flags_get(dR['flags'],'fcs'))
-                        except rtap.RadiotapException:
-                            # the parsing failed at radiotap, set insert values to empty
-                            validRTAP = validMPDU = False
-                            vs = (sid,ts,lF,0,0,[0,lF],0,'none',0)
-                        except mpdu.MPDUException:
-                            # the radiotap was valid but mpdu failed - initialize empty mpdu
-                            validMPDU = False
-                            vs = (sid,ts,lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
-                                  int('a-mpdu' in dR['present']),
-                                  rtap.flags_get(dR['flags'],'fcs'))
-                        except UnpackError as e:
-                            # parsing uncaught error (most likely mpdu)
-                            if not dR:
-                                msg = 'Unpack error in radiotap at %d: %s' % (ix,f)
-                            else:
-                                msg = 'Unpack error in mpdu at %d: %s' % (ix,f)
-                            self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
-                            continue
-                        else:
-                            vs = (sid,ts,lF,dR['sz'],dM.offset,
-                                  [(dR['sz']+dM.offset),(lF-dM.stripped)],dR['flags'],
-                                  int('a-mpdu' in dR['present']),
-                                  rtap.flags_get(dR['flags'],'fcs'))
-
-                        # insert the frame
-                        fid = None
-
-                        # individual helper functions will commit database inserts
-                        # /updates. All db errors will be caught in this try block
-                        # and rollbacks will be executed here
-                        try:
-                            # setup next and fake fid
-                            self._next = 'frame'
-
-                            # insert the frame and get frame's id
-                            sql = """
-                                   insert into frame (sid,ts,bytes,bRTAP,bMPDU,
-                                                      data,flags,ampdu,fcs)
-                                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning frame_id;
-                                  """
-                            self._curs.execute(sql,vs)
-                            fid = self._curs.fetchone()[0]
-                            self._conn.commit()
-
-                            # pass fid, index, nBytes, left, right indices to writer
-                            if self._write:
-                                l = r = 0
-                                if validRTAP: l += dR['sz']
-                                if validMPDU:
-                                    l += dM.offset
-                                    r = lF-dM.stripped
-                                rdos[src]['writer'].put(('!FRAME!',ts,[fid,ix,b,l,r]))
-
-                            # NOTE: the next two "parts" storing and extracting
-                            # are mutually exlusive and do not need to happen in
-                            # any order & could be handled by threads/processes
-
-                            # store frame details in db
-                            self._next = 'store'
-                            self._insertrtap(fid,src,dR)           # radiotap related
-                            if dM.offset: self._insertmpdu(fid,dM) # mpdu related
-
-                            # store extracted 'metadata'
-                            self._next = 'extract'
-                            # sta addresses
-                            # Fct        To From    Addr1    Addr2  Addr3  Addr4
-                            # IBSS/Intra  0    0    RA=DA    TA=SA  BSSID    N/A
-                            # From AP     0    1    RA=DA TA=BSSID     SA    N/A
-                            # To AP       1    0 RA=BSSID    TA=SA     DA    N/A
-                            # Wireless DS 1    1 RA=BSSID TA=BSSID DA=WDS SA=WDS
-
-                            # extract unique addresses of stas in the mpdu into the
-                            # addr dict having the form:
-                            # <hwaddr>->{'loc:[<i..n>], where i=1..4
-                            #            'id':<sta_id>}
-                            addrs = {}
-                            for i,a in enumerate(['addr1','addr2','addr3','addr4']):
-                                if not a in dM: break
-                                if dM[a] in addrs: addrs[dM[a]]['loc'].append(i+1)
-                                else: addrs[dM[a]] = {'loc':[i+1],'id':None}
-
-                            # insert the sta, sta_activity
-                            # NOTE: insertsta modifies the addrs dict in place
-                            # assigning ids to each nonbroadcast address
-                            self._insertsta(fid,sid,ts,addrs)
-                            self._insertsta_activity(fid,sid,ts,addrs)
-
-                            # further process management frames
-                            if dM.isempty:
-                                self._icomms.put((cs,ts1,'!THRESH_WARN!','Malformed MPDU in frame %d: %s' % (fid,f)))
-                                continue
-
-                            # further process mgmt frames
-                            self._next = 'mgmt'
-                            if dM.type == mpdu.FT_MGMT:
-                                self._processmgmt(fid,sid,ts,addrs,dM)
-                        except psql.OperationalError as e: # unrecoverable
-                            if not fid:
-                                msg = "Failed to insert frame: %s: %s. %s" % (e.pgcode,e.pgerror,f)
-                            else:
-                                msg = "Frame %d insert failed at %s:. %s: %s. %s" % (fid,self._next,e.pgcode,e.pgerror,f)
-                            self._icomms.put((cs,ts1,'!THRESH_ERR!',msg))
-                        except psql.Error as e:
-                            self._conn.rollback()
-                            if not fid:
-                                msg = "Failed to insert frame: %s: %s. %s" % (e.pgcode,e.pgerror,f)
-                            else:
-                                msg = "Frame %d failed at %s. %s: %s. %s" % (fid,self._next,e.pgcode,e.pgerror,f)
-                            self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
-                        except Exception as e:
-                            self._conn.rollback()
-                            if not fid:
-                                msg = "Failed to insert frame: %s: %s. %s" % (type(e).__name__,e,f)
-                            else:
-                                msg = "Frame %d failed at %s. %s: %s. %s" % (fid,self._next,type(e).__name__,e,f)
-                            self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
+                        self._processframe(sid,rdos,ts,ts1,d)
                     else:
                         msg = "invalid token %s" % tkn
-                        self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
+                        self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
                 except (IndexError,ValueError):
                     msg = "invalid arguments (%s) for %s" % (','.join([str(x) for x in d]),tkn)
-                    self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
+                    self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
                 except KeyError as e:
-                    msg = "invalid radio hwaddr: %s" % cs
-                    self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
+                    msg = "invalid radio hwaddr: %s" % e
+                    self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
                 except Exception as e:
                     msg = "%s: %s" % (type(e).__name__,e)
-                    self._icomms.put((cs,ts1,'!THRESH_WARN!',msg))
+                    self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
 
         # notify collector we're down
         if self._curs: self._curs.close()
         if self._conn: self._conn.close()
-        self._icomms.put((cs,ts2iso(time.time()),'!THRESH!',None))
+        self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH!',None))
 
     def stop(self,signum=None,stack=None): self._stop = True
 
@@ -459,6 +333,131 @@ class Thresher(mp.Process):
                 self._curs.close()
             if self._conn: self._conn.close()
             raise RuntimeError(e)
+
+    def _processframe(self,sid,rdos,ts,ts1,d):
+        """
+         inserts frame into db
+
+         :param rdos: radio dict
+         :param d:  data
+        """
+        # pull frame out of buffer
+        src,ix,b = d[0],d[1],d[2] # hwaddr,index,nBytes
+        f = rdos[src]['buffer'][(ix*N):(ix*N)+b].tobytes()
+
+        # parse the frame
+        fid = None       # current frame id
+        vs = ()          # values for db insert
+        lF = len(f)      # & get the total length
+        dR = {}          # make an empty rtap dict
+        dM = mpdu.MPDU() # & an empty mpdu dict
+        validRTAP = True # rtap was parsed correctly
+        validMPDU = True # mpdu was parsed correctly
+        try:
+            dR = rtap.parse(f)
+            dM = mpdu.parse(f[dR['sz']:],rtap.flags_get(dR['flags'],'fcs'))
+        except rtap.RadiotapException: # parsing failed @ radiotap, set empty vals
+            validRTAP = validMPDU = False
+            vs = (sid,ts,lF,0,0,[0,lF],0,'none',0)
+        except mpdu.MPDUException: # mpdu failed - initialize empty mpdu
+            validMPDU = False
+            vs = (sid,ts,lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
+                  int('a-mpdu' in dR['present']),rtap.flags_get(dR['flags'],'fcs'))
+        except UnpackError as e: # uncaught parsing error (most likely mpdu)
+            if not dR: msg = 'Unpack error in radiotap at %d: %s' % (ix,f)
+            else: msg = 'Unpack error in mpdu at %d: %s' % (ix,f)
+            self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
+            return
+        else:
+            vs = (sid,ts,lF,dR['sz'],dM.offset,
+                  [(dR['sz']+dM.offset),(lF-dM.stripped)],
+                  dR['flags'],int('a-mpdu' in dR['present']),
+                  rtap.flags_get(dR['flags'],'fcs'))
+
+        # individual helper functions will commit database inserts/updates. All
+        # db errors will be caught in this try & rollbacks will be executed here
+        try:
+            self._next = 'frame'
+
+            # insert the frame and get frame's id
+            sql = """
+                   insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning frame_id;
+                  """
+            self._curs.execute(sql,vs)
+            fid = self._curs.fetchone()[0]
+            self._conn.commit()
+
+            # pass fid, index, nBytes, left, right indices to writer
+            if self._write:
+                l = r = 0
+                if validRTAP: l += dR['sz']
+                if validMPDU:
+                    l += dM.offset
+                    r = lF-dM.stripped
+                rdos[src]['writer'].put(('!FRAME!',ts,[fid,ix,b,l,r]))
+
+            # NOTE: the next two "parts" storing and extracting are mutually
+            # exlusive & are required to occur sequentially, thus could be
+            # handled by threads/processes
+
+            # (1) store frame details in db
+            self._next = 'store'
+            self._insertrtap(fid,src,dR)
+            if not dM.isempty: self._insertmpdu(fid,dM)
+
+            # (2) extract
+            self._next = 'extract'
+            # sta addresses
+            # Fct        To From    Addr1    Addr2  Addr3  Addr4
+            # IBSS/Intra  0    0    RA=DA    TA=SA  BSSID    N/A
+            # From AP     0    1    RA=DA TA=BSSID     SA    N/A
+            # To AP       1    0 RA=BSSID    TA=SA     DA    N/A
+            # Wireless DS 1    1 RA=BSSID TA=BSSID DA=WDS SA=WDS
+
+            # pull unique addresses of stas from mpdu into the addr dict
+            # having the form: <hwaddr>->{'loc:[<i..n>], where i=1..4
+            #                             'id':<sta_id>}
+            # NOTE: insertsta modifies the addrs dict in place assigning ids to
+            # each nonbroadcast address
+            addrs = {}
+            for i,a in enumerate(['addr1','addr2','addr3','addr4']):
+                if not a in dM: break
+                if dM[a] in addrs: addrs[dM[a]]['loc'].append(i+1)
+                else: addrs[dM[a]] = {'loc':[i+1],'id':None}
+
+            # insert the sta, sta_activity
+            self._insertsta(fid,sid,ts,addrs)
+            self._insertsta_activity(fid,sid,ts,addrs)
+
+            # further process management frames
+            if dM.isempty:
+                self._icomms.put((self.cs,ts1,'!THRESH_WARN!',"Bad MPDU in %d. %s" % (fid,f)))
+                return
+
+            # further process mgmt frames
+            self._next = 'mgmt'
+            if dM.type == mpdu.FT_MGMT: self._processmgmt(fid,sid,ts,addrs,dM)
+        except psql.OperationalError as e: # unrecoverable
+            if not fid:
+                msg = "Failed to insert frame: %s: %s. %s" % (e.pgcode,e.pgerror,f)
+            else:
+                msg = "Frame %d insert failed at %s:. %s: %s. %s" % (fid,self._next,e.pgcode,e.pgerror,f)
+            self._icomms.put((self.cs,ts1,'!THRESH_ERR!',msg))
+        except psql.Error as e:
+            self._conn.rollback()
+            if not fid:
+                msg = "Failed to insert frame: %s: %s. %s" % (e.pgcode,e.pgerror,f)
+            else:
+                msg = "Frame %d failed at %s. %s: %s. %s" % (fid,self._next,e.pgcode,e.pgerror,f)
+            self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
+        except Exception as e:
+            self._conn.rollback()
+            if not fid:
+                msg = "Failed to insert frame: %s: %s. %s" % (type(e).__name__,e,f)
+            else:
+                msg = "Frame %d failed at %s. %s: %s. %s" % (fid,self._next,type(e).__name__,e,f)
+                self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
 
     #### All below _insert functions will allow db exceptions to pass through to caller
 

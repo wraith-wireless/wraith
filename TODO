@@ -34,6 +34,8 @@ Iyri:
  55) start gpsd if it does not start automatically (assuming gps device is
      plugged in)
  56) test c2c after switch to single platform
+ 57) getting bad mpdus sometimes - is this just malformed packets or is it an
+     error with the thresher? write out bad frames to logs to parse later
 Wifi:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)
