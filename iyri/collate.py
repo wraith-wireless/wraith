@@ -256,7 +256,7 @@ class Collator(mp.Process):
                     ix,l = msg
                     qT.put(('!FRAME!',ts,[rmap[cs],ix,l]))
                 else: # unidentified event type, notify iyri
-                    self._cI.send(('warn','Collator','Radio',"unknown event %s from %s" % (ev,cs)))
+                    self._cI.send(('warn','Collator',cs,"unknown event %s from %s" % (ev,cs)))
             except Empty: continue
             except psql.OperationalError as e: # unrecoverable
                 self._cI.send(('err','Collator','DB',"%s: %s" % (e.pgcode,e.pgerror)))

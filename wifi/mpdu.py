@@ -191,9 +191,11 @@ class MPDU(dict):
     @property
     def crypt(self): return self['l3-crypt'] if 'l3-crypt' in self else None
     @property
-    def fixed_params(self): return self['fixed-params'] if 'fixed-params' in self else None
+    def fixed_params(self):
+        return self['fixed-params'] if 'fixed-params' in self else None
     @property
-    def info_els(self): return self['info-elements'] if 'info-elements' in self else None
+    def info_els(self):
+        return self['info-elements'] if 'info-elements' in self else None
 
 def parse(frame,hasFCS=False):
     """
@@ -308,7 +310,7 @@ FT_DATA              =  2
 FT_RSRV              =  3
 ST_MGMT_TYPES = ['assoc-req','assoc-resp','reassoc-req','reassoc-resp','probe-req',
                  'probe-resp','timing-adv','rsrv','beacon','atim','disassoc','auth',
-                 'deauth','action','action_noack','rsrv']
+                 'deauth','action','action-noack','rsrv']
 ST_MGMT_ASSOC_REQ    =  0
 ST_MGMT_ASSOC_RESP   =  1
 ST_MGMT_REASSOC_REQ  =  2
@@ -344,7 +346,7 @@ ST_CTRL_CTS           = 12
 ST_CTRL_ACK           = 13
 ST_CTRL_CFEND         = 14
 ST_CTRL_CFEND_CFACK   = 15
-ST_DATA_TYPES = ['data','cfack','cfpoll','cfack_cfpoll','null','null-cfack',
+ST_DATA_TYPES = ['data','cfack','cfpoll','cfack-cfpoll','null','null-cfack',
                  'null-cfpoll','null-cfack-cfpoll','qos-data','qos-data-cfack',
                  'qos-data-cfpoll','qos-data-cfack-cfpoll','qos-null','rsrv',
                  'qos-cfpoll','qos-cfack-cfpoll']

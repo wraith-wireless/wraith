@@ -1,7 +1,7 @@
 -- using postgresql 9.3.4
 -- version 0.0.13
 
--- create nidus user and nidus database  
+-- create nidus user and nidus database
 --postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
 --  Enter password for new role: **** (nidus)
 --  Enter it again: **** (nidus)
@@ -37,8 +37,8 @@ CREATE INDEX sensor_period_idx ON sensor USING GIST (period);
 
 -- platform table
 -- defines the platform a sensor is running on to include the regulatory domain
--- the wireless nics are defined under. This should not change much over 
--- any conceivable time except for kernel upgrade, os upgrade and reg. domain. 
+-- the wireless nics are defined under. This should not change much over
+-- any conceivable time except for kernel upgrade, os upgrade and reg. domain.
 -- useful for debugging? performance metrics?
 DROP TABLE IF EXISTS platform;
 CREATE TABLE platform(
@@ -141,7 +141,7 @@ CREATE TABLE radio(
    mac macaddr NOT NULL,                      -- mac address of nic
    driver VARCHAR(20) DEFAULT 'UNKNOWN',      -- nic driver
    chipset VARCHAR(20) DEFAULT 'UNKNOWN',     -- nic chipset
-   channels SMALLINT[] NOT NULL,              -- list of channels supported by nic 
+   channels SMALLINT[] NOT NULL,              -- list of channels supported by nic
    standards VARCHAR(20) DEFAULT '802.11b/g', -- list of standards supported by nic
    description VARCHAR(100),                  -- brief description of radio
    PRIMARY KEY(mac)
@@ -218,8 +218,8 @@ CREATE TABLE using_radio(
 CREATE INDEX using_radio_period_idx ON using_radio USING GIST (period);
 
 -- NOTE:
--- capture header and mpdu layers are defined in a set of tables. The phy layer 
--- is defined (partially) in frame, source, ampdu and signal. The mac layer 
+-- capture header and mpdu layers are defined in a set of tables. The phy layer
+-- is defined (partially) in frame, source, ampdu and signal. The mac layer
 -- is defined in traffic, wepcrypt, tkipcrypt and ccmpcrypt
 
 -- frame table
@@ -232,7 +232,7 @@ CREATE TABLE frame(
    bytes smallint NOT NULL,          -- ttl bytes
    bRTAP smallint,                   -- bytes in radiotap
    bMPDU smallint,                   -- bytes in mpdu
-   data smallint[2] NOT NULL,        -- left,right indexes into data portion 
+   data smallint[2] NOT NULL,        -- left,right indexes into data portion
    flags smallint default '0',       -- radiotap frame flags
    ampdu smallint not NULL,          -- ampdu is present
    fcs smallint not NULL,            -- fcs is present (1) or not (0)
@@ -570,7 +570,7 @@ CREATE TABLE assocreq(
   CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_client CHECK (client > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
-  CONSTRAINT ch_listen_int CHECK (listen_int > 0),
+  CONSTRAINT ch_listen_int CHECK (listen_int >= 0),
   CONSTRAINT ch_ess CHECK (ess >=0 and ess <=1),
   CONSTRAINT ch_ibss CHECK (ibss >=0 and ibss <=1),
   CONSTRAINT ch_cf_pollable CHECK (cf_pollable >=0 and cf_pollable <=1),
@@ -1125,13 +1125,13 @@ select frame.ts,frame.bytes,frame.bRTAP,frame.bMPDU,frame.data,traffic.type,
        traffic.addr4,traffic.crypt from frame,traffic where frame.id = traffic.fid;
 
 -- beacons with ap.bssid
-select beacon.ts,sta.mac,beacon.ssid,beacon.sup_rates,beacon.ext_rates,beacon.vendors 
+select beacon.ts,sta.mac,beacon.ssid,beacon.sup_rates,beacon.ext_rates,beacon.vendors
 from beacon,sta where sta.id = beacon.ap;
 
 select sta.mac,probereq.ts,probereq.ssid,probereq.sup_rates,probereq.ext_rates,
 probereq.vendors from probereq,sta where sta.id=probereq.client;
 
--- data sizes 
+-- data sizes
 -- size of relations
 SELECT nspname || '.' || relname AS "relation",
     pg_size_pretty(pg_relation_size(C.oid)) AS "size"
@@ -1139,7 +1139,7 @@ SELECT nspname || '.' || relname AS "relation",
   LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
   WHERE nspname NOT IN ('pg_catalog', 'information_schema')
   ORDER BY pg_relation_size(C.oid) DESC;
-  
+
 -- total diskspace of table
 SELECT nspname || '.' || relname AS "relation",
     pg_size_pretty(pg_total_relation_size(C.oid)) AS "total_size"

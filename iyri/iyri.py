@@ -379,7 +379,7 @@ class Iryi(object):
                 self._sbuffer = memoryview(mp.Array('B',M*N,lock=False))
 
             # start Collator first (IOT accept comms
-            logging.info("Initializing subprocess...")
+            logging.info("Initializing subprocesses...")
             logging.info("Starting Collator...")
             (conn1,conn2) = mp.Pipe()
             self._pConns['collator'] = conn1
