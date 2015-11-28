@@ -111,3 +111,5 @@ and editing of configuration files, some manipulation of backened storage.
      - collate.py       data collation and forwarding
      - thresh.py        Thresher process for parsing/writing frames
      - iyrid            iyri daemon
+ * deprecated
+     - wraith.0.0.4.tar.gz client/version server
