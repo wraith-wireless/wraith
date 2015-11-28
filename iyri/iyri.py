@@ -768,13 +768,8 @@ if __name__ == '__main__':
         logging.info("Iryi %s",iyri.__version__)
         sensor = Iryi()
         sensor.run()
-    except IryiConfException as err:
-        logging.error("Configuration Error: %s",err)
-    except IryiParamException as err:
-        logging.error("Parameter Error: %s",err)
-    except IryiRuntimeException as err:
-        logging.error("Runtime Error: %s",err)
-    except IryiException as err:
-        logging.error("General Error: %s",err)
-    except Exception as err:
-        logging.exception("Unknown Error: %s",err)
+    except IryiConfException as e: logging.error("Configuration Error: %s",e)
+    except IryiParamException as e: logging.error("Parameter Error: %s",e)
+    except IryiRuntimeException as e: logging.error("Runtime Error: %s",e)
+    except IryiException as e: logging.error("General Error: %s",e)
+    except Exception as e: logging.exception("Unknown Error: %s",e)

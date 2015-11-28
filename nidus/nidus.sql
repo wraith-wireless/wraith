@@ -333,18 +333,20 @@ DROP TYPE IF EXISTS FT_TYPE;
 CREATE TYPE FT_TYPE AS ENUM ('mgmt','ctrl','data','rsrv');
 
 -- 802.11 subtype enumerations
--- defines all subtypes together including one 'rsrv' enum
+-- defines all subtypes together
 DROP TYPE IF EXISTS FT_SUBTYPE;
 CREATE TYPE FT_SUBTYPE AS ENUM ('assoc-req','assoc-resp','reassoc-req','reassoc-resp',
-                                'probe-req','probe-resp','timing-adv','beacon',
-                                'atim','disassoc','auth','deauth','action',
-                                'action-noack','wrapper','block-ack-req',
-                                'block-ack','pspoll','rts','cts','ack','cfend',
-                                'cfend-cfack','data','cfack','cfpoll','cfack-cfpoll',
+                                'probe-req','probe-resp','timing-adv','mgmt-rsrv-7',
+                                'beacon','atim','disassoc','auth','deauth','action',
+                                'action-noack','mgmt-rsrv-15','ctrl-rsrv-0',
+                                'ctrl-rsrv-1','ctrl-rsrv-2','ctrl-rsrv-3',
+                                'ctrl-rsrv-4','ctrl-rsrv-5','ctrl-rsrv-6','wrapper',
+                                'block-ack-req','block-ack','pspoll','rts','cts',
+                                'ack','cfend','cfend-cfack','data','cfack','cfpoll','cfack-cfpoll',
                                 'null','null-cfack','null-cfpoll','null-cfack-cfpoll',
                                 'qos-data','qos-data-cfack','qos-data-cfpoll',
-                                'qos-data-cfack-cfpoll','qos-null','qos-cfpoll',
-                                'qos-cfack-cfpoll','rsrv');
+                                'qos-data-cfack-cfpoll','qos-null','data-rsrv-13',
+                                'qos-cfpoll','qos-cfack-cfpoll');
 
 DROP TYPE IF EXISTS DUR_TYPE;
 CREATE TYPE DUR_TYPE AS ENUM ('vcs','cfp','aid','rsrv');

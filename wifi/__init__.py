@@ -17,7 +17,7 @@ REVISIONS:
 radio 0.0.5
  desc: provides tools to manipulate wireless nics and parse raw wireless traffic
  includes: bits 0.0.4 channels 0.0.1, mcs 0.0.1, iw 0.1.0 iwtools 0.0.12,
- radiotap 0.0.4, mpdu 0.1.0, infoelement 0.0.1, oui 0.0.1
+ radiotap 0.0.4, mpdu 0.1.1, oui 0.0.1
  changes:
   - cleaned up some of the code in mpdu
     o moved parse function to top, 'sectioned' code together based on field,
@@ -26,6 +26,7 @@ radio 0.0.5
     o added wep, tkip and ccmp parsing
     o decided to pass on parsing msb of qosctrl to 'clients'
   - modified regget in iw to allow partial parsing of regulatory domain
+  - added error property to mpdu object
 """
 __name__ = 'radio'
 __license__ = 'GPL v3.0'
