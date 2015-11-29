@@ -62,7 +62,6 @@ from wraith.iyri.constants import *             # buffer dims
 def parsechlist(pattern,ptype):
     """
       parses a channel list pattern
-
       :param pattern: see iyri.conf for  channel list definition
       :param ptype: oneof {'scan'|'pass'}
       :returns: a list of tuples t = (channel,chwidth) defined in pattern
@@ -82,7 +81,8 @@ def parsechlist(pattern,ptype):
                 elif band == '5':
                     chs = sorted(channels.UNII_5_C2F.keys())
                 else:
-                    raise ValueError("Band specification %s for %s not supported" % (chs,ptype))
+                    err = "Band spec: %s for %s not supported".format(chs,ptype)
+                    raise ValueError(err)
             elif '-' in chs: # range specification
                 [l,u] = chs.split('-')
                 chs = [c for c in xrange(int(l),int(u)+1) if c in channels.channels()]
@@ -90,14 +90,17 @@ def parsechlist(pattern,ptype):
                 try:
                     chs = [int(c) for c in chs.split(',')]
                 except ValueError:
-                    raise ValueError("Invalid channel list specification %s for %s" % (chs,ptype))
+                    err = "Invalid channel list spec: {0} for {1}".format(chs,ptype)
+                    raise ValueError(err)
 
             # parse width portion
             if not ws or ws.lower() == 'all': ws = []
             else:
                 if ws.lower() == "noht": ws = [None,'HT20']
                 elif ws.lower() == "ht": ws = ['HT40+','HT40-']
-                else: raise ValueError("Invalid specification for width %s for %s" % (ws,ptype))
+                else:
+                    err = "Invalid specification for width {0} for {1}".format(ws,ptype)
+                    raise ValueError(err)
 
     # compile all possible combinations
     if (chs,ws) == ([],[]):
@@ -146,7 +149,7 @@ class C2C(threading.Thread):
                 elif self._sock and not self._caddr:
                     if self._accept():
                         logging.info("Client %s connected",self.clientstr)
-                        self._send("Iryi v%s\n" % iyri.__version__)
+                        self._send("Iyri v{0}".format(iyri.__version__))
 
                 # prepare inputs
                 ins = [self._cD,self._csock] if self._csock else [self._cD]
@@ -206,7 +209,10 @@ class C2C(threading.Thread):
             return msg
 
     def _send(self,msg):
-        """ send msg to client """
+        """
+         send msg to client
+         :param msg: reply to client
+        """
         if self._csock: self._csock.send(msg)
 
     def _shutdown(self,how=socket.SHUT_RDWR):
@@ -233,7 +239,7 @@ class C2C(threading.Thread):
     @property # will throw error on no client
     def clientstr(self):
         try:
-            return "%s:%d" % (self._caddr[0],self._caddr[1])
+            return "{0}:{1}".format(self._caddr[0],self._caddr[1])
         except:
             return ""
 
@@ -248,7 +254,6 @@ class Iryi(object):
     def __init__(self,conf=None):
         """
          initialize Iyri
-
          :param conf: path to configuration file
         """
         # get parameters
@@ -339,7 +344,6 @@ class Iryi(object):
     def stop(self,signum=None,stack=None):
         """
          stop execution
-
          :param signum: signal number, ignored
          :param stack: stack frame at point of interruption, ignored
         """
@@ -504,7 +508,7 @@ class Iryi(object):
         logging.info("Reading configuration file...")
         cp = ConfigParser.RawConfigParser()
         if not cp.read(self._cpath):
-            raise IryiConfException('%s is invalid' % self._cpath)
+            raise IryiConfException("{0} is invalid".format(self._cpath))
 
         # intialize conf to empty dict
         self._conf = {}
@@ -566,7 +570,7 @@ class Iryi(object):
                     if not os.path.abspath(self._conf['save']['path']):
                         self._conf['save']['path'] = os.path.realpath(self._conf['save']['path'])
                     if not os.path.isdir(self._conf['save']['path']):
-                        msg = "Save Path %s does not exist" % self._conf['save']['path']
+                        msg = "Save Path {0} does not exist".format(self._conf['save']['path'])
                         raise IryiConfException(msg)
 
             # Local section
@@ -592,12 +596,12 @@ class Iryi(object):
     def _readradio(self,cp,rtype='Abad'):
         """
          read in the rtype radio configuration from conf and return parsed dict
-
          :param cp: ConfigParser object
          :param rtype: radio type onoeof {'Abad'|'Shama'}
         """
         if not cp.get(rtype,'nic') in wifaces():
-            raise RuntimeError("Radio %s not present/not wireless" % cp.get(rtype,'nic'))
+            err = "Radio %s not present/not wireless".format(cp.get(rtype,'nic'))
+            raise RuntimeError(err)
 
         # get nic and set role setting default antenna config
         r = {
@@ -690,7 +694,6 @@ class Iryi(object):
     def _processcmd(self,msg):
         """
          parse and process command from c2c socket
-
          :param msg: the commnd from user
         """
         # ensure there are at least 3 tokens
@@ -715,17 +718,20 @@ class Iryi(object):
         # ATT we can error/ack with associated cmd id
         cmd = tkns[1].strip().lower()
         if cmd not in ['state','scan','hold','listen','pause','txpwr','spoof']:
-            self._pConns['c2c'].send("ERR %d \001invalid command\001\n" % cmdid)
+            resp = "ERR {0} \001invalid command\001\n".format(cmdid)
+            self._pConns['c2c'].send(resp)
             return None,None,None,None
 
         if cmd == 'txpwr' or cmd == 'spoof':
-            self._pConns['c2c'].send("ERR %d \001%s not implemented\001\n" % (cmdid,cmd))
+            resp = "ERR {0} \001{1} not implemented\001\n".format(cmdid,cmd)
+            self._pConns['c2c'].send(resp)
             return None,None,None,None
 
         radios = []
         radio = tkns[2].strip().lower()
         if radio not in ['both','all','abad','shama']:
-            self._pConns['c2c'].send("ERR %d \001invalid radio specification: %s \001\n" % (cmdid,radio))
+            resp = "ERR {0} \001invalid radio spec: {1} \001\n".format(cmdid,radio)
+            self._pConns['c2c'].send(resp)
             return None,None,None,None
 
         if radio == 'all':
@@ -734,7 +740,8 @@ class Iryi(object):
         elif radio == 'both': radios = ['abad','shama']
         else: radios = [radio]
         if 'shama' in radios and self._sr is None:
-            self._pConns['c2c'].send("ERR %d \001shama radio not present\001\n" % cmdid)
+            resp = "ERR {0} \001shama radio not present\001\n".format(cmdid)
+            self._pConns['c2c'].send(resp)
             return None,None,None,None
 
         # ensure any params are valid
@@ -757,7 +764,8 @@ class Iryi(object):
                     ps = ':'.join(ps).upper() # rejoin the mac
                     if re.match(MACADDR,ps) is None: raise RuntimeError
             except:
-                self._pConns['c2c'].send("ERR %d \001invalid params\001\n" % cmdid)
+                resp = "ERR {0} \001invalid params\001\n".format(cmdid)
+                self._pConns['c2c'].send(resp)
                 return None,None,None,None
 
         # all good
