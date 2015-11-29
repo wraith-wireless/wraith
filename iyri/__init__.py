@@ -3,7 +3,7 @@
 """ iyri: Wraith 802.11 Sensor
 
 Iyri is a 802.11 sensor consisting of a mandatory radio (Abad) and an optional
-radio (Shama). While Abad can receive/collect and transmit, Shama will only receive.
+radio (Shama). While Abad can receive/collect and transmit, Shama only receives.
 Iyri relays collected data to the backend database nidus, collects/stores data
 from raw 802.11 packets and any geolocational data (if a gps device is present).
 
@@ -22,7 +22,8 @@ REVISIONS:
    of bytes with a memoryview and using the socket.recv_from method to 'put'
    frames onto the "buffer". Children then utilize shared access to the "buffer"
    to process the frames accordingly.
-  includes: iyri 0.1.0 collator 0.1.1 rdoctl 0.1.0 geo 0.0.1 iyri.conf iyri.log.conf
+  includes: iyri 0.1.0 collate 0.1.2 constants 0.0.1 gpsctl 0.0.1 rdoctl 0.1.0
+            thresh 0.0.4 iyrid iyri.conf iyri.log.conf
   iyrid
   changes:
    - Uses a process for the GPSController rather than a thread

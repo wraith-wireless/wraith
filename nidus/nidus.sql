@@ -1,5 +1,5 @@
 -- using postgresql 9.3.4
--- version 0.0.13
+-- version 0.0.14
 
 -- create nidus user and nidus database
 --postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
@@ -490,11 +490,10 @@ CREATE TABLE ccmpcrypt(
 --);
 
 
--- sta table
+-- sta table (exists across all sessions)
 -- primary entity of a network. A sta is a client or an ap of a BSS/IBSS or
 -- a station attempting to enter/create a BSS/IBSS or the ap a sta is
 -- probing for
--- the sta table exists across sessions
 DROP TABLE IF EXISTS sta;
 CREATE TABLE sta(
    sta_id bigserial NOT NULL,            -- primary key
@@ -936,6 +935,15 @@ CREATE TABLE action(
   FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
+DROP TABLE IF EXISTS malformed;
+CREATE TABLE malformed(
+  mal_id bigserial NOT NULL, -- primary key
+  fid bigint NOT NULL,       -- fk to frame
+  reason text NOT NULL,      -- reason frame is malformed
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  PRIMARY KEY(mal_id)
+);
+
 -- NOTE CURRENTLY USED --
 --DROP TYPE IF EXISTS STA_TYPE;
 --CREATE TYPE STA_TYPE AS ENUM ('unknown','ap','sta','wired');
@@ -1012,6 +1020,8 @@ CREATE FUNCTION delete_all()
       DELETE FROM sta_activity;
       DELETE FROM sta;
       ALTER SEQUENCE sta_sta_id_seq RESTART;
+      DELETE FROM malformed;
+      ALTER SEQUENCE malformed_malformed_id_seq RESTART;
       DELETE FROM traffic;
       DELETE FROM frame_path;
       DELETE FROM frame;
@@ -1068,6 +1078,8 @@ DELETE FROM action;
 DELETE FROM sta_activity;
 DELETE FROM sta;
 ALTER SEQUENCE sta_sta_id_seq restart;
+DELETE FROM malformed;
+ALTER SEQUENCE malformed_malformed_id_seq RESTART;
 DELETE FROM traffic;
 DELETE FROM frame_path;
 DELETE FROM frame;
@@ -1105,6 +1117,7 @@ DROP TABLE auth;
 DROP TABLE action;
 DROP TABLE sta_activity;
 DROP TABLE sta;
+DROP TABLE malformed;
 DROP TABLE frame_path;
 DROP TABLE frame;
 DROP TABLE platform;

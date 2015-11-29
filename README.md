@@ -24,7 +24,7 @@ data to view, how to view it and 'when' to view it.
  * Python 2.7
  * iw 3.17
  * postgresql 9.x (tested on 9.3.5)
- * pyscopg 2.6
+ * pyscopg > 2.6
  * mgrs 1.1
  * macchanger 1.7.0
 
@@ -111,5 +111,4 @@ and editing of configuration files, some manipulation of backened storage.
      - collate.py       data collation and forwarding
      - thresh.py        Thresher process for parsing/writing frames
      - iyrid            iyri daemon
- * deprecated
-     - wraith.0.0.4.tar.gz client/version server
+ * deprecated           client/server version

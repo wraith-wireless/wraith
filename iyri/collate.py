@@ -37,25 +37,25 @@ class Collator(mp.Process):
         """
          :param comms: internal communication all data sent here
           NOTE: all messages sent on internal comms must be a tuple t where
-           t = (sender callsign,timestamp of event,type of message,event message)
+           t = (sender callsign,message timestamp,type of message,event message)
          :param conn: connection pipe to/from Iyri
          :param ab: Abad's circular buffer
          :param sb: Shama's circular buffer
          :param conf: configuration dict
         """
         mp.Process.__init__(self)
-        self._icomms = comms       # communications queue
-        self._cI = conn            # message connection to/from Iyri
-        self._conn = None          # conn to backend db
-        self._curs = None          # primary db cursors
-        self._sid = None           # our session id (from the backend)
-        self._gid = None           # the gpsd id (from the backend)
-        self._ab = ab              # abad's buffer
-        self._sb = sb              # shama's buffer
-        self._writea = False       # write abad pcap
-        self._writes = False       # write shama pcap
-        self._save = None          # save options
-        self._dbstr = {}           # db connection string
+        self._icomms = comms # communications queue
+        self._cI = conn      # message connection to/from Iyri
+        self._conn = None    # conn to backend db
+        self._curs = None    # primary db cursor
+        self._sid = None     # our session id (from the db)
+        self._gid = None     # the gpsd id
+        self._ab = ab        # abad's buffer
+        self._sb = sb        # shama's buffer
+        self._writea = False # write abad pcap?
+        self._writes = False # write shama pcap?
+        self._save = None    # save options
+        self._dbstr = {}     # db connection string
         self._setup(conf)
 
     def terminate(self): pass
@@ -68,9 +68,9 @@ class Collator(mp.Process):
 
         # function local variables
         lSta = mp.Lock()                           # sta lock
-        qT = mp.Queue()                            # queue for tasks to threshers
-        qWA = mp.Queue() if self._writea else None # queue for abad writer
-        qWS = mp.Queue() if self._writes else None # queue for shama writer
+        qT = mp.Queue()                            # thresher task queue
+        qWA = mp.Queue() if self._writea else None # abad writer queue
+        qWS = mp.Queue() if self._writes else None # shama writer queue
         ouis = parseoui(OUIPATH)                   # oui dict
         rmap = {}                                  # maps callsigns (vnic) to hwaddr
         roles = {}                                 # maps roles to callsigns (vnics)
@@ -84,10 +84,10 @@ class Collator(mp.Process):
             self._submitplatform()
         except psql.Error as e:
             # sensor submit failed, no point continuing
-            if e.pgcode == '23P01': errmsg = "Last session closed incorrectly"
-            else: errmsg = "%s: %s" % (e.pgcode,e.pgerror)
+            if e.pgcode == '23P01': err = "Last session closed incorrectly"
+            else: err = "{0}: {1}".format(e.pgcode,e.pgerror)
             self._conn.rollback()
-            self._cI.send(('err','Collator','DB',errmsg))
+            self._cI.send(('err','Collator','DB',err))
             return
         except Exception as e:
             self._conn.rollback()
@@ -97,8 +97,10 @@ class Collator(mp.Process):
         for _ in xrange(NTHRESH):
             try:
                 recv,send = mp.Pipe(False)
-                t = Thresher(self._icomms,qT,recv,lSta,(self._ab,qWA),
-                             (self._sb,qWS),self._dbstr,ouis)
+                t = Thresher(self._icomms,qT,recv,lSta,
+                             (self._ab,qWA),
+                             (self._sb,qWS),
+                             self._dbstr,ouis)
                 t.start()
                 threshers[t.pid] = {'obj':t,'conn':send}
                 send.send(('!SID!',ts2iso(time.time()),[self._sid]))
@@ -108,7 +110,7 @@ class Collator(mp.Process):
             except RuntimeError as e:
                 self._cI.send(('warn','Collator','Thresher',e))
         if not len(threshers):
-            self._cI.send(('err','Collator','Thresher',"No threshers started. Quitting..."))
+            self._cI.send(('err','Collator','Thresher',"No Threshers. Quitting..."))
 
         # execution loop
         while len(threshers):
@@ -126,66 +128,80 @@ class Collator(mp.Process):
                     # thresher process up/down message
                     if msg is not None:
                         if msg in threshers:
-                            self._cI.send(('info','Collator','Thresher',"%s initiated" % cs))
+                            rmsg = "{0} initiated".format(cs)
+                            lvl = 'info'
                         else:
-                            self._cI.send(('warn','Collator','Thresher',"%s not recognized" % cs))
+                            rmsg = "{0} not recognized".format(cs)
+                            lvl = 'warn'
+                        self._cI.send((lvl,'Collator','Thresher',rmsg))
                     else:
                         pid = int(cs.split('-')[1])
                         threshers[pid]['conn'].close()
                         del threshers[pid]
-                elif ev == '!THRESH_WARN!': self._cI.send(('warn','Collator','Thresher',msg))
+                elif ev == '!THRESH_WARN!':
+                    self._cI.send(('warn','Collator','Thresher',msg))
                 elif ev == '!THRESH_ERR!':
-                    # tell process to stop
+                    # warn collator about error then tell process to stop
                     pid = int(cs.split('-')[1])
-                    self._cI.send(('warn','Collator','Thresher',"%s->%s" % (cs,msg)))
-                    threshers[pid]['conn'].send(('!STOP!',ts2iso(time.time()),None))
+                    rmsg = "{0}->{1}".format(cs,msg)
+                    self._cI.send(('warn','Collator','Thresher',rmsg))
+                    threshers[pid]['conn'].send(('!STOP!',ts,None))
                 # events from writer(s)
                 elif ev == '!WRITE!':
                     # writer process up/down message
                     if msg is not None:
                         if msg in writers:
-                            self._cI.send(('info','Collator','Writer',"%s initiated" % cs))
+                            lvl = 'info'
+                            rmsg = "{0} initiated".format(cs)
                         else:
-                            self._cI.send(('warn','Collator','Writer',"%s not recognized" % cs))
+                            lvl = 'warn'
+                            rmsg = "{0} not recognized".format(cs)
+                        self._cI.send((lvl,'Collator','Writer',rmsg))
                     else:
-                        pid = int(cs.split('-')[1])
-                        del writers[pid]
-
                         # for now, tell thresher's to stop writing (should add
                         # capability to stop writing for only one radio)
+                        pid = int(cs.split('-')[1])
+                        del writers[pid]
                         for pid in threshers:
-                            threshers[pid]['conn'].send(('!WRITE!',ts2iso(time.time()),False))
+                            threshers[pid]['conn'].send(('!WRITE!',ts,False))
                 elif ev == '!WRITE_WARN!':
-                    pid = int(cs.split('-')[1])
-                    self._cI.send(('warn','Collator',"%s Writer" % writers[pid]['role'],msg))
+                    role = "{0} Writer".format(writers[int(cs.split('-')[1])]['role'])
+                    self._cI.send(('warn','Collator',role,msg))
                 elif ev == '!WRITE_ERR!':
                     # tell process to stop
                     pid = int(cs.split('-')[1])
-                    self._cI.send(('warn','Collator',"%s Writer" % writers[pid]['role'],msg))
+                    role = "{0} Writer".format(writers[pid]['role'])
+                    self._cI.send(('warn','Collator',role,msg))
                     writers[pid]['conn'].send(('!STOP!',ts2iso(time.time()),None))
                 elif ev == '!WRITE_OPEN!' or ev == '!WRITE_DONE!':
                     self._cI.send(('info','Collator','Writer',msg))
                 # events from gps device
                 elif ev == '!GPSD!':
-                    # updown message from gpsd (if down delete the gps id)
+                    # up/down message from gpsd
                     self._submitgpsd(ts,msg)
-                    if msg is not None:
-                        self._cI.send(('info','Collator','GPSD',"%s initiated" % cs))
-                    else:
-                        self._gid = None
-                        self._cI.send(('info','Collator','GPSD',"%s shutdown" % cs))
+                    if msg: self._cI.send(('info','Collator','GPSD','initiated'))
+                    else: self._cI.send(('info','Collator','GPSD','shutdown'))
                 elif ev == '!FLT!': self._submitflt(ts,msg)
                 # events from radio(s)
                 elif ev == '!RADIO!': #
                     # up/down message from radio(s).
                     if msg is not None:
+                        # pull out mac and role
+                        mac = msg['mac']
+                        role = msg['role']
+
                         # shouldn't happen but make sure radio doesn't initate twice
-                        if msg['role'] in roles:
-                            self._cI.send(('warn','Collator','Radio',"%s already initiated" % msg['role']))
+                        # & that role is valid i.e. abad or shama
+                        if role in roles:
+                            rmsg = "{0} already initiated".format(role)
+                            self._cI.send(('warn','Collator','Radio',rmsg))
                             continue
+                        elif role not in ['abad','shama']:
+                            rmsg = "invalid role: {0}".format(role)
+                            self._cI.send(('warn','Collator','Radio',rmsg))
 
                         # create a file writer (if saving) & update threshers
-                        if msg['role'] == 'abad' and self._writea:
+                        if role == 'abad' and self._writea:
                             try:
                                 p = PCAPWriter(self._icomms,qWA,self._sid,msg['mac'],
                                                self._ab,self._dbstr,self._save)
@@ -193,7 +209,7 @@ class Collator(mp.Process):
                                 writers[p.pid] = {'obj':p,'q':qWA,'role':'abad'}
                             except RuntimeError as e:
                                 self._cI.send(('warn','Collator',"Abad Writer",e))
-                        elif msg['role'] == 'shama' and self._writes:
+                        elif role == 'shama' and self._writes:
                             try:
                                 p = PCAPWriter(self._icomms,qWS,self._sid,msg['mac'],
                                                self._sb,self._dbstr,self._save)
@@ -204,15 +220,18 @@ class Collator(mp.Process):
 
                         # update threshers
                         for pid in threshers:
-                            threshers[pid]['conn'].send(('!RADIO!',ts,[msg['mac'],msg['role']]))
+                            threshers[pid]['conn'].send(('!RADIO!',ts,[mac,role]))
 
-                        # add to radio & role maps, submit radio & submit antenna(s)
-                        self._cI.send(('info','Collator','Radio',"%s (%s) initiated" % (cs,msg['role'])))
-                        rmap[cs] = msg['mac']
-                        roles[msg['role']] = cs
-                        self._submitradio(ts,msg['mac'],msg)
+                        # add to radio & role maps
+                        rmsg = "{0}:{1} initiated".format(role,cs)
+                        self._cI.send(('info','Collator','Radio',rmsg))
+                        rmap[cs] = mac
+                        roles[role] = cs
+
+                        # submit radio & submit antenna(s)
+                        self._submitradio(ts,mac,msg)
                         for i in xrange(msg['nA']):
-                            self._submitantenna(ts,{'mac':msg['mac'],'idx':i,
+                            self._submitantenna(ts,{'mac':mac,'idx':i,
                                                     'type':msg['type'][i],
                                                     'gain':msg['gain'][i],
                                                     'loss':msg['loss'][i],
@@ -220,7 +239,8 @@ class Collator(mp.Process):
                                                     'y':msg['y'][i],
                                                     'z':msg['z'][i]})
                     else:
-                        self._cI.send(('info','Collator','Radio',"%s shutdown" % cs))
+                        rmsg = "{0} shutdown".format(cs)
+                        self._cI.send(('info','Collator','Radio',rmsg))
                         self._submitradio(ts,rmap[cs],None)
                         del rmap[cs]
                         for role in roles:
@@ -229,14 +249,15 @@ class Collator(mp.Process):
                                 break
                 elif ev == '!FAIL!':
                     # notify Iyri, submit fail & delete cs
-                    self._cI.send(('err','Collator','Radio',"Deleting radio %s" % cs,msg))
+                    rmsg = "Deleting radio {0}: {1}".format(cs,msg)
+                    self._cI.send(('err','Collator','Radio',rmsg))
                     self._submitradioevent(ts,[rmap[cs],'fail',msg])
                     del rmap[cs]
                 elif ev == '!SCAN!':
                     # compile the scan list into a string before sending
-                    sl = ",".join(["%s:%s" % (c,w) for (c,w) in msg])
-                    self._cI.send(('info',cs,ev.replace('!',''),sl))
-                    self._submitradioevent(ts,[rmap[cs],'scan',sl])
+                    rmsg = ','.join(["{0}:{1}".format(c,w) for (c,w) in msg])
+                    self._cI.send(('info',cs,ev.replace('!',''),rmsg))
+                    self._submitradioevent(ts,[rmap[cs],'scan',rmsg])
                 elif ev == '!LISTEN!':
                     self._cI.send(('info',cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'listen',msg])
@@ -256,17 +277,21 @@ class Collator(mp.Process):
                     ix,l = msg
                     qT.put(('!FRAME!',ts,[rmap[cs],ix,l]))
                 else: # unidentified event type, notify iyri
-                    self._cI.send(('warn','Collator',cs,"unknown event %s from %s" % (ev,cs)))
+                    rmsg = "unknown event. {0}->{1}".format(ev,cs)
+                    self._cI.send(('warn','Collator',cs,rmsg))
             except Empty: continue
             except psql.OperationalError as e: # unrecoverable
-                self._cI.send(('err','Collator','DB',"%s: %s" % (e.pgcode,e.pgerror)))
+                rmsg = "{0}: {1}".format(e.pgcode,e.pgerror)
+                self._cI.send(('err','Collator','DB',rmsg))
             except psql.Error as e: # possible incorrect semantics/syntax
                 self._conn.rollback()
-                self._cI.send(('warn','Collator','SQL',"%s: %s" % (e.pgcode,e.pgerror)))
+                rmsg = "{0}: {1}".format(e.pgcode,e.pgerror)
+                self._cI.send(('warn','Collator','SQL',rmsg))
             except IndexError: # something wrong with antenna indexing
                 self._cI.send(('err','Collator',"Radio","misconfigured antennas"))
             except KeyError as e: # (most likely) a radio sent a message without initiating
-                self._cI.send(('err','Collator',"Key %s" % e,"in event (%s)" % ev))
+                rmsg = "Bad key {0} in event {1}".format(e,ev)
+                self._cI.send(('err','Collator','Key',rmsg))
             except Exception as e: # handle catchall error
                 self._cI.send(('warn','Collator',type(e).__name__,e))
 
@@ -286,15 +311,16 @@ class Collator(mp.Process):
             # effect of joining
             for pid in threshers:
                 try:
-                    threshers[pid]['conn'].send(('!STOP!',ts2iso(time.time()),None))
-                except EOFError: pass
+                    threshers[pid]['conn'].send(('!STOP!',ts,None))
+                except:
+                    pass
                 finally:
                     threshers[pid]['conn'].close()
 
             for pid in writers:
                 try:
                     writers[pid]['q'].put(('!STOP!',ts2iso(time.time()),None))
-                except Exception as e:
+                except:
                     pass
 
             # wait for children & join processes
@@ -306,14 +332,14 @@ class Collator(mp.Process):
         except EOFError: pass
         except Exception as e:
             if self._cI:
-                self._cI.send(('warn','Collator','shutdown',"Failed to clean up: %s" % e))
+                rmsg = "Failed to clean up: {0}".format(e)
+                self._cI.send(('warn','Collator','shutdown',rmsg))
 
 #### private helper functions
 
     def _setup(self,conf):
         """
          connect to db w/ params in store & pass sensor up event
-
          :param conf: configuration details
         """
         try:
@@ -341,13 +367,12 @@ class Collator(mp.Process):
             else:
                 raise RuntimeError('Collator:PostgreSQL:DB error: %s' % e)
         except Exception as e:
-            raise RuntimeError("Collator:Unknown:%s" % e)
+            raise RuntimeError("Collator:Unknown:{0}".format(e))
 
     #### DB functionality ####
     def _submitsensor(self,ts,state):
         """
          submit sensor at ts having state
-
          :param ts: timestamp of event
          :param state: state of event
         """
@@ -379,9 +404,9 @@ class Collator(mp.Process):
             rd = None
         kernel = platform.release()
         arch = platform.machine()
-        pyvers = "%d.%d.%d" % (sys.version_info.major,
-                               sys.version_info.minor,
-                               sys.version_info.micro)
+        pyvers = "{0}.{1}.{2}".format(sys.version_info.major,
+                                      sys.version_info.minor,
+                                      sys.version_info.micro)
         bits,link = platform.architecture()
         compiler = platform.python_compiler()
         libcvers = " ".join(platform.libc_ver())
@@ -400,7 +425,6 @@ class Collator(mp.Process):
     def _submitgpsd(self,ts,g):
         """
          submit gps device at gs
-
          :param ts: timestamp of event
          :param g: gps device details
         """
@@ -430,12 +454,12 @@ class Collator(mp.Process):
                    where sid = %s and gid = %s;
                   """
             self._curs.execute(sql,(ts,self._sid,self._gid))
+            self._gid = None
         self._conn.commit()
 
     def _submitflt(self,ts,flt):
         """
          submit the flt at ts
-
          :param ts: timestamp of frontline trace
          :param flt: frontline trace dict
         """
@@ -452,7 +476,6 @@ class Collator(mp.Process):
     def _submitradio(self,ts,mac,r):
         """
          submit radio
-
          :param ts: timestamp of radio event
          :param mac: mac hw address
          :param r: radio details
@@ -462,7 +485,8 @@ class Collator(mp.Process):
             self._curs.execute("select * from radio where mac=%s;",(mac,))
             if not self._curs.fetchone():
                 sql = """
-                       insert into radio (mac,driver,chipset,channels,standards,description)
+                       insert into radio (mac,driver,chipset,channels,
+                                          standards,description)
                        values (%s,%s,%s,%s,%s,%s);
                       """
                 self._curs.execute(sql,(mac,r['driver'][0:20],r['chipset'][0:20],
@@ -494,7 +518,6 @@ class Collator(mp.Process):
     def _submitantenna(self,ts,a):
         """
          submit antenna
-
          :param ts: timestamp of antenna submit
          :param a: antenna details
         """
@@ -509,7 +532,6 @@ class Collator(mp.Process):
     def _submitradioevent(self,ts,m):
         """
          submit radioevent at ts
-
          :param ts: timestamp of radio event
          :param m: event details
         """
