@@ -25,6 +25,7 @@ class GPSController(mp.Process):
     """ periodically checks gps for current location """
     def __init__(self,comms,conn,conf):
         """
+         connects to gps (if dynamic)
          :param comms: internal communication for data to Collator
          :param conn: connection pipe to/from Iyri
          :param conf: gps configuration s dict
@@ -74,6 +75,7 @@ class GPSController(mp.Process):
                 try:
                     if rpt['epx'] > self._qpx or rpt['epy'] > self._qpy: continue
                     else:
+                        ts = ts2iso(time.time())
                         flt = {'id':self._dd['id'],
                                'fix':rpt['mode'],
                                'coord':self._m.toMGRS(rpt['lat'],rpt['lon']),
@@ -85,8 +87,7 @@ class GPSController(mp.Process):
                                'dop':{'xdop':'%.3f' % self._gpsd.xdop,
                                       'ydop':'%.3f' % self._gpsd.ydop,
                                       'pdop':'%.3f' % self._gpsd.pdop}}
-                        self._icomms.put((self._dd['id'],ts2iso(time.time()),
-                                          '!FLT!',flt))
+                        self._icomms.put((self._dd['id'],ts,'!FLT!',flt))
                         break
                 except (KeyError,AttributeError):
                     # a KeyError means not all values are present, an
@@ -129,7 +130,6 @@ class GPSController(mp.Process):
     def _setup(self,conf):
         """
          attempt to connect to device if fixed is off
-
          :param conf: gps configuration
         """
         # if dynamic, attempt connect to device otherwise configure static flt
