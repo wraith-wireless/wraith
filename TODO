@@ -46,6 +46,9 @@ Iyri:
     send(obj)
     IOError: [Errno 32] Broken pipe
     what process is this comming from?
+ 59) remove writer/write to file and add write frames to db as bytea
+ 60) replace string tokens i.e. !THRESH_WARN! with defined constants
+ 61) document differnt comm protocols
 Wifi:
  1) Should we add support for AVS, Prism headers ?
  2) radiotap: ensure data pad is handled for atheros cards (any others?)

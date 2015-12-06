@@ -126,7 +126,7 @@ class WraithConfigPanel(gui.ConfigPanel):
         """ validate entries """
         host = self._entHost.get()
         if re.match(IPADDR,host) is None and host != 'localhost':
-            self.err("Invalid Input","Host %s is not valid" % host)
+            self.err("Invalid Input","Host {0} is not valid".format(host))
             return False
         port = self._entPort.get()
         try:
@@ -163,9 +163,10 @@ class WraithConfigPanel(gui.ConfigPanel):
             fout = open(wraith.WRAITHCONF,'w')
             cp.write(fout)
         except IOError as e:
-            self.err("File Error","Error <%s> writing to config file" % e)
+            self.err("File Error","Error <{0}> writing to config file".format(e))
         except ConfigParser.Error as e:
-            self.err("Configuration Error","Error <%s> writing to config file" % e)
+            self.err("Configuration Error",
+                     "Error <{0}> writing config file".format(e))
         else:
             self.info('Success',"Restart for changes to take effect")
         finally:
@@ -220,7 +221,8 @@ class ConvertPanel(gui.SimplePanel):
             if m:
                 try:
                     ll = self._mgrs.toLatLon(m)
-                    self._entLatLon.insert(0,"%.3f %.3f" % (ll[0],ll[1]))
+                    "{0:.3} {1:.3}".format(ll[0],ll[1])
+                    self._entLatLon.insert(0,"{0:.3} {1:.3}".format(ll[0],ll[1]))
                 except:
                     self.err('Error',"MGRS is not valid")
             elif ll:
@@ -240,24 +242,24 @@ class ConvertPanel(gui.SimplePanel):
             try:
                 w = math.pow(10,(float(d)/10.0))
                 m = 100 * float(d)
-                self._entmW.insert(0,'%.3f' % w)
-                self._entmBm.insert(0,'%.3f' % m)
+                self._entmW.insert(0,'{0.3}'.format(w))
+                self._entmBm.insert(0,'{0.3}'.format(m))
             except:
                 self.err('Error',"dBm is not valid")
         elif w and not (m or d):
             try:
                 d = 10*math.log10(float(w))
                 m = 100 * d
-                self._entdBm.insert(0,'%.3f' % d)
-                self._entmBm.insert(0,'%.3f' % m)
+                self._entdBm.insert(0,'{0.3}'.format(d))
+                self._entmBm.insert(0,'{0.3}'.format(m))
             except:
                 self.err('Error',"dBm is not valid")
         elif m and not (d or m):
             try:
                 d = float(m) / 100
                 w = math.pow(10,(float(d)/10.0))
-                self._entdBm.insert(0,'%.3f' % d)
-                self._entmW.insert(0,'%.3f' % w)
+                self._entdBm.insert(0,'{0.3}'.format(d))
+                self._entmW.insert(0,'{0.3}'.format(w))
             except:
                 self.err('Error',"mBm is not valid")
         else: self.err('Error',"Two fields must be empty")
@@ -349,7 +351,8 @@ class CalculatePanel(gui.SimplePanel):
         i = 0
         for input in inputs:
             for c in xrange(len(input)):
-                ttk.Label(frmEnt,text=" %s: " % input[c][0]).grid(row=r,column=c*2,sticky='w')
+                txt = " {0}: ".format(input[c][0])
+                ttk.Label(frmEnt,text=txt).grid(row=r,column=c*2,sticky='w')
                 self._entries.append(ttk.Entry(frmEnt,width=input[c][1]))
                 self._entries[i].grid(row=r,column=c*2+1,sticky='w')
                 i += 1
@@ -374,16 +377,19 @@ class CalculatePanel(gui.SimplePanel):
         # TODO use enumerate here
         for i in xrange(len(self._entries)):
             if self._entries[i].get():
-                formula = formula.replace('$%d' % i,"%s('%s')" % (self._inputs[i][2],self._entries[i].get()))
+                formula = formula.replace('${0}'.format(i),
+                                          "{0}('{1}')".format((self._inputs[i][2],
+                                                               self._entries[i].get()))
             else:
                 self.err('Error',"All entries must be filled in")
                 return
 
         # attempt to calculate
         try:
-            self._ans.set("%s %s" % (str(eval(formula)),self._meas))
+            self._ans.set("{0} {1}".format(str(eval(formula)),self._meas))
         except ValueError as e:
-            self.err("Invalid Input","%s is not a valid input" % e.message.split(':')[1].strip())
+            err = "{0} is not a valid input".format(e.message.split(':')[1].strip())
+            self.err("Invalid Input",err)
         except Exception as e:
             self.err('Error',e)
 
@@ -493,10 +499,11 @@ class DatabinPanel(gui.SimplePanel):
             self.warn("Disconnected","Connect and try again")
             return
 
-        panel = self.getpanels('query%s' % b,False)
+        panel = self.getpanels('query{0}'.format(b),False)
         if not panel:
             t = tk.Toplevel()
-            pnl = QueryPanel(t,self,"Query [bin %s]" % b,b,self._chief.connectstring)
+            pnl = QueryPanel(t,self,"Query [bin {0}]".format(b),b,
+                             self._chief.connectstring)
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -814,15 +821,21 @@ class QueryPanel(gui.SlavePanel):
         self._trTypes.insert('','end',iid='MGMT',values=('MGMT',))
         for mgmt in mpdu.ST_MGMT_TYPES:
             if mgmt == 'rsrv': continue
-            self._trTypes.insert('MGMT','end',iid="%s.%s" % ('MGMT',mgmt),values=(mgmt,))
+            self._trTypes.insert('MGMT','end',
+                                 iid="{0}.{1}".format('MGMT',mgmt),
+                                 values=(mgmt,))
         self._trTypes.insert('','end',iid='CTRL',values=('CTRL',))
         for ctrl in mpdu.ST_CTRL_TYPES:
             if ctrl == 'rsrv': continue
-            self._trTypes.insert('CTRL','end',iid="%s.%s" % ('CTRL',ctrl),values=(ctrl,))
+            self._trTypes.insert('CTRL','end',
+                                 iid="{0}.{1}".format('CTRL',ctrl),
+                                 values=(ctrl,))
         self._trTypes.insert('','end',iid='DATA',values=('DATA',))
         for data in mpdu.ST_DATA_TYPES:
             if data == 'rsrv': continue
-            self._trTypes.insert('DATA','end',iid="%s.%s" % ('DATA',data),values=(data,))
+            self._trTypes.insert('DATA','end',
+                                 iid="{0}.{1}".format('DATA',data),
+                                 values=(data,))
         frmR = ttk.Frame(frmT)
         frmR.grid(row=0,column=1,sticky='nswe')
         frmRFC = ttk.LabelFrame(frmR,text="Frame Control Frames")
@@ -855,7 +868,9 @@ class QueryPanel(gui.SlavePanel):
         # TODO should we use enumerate here
         for i in xrange(4):
             self._vlimitto.append(tk.IntVar())
-            chk = ttk.Checkbutton(frmRAL,text="ADDR %d" % (i+1),variable=self._vlimitto[i])
+            chk = ttk.Checkbutton(frmRAL,
+                                  text="ADDR {0}".format((i+1)),
+                                  variable=self._vlimitto[i])
             chk.grid(row=0,column=i,sticky='nwse')
         nb.add(frmT,text='Traffic')
 
@@ -1016,21 +1031,22 @@ class QueryPanel(gui.SlavePanel):
             # allow all in host, nic, driver
             mac = self._entSensorMac.get().upper()
             if mac and re.match(MACADDR,mac) is None:
-                self.err("Invalid Input","MAC addr %s is not valid" % mac)
+                self.err("Invalid Input","MAC addr {0} is not valid".format(mac))
                 return False
             mac = self._entSensorSpoof.get().upper()
             if mac and re.match(MACADDR,mac) is None:
-                self.err("Invalid Input","Spoof addr %s is not valid" % mac)
+                self.err("Invalid Input","Spoof addr {0} is not valid".format(mac))
                 return False
             stds = self._entSensorStd.get().split(',')
             if stds and stds != ['']:
                 for std in stds:
                     if not std in ['a','b','g','n','ac']:
-                        self.err("Invalid Input","Invalid standard specifier %s" % std)
+                        self.err("Invalid Input",
+                                 "Invalid standard specifier {0}".format(std))
                         return False
             cp = self._entCenterPT.get()
             if cp and not landnav.validMGRS(cp):
-                self.err("Invalid Input","Center point is not a valid MGRS location")
+                self.err("Invalid Input","Center point is not valid MGRS")
                 return False
 
         # # only validate signal entries if 'enabled'
@@ -1039,7 +1055,8 @@ class QueryPanel(gui.SlavePanel):
             if stds and stds != ['']:
                 for std in stds:
                     if not std in ['a','b','g','n','ac']:
-                        self.err("Invalid Input","Invalid standard specifier %s" % std)
+                        self.err("Invalid Input",
+                                 "Invalid standard specifier {0}".format(std))
                         return False
             rs = self._entSignalRate.get().split(',')
             if rs and rs != ['']:
@@ -1068,7 +1085,7 @@ class QueryPanel(gui.SlavePanel):
         if self._vfilteron[2]:
             mac = self._entHWAddr.get().upper()
             if mac and re.match(MACADDR,mac) is None:
-                self.err("Invalid Input","HW Addr %s is not valid" % mac)
+                self.err("Invalid Input","HW Addr {0} is not valid".format(mac))
                 return False
             # check file path and file
             fin = None
@@ -1079,10 +1096,12 @@ class QueryPanel(gui.SlavePanel):
                 ss = fin.read().split(',')
                 for s in ss:
                     if re.match(MACADDR,s.strip()) is None:
-                        self.err("Invalid Input","Selector file %s has invalid data %s" % (fpath,s))
+                        self.err("Invalid Input",
+                                 "File {0} has invalid data {1}".format(fpath,s))
                         return False
             except IOError:
-                self.err("Invalid Input","Select file %s does not exist" % fpath)
+                self.err("Invalid Input",
+                         "Select file {0} does not exist".format(fpath))
                 return False
             else:
                 if fin: fin.close()
@@ -1153,7 +1172,7 @@ class SessionsPanel(gui.DBPollingTabularPanel):
             self._curs.execute(sql)
         except psql.Error as e:
             self._conn.rollback()
-            self.logwrite("Sessions failed: %s" % e,gui.LOG_NOERR)
+            self.logwrite("Sessions failed: {0}".format(e),gui.LOG_NOERR)
             return
 
         # TODO: could this get extremely large?
@@ -1229,21 +1248,23 @@ class SessionsPanel(gui.DBPollingTabularPanel):
             for sid in sids:
                 # ensure session is not active
                 if self._tree.set(sid,'Stop') == '':
-                    self.logwrite("Cannot delete active session %s" % sid,gui.LOG_WARN)
+                    self.logwrite("Cannot delete active session {0}".format(sid),
+                                  gui.LOG_WARN)
                     continue
                 try:
                     self._curs.execute(sql,(int(sid),))
                     self._tree.delete(sid)
                     i += 1
                 except psql.Error as e:
-                    self.logwrite("Failed to delete session %s: %s" % (sid,e),gui.LOG_ERR)
+                    self.logwrite("Failed to delete session {0}: {1}".format(sid,e),
+                                  gui.LOG_ERR)
                     self._conn.rollback()
                 else:
                     self._conn.commit()
         except: pass
         finally:
             self._l.release()
-        self.logwrite("Deleted %d sessions" % i,gui.LOG_NOTE)
+        self.logwrite("Deleted {0} sessions".format(i),gui.LOG_NOTE)
 
     def _connect(self,connect):
         """ get and return a connection object """
@@ -1401,7 +1422,7 @@ class NidusConfigPanel(gui.ConfigPanel):
         # storage server
         host = self._entHost.get()
         if re.match(IPADDR,host) is None and host != 'localhost':
-            self.err("Invalid Input","Host %s is not valid" % host)
+            self.err("Invalid Input","Host {0} is not valid".format(host))
             return False
         port = self._entPort.get()
         try:
@@ -1427,7 +1448,8 @@ class NidusConfigPanel(gui.ConfigPanel):
             if not os.path.isabs(pPCAP):
                 pPCAP = os.path.abspath(os.path.join('nidus',pPCAP))
             if not os.path.exists(pPCAP):
-                self.err("Invalid Input","PCAP directory %s does not exist" % pPCAP)
+                self.err("Invalid Input",
+                         "PCAP directory {0} does not exist".format(pPCAP))
                 return False
             try:
                 if int(self._entMaxSz.get()) < 1:
@@ -1460,7 +1482,8 @@ class NidusConfigPanel(gui.ConfigPanel):
             self.err("Invalid Input","Number of extract threads must be an integer")
             return False
         if not os.path.isfile(self._entOUIPath.get()):
-            self.err("Invalid Input","OUI file %s is not valid" % self._entOUIPath.get())
+            self.err("Invalid Input",
+                     "OUI file {0} is invalid".format(self._entOUIPath.get()))
             return False
         return True
 
@@ -1482,9 +1505,10 @@ class NidusConfigPanel(gui.ConfigPanel):
             fout = open(wraith.NIDUSCONF,'w')
             cp.write(fout)
         except IOError as e:
-            self.err("File Error","Error <%s> writing to config file" % e)
+            self.err("File Error","Error <{0}> writing to config file".format(e))
         except ConfigParser.Error as e:
-            self.err("Configuration Error","Error <%s> writing to config file" % e)
+            self.err("Configuration Error",
+                     "Error <{0}> writing to config file".format(e))
         else:
             self.info('Success',"Changes will take effect on next start")
         finally:
@@ -2087,9 +2111,11 @@ class IyriConfigPanel(gui.ConfigPanel):
             fout = open(wraith.IYRICONF,'w')
             cp.write(fout)
         except IOError as e:
-            self.err("File Error","Error <%s> writing to config file" % e)
+            self.err("File Error",
+                     "Error <{0}> writing to config file".format(e))
         except ConfigParser.Error as e:
-            self.err("Configuration Error","Error <%s> writing to config file" % e)
+            self.err("Configuration Error",
+                     "Error <{0}> writing to config file".format(e))
         else:
             self.info('Success',"Restart for changes to take effect")
         finally:
@@ -2129,12 +2155,13 @@ class AboutPanel(gui.SimplePanel):
     def _body(self):
         self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/splash.png"))
         ttk.Label(self,image=self.logo).grid(row=0,column=0,sticky='n')
-        ttk.Label(self,text="wraith-rt %s" % wraith.__version__,
+        ttk.Label(self,text="wraith-rt {0}".format(wraith.__version__),
                   font=("Roman",16,'bold')).grid(row=1,column=0,sticky='n')
         ttk.Label(self,justify=tk.CENTER,
                   text="Wireless Reconnaissance And\nIntelligent Target Harvesting",
                   font=("Roman",8,'bold')).grid(row=2,column=0,sticky='n')
-        ttk.Label(self,text="Copyright %s %s %s" % (COPY,
-                                                    wraith.__date__.split(' ')[1],
-                                                    wraith.__email__),
+        ttk.Label(self,
+                  text="Copyright {0} {1} {2}".format(COPY,
+                                                      wraith.__date__.split(' ')[1],
+                                                      wraith.__email__),
                   font=('Roman',8,'bold')).grid(row=3,column=0,sticky='n')

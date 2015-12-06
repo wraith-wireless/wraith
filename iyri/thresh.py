@@ -77,7 +77,7 @@ class PCAPWriter(mp.Process):
     def terminate(self): pass
 
     @property
-    def cs(self): return 'writer-%d' % self.pid
+    def cs(self): return 'writer-{0}'.format(self.pid)
 
     def run(self):
         """ execution loop """
@@ -102,13 +102,13 @@ class PCAPWriter(mp.Process):
                     self._pkts.append((ts,fid,f))
                     if len(self._pkts) > NWRITE: self._writepkts()
                 else:
-                    msg = "invalid token %s" % tkn
+                    msg = "invalid token {0}".format(tkn)
                     self._icomms.put((self.cs,ts1,'!WRITE_ERR!',msg))
             except Empty: pass
             except (IndexError,ValueError):
                 self._icomms.put((self.cs,ts1,'!WRITE_ERR!',"Invalid arguments"))
             except Exception as e:
-                msg = "%s: %s" % (type(e).__name__,e)
+                msg = "{0}: {1}".format(type(e).__name__,e)
                 self._icomms.put((self.cs,ts1,'!WRITE_ERR!',msg))
 
         # are there unwritten packets?
@@ -124,18 +124,20 @@ class PCAPWriter(mp.Process):
     def _writepkts(self):
         """ write all packets to file """
         # get a timestamp & cs
-        cs = 'writer-%d' % self.pid
+        cs = self.cs
         ts = ts2iso(time.time())
 
         # wrap everything in a try block & reset all when done
         try:
             # open a new file sid_timestamp_hwaddr.pcap
             if not self._fout:
-                fname = os.path.join(self._path,"%d_%s_%s.pcap" % (self._sid,
-                                                                   self._pkts[0][0],
-                                                                   self._mac))
-                self._fout = pcap.pcapopen(fname)
-                self._icomms.put((cs,ts,'!WRITE_OPEN!',"%s opened for writing" % fname))
+                fname = "{0}_{1}_{2}.pcap".format(self._sid,
+                                                  self._pkts[0][0],
+                                                  self._mac)
+                fpath = os.path.join(self._path,fname)
+                self._fout = pcap.pcapopen(fpath)
+                msg = "{0} opened for writing".format(fpath)
+                self._icomms.put((cs,ts,'!WRITE_OPEN!',msg))
 
             # write each packet, then reset the packet list
             for i,pkt in enumerate(self._pkts):
@@ -152,14 +154,17 @@ class PCAPWriter(mp.Process):
                 self._fout = None
                 self._npkt = 1
         except psql.OperationalError as e: # unrecoverable
-            self._icomms.put((cs,ts,'!THRESH_ERR!',"DB: %s->%s" % (e.pgcode,e.pgerror)))
+            msg = "DB: {0}->{1}".format(e.pgcode,e.pgerror)
+            self._icomms.put((cs,ts,'!THRESH_ERR!',msg))
         except pcap.PCAPException as e:
-            self._icomms.put((cs,ts,'!THRESH_ERR!',"File Error: %s" % e))
+            self._icomms.put((cs,ts,'!THRESH_ERR!',"File Error: {0}".format(e)))
         except psql.Error as e: # possible incorrect semantics/syntax
             self._conn.rollback()
-            self._icomms.put((cs,ts,'!THRESH_WARN!',"SQL: %s->%s" % (e.pgcode,e.pgerror)))
+            msg = "SQL: {0}->{1}".format(e.pgcode,e.pgerror)
+            self._icomms.put((cs,ts,'!THRESH_WARN!',msg))
         except Exception as e:
-            self._icomms.put((cs,ts,'!THRESH_WARN!',"%s: %s" % (type(e).__name__,e)))
+            msg = "{0}: {1}".format(type(e).__name__,e)
+            self._icomms.put((cs,ts,'!THRESH_WARN!',msg))
         else:
             self._conn.commit()
 
@@ -192,7 +197,6 @@ class PCAPWriter(mp.Process):
             if self._conn: self._conn.close()
             raise RuntimeError(e)
 
-class ButtFuckError(Exception): pass
 def extractie(dM):
     """
      extracts info-elements for ssid, supported rates, extended rates & vendors
@@ -203,7 +207,6 @@ def extractie(dM):
     ss = []
     es = []
     vs = []
-    if not dM.info_els: raise ButtFuckError
     for ie in dM.info_els:
         if ie[0] == mpdu.EID_SSID: ssids.append(ie[1])
         if ie[0] == mpdu.EID_SUPPORTED_RATES: ss = ie[1]
@@ -256,7 +259,7 @@ class Thresher(mp.Process):
     def terminate(self): pass
 
     @property
-    def cs(self): return 'thresher-%d' % self.pid
+    def cs(self): return 'thresher-{0}'.format(self.pid)
 
     def run(self):
         """ execute frame process loop """
@@ -299,7 +302,7 @@ class Thresher(mp.Process):
                             rdos[d[0]]['buffer'] = self._shama[0]
                             rdos[d[0]]['writer'] = self._shama[1]
                         else:
-                            msg = "Invalid role for radio: %s" % d[1]
+                            msg = "Invalid role for radio: {0}".format(d[1])
                             self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
                     elif tkn == '!WRITE!':
                         if d[0]: self._write = True
@@ -307,22 +310,17 @@ class Thresher(mp.Process):
                     elif tkn == '!FRAME!':
                         self._processframe(sid,rdos,ts,ts1,d)
                     else:
-                        msg = "invalid token %s" % tkn
+                        msg = "invalid token {0}".format(tkn)
                         self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
-                except (IndexError,ValueError) as e:
+                except (IndexError,ValueError,KeyError) as e:
                     _,_,etrace = sys.exc_info()
-                    msg = "%s %s\n%s" % (type(e).__name__,e,
-                                         repr(traceback.format_tb(etrace)))
-                    self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
-                except KeyError as e:
-                    _,_,etrace = sys.exc_info()
-                    msg = "%s %s\n%s" % (type(e).__name__,e,
-                                         repr(traceback.format_tb(etrace)))
+                    msg = "{0} {1}\n{2}".format(type(e).__name__,e,
+                                                repr(traceback.format_tb(etrace)))
                     self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
                 except Exception as e:
                     _,_,etrace = sys.exc_info()
-                    msg = "%s %s\n%s" % (type(e).__name__,e,
-                                         repr(traceback.format_tb(etrace)))
+                    msg = "{0} {1}\n{2}".format(type(e).__name__,e,
+                                                repr(traceback.format_tb(etrace)))
                     self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
 
         # notify collector we're down
@@ -386,8 +384,8 @@ class Thresher(mp.Process):
                   int('a-mpdu' in dR['present']),rtap.flags_get(dR['flags'],'fcs'))
         except Exception as e: # blanket error
             _,_,etrace = sys.exc_info()
-            msg = "Parsing Error. %s %s\n%s" % (type(e).__name__,e,
-                                                repr(traceback.format_tb(etrace)))
+            msg = "Parsing Error. {0} {1}\n{2}".format(type(e).__name__,e,
+                                                       repr(traceback.format_tb(etrace)))
             self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
             return
         else:
@@ -477,29 +475,35 @@ class Thresher(mp.Process):
             self._next = 'mgmt'
             if dM.type == mpdu.FT_MGMT: self._processmgmt(fid,sid,ts,addrs,dM)
         except psql.OperationalError as e: # unrecoverable
-            if not fid:
-                msg = "Failed to insert frame: %s: %s. %s" % (e.pgcode,e.pgerror,f)
+            if fid:
+                msg = "Frame {0} insert failed at {1}. {2}: {3}.".format(fid,
+                                                                         self._next,
+                                                                         e.pgcode,
+                                                                         e.pgerror)
             else:
-                msg = "Frame %d insert failed at %s:. %s: %s. %s" % (fid,self._next,e.pgcode,e.pgerror,f)
+                msg = "Failed to insert frame. {0}: {1}.".format(e.pgcode,e.pgerror)
             self._icomms.put((self.cs,ts1,'!THRESH_ERR!',msg))
         except psql.Error as e:
             self._conn.rollback()
-            if not fid:
-                msg = "<PSQL> Failed to insert frame: %s: %s. %s" % (e.pgcode,e.pgerror,f)
+            if fid:
+                msg = "<PSQL> Frame {0} failed at {1}. {2}: {3}.".format(fid,
+                                                                         self._next,
+                                                                         e.pgcode,
+                                                                         e.pgerror)
             else:
-                msg = "<PSQL> Frame %d failed at %s. %s: %s. %s" % (fid,self._next,e.pgcode,e.pgerror,f)
+                msg = "<PSQL> Failed to insert frame. {0}: {1}.".format(e.pgcode,
+                                                                        e.pgerror)
             self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
-            fout = pcap.pcapopen('badbeacon_%d_%d.pcap' % (sid,fid))
-            pcap.pktwrite(fout,ts,f)
-            fout.close()
         except Exception as e:
             _,_,etrace = sys.exc_info()
             self._conn.rollback()
-            if not fid:
-                msg = "%s %s\n%s" % (type(e).__name__,e,repr(traceback.format_tb(etrace)))
+            if fid:
+                msg = "{0} {1} in frame {2}\n{3}".format(type(e).__name__,
+                                                         e,fid,
+                                                         repr(traceback.format_tb(etrace)))
             else:
-                msg = "%s %s in frame %d\n%s" % (type(e).__name__,e,fid,repr(traceback.format_tb(etrace)))
-            #    msg = "<UNK> Frame %d failed at %s. %s: %s. %s" % (fid,self._next,type(e).__name__,e,f)
+                msg = "{0} {1}\n{2}".format(type(e).__name__,e,
+                                            repr(traceback.format_tb(etrace)))
             self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
 
     #### All below _insert functions will allow db exceptions to pass through to caller

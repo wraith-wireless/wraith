@@ -62,14 +62,14 @@ def fetch():
     ouipath = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            os.path.abspath('../'+OUI))
     if not os.path.isdir(os.path.dirname(ouipath)):
-        print 'Path to data is incorrect %s' % ouipath
+        print "Path to data is incorrect {0}".format(ouipath)
         sys.exit(1)
 
     # fetch oui file from ieee
     fout = None
     pattern = r'^([-|\w]*)   \(hex\)\t\t(.*)\r'
     req = urllib2.Request(ouiurl)
-    req.add_header('User-Agent',"wraith-rt/%s +https://github.com/wraith-wireless/wraith/" % v)
+    req.add_header('User-Agent',"wraith-rt +https://github.com/wraith-wireless/wraith/")
     try:
         # retrieve the oui file and parse out generated date
         print 'Fetching ', ouiurl
@@ -94,16 +94,16 @@ def fetch():
                     manuf = "IEEE REGISTRATION AUTHORITY"
 
                 # write to file & update count
-                fout.write('%s\t%s\n' % (oui,manuf))
+                fout.write('{0}\t{1}\n'.format(oui,manuf))
                 cnt += 1
         t1 = time.time()
-        print "Wrote %d OUIs in %.3f secs" % (cnt,t1-t)
+        print "Wrote {0} OUIs in {1:.3} secs".format(cnt,t1-t)
     except urllib2.URLError as e:
-        print "Error fetching oui file: %s" % e
+        print "Error fetching oui file: {0}".format(e)
     except IOError as e:
-        print "Error opening output file :%s" % e
-    #except Exception as e:
-    #    print "Error parsing oui file: %s" % e
+        print "Error opening output file {0}".format(e)
+    except Exception as e:
+        print "Error parsing oui file: {0}".format(e)
     finally:
         if fout: fout.close()
 

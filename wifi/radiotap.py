@@ -105,7 +105,7 @@ def length(f):
         (v,l) = struct.unpack(_LEN_,f[:_LEN_SZ_])
     except struct.error:
         raise RadiotapException("invalid frame")
-    if v: raise RadiotapException("invalid vers. %d" % v)
+    if v: raise RadiotapException("invalid vers. {0}".format(v))
     return l
 
 def pflags(f):
@@ -120,7 +120,7 @@ def pflags(f):
         (v,l,p) = struct.unpack(_HDR_,f[:_HDR_SZ_])
     except struct.error:
         raise RadiotapException("frame")
-    if v: raise RadiotapException("invalid vers. %d" % v)
+    if v: raise RadiotapException("invalid vers. {0}".format(v))
     return p
           
 #--> IT_PRESENT FLAGS <-- (see description of each present flag)
@@ -220,7 +220,7 @@ def present_get(mn,f):
     try:
         return bitmask_get(_PRESENT_,mn,f)
     except KeyError:
-        raise RadiotapException("Invalid present flag '%s'" % f)
+        raise RadiotapException("Invalid present flag {0}".format(f))
 
 # --> Flags <-- http://www.radiotap.org/defined-fields/Flags
 # cfp Sent/Received during CFP
@@ -239,7 +239,7 @@ def flags_get(mn,f):
     try:
         return bitmask_get(_FLAGS_,mn,f)
     except KeyError:
-        raise RadiotapException("invalid flag '%s'" % f)
+        raise RadiotapException("invalid flag {0}".format(f))
         
 # --> CHANNEL FLAGS <-- http://www.radiotap.org/defined-fields/Channel
 # turbo Turbo Channel
@@ -258,7 +258,7 @@ def chflags_get(mn,f):
     try:
         return bitmask_get(_CHANNEL_FLAGS_,mn,f)
     except KeyError:
-        raise RadiotapException("invalid channel flag '%s'" % f)
+        raise RadiotapException("invalid channel flag {0}".format(f))
 
 # --> RX Flags <-- http://www.radiotap.org/defined-fields/RX%20flags
 # crc PLCP CRC check failed
@@ -269,7 +269,7 @@ def rxflags_get(mn,f):
     try:
         return bitmask_get(_RX_FLAGS_,mn,f)
     except KeyError:
-        raise RadiotapException("invalid RX flag '%s'" % f) 
+        raise RadiotapException("invalid RX flag {0}".format(f))
 
 # --> MCS Known <-- http://www.radiotap.org/defined-fields/MCS
 # bw Bandwidth
@@ -288,7 +288,7 @@ def mcsknown_get(mn,f):
     try:
         return bitmask_get(_MCS_KNOWN_,mn,f)
     except KeyError:
-        raise RadiotapException("invalid MCS Known field '%s'" % f)
+        raise RadiotapException("invalid MCS Known field {0}".format(f))
 
 # --> MCS Flags <-- http://www.radiotap.org/defined-fields/MCS
 # bw Bandwidth (0: 20, 1: 40, 2: 20L, 3: 20U) ?
@@ -331,7 +331,7 @@ def ampduflags_get(mn,f):
     try:
         return bitmask_get(_AMPDU_FLAGS_,mn,f)
     except KeyError:
-        raise RadiotapException("invalid A-MPDU flag '%s'" % f)
+        raise RadiotapException("invalid A-MPDU flag {0}".format(f))
         
 # --> VHT Known <-- http://www.radiotap.org/defined-fields/VHT
 # stbc STBC known
@@ -351,7 +351,7 @@ def vhtknown_get(mn,f):
     try:
         return bitmask_get(_VHT_KNOWN_,mn,f)
     except KeyError:
-        raise RadiotapException("invalid VHT Known field '%s'" % f)
+        raise RadiotapException("invalid VHT Known field {0}".format(f))
 
 # --> VHT Flags <-- http://www.radiotap.org/defined-fields/VHT
 # stbc Space-Time Block Coding (Set to 0 if no spatial streams of any user has STBC.
@@ -386,4 +386,4 @@ def vhtcoding_get(mn,f):
     try:
         return bitmask_get(_VHT_CODING_,mn,f)
     except KeyError:
-        raise RadiotapException("invalid VHT Coding flag '%s'" % f)
+        raise RadiotapException("invalid VHT Coding flag {0}".format(f))

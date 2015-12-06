@@ -329,12 +329,15 @@ class Iryi(object):
                         if cid is None: continue
                         for rdo in rdos:
                             logging.info("Client sent %s w/ id %d to %s",cmd,cid,rdo)
-                            self._pConns[rdo].send('%s:%d:%s' % (cmd,cid,'-'.join(ps)))
+                            rmsg = '{0}:{1}:{2}'.format(cmd,cid,'-'.join(ps))
+                            self._pConns[rdo].send(rmsg)
                     elif l == 'cmderr':
-                        self._pConns['c2c'].send("ERR %d \001%s\001\n" % (t,m))
+                        resp = "ERR %d \001%s\001\n".format(t,m)
+                        self._pConns['c2c'].send(resp)
                         logging.info('Command %d failed: %s',t,m)
                     elif l == 'cmdack':
-                        self._pConns['c2c'].send("OK %d \001%s\001\n" % (t,m))
+                        resp = "OK %d \001%s\001\n".format(t,m)
+                        self._pConns['c2c'].send(resp)
                         logging.info('Command %d succeeded',t)
                 except Exception as e:
                     logging.error("Iryi failed. %s->%s", type(e),e)
@@ -437,7 +440,7 @@ class Iryi(object):
                 (conn1,conn2) = mp.Pipe()
                 self._c2c = C2C(conn2,self._conf['local']['c2c'])
             except Exception as e:
-                logging.warn("C2C failed: %s, continuing without" % e)
+                logging.warn("C2C failed: %s, continuing without",e)
             else:
                 self._pConns['c2c'] = conn1
 
@@ -465,7 +468,7 @@ class Iryi(object):
                 self._sr.start()
                 logging.info("Shama started in %s mode",smode)
             if self._c2c:
-                logging.info("C2C listening on port %d" % self._conf['local']['c2c'])
+                logging.info("C2C listening on port %d",self._conf['local']['c2c'])
 
     def _destroy(self):
         """ destroy Iryi cleanly """
@@ -588,9 +591,9 @@ class Iryi(object):
                 else:
                     self._conf['local']['region'] = cp.get('Local','region')
         except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
-            raise IryiConfException("%s" % e)
+            raise IryiConfException(e)
         except (RuntimeError,ValueError) as e:
-            raise IryiConfException("%s" % e)
+            raise IryiConfException(e)
 
     # noinspection PyMethodMayBeStatic
     def _readradio(self,cp,rtype='Abad'):

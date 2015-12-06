@@ -219,7 +219,7 @@ def chset(vnic,ch,chwidth=None):
     out,err = p.communicate()
     
     # two errors, one returned in error, other returned as usage in out
-    if out: raise IWException("Invalid command <%s> (-22)" % ' '.join(cmd))
+    if out: raise IWException("Invalid command {0} (-22)".format(' '.join(cmd)))
     elif err: raise IWException(err.split(':')[1].strip())
 
 """ txpower """
@@ -235,7 +235,7 @@ def txpwrset(nic,pwr,option='fixed'):
     # NOTE: does not work (at least on my cards)
     # confirm option is valid
     if not option in ['fixed','auto','limit']:
-        raise IWException("option %s must be one of {fixed|limit|auto}" % option)
+        raise IWException("option {0} must be one of {fixed|limit|auto}".format(option))
 
     cmd = ['/usr/sbin/iw','dev',nic,'set','txpower',option,str(pwr*100)]
     if os.getuid() != 0: cmd.insert(0,'sudo')
@@ -258,7 +258,7 @@ def txpwrget(nic):
         pwr = re.search(r'Current Tx-Power=([\d]*)',out).group(1)
     except AttributeError:
         # re error, raise an unknown
-        raise IWException("Failed to get txpower of %s" % nic)
+        raise IWException("Failed to get txpower of {0}".format(nic))
     else:
         return int(pwr)
 

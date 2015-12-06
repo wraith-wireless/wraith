@@ -680,7 +680,7 @@ class TailLogPanel(TabularPanel):
                               "widgets/icons/log.png",resize)
         # check validity of logfile first
         if not os.path.exists(logfile) and not os.path.isfile(logfile):
-            self._chief.logwrite("Log File %s does not exist" % logfile,LOG_ERR)
+            self._chief.logwrite("Log {0} does not exist".format(logfile),LOG_ERR)
             return
 
         # member variables
@@ -708,7 +708,8 @@ class TailLogPanel(TabularPanel):
                 self._newlines(fin.readlines())
                 self._offset = fin.tell()
             except Exception as e:
-                self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],e),LOG_ERR)
+                msg = "Log for {0} failed: {1}".format(os.path.split(self._lf)[1],e)
+                self._chief.logwrite(msg,LOG_ERR)
             finally:
                 if fin: fin.close()
         else:
@@ -723,7 +724,8 @@ class TailLogPanel(TabularPanel):
                     self._offset = fin.tell()
                     self._ctime = ctime
             except Exception as e:
-                self._chief.logwrite("Log for %s failed %s" % (os.path.split(self._lf)[1],e),LOG_ERR)
+                msg = "Log for {0} failed: {1}".format(os.path.split(self._lf)[1],e)
+                self._chief.logwrite(msg,LOG_ERR)
             finally:
                 if fin: fin.close()
 

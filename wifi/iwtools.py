@@ -48,7 +48,7 @@ def ifaces():
         ns = fin.read().split('\n')[2:-1]
         fin.close()
     except Exception as e:
-        raise IWToolsException('ifaces: %s' % e)
+        raise IWToolsException('ifaces: {0}'.format(e))
     
     # the remaining lines are <nicname>: p1 p2 ... p3, split on ':' & strip whitespace
     nics = []
@@ -267,7 +267,7 @@ def getdriver(nic):
     """
     try:
         # find the driver for nic in driver's module, split on ':' and return
-        ds = os.listdir('/sys/class/net/%s/device/driver/module/drivers' % nic)
+        ds = os.listdir('/sys/class/net/{0}/device/driver/module/drivers'.format(nic))
         if len(ds) > 1: return "Unknown"
         return ds[0].split(':')[1]
     except OSError:

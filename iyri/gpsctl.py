@@ -84,9 +84,9 @@ class GPSController(mp.Process):
                                'alt':rpt['alt'] if 'alt' in rpt else float("nan"),
                                'dir':rpt['track'] if 'track' in rpt else float("nan"),
                                'spd':rpt['spd'] if 'spd' in rpt else float("nan"),
-                               'dop':{'xdop':'%.3f' % self._gpsd.xdop,
-                                      'ydop':'%.3f' % self._gpsd.ydop,
-                                      'pdop':'%.3f' % self._gpsd.pdop}}
+                               'dop':{'xdop':'{0:.3}'.format(self._gpsd.xdop),
+                                      'ydop':'{0:.3}'.format(self._gpsd.ydop),
+                                      'pdop':'{0:.3}'.format(self._gpsd.pdop)}}
                         self._icomms.put((self._dd['id'],ts,'!FLT!',flt))
                         break
                 except (KeyError,AttributeError):
@@ -124,7 +124,8 @@ class GPSController(mp.Process):
                         pass
                     except:
                         return False
-        self._cI.send(('info','GPSD','Connect',"GPS v%s connected" % self._dd['version']))
+        rmsg = "GPS v{0} connected".format(self._dd['version'])
+        self._cI.send(('info','GPSD','Connect',rmsg))
         return True
 
     def _setup(self,conf):

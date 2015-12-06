@@ -47,13 +47,15 @@ class Tuner(threading.Thread):
         self._state = TUNE_PAUSE if pause else TUNE_SCAN # initial state
 
     @property
-    def channel(self): return '%s:%s' % (self._chs[self._i][0],self._chs[self._i][1])
+    def channel(self): return '{0}:{1}'.format(self._chs[self._i][0],
+                                               self._chs[self._i][1])
 
     def run(self):
         """ switch channels based on associted dwell times """
         # starting paused or scanning?
-        if self._state == TUNE_PAUSE: self._qR.put(('!PAUSE!',ts2iso(time.time()),(-1,' ')))
-        else: self._qR.put(('!SCAN!',ts2iso(time.time()),(-1,self._chs)))
+        ts = ts2iso(time.time())
+        if self._state == TUNE_PAUSE: self._qR.put(('!PAUSE!',ts),(-1,' '))
+        else: self._qR.put(('!SCAN!',ts),(-1,self._chs))
 
         # execution loop - wait on the internal connection for each channels
         # dwell time. IOT avoid a state where we would continue to scan the same
@@ -119,13 +121,16 @@ class Tuner(threading.Thread):
                                 if chw == 'None': chw = None
                                 iw.chset(self._vnic,ch,chw)
                                 self._state = TUNE_LISTEN
-                                self._qR.put(('!LISTEN',ts2iso(ts),(cid,"%s:%s" % (ch,chw))))
+                                self._qR.put(('!LISTEN',ts2iso(ts),
+                                             (cid,"{0}:{1}".format(ch,chw))))
                             except ValueError:
-                                self._qR.put(('!ERR!',ts2iso(ts),(cid,'invalid param format')))
+                                self._qR.put(('!ERR!',ts2iso(ts),
+                                             (cid,'invalid param format')))
                             except iw.IWException as e:
                                 self._qR.put(('!ERR!',ts2iso(ts),(cid,str(e))))
                         else:
-                            self._qR.put(('!ERR!',ts2iso(ts),(cid,"invalid command %s" % cmd)))
+                            self._qR.put(('!ERR!',ts2iso(ts),
+                                        (cid,"invalid command {0}".format(cmd))))
             else:
                 try:
                     # no token, go to next channel, reset remaining
@@ -273,8 +278,8 @@ class RadioController(mp.Process):
                 'chipset':self._chipset,
                 'standards':self._std,
                 'channels':self._chs,
-                'hop':'%.3f' % self._hop,
-                'ival':'%.3f' % self._interval,
+                'hop':'{0:.3}'.format(self._hop),
+                'ival':'{0:.3}'.format(self._interval),
                 'txpwr':self._txpwr,
                 'desc':self._desc,
                 'nA':self._antenna['num'],
@@ -297,7 +302,7 @@ class RadioController(mp.Process):
         """
         # 1) set radio properties as specified in conf
         if conf['nic'] not in iwt.wifaces():
-            raise RuntimeError("%s:iwtools.wifaces:not found" % conf['role'])
+            raise RuntimeError("{0}:iwtools.wifaces:not found".format(conf['role']))
         self._nic = conf['nic']
         self._role = conf['role']
 
@@ -306,9 +311,11 @@ class RadioController(mp.Process):
             self._phy,ifaces = iw.dev(self._nic)
             self._mac = ifaces[0]['addr']
         except (KeyError, IndexError):
-            raise RuntimeError("%s:iw.dev:error getting interfaces" % self._role)
+            err = "{0}:iw.dev:error getting interfaces".format(self._role)
+            raise RuntimeError(err)
         except iw.IWException as e:
-            raise RuntimeError("%s:iw.dev:failed to get phy <%s>" % (self._role,e))
+            err = "{0}:iw.dev:failed to get phy <{1}>".format(self._role,e)
+            raise RuntimeError(err)
 
         # get properties (the below will return None rather than throw exception)
         self._chs = iw.chget(self._phy)
@@ -339,7 +346,7 @@ class RadioController(mp.Process):
             except ValueError:
                 pass
         n = 0 if not 0 in ns else max(ns)+1
-        self._vnic = "iyri%d" % n
+        self._vnic = "iyri{0}".format(n)
 
         # sniffing interface
         try:
@@ -347,21 +354,21 @@ class RadioController(mp.Process):
             iwt.ifconfig(self._vnic,'up')             # and turn it on
         except iw.IWException as e:
             # never added virtual nic, restore nic
-            errMsg = "%s:iw.phyadd:%s" % (self._role,e)
+            errMsg = "{0}:iw.phyadd:{1}".format(self._role,e)
             try:
                 iwt.ifconfig(self._nic,'up')
             except iwt.IWToolsException:
-                errMsg += " Failed to restore %s" % self._nic
+                errMsg += " Failed to restore {0}".format(self._nic)
             raise RuntimeError(errMsg)
         except iwt.IWToolsException as e:
             # failed to 'raise' virtual nic, remove vnic and add nic
-            errMsg = "%s:iwtools.ifconfig:%s" % (self._role,e)
+            errMsg = "{0}:iwtools.ifconfig:{1}".format(self._role,e)
             try:
                 iw.phyadd(self._phy,self._nic,'managed')
                 iw.devdel(self._vnic)
                 iwt.ifconfig(self._nic,'up')
             except (iw.IWException,iwt.IWToolsException):
-                errMsg += " Failed to restore %s" % self._nic
+                errMsg += " Failed to restore {0}".format(self._nic)
             raise RuntimeError(errMsg)
 
         # wrap remaining in a try block, we must attempt to restore card and
@@ -425,7 +432,6 @@ class RadioController(mp.Process):
             except ValueError:
                 ch_i = 0
             iw.chset(self._vnic,scan[ch_i][0],scan[ch_i][1])
-            self._hkey = '%s:%s' % (scan[ch_i][0],scan[ch_i][1])
 
             # initialize tuner thread
             self._qT = Queue()
@@ -440,7 +446,7 @@ class RadioController(mp.Process):
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
-            raise RuntimeError("%s:Raw Socket:%s" % (self._role,e))
+            raise RuntimeError("{0}:Raw Socket:{1}".format(self._role,e))
         except iw.IWException as e:
             try:
                 iw.devdel(self._vnic)
@@ -451,7 +457,8 @@ class RadioController(mp.Process):
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
-            raise RuntimeError("%s:iw.chset:Failed to set channel: %s" % (self._role,e))
+            err = "{0}:iw.chset:Failed to set channel: {1}".format(self._role,e)
+            raise RuntimeError(err)
         except (ValueError,TypeError) as e:
             try:
                 iw.devdel(self._vnic)
@@ -473,7 +480,7 @@ class RadioController(mp.Process):
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
-            raise RuntimeError("%s:Unknown:%s" % (self._role,e))
+            raise RuntimeError("{0}:Unknown:{1}".format(self._role,e))
 
     def _shutdown(self):
         """ restore everything. returns whether a full reset or not occurred """

@@ -365,7 +365,7 @@ class Collator(mp.Process):
             elif e.__str__().find('authentication') > 0:
                 raise RuntimeError('Collator:PostgreSQL:Invalid connection string')
             else:
-                raise RuntimeError('Collator:PostgreSQL:DB error: %s' % e)
+                raise RuntimeError('Collator:PostgreSQL:DB error: {0}'.format(e))
         except Exception as e:
             raise RuntimeError("Collator:Unknown:{0}".format(e))
 

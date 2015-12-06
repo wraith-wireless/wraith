@@ -151,7 +151,7 @@ class WraithPanel(gui.MasterPanel):
         self._pwd = pwd     # sudo password (should we not save it?)
 
         # set up super
-        gui.MasterPanel.__init__(self,tl,"Wraith  v%s" % wraith.__version__,
+        gui.MasterPanel.__init__(self,tl,"Wraith  v{0}".format(wraith.__version__),
                                  [],"widgets/icons/wraith3.png",False)
         self._menuenable()
 
@@ -200,30 +200,41 @@ class WraithPanel(gui.MasterPanel):
 
     def _create(self):
         # read in conf file, exit on error
-        msgs = [(time.strftime('%H:%M:%S'),"Wraith v%s" % wraith.__version__,gui.LOG_NOERR)]
+        msgs = [(time.strftime('%H:%M:%S'),
+                 "Wraith v{0}".format(wraith.__version__),gui.LOG_NOERR)]
         self._conf = readconf()
         if 'err' in self._conf:
             msgs.append((time.strftime('%H:%M:%S'),
-                          "Configuration file is invalid. %s" % self._conf['err'],
+                          "Invalid configuration file: {0}".format(self._conf['err']),
                           gui.LOG_ERR))
             return
 
         # determine if postgresql is running
         if cmdline.runningprocess('postgres'):
             # update self, msg and connect
-            msgs.append((time.strftime('%H:%M:%S'),'PostgreSQL running',gui.LOG_NOERR))
+            msgs.append((time.strftime('%H:%M:%S'),
+                         "PostgreSQL running",
+                         gui.LOG_NOERR))
             if not self._pwd: self._bSQL = True
             self._setstate(_STATE_STORE_)
             (self._conn,ret) = cmdline.psqlconnect(self._conf['store'])
             if not self._conn is None:
                 self._setstate(_STATE_CONN_)
-                msgs.append((time.strftime('%H:%M:%S'),'Connected to DB',gui.LOG_NOERR))
+                msgs.append((time.strftime('%H:%M:%S'),
+                             "Connected to DB",
+                             gui.LOG_NOERR))
             else:
-                msgs.append((time.strftime('%H:%M:%S'),"Connect to DB failed: %s" % ret,gui.LOG_ERR))
+                msgs.append((time.strftime('%H:%M:%S'),
+                             "DB connect failed: {0}".format(ret),
+                             gui.LOG_ERR))
                 return
         else:
-            msgs.append((time.strftime('%H:%M:%S'),"PostgreSQL not running",gui.LOG_WARN))
-            msgs.append((time.strftime('%H:%M:%S'),"Not connected to DB",gui.LOG_WARN))
+            msgs.append((time.strftime('%H:%M:%S'),
+                         "PostgreSQL not running",
+                         gui.LOG_WARN))
+            msgs.append((time.strftime('%H:%M:%S'),
+                         "Not connected to DB",
+                         gui.LOG_WARN))
 
         # nidus running?
         if cmdline.runningservice(wraith.NIDUSPID):
@@ -233,7 +244,7 @@ class WraithPanel(gui.MasterPanel):
             msgs.append((time.strftime('%H:%M:%S'),"Nidus not running",gui.LOG_WARN))
 
         # Iyri running?
-        if cmdline.runningservice(wraith.LYRIPID):
+        if cmdline.runningservice(wraith.IYRIPID):
             msgs.append((time.strftime('%H:%M:%S'),"Iyri running",gui.LOG_NOERR))
             self._setstate(_STATE_LYRI_)
         else:
@@ -366,7 +377,7 @@ class WraithPanel(gui.MasterPanel):
         elif desc == 'Iyrilog': self.viewIyrilog()
         elif desc == 'Iyriprefs': self.configIyri()
         elif desc == 'about': self.about()
-        else: raise RuntimeError, "WTF Cannot open %s" % desc
+        else: raise RuntimeError, "WTF Cannot open {0}".format(desc)
 
 #### MENU CALLBACKS
 
@@ -398,13 +409,13 @@ class WraithPanel(gui.MasterPanel):
 
     def calc(self,key):
         """ calculate the function defined by key in the _CALCS_ dict"""
-        panel = self.getpanels('%scalc' % key)
+        panel = self.getpanels('{0}calc'.format(key))
         if not panel:
             t = tk.Toplevel()
             pnl = subgui.CalculatePanel(t,self,key,subgui.CALCS[key]['inputs'],
                                                    subgui.CALCS[key]['answer'],
                                                    subgui.CALCS[key]['rc'])
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'%scalc' % key))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'{0}calc'.format(key)))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -541,7 +552,8 @@ class WraithPanel(gui.MasterPanel):
                 self.logwrite("Fixed all null-ended records")
             except psql.Error as e:
                 self._conn.rollback()
-                self.logwrite("Error fixing records <%s: %s>" % (e.pgcode,e.pgerror),
+                self.logwrite("Error fixing records <{0}:{1}>".format(e.pgcode,
+                                                                      e.pgerror),
                               gui.LOG_ERR)
             finally:
                 if curs: curs.close()
@@ -565,7 +577,8 @@ class WraithPanel(gui.MasterPanel):
                 self.logwrite("Deleted all records")
             except psql.Error as e:
                 self._conn.rollback()
-                self.logwrite("Delete Failed<%s: %s>" % (e.pgcode,e.pgerror),gui.LOG_ERR)
+                self.logwrite("Delete Failed<{0}: {1}>".format(e.pgcode,e.pgerror),
+                              gui.LOG_ERR)
             finally:
                 if curs: curs.close()
 
@@ -970,7 +983,7 @@ class WraithPanel(gui.MasterPanel):
                 time.sleep(0.5)
                 if not cmdline.runningservice(wraith.LYRIPID): raise RuntimeError('unknown')
             except RuntimeError as e:
-                self.logwrite("Error starting Iyri: %s" % e,gui.LOG_ERR)
+                self.logwrite("Error starting Iyri: {0}".format(e),gui.LOG_ERR)
             else:
                 self.logwrite("Iyri Started")
                 self._setstate(_STATE_LYRI_)
@@ -993,7 +1006,7 @@ class WraithPanel(gui.MasterPanel):
                 self.logwrite("Shutting down Iyri...",gui.LOG_NOTE)
                 cmdline.service('Iyrid',self._pwd,False)
             except RuntimeError as e:
-                self.logwrite("Error shutting down Iyri: %s" % e,gui.LOG_ERR)
+                self.logwrite("Error shutting down Iyri: {0}".format(e),gui.LOG_ERR)
             else:
                 self._setstate(_STATE_LYRI_,False)
                 self.logwrite("Iyri shut down")
@@ -1025,7 +1038,7 @@ class WraithSplash(object):
 
         # create our splash image, progress bar and status label
         ttk.Label(self._tl,style="splash.TLabel",font=('Gothic',20,'bold'),
-                  text="WRAITH-RT %s" % wraith.__version__,
+                  text="WRAITH-RT {0}".format(wraith.__version__),
                   justify=tk.CENTER).grid(row=0,column=0,sticky='nwse')
         self._logo = ImageTk.PhotoImage(Image.open("widgets/icons/splash.png"))
         ttk.Label(self._tl,image=self._logo,
@@ -1048,7 +1061,7 @@ class WraithSplash(object):
         sz = tuple(int(_) for _ in self._tl.geometry().split('+')[0].split('x'))
         x = (w/2 - sz[0])/2
         y = (h/2 - sz[1])/2
-        self._tl.geometry("+%d+%d" % (x,y))
+        self._tl.geometry("+{0}+{1}".format(x,y))
 
         # start 'polling'
         self._bconfig = False
@@ -1074,7 +1087,8 @@ class WraithSplash(object):
         self._sv.set("Checking configuration file...")
         self._pb.step(0.5)
         conf = readconf()
-        if 'err' in conf: raise RuntimeError("Config file invalid: %s" % conf['err'])
+        if 'err' in conf:
+            raise RuntimeError("Config file invalid: {0}".format(conf['err']))
         else: self._sv.set('Configuration file is valid')
         self._bconfig = True
         self._pb.step(2.0)
@@ -1124,11 +1138,11 @@ class WraithSplash(object):
 
 if __name__ == '__main__':
     # create arg parser and parse arguments
-    ap = argparse.ArgumentParser(description="Wraith-rt %s" % wraith.__version__)
+    ap = argparse.ArgumentParser(description="Wraith-rt {0}".format(wraith.__version__))
     ap.add_argument('-s','--start',help="Start with options = one of {nogui|gui|all}")
     ap.add_argument('-d','--stop',action='store_true',help="Stops all found services")
     ap.add_argument('-x','--exclude',action='store_true',help="Does not stop PostgreSQL")
-    ap.add_argument('-v','--version',action='version',version="Wraith-rt %s" % wraith.__version__)
+    ap.add_argument('-v','--version',action='version',version="Wraith-rt {0}".format(wraith.__version__))
     args = ap.parse_args()
     sopts = args.start
     stop = args.stop
@@ -1143,7 +1157,8 @@ if __name__ == '__main__':
     if stop:
         # verify pwd has been set
         i = 2
-        pwd = getpass.unix_getpass(prompt="Password [for %s]:" % getpass.getuser())
+        usr = getpass.getuser()
+        pwd = getpass.unix_getpass(prompt="Password [for {0}]:".format(usr))
         while not cmdline.testsudopwd(pwd):
             pwd = getpass.unix_getpass(prompt="Incorrect password, try again:")
             i -= 1
@@ -1153,15 +1168,15 @@ if __name__ == '__main__':
         sd = sn = sp = True
         if cmdline.runningservice(wraith.LYRIPID):
             ret = 'ok' if stopIyri(pwd) else 'fail'
-            print "Stopping Iyri\t\t\t\t[%s]" % ret
+            print "Stopping Iyri\t\t\t\t[{0}]".format(ret)
         else: print "Iyri not running"
         if cmdline.runningservice(wraith.NIDUSPID):
             ret = 'ok' if stopnidus(pwd) else 'fail'
-            print "Stopping Nidus\t\t\t\t[%s]" % ret
+            print "Stopping Nidus\t\t\t\t[{0}]".format(ret)
         else: print "Nidus not running"
         if cmdline.runningprocess('postgres') and not exclude:
             ret = 'ok' if stoppsql(pwd) else 'fail'
-            print "Stopping PostgreSQL\t\t\t[%s]" % ret
+            print "Stopping PostgreSQL\t\t\t[{0}]".format(ret)
         else: print "PostgreSQL not running"
         sys.exit(0)
 
@@ -1169,7 +1184,8 @@ if __name__ == '__main__':
     if sopts == 'nogui':
         # verify pwd is present
         i = 2
-        pwd = getpass.unix_getpass(prompt="Password [for %s]:" % getpass.getuser())
+        usr = getpass.getuser()
+        pwd = getpass.unix_getpass(prompt="Password [for {0}]:".format(usr))
         while not cmdline.testsudopwd(pwd):
             pwd = getpass.unix_getpass(prompt="Incorrect password, try again:")
             i -= 1
@@ -1178,24 +1194,25 @@ if __name__ == '__main__':
         # start postgresql (if needed), nidus and Iyri
         if not cmdline.runningprocess('postgres'):
             ret = 'ok' if startpsql(pwd) else 'fail'
-            print "Starting PostgreSQL\t\t\t[%s]" % ret
+            print "Starting PostgreSQL\t\t\t[{0}]".format(ret)
         else:
             print "PostgreSQL already running"
         if not cmdline.runningservice(wraith.NIDUSPID):
             ret = 'ok' if startnidus(pwd) else 'fail'
-            print "Starting Nidus\t\t\t\t[%s]" % ret
+            print "Starting Nidus\t\t\t\t[{0}]".format(ret)
         else:
             print "Nidus already running"
         if not cmdline.runningservice(wraith.LYRIPID):
             ret = 'ok' if startIyri(pwd) else 'fail'
-            print "Starting Iyri\t\t\t\t[%s]" % ret
+            print "Starting Iyri\t\t\t\t[{0}]".format(ret)
         else:
             print "Iyri already Running"
         sys.exit(0)
     else:
         if sopts == 'all':
             i = 2
-            pwd = getpass.unix_getpass(prompt="Password [for %s]:" % getpass.getuser())
+            usr = getpass.getuser()
+            pwd = getpass.unix_getpass(prompt="Password [for {0}]:".format(usr))
             while not cmdline.testsudopwd(pwd):
                 pwd = getpass.unix_getpass(prompt="Incorrect password, try again:")
                 i -= 1
@@ -1224,7 +1241,7 @@ if __name__ == '__main__':
             sys.exit(0)
         except Exception as e:
             fout = open('wraith.log','a')
-            fout.write("%s: %s\n" % (time.strftime("%d%H%ML%b%Y").upper(),e))
+            fout.write("{0}: {1}\n".format(time.strftime("%d%H%ML%b%Y").upper(),e))
             fout.close()
             print 'Error: check wraith.log for details'
             sys.exit(1)
