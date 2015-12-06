@@ -242,15 +242,23 @@ class Thresher(mp.Process):
             fid = self._curs.fetchone()[0]
             self._conn.commit()
 
-            # notify collator if we had any issues
+            # notify collator & insert malformed if we had any issues
             if dM.error:
                 self._icomms.put((self.cs,ts1,'!THRESH_WARN!',
-                                  "Frame %d. Bad MPDU %s at %s" % (fid,
-                                                                   dM.error[1],
-                                                                   dM.error[0])))
+                                  "Frame {0}. Bad MPDU".format(fid)))
+                sql = """
+                       insert into malformed (fid,location,reason)
+                       values (%s,%s,%s);
+                      """
+                self._curs.execute(sql,(fid,dM.error[1],dM.error[2]))
+                self._conn.commit()
 
             # pass fid, index, nBytes, left, right indices to writer
-            if rdos[src]['record']: pass
+            if rdos[src]['record']:
+                self._next = 'frame_raw'
+                sql = "insert into frame_raw (fid,raw) values (%s,E%s);"
+                self._curs.execute(sql,(fid,f))
+                self._conn.commit()
             #if self._write:
             #    l = r = 0
             #    if validRTAP: l += dR['sz']
@@ -267,6 +275,7 @@ class Thresher(mp.Process):
             self._next = 'store'
             self._insertrtap(fid,src,dR)
             if not dM.isempty: self._insertmpdu(fid,dM)
+            else: return
 
             # (2) extract
             self._next = 'extract'
@@ -292,21 +301,7 @@ class Thresher(mp.Process):
             self._insertsta(fid,sid,ts,addrs)
             self._insertsta_activity(fid,sid,ts,addrs)
 
-            # further process management frames
-            if dM.isempty:
-                #msg = ''
-                #try:
-                #    fname = os.path.join(MPDUPATH,"bad_%d_%d.pcap" % (sid,fid))
-                #    fout = pcap.pcapopen(fname)
-                #    pcap.pktwrite(fout,ts,f)
-                #    fout.close()
-                #    msg = "Bad MPDU in %d. Wrote to %s" % (fid,fname)
-                #except:
-                #    msg = "Bad MPDU in %d. %s" % (fid,f)
-                #self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
-                return
-
-            # further process mgmt frames
+            # further process mgmt frames?
             self._next = 'mgmt'
             if dM.type == mpdu.FT_MGMT: self._processmgmt(fid,sid,ts,addrs,dM)
         except psql.OperationalError as e: # unrecoverable

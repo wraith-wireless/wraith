@@ -333,7 +333,7 @@ class RadioController(mp.Process):
                 iwt.ifconfig(self._nic,'down')
                 self._spoofed = iwt.sethwaddr(self._nic,mac)
             except iwt.IWToolsException as e:
-                raise RuntimeError("%s:iwtools.sethwaddr:%s" % (self._role,e))
+                raise RuntimeError("{0}:iwtools.sethwaddr:{1}".format(self._role,e))
 
         # write the frames?
         self._record = conf['record']
@@ -474,7 +474,7 @@ class RadioController(mp.Process):
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
-            raise RuntimeError("%s:config:%s" % (self._role,e))
+            raise RuntimeError("{0}:config:{1}".format(self._role,e))
         except Exception as e: # blanket exception
             try:
                 iw.devdel(self._vnic)
