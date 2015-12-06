@@ -27,7 +27,6 @@ from wraith.wifi.iw import regget          # regulatory domain
 from wraith.utils.cmdline import ipaddr    # returns ip address
 from wraith.wifi.oui import parseoui       # parse out oui dict
 from wraith.iyri.thresh import Thresher    # thresher process
-from wraith.iyri.thresh import PCAPWriter  # & the pcap writer process
 from wraith.iyri.constants import NTHRESH  # num thresher processes
 from wraith.iyri.constants import OUIPATH  # location of oui text file
 
@@ -52,8 +51,6 @@ class Collator(mp.Process):
         self._gid = None     # the gpsd id
         self._ab = ab        # abad's buffer
         self._sb = sb        # shama's buffer
-        self._writea = False # write abad pcap?
-        self._writes = False # write shama pcap?
         self._save = None    # save options
         self._dbstr = {}     # db connection string
         self._setup(conf)
@@ -69,14 +66,11 @@ class Collator(mp.Process):
         # function local variables
         lSta = mp.Lock()                           # sta lock
         qT = mp.Queue()                            # thresher task queue
-        qWA = mp.Queue() if self._writea else None # abad writer queue
-        qWS = mp.Queue() if self._writes else None # shama writer queue
         ouis = parseoui(OUIPATH)                   # oui dict
         rmap = {}                                  # maps callsigns (vnic) to hwaddr
         roles = {}                                 # maps roles to callsigns (vnics)
         buffers = {}                               # buffer map
         threshers = {}                             # pid->{'obj':Thresher,'conn':connection}
-        writers = {}                               # pid->{'obj':Writer,'q':queue,'role':role}
 
         # send sensor up notification, platform details and gpsid
         try:
@@ -97,16 +91,12 @@ class Collator(mp.Process):
         for _ in xrange(NTHRESH):
             try:
                 recv,send = mp.Pipe(False)
-                t = Thresher(self._icomms,qT,recv,lSta,
-                             (self._ab,qWA),
-                             (self._sb,qWS),
+                t = Thresher(self._icomms,qT,recv,
+                             lSta,self._ab,self._sb,
                              self._dbstr,ouis)
                 t.start()
                 threshers[t.pid] = {'obj':t,'conn':send}
                 send.send(('!SID!',ts2iso(time.time()),[self._sid]))
-
-                # writing?
-                if self._writea: send.send(('!WRITE!',ts2iso(time.time()),[True]))
             except RuntimeError as e:
                 self._cI.send(('warn','Collator','Thresher',e))
         if not len(threshers):
@@ -146,35 +136,6 @@ class Collator(mp.Process):
                     rmsg = "{0}->{1}".format(cs,msg)
                     self._cI.send(('warn','Collator','Thresher',rmsg))
                     threshers[pid]['conn'].send(('!STOP!',ts,None))
-                # events from writer(s)
-                elif ev == '!WRITE!':
-                    # writer process up/down message
-                    if msg is not None:
-                        if msg in writers:
-                            lvl = 'info'
-                            rmsg = "{0} initiated".format(cs)
-                        else:
-                            lvl = 'warn'
-                            rmsg = "{0} not recognized".format(cs)
-                        self._cI.send((lvl,'Collator','Writer',rmsg))
-                    else:
-                        # for now, tell thresher's to stop writing (should add
-                        # capability to stop writing for only one radio)
-                        pid = int(cs.split('-')[1])
-                        del writers[pid]
-                        for pid in threshers:
-                            threshers[pid]['conn'].send(('!WRITE!',ts,False))
-                elif ev == '!WRITE_WARN!':
-                    role = "{0} Writer".format(writers[int(cs.split('-')[1])]['role'])
-                    self._cI.send(('warn','Collator',role,msg))
-                elif ev == '!WRITE_ERR!':
-                    # tell process to stop
-                    pid = int(cs.split('-')[1])
-                    role = "{0} Writer".format(writers[pid]['role'])
-                    self._cI.send(('warn','Collator',role,msg))
-                    writers[pid]['conn'].send(('!STOP!',ts2iso(time.time()),None))
-                elif ev == '!WRITE_OPEN!' or ev == '!WRITE_DONE!':
-                    self._cI.send(('info','Collator','Writer',msg))
                 # events from gps device
                 elif ev == '!GPSD!':
                     # up/down message from gpsd
@@ -199,28 +160,13 @@ class Collator(mp.Process):
                         elif role not in ['abad','shama']:
                             rmsg = "invalid role: {0}".format(role)
                             self._cI.send(('warn','Collator','Radio',rmsg))
-
-                        # create a file writer (if saving) & update threshers
-                        if role == 'abad' and self._writea:
-                            try:
-                                p = PCAPWriter(self._icomms,qWA,self._sid,msg['mac'],
-                                               self._ab,self._dbstr,self._save)
-                                p.start()
-                                writers[p.pid] = {'obj':p,'q':qWA,'role':'abad'}
-                            except RuntimeError as e:
-                                self._cI.send(('warn','Collator',"Abad Writer",e))
-                        elif role == 'shama' and self._writes:
-                            try:
-                                p = PCAPWriter(self._icomms,qWS,self._sid,msg['mac'],
-                                               self._sb,self._dbstr,self._save)
-                                p.start()
-                                writers[p.pid] = {'obj':p,'q':qWS,'role':'shama'}
-                            except RuntimeError as e:
-                                self._cI.send(('warn','Collator',"Shama Writer",e))
+                            continue
 
                         # update threshers
                         for pid in threshers:
                             threshers[pid]['conn'].send(('!RADIO!',ts,[mac,role]))
+                            threshers[pid]['conn'].send(('!WRITE!',ts,
+                                                         [mac,msg['record']]))
 
                         # add to radio & role maps
                         rmsg = "{0}:{1} initiated".format(role,cs)
@@ -317,12 +263,6 @@ class Collator(mp.Process):
                 finally:
                     threshers[pid]['conn'].close()
 
-            for pid in writers:
-                try:
-                    writers[pid]['q'].put(('!STOP!',ts2iso(time.time()),None))
-                except:
-                    pass
-
             # wait for children & join processes
             while mp.active_children(): time.sleep(0.5)
 
@@ -353,12 +293,6 @@ class Collator(mp.Process):
             self._curs = self._conn.cursor()
             self._curs.execute("set time zone 'UTC';")
             self._conn.commit()
-
-            # set save values
-            if conf['save']['on']:
-                self._writea = True
-                if conf['shama'] is not None: self._writes = True
-                self._save = conf['save']
         except psql.OperationalError as e:
             if e.__str__().find('connect') > 0:
                 raise RuntimeError('Collator:PostgreSQL:DB not running')

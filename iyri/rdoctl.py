@@ -173,6 +173,7 @@ class RadioController(mp.Process):
         self._driver = None       # the driver
         self._chipset = None      # the chipset
         self._spoofed = ""        # spoofed mac address
+        self._record = False      # write frames to file?
         self._desc = None         # optional description
         self._s = None            # the raw socket
         self._tuner = None        # tuner thread
@@ -274,6 +275,7 @@ class RadioController(mp.Process):
                 'mac':self._mac,
                 'role':self._role,
                 'spoofed':self._spoofed,
+                'record':self._record,
                 'driver':self._driver,
                 'chipset':self._chipset,
                 'standards':self._std,
@@ -332,6 +334,9 @@ class RadioController(mp.Process):
                 self._spoofed = iwt.sethwaddr(self._nic,mac)
             except iwt.IWToolsException as e:
                 raise RuntimeError("%s:iwtools.sethwaddr:%s" % (self._role,e))
+
+        # write the frames?
+        self._record = conf['record']
 
         # 2) prepare specified nic for monitoring and bind it
         # delete all associated interfaces - we want full control

@@ -556,26 +556,6 @@ class Iryi(object):
                self._conf['store']['host'] != 'localhost':
                 raise RuntimeError("Invalid IP address for storage host")
 
-            # Save Section
-            self._conf['save'] = {'on':False,'private':False,
-                                  'path':'..data/frames','sz':67108864}
-            if cp.has_section('Save'):
-                self._conf['save']['on'] = cp.getboolean('Save','save')
-                if self._conf['save']['on']:
-                    if self._conf['save']['private']:
-                        self._conf['save']['private'] = cp.get('Save','save_private')
-                    if self._conf['save']['path']:
-                        self._conf['save']['path'] = cp.get('Save','save_path')
-                    if self._conf['save']['sz']:
-                        self._conf['save']['sz'] = cp.getint('Save','save_maxsize') * 1048576
-
-                    # confirm save path exists
-                    if not os.path.abspath(self._conf['save']['path']):
-                        self._conf['save']['path'] = os.path.realpath(self._conf['save']['path'])
-                    if not os.path.isdir(self._conf['save']['path']):
-                        msg = "Save Path {0} does not exist".format(self._conf['save']['path'])
-                        raise IryiConfException(msg)
-
             # Local section
             self._conf['local'] = {'region':None,'c2c':2526}
             if cp.has_option('Local','C2C'):
@@ -606,20 +586,19 @@ class Iryi(object):
             err = "Radio %s not present/not wireless".format(cp.get(rtype,'nic'))
             raise RuntimeError(err)
 
-        # get nic and set role setting default antenna config
-        r = {
-             'nic':cp.get(rtype,'nic'),
+        # get nic & set role, also setting defaults
+        r = {'nic':cp.get(rtype,'nic'),
              'paused':False,
              'spoofed':None,
-             'ant_gain':0.0,
-             'ant_loss':0.0,
-             'ant_offset':0.0,
-             'ant_type':0.0,
+             'record':True,
              'desc':"unknown",
              'scan_start':None,
              'role':rtype.lower(),
-             'antennas':{}
-            }
+             'antennas':{'num':0,
+                         'type':[],
+                         'gain':[],
+                         'loss':[],
+                         'xyz':[]}}
 
         # get optional properties
         if cp.has_option(rtype,'spoof'):
@@ -630,6 +609,7 @@ class Iryi(object):
                 r['spoofed'] = spoof
         if cp.has_option(rtype,'desc'): r['desc'] = cp.get(rtype,'desc')
         if cp.has_option(rtype,'paused'): r['paused'] = cp.getboolean(rtype,'paused')
+        if cp.has_option(rtype,'record'): r['record'] = cp.getboolean(rtype,'record')
 
         # process antennas - get the number first
         try:
@@ -662,13 +642,6 @@ class Iryi(object):
                 r['antennas']['type'] = atype
                 r['antennas']['loss'] = loss
                 r['antennas']['xyz'] = xyz
-        else:
-            # none, set all empty
-            r['antennas']['num'] = 0
-            r['antennas']['gain'] = []
-            r['antennas']['type'] = []
-            r['antennas']['loss'] = []
-            r['antennas']['xyz'] = []
 
         # get scan pattern
         r['dwell'] = cp.getfloat(rtype,'dwell')

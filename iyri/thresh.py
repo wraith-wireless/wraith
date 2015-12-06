@@ -21,181 +21,20 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                                   # path/file functions
 import signal                               # handle signals
 import select                               # for select
 import time                                 # timestamps
 import multiprocessing as mp                # multiprocessing
 import psycopg2 as psql                     # postgresql api
-from Queue import Empty                     # queue empty exception
 from wraith.utils.timestamps import ts2iso  # timestamp conversion
 from dateutil import parser as dtparser     # parse out timestamps
-from wraith.iyri.constants import NWRITE    # max packets to store before writing
 from wraith.iyri.constants import N         # row size in buffer
-#from wraith.iyri.constants import MPDUPATH  # path to store bad frames
 import wraith.wifi.radiotap as rtap         # 802.11 layer 1 parsing
 from wraith.wifi import mpdu                # 802.11 layer 2 parsing
 from wraith.wifi import mcs                 # mcs functions
 from wraith.wifi import channels            # 802.11 channels/RFs
 from wraith.wifi.oui import manufacturer    # oui functions
-from wraith.utils import simplepcap as pcap # write frames to file
 import sys,traceback                        # error reporting
-
-class PCAPWriter(mp.Process):
-    """
-     A PCAP writer is responsible for saving frames from one radio. This can be
-     a bottleneck as multiple Threshers will be sending data and the frames
-     will be out of order.
-    """
-    def __init__(self,comms,q,sid,mac,buff,dbstr,conf):
-        """
-         :param comms: internal communication (to Collator)
-         :param q: task queue i.e frames to write
-         :param sid: current session id
-         :param mac: hwaddr of collecting radio
-         :param buff: the buffer of frames to write
-         :param dbstr: db connection string
-         :param conf: configuration details
-        """
-        mp.Process.__init__(self)
-        self._icomms = comms  # communications queue
-        self._tasks = q       # write to/from Thresher and/or Collator
-        self._conn = None     # db connection
-        self._curs = None     # our cursor
-        self._sid = sid       # current session id
-        self._mac = mac       # hw addr of collecting radio
-        self._buffer = buff   # the collecting radio's buffer
-        self._stop = False    # stop flag
-        self._path = ''       # file config variables
-        self._private = False # data private
-        self._sz = 0          # size limit
-        self._pkts = []       # bulked packets
-        self._npkt = 1        # cur packet number in file
-        self._fout = None     # our file object
-        self._setup(dbstr,conf)
-
-    def terminate(self): pass
-
-    @property
-    def cs(self): return 'writer-{0}'.format(self.pid)
-
-    def run(self):
-        """ execution loop """
-        # ignore signals used by main program
-        signal.signal(signal.SIGINT,signal.SIG_IGN)   # CTRL-C and kill -INT stop
-        signal.signal(signal.SIGTERM,signal.SIG_IGN)  # kill -TERM stop
-        signal.signal(signal.SIGUSR1,self.stop)       # kill signal from Collator
-
-        # notify collator we're up
-        self._icomms.put((self.cs,ts2iso(time.time()),'!WRITE!',self.pid))
-
-        # loop until told to quit
-        while not self._stop:
-            try:
-                ts1 = ts2iso(time.time()) # our timestamp
-                tkn,ts,d = self._tasks.get(1.0)
-                if tkn == '!STOP!': self._stop = True
-                elif tkn == '!FRAME!':
-                    fid,ix,b,l,r = d # frame id,index,bytes,left, right
-                    f = self._buffer[(ix*N):(ix*N)+b].tobytes()
-                    if self._private and l < r: f = f[:l] + f[r:]
-                    self._pkts.append((ts,fid,f))
-                    if len(self._pkts) > NWRITE: self._writepkts()
-                else:
-                    msg = "invalid token {0}".format(tkn)
-                    self._icomms.put((self.cs,ts1,'!WRITE_ERR!',msg))
-            except Empty: pass
-            except (IndexError,ValueError):
-                self._icomms.put((self.cs,ts1,'!WRITE_ERR!',"Invalid arguments"))
-            except Exception as e:
-                msg = "{0}: {1}".format(type(e).__name__,e)
-                self._icomms.put((self.cs,ts1,'!WRITE_ERR!',msg))
-
-        # are there unwritten packets?
-        if len(self._pkts) > 0: self._writepkts()
-
-        # notify Collator we're down
-        if self._curs: self._curs.close()
-        if self._conn: self._conn.close()
-        self._icomms.put((self.cs,ts2iso(time.time()),'!WRITE!',None))
-
-    def stop(self,signum=None,stack=None): self._stop = True
-
-    def _writepkts(self):
-        """ write all packets to file """
-        # get a timestamp & cs
-        cs = self.cs
-        ts = ts2iso(time.time())
-
-        # wrap everything in a try block & reset all when done
-        try:
-            # open a new file sid_timestamp_hwaddr.pcap
-            if not self._fout:
-                fname = "{0}_{1}_{2}.pcap".format(self._sid,
-                                                  self._pkts[0][0],
-                                                  self._mac)
-                fpath = os.path.join(self._path,fname)
-                self._fout = pcap.pcapopen(fpath)
-                msg = "{0} opened for writing".format(fpath)
-                self._icomms.put((cs,ts,'!WRITE_OPEN!',msg))
-
-            # write each packet, then reset the packet list
-            for i,pkt in enumerate(self._pkts):
-                pcap.pktwrite(self._fout,pkt[0],pkt[2])
-                sql = "insert into frame_path (fid,filepath,n) values (%s,%s,%s);"
-                self._curs.execute(sql,(pkt[1],self._fout.name,self._npkt))
-                self._npkt += 1
-            self._pkts = []
-
-            # close file if it exceeds the max
-            if self._fout and os.path.getsize(self._fout.name) > self._sz:
-                self._icomms.put((cs,ts,'!WRITE_DONE!',"Closing %s. Wrote %d packets" % (self._fout.name,self._npkt)))
-                self._fout.close()
-                self._fout = None
-                self._npkt = 1
-        except psql.OperationalError as e: # unrecoverable
-            msg = "DB: {0}->{1}".format(e.pgcode,e.pgerror)
-            self._icomms.put((cs,ts,'!THRESH_ERR!',msg))
-        except pcap.PCAPException as e:
-            self._icomms.put((cs,ts,'!THRESH_ERR!',"File Error: {0}".format(e)))
-        except psql.Error as e: # possible incorrect semantics/syntax
-            self._conn.rollback()
-            msg = "SQL: {0}->{1}".format(e.pgcode,e.pgerror)
-            self._icomms.put((cs,ts,'!THRESH_WARN!',msg))
-        except Exception as e:
-            msg = "{0}: {1}".format(type(e).__name__,e)
-            self._icomms.put((cs,ts,'!THRESH_WARN!',msg))
-        else:
-            self._conn.commit()
-
-    def _setup(self,dbstr,conf):
-        """
-         connect to database & initialize variables
-
-         :param dbstr: database connection string
-         :param conf: configuration database
-        """
-        try:
-            # connect to db
-            self._conn = psql.connect(host=dbstr['host'],
-                                      port=dbstr['port'],
-                                      dbname=dbstr['db'],
-                                      user=dbstr['user'],
-                                      password=dbstr['pwd'])
-            self._curs = self._conn.cursor()
-            self._curs.execute("set time zone 'UTC';")
-            self._conn.commit()
-
-            # set save parameters
-            self._path = conf['path']
-            self._private = conf['private']
-            self._sz = conf['sz']
-        except Exception as e:
-            if self._curs:
-                self._conn.rollback()
-                self._curs.close()
-            if self._conn: self._conn.close()
-            raise RuntimeError(e)
 
 def extractie(dM):
     """
@@ -236,8 +75,8 @@ class Thresher(mp.Process):
          :param q: task queue from Collator
          :param conn: token connection from Collator
          :param lSta: lock for sta and sta activity inserts/updates
-         :param abad: tuple t = (AbadBuffer,AbadWriterQueue)
-         :param shama: tuple t = (ShamaBuffer,ShamaWriterQueue)
+         :param abad: Abad buffer
+         :param shama: Shama buffer
          :param dbstr: db connection string
          :param ouis: oui dict
         """
@@ -245,8 +84,8 @@ class Thresher(mp.Process):
         self._icomms = comms # communications queue
         self._tasks = q      # connection from Collator
         self._cC = conn      # token connection from Collator
-        self._abad = abad    # abad tuple
-        self._shama = shama  # shama tuple
+        self._abuff = abad   # abad buffer
+        self._sbuff = shama  # shama buffer
         self._conn = None    # db connection
         self._l = lSta       # sta lock
         self._curs = None    # our cursor
@@ -294,19 +133,14 @@ class Thresher(mp.Process):
                     elif tkn == '!SID!': sid = d[0]
                     elif tkn == '!RADIO!':
                         # fill in radio map, assigning buffer and writer
-                        rdos[d[0]] = {'role':d[1],'buffer':None,'writer':None}
-                        if d[1] == 'abad':
-                            rdos[d[0]]['buffer'] = self._abad[0]
-                            rdos[d[0]]['writer'] = self._abad[1]
-                        elif d[1] == 'shama':
-                            rdos[d[0]]['buffer'] = self._shama[0]
-                            rdos[d[0]]['writer'] = self._shama[1]
+                        rdos[d[0]] = {'role':d[1],'buffer':None,'record':False}
+                        if d[1] == 'abad': rdos[d[0]]['buffer'] = self._abuff
+                        elif d[1] == 'shama': rdos[d[0]]['buffer'] = self._sbuff
                         else:
                             msg = "Invalid role for radio: {0}".format(d[1])
                             self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
                     elif tkn == '!WRITE!':
-                        if d[0]: self._write = True
-                        elif not d[0]: self._write = False
+                        rdos[d[0]]['record'] = d[1]
                     elif tkn == '!FRAME!':
                         self._processframe(sid,rdos,ts,ts1,d)
                     else:
@@ -416,13 +250,14 @@ class Thresher(mp.Process):
                                                                    dM.error[0])))
 
             # pass fid, index, nBytes, left, right indices to writer
-            if self._write:
-                l = r = 0
-                if validRTAP: l += dR['sz']
-                if validMPDU:
-                    l += dM.offset
-                    r = lF-dM.stripped
-                rdos[src]['writer'].put(('!FRAME!',ts,[fid,ix,b,l,r]))
+            if rdos[src]['record']: pass
+            #if self._write:
+            #    l = r = 0
+            #    if validRTAP: l += dR['sz']
+            #    if validMPDU:
+            #        l += dM.offset
+            #        r = lF-dM.stripped
+            #    rdos[src]['writer'].put(('!FRAME!',ts,[fid,ix,b,l,r]))
 
             # NOTE: the next two "parts" storing and extracting are mutually
             # exlusive & are required to occur sequentially, thus could be

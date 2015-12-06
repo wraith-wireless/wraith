@@ -247,19 +247,24 @@ CREATE TABLE frame(
 );
 CREATE INDEX frame_ts_idx ON frame(ts);
 
--- frame_path table
--- stores the file that this frame is save in
--- NOTE: this is the same id as frame.id but we do not make a reference in
--- case the different threads processing thsee are out of sync
-DROP TABLE IF EXISTS frame_path;
+-- frame_raw table
+-- stores raw bytes of the frame
+DROP TABLE IF EXISTS frame_raw;
 CREATE TABLE frame_path(
    fid bigint NOT NULL,    -- foreign key to frame id
-   filepath TEXT NOT NULL, -- file path of this frame
-   n bigint NOT NULL,      -- # of this packet in the file
+   raw bytea NOT NULL,     -- unescaped hex of the raw frame
    CONSTRAINT ch_fid CHECK (fid > 0),
-   CONSTRAINT ch_n CHECK (n > 0),
    FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
-   PRIMARY KEY(filepath,n)
+);
+
+DROP TABLE IF EXISTS malformed;
+CREATE TABLE malformed(
+  mal_id bigserial NOT NULL, -- primary key
+  fid bigint NOT NULL,       -- fk to frame
+  location text NOT NULL,    -- location of error
+  reason text NOT NULL,      -- reason frame is malformed
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+  PRIMARY KEY(mal_id)
 );
 
 -- ampdu table
@@ -935,15 +940,6 @@ CREATE TABLE action(
   FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
-DROP TABLE IF EXISTS malformed;
-CREATE TABLE malformed(
-  mal_id bigserial NOT NULL, -- primary key
-  fid bigint NOT NULL,       -- fk to frame
-  reason text NOT NULL,      -- reason frame is malformed
-  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
-  PRIMARY KEY(mal_id)
-);
-
 -- NOTE CURRENTLY USED --
 --DROP TYPE IF EXISTS STA_TYPE;
 --CREATE TYPE STA_TYPE AS ENUM ('unknown','ap','sta','wired');
@@ -1023,7 +1019,7 @@ CREATE FUNCTION delete_all()
       DELETE FROM malformed;
       ALTER SEQUENCE malformed_malformed_id_seq RESTART;
       DELETE FROM traffic;
-      DELETE FROM frame_path;
+      DELETE FROM frame_raw;
       DELETE FROM frame;
       ALTER SEQUENCE frame_frame_id_seq RESTART;
       DELETE FROM platform;
@@ -1081,7 +1077,7 @@ ALTER SEQUENCE sta_sta_id_seq restart;
 DELETE FROM malformed;
 ALTER SEQUENCE malformed_malformed_id_seq RESTART;
 DELETE FROM traffic;
-DELETE FROM frame_path;
+DELETE FROM frame_raw;
 DELETE FROM frame;
 ALTER SEQUENCE frame_frame_id_seq RESTART;
 DELETE FROM platform;
@@ -1118,7 +1114,7 @@ DROP TABLE action;
 DROP TABLE sta_activity;
 DROP TABLE sta;
 DROP TABLE malformed;
-DROP TABLE frame_path;
+DROP TABLE frame_raw;
 DROP TABLE frame;
 DROP TABLE platform;
 DROP TABLE using_gpsd;

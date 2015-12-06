@@ -21,9 +21,6 @@ N = MAX_MPDU # number of cols (bytes)
 # number of (initial) threshers
 NTHRESH = 2
 
-# BULK WRITE NUMBER
-NWRITE = 20
-
 # iyri states
 IYRI_INVALID         = -1 # iyri is unuseable
 IYRI_CREATED         =  0 # iyri is created but not yet started
@@ -45,6 +42,3 @@ GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device 
 
 # path for oui text file
 OUIPATH = '../data/oui.txt'
-
-# path for bad mpdu files
-MPDUPATH = '../data/bad/'
