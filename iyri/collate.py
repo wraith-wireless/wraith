@@ -201,22 +201,22 @@ class Collator(mp.Process):
                 elif ev == RDO_SCAN:
                     # compile the scan list into a string before sending
                     rmsg = ','.join(["{0}:{1}".format(c,w) for (c,w) in msg])
-                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),rmsg))
+                    self._cI.send((IYRI_INFO,cs,'scan',rmsg))
                     self._submitradioevent(ts,[rmap[cs],'scan',rmsg])
                 elif ev == RDO_LISTEN:
-                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),msg))
+                    self._cI.send((IYRI_INFO,cs,'listen',msg))
                     self._submitradioevent(ts,[rmap[cs],'listen',msg])
                 elif ev == RDO_HOLD:
-                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),msg))
+                    self._cI.send((IYRI_INFO,cs,'hold',msg))
                     self._submitradioevent(ts,[rmap[cs],'hold',msg])
                 elif ev == RDO_PAUSE:
-                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),msg))
+                    self._cI.send((IYRI_INFO,cs,'pause',msg))
                     self._submitradioevent(ts,[rmap[cs],'pause',' '])
                 elif ev == RDO_SPOOF:
-                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),msg))
+                    self._cI.send((IYRI_INFO,cs,'spoof',msg))
                     self._submitradioevent(ts,[rmap[cs],'spoof',msg])
                 elif ev == RDO_TXPWR:
-                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),msg))
+                    self._cI.send((IYRI_INFO,cs,'txpwr',msg))
                     self._submitradioevent(ts,[rmap[cs],'txpwr',msg])
                 elif ev == RDO_FRAME:
                     ix,l = msg

@@ -1017,7 +1017,7 @@ CREATE FUNCTION delete_all()
       DELETE FROM sta;
       ALTER SEQUENCE sta_sta_id_seq RESTART;
       DELETE FROM malformed;
-      ALTER SEQUENCE malformed_malformed_id_seq RESTART;
+      ALTER SEQUENCE malformed_mal_id_seq RESTART;
       DELETE FROM traffic;
       DELETE FROM frame_raw;
       DELETE FROM frame;
@@ -1075,7 +1075,7 @@ DELETE FROM sta_activity;
 DELETE FROM sta;
 ALTER SEQUENCE sta_sta_id_seq restart;
 DELETE FROM malformed;
-ALTER SEQUENCE malformed_malformed_id_seq RESTART;
+ALTER SEQUENCE malformed_mal_id_seq RESTART;
 DELETE FROM traffic;
 DELETE FROM frame_raw;
 DELETE FROM frame;
