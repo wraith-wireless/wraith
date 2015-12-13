@@ -219,9 +219,7 @@ class RadioController(mp.Process):
                 # tuple m=(cmdid,description) such that cmdid != -1 if this
                 # command comes from an external source
                 event,ts,msg = self._qT.get_nowait()
-            except Empty:
-                # no notices from tuner thread
-
+            except Empty: # no notices from tuner thread
                 try:
                     # pull the frame off and pass it on
                     l = self._s.recv_into(self._buffer[(ix*DIM_N):(ix*DIM_N)+DIM_N],DIM_N)
@@ -264,6 +262,8 @@ class RadioController(mp.Process):
                 elif event == RDO_PAUSE:
                     self._stuner = TUNE_PAUSE
                     self._icomms.put((self._vnic,ts,RDO_PAUSE,' '))
+                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                elif event == RDO_STATE:
                     if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
                 elif event == POISON: break
 
