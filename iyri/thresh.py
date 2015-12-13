@@ -8,7 +8,7 @@ Provides Thresher and PCAPWriter:
 
 Each Process is configured to all for future commands (via tokens) to be used
 to assist in any as of yet unidentified issues or future upgrades that may be
-desired. Additionally, while each process will stop if given a token !STOP!,
+desired. Additionally, while each process will stop if given a POISON pill,
 the calling process i.e. the Collator can also send a SIGUSR1 signal to stop
 the process out of order, i.e preemptively
 """
@@ -28,7 +28,7 @@ import multiprocessing as mp                # multiprocessing
 import psycopg2 as psql                     # postgresql api
 from wraith.utils.timestamps import ts2iso  # timestamp conversion
 from dateutil import parser as dtparser     # parse out timestamps
-from wraith.iyri.constants import N         # row size in buffer
+from wraith.iyri.constants import *         # constants
 import wraith.wifi.radiotap as rtap         # 802.11 layer 1 parsing
 from wraith.wifi import mpdu                # 802.11 layer 2 parsing
 from wraith.wifi import mcs                 # mcs functions
@@ -113,7 +113,7 @@ class Thresher(mp.Process):
         ouis = {}                     # oui dict
 
         # notify collator we're up
-        self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH!',self.pid))
+        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_THRESH,self.pid))
 
         while not self._stop:
             # check for tasks or messages
@@ -129,38 +129,38 @@ class Thresher(mp.Process):
                     else: tkn,ts,d = self._tasks.get(0.5)
 
                     # & process it
-                    if tkn == '!STOP!': self._stop = True
-                    elif tkn == '!SID!': sid = d[0]
-                    elif tkn == '!RADIO!':
+                    if tkn == POISON: self._stop = True
+                    elif tkn == COL_SID: sid = d[0]
+                    elif tkn == COL_RDO:
                         # fill in radio map, assigning buffer and writer
                         rdos[d[0]] = {'role':d[1],'buffer':None,'record':False}
                         if d[1] == 'abad': rdos[d[0]]['buffer'] = self._abuff
                         elif d[1] == 'shama': rdos[d[0]]['buffer'] = self._sbuff
                         else:
                             msg = "Invalid role for radio: {0}".format(d[1])
-                            self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
-                    elif tkn == '!WRITE!':
+                            self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
+                    elif tkn == COL_WRITE:
                         rdos[d[0]]['record'] = d[1]
-                    elif tkn == '!FRAME!':
+                    elif tkn == COL_FRAME:
                         self._processframe(sid,rdos,ts,ts1,d)
                     else:
                         msg = "invalid token {0}".format(tkn)
-                        self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
+                        self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
                 except (IndexError,ValueError,KeyError) as e:
                     _,_,etrace = sys.exc_info()
                     msg = "{0} {1}\n{2}".format(type(e).__name__,e,
                                                 repr(traceback.format_tb(etrace)))
-                    self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
+                    self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
                 except Exception as e:
                     _,_,etrace = sys.exc_info()
                     msg = "{0} {1}\n{2}".format(type(e).__name__,e,
                                                 repr(traceback.format_tb(etrace)))
-                    self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
+                    self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
 
         # notify collector we're down
         if self._curs: self._curs.close()
         if self._conn: self._conn.close()
-        self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH!',None))
+        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_THRESH,None))
 
     def stop(self,signum=None,stack=None): self._stop = True
 
@@ -196,7 +196,7 @@ class Thresher(mp.Process):
         """
         # pull frame out of buffer
         src,ix,b = d[0],d[1],d[2] # hwaddr,index,nBytes
-        f = rdos[src]['buffer'][(ix*N):(ix*N)+b].tobytes()
+        f = rdos[src]['buffer'][(ix*DIM_N):(ix*DIM_N)+b].tobytes()
 
         # parse the frame
         fid = None       # current frame id
@@ -220,7 +220,7 @@ class Thresher(mp.Process):
             _,_,etrace = sys.exc_info()
             msg = "Parsing Error. {0} {1}\n{2}".format(type(e).__name__,e,
                                                        repr(traceback.format_tb(etrace)))
-            self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
+            self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
             return
         else:
             vs = (sid,ts,lF,dR['sz'],dM.offset,
@@ -244,28 +244,21 @@ class Thresher(mp.Process):
 
             # notify collator & insert malformed if we had any issues
             if dM.error:
-                self._icomms.put((self.cs,ts1,'!THRESH_WARN!',
+                self._icomms.put((self.cs,ts1,THRESH_WARN,
                                   "Frame {0}. Bad MPDU".format(fid)))
                 sql = """
                        insert into malformed (fid,location,reason)
                        values (%s,%s,%s);
                       """
-                self._curs.execute(sql,(fid,dM.error[1],dM.error[2]))
+                self._curs.execute(sql,(fid,dM.error[0],dM.error[1]))
                 self._conn.commit()
 
-            # pass fid, index, nBytes, left, right indices to writer
+            # write raw bytes if specified
             if rdos[src]['record']:
                 self._next = 'frame_raw'
-                sql = "insert into frame_raw (fid,raw) values (%s,E%s);"
-                self._curs.execute(sql,(fid,f))
+                sql = "insert into frame_raw (fid,raw) values (%s,%s);"
+                self._curs.execute(sql,(fid,psql.Binary(f)))
                 self._conn.commit()
-            #if self._write:
-            #    l = r = 0
-            #    if validRTAP: l += dR['sz']
-            #    if validMPDU:
-            #        l += dM.offset
-            #        r = lF-dM.stripped
-            #    rdos[src]['writer'].put(('!FRAME!',ts,[fid,ix,b,l,r]))
 
             # NOTE: the next two "parts" storing and extracting are mutually
             # exlusive & are required to occur sequentially, thus could be
@@ -312,7 +305,7 @@ class Thresher(mp.Process):
                                                                          e.pgerror)
             else:
                 msg = "Failed to insert frame. {0}: {1}.".format(e.pgcode,e.pgerror)
-            self._icomms.put((self.cs,ts1,'!THRESH_ERR!',msg))
+            self._icomms.put((self.cs,ts1,THRESH_ERR,msg))
         except psql.Error as e:
             self._conn.rollback()
             if fid:
@@ -323,7 +316,7 @@ class Thresher(mp.Process):
             else:
                 msg = "<PSQL> Failed to insert frame. {0}: {1}.".format(e.pgcode,
                                                                         e.pgerror)
-            self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
+            self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
         except Exception as e:
             _,_,etrace = sys.exc_info()
             self._conn.rollback()
@@ -334,7 +327,7 @@ class Thresher(mp.Process):
             else:
                 msg = "{0} {1}\n{2}".format(type(e).__name__,e,
                                             repr(traceback.format_tb(etrace)))
-            self._icomms.put((self.cs,ts1,'!THRESH_WARN!',msg))
+            self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
 
     #### All below _insert functions will allow db exceptions to pass through to caller
 
@@ -695,9 +688,9 @@ class Thresher(mp.Process):
         #if len(ssids) == 1:
         #    if isutf8(ssids[0]): ssid = ssids[0]
         #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!',"non utf-8 found in ssid"))
+        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
         else:
-            self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!','multiple ssids in assocreq'))
+            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in assocreq'))
         self._curs.execute(sql,(fid,client,ap,
                                 dM.fixed_params['capability']['ess'],
                                 dM.fixed_params['capability']['ibss'],
@@ -746,9 +739,9 @@ class Thresher(mp.Process):
         #if len(ssids) == 1:
         #    if isutf8(ssids[0]): ssid = ssids[0]
         #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!',"non utf-8 found in ssid"))
+        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
         else:
-            self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!','multiple ssids in assocresp'))
+            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in assocresp'))
         aid = dM.fixed_params['status-code'] if 'status-code' in dM.fixed_params else None
         self._curs.execute(sql,(fid,client,ap,assoc,
                                 dM.fixed_params['capability']['ess'],
@@ -818,9 +811,9 @@ class Thresher(mp.Process):
         #if len(ssids) == 1:
         #    if isutf8(ssids[0]): ssid = ssids[0]
         #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!',"non utf-8 found in ssid"))
+        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
         else:
-            self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!','multiple ssids in reassocreq'))
+            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in reassocreq'))
         self._curs.execute(sql,(fid,client,ap,
                                 dM.fixed_params['capability']['ess'],
                                 dM.fixed_params['capability']['ibss'],
@@ -862,9 +855,9 @@ class Thresher(mp.Process):
         #if len(ssids) == 1:
         #    if isutf8(ssids[0]): ssid = ssids[0]
         #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!',"non utf-8 found in ssid"))
+        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
         else:
-            self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!','multiple ssids in probereq'))
+            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in probereq'))
         self._curs.execute(sql,(fid,client,ap,ssid,sup_rs,ext_rs,vendors))
         self._conn.commit()
 
@@ -893,9 +886,9 @@ class Thresher(mp.Process):
         #if len(ssids) == 1:
         #    if isutf8(ssids[0]): ssid = ssids[0]
         #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!',"non utf-8 found in ssid"))
+        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
         else:
-            self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!','multiple ssids in proberesp'))
+            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in proberesp'))
         self._curs.execute(sql,(fid,client,ap,beaconts,
                                 dM.fixed_params['beacon-int'],
                                 dM.fixed_params['capability']['ess'],
@@ -941,9 +934,9 @@ class Thresher(mp.Process):
         #if len(ssids) == 1:
         #    if isutf8(ssids[0]): ssid = ssids[0]
         #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!',"non utf-8 found in ssid"))
+        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
         else:
-            self._icomms.put((self.cs,ts2iso(time.time()),'!THRESH_WARN!','multiple ssids in assocreq'))
+            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in assocreq'))
         self._curs.execute(sql,(fid,ap,beaconts,
                                 dM.fixed_params['beacon-int'],
                                 dM.fixed_params['capability']['ess'],

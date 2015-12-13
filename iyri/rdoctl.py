@@ -54,8 +54,8 @@ class Tuner(threading.Thread):
         """ switch channels based on associted dwell times """
         # starting paused or scanning?
         ts = ts2iso(time.time())
-        if self._state == TUNE_PAUSE: self._qR.put(('!PAUSE!',ts),(-1,' '))
-        else: self._qR.put(('!SCAN!',ts),(-1,self._chs))
+        if self._state == TUNE_PAUSE: self._qR.put((RDO_PAUSE,ts,[-1,' ']))
+        else: self._qR.put((RDO_SCAN,ts,[-1,self._chs]))
 
         # execution loop - wait on the internal connection for each channels
         # dwell time. IOT avoid a state where we would continue to scan the same
@@ -74,10 +74,10 @@ class Tuner(threading.Thread):
                 tkn = self._cI.recv()
                 ts = time.time()
 
-                # tokens will have 2 flavor's '!STOP!' and 'cmd:cmdid:params'
-                # where params is empty (for !STOP!) or a '-' separated list
-                if tkn == '!STOP!':
-                    self._qR.put(('!STOP!',ts2iso(ts),(-1,' ')))
+                # tokens will have 2 flavor's POISON and 'cmd:cmdid:params'
+                # where params is empty (for POISON) or a '-' separated list
+                if tkn == POISON:
+                    self._qR.put((POISON,ts2iso(ts),[-1,' ']))
                     break
                 else:
                     # calculate time remaining for this channel
@@ -89,48 +89,57 @@ class Tuner(threading.Thread):
                         cmd,cid,ps = tkn.split(':') # force into 3 components
                         cid = int(cid)
                     except:
-                        self._qR.put(('!ERR!',ts2iso(ts),(-1,"invalid command format")))
+                        err = "invalid command format"
+                        self._qR.put((CMD_ERR,ts2iso(ts),[-1,err]))
                     else:
                         if cmd == 'state':
-                            self._qR.put(('!STATE!',ts2iso(ts),(cid,TUNE_DESC[self._state])))
+                            self._qR.put((RDO_STATE,ts2iso(ts),
+                                          [cid,TUNE_DESC[self._state]]))
                         elif cmd == 'scan':
                             if self._state != TUNE_SCAN:
                                 self._state = TUNE_SCAN
-                                self._qR.put(('!SCAN!',ts2iso(ts),(cid,self._chs)))
+                                self._qR.put((RDO_SCAN,ts2iso(ts),[cid,self._chs]))
                             else:
-                                self._qR.put(('!ERR!',ts2iso(ts),(cid,'redundant command')))
-                        elif cmd == 'txpwr': pass
-                        elif cmd == 'spoof': pass
+                                err = "redundant command"
+                                self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
+                        elif cmd == 'txpwr':
+                            err = "not currently supported"
+                            self._qR.put((RDO_HOLD,ts2iso(ts),[cid,err]))
+                        elif cmd == 'spoof':
+                            err = "not currently supported"
+                            self._qR.put((RDO_HOLD,ts2iso(ts),[cid,err]))
                         elif cmd == 'hold':
                             if self._state != TUNE_HOLD:
                                 self._state = TUNE_HOLD
-                                self._qR.put(('!HOLD!',ts2iso(ts),(cid,self.channel)))
+                                self._qR.put((RDO_HOLD,ts2iso(ts),[cid,self.channel]))
                             else:
-                                self._qR.put(('!ERR!',ts2iso(ts),(cid,'redundant command')))
+                                err = "redundant command"
+                                self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
                         elif cmd == 'pause':
                             if self._state != TUNE_PAUSE:
                                 self._state = TUNE_PAUSE
-                                self._qR.put(('!PAUSE!',ts2iso(ts),(cid,self.channel)))
+                                self._qR.put((RDO_PAUSE,ts2iso(ts),[cid,self.channel]))
                             else:
-                                self._qR.put(('!ERR!',ts2iso(ts),(cid,'redundant command')))
+                                err = "redundant command"
+                                self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
                         elif cmd == 'listen':
                             # for listen, we ignore reduandacies as some other
-                            # (external) process may have changed the channel
+                            # process may have changed the channel
                             try:
                                 ch,chw = ps.split('-')
                                 if chw == 'None': chw = None
                                 iw.chset(self._vnic,ch,chw)
                                 self._state = TUNE_LISTEN
-                                self._qR.put(('!LISTEN',ts2iso(ts),
-                                             (cid,"{0}:{1}".format(ch,chw))))
+                                details = "{0}:{1}".format(ch,chw)
+                                self._qR.put((RDO_LISTEN,ts2iso(ts),[cid,details]))
                             except ValueError:
-                                self._qR.put(('!ERR!',ts2iso(ts),
-                                             (cid,'invalid param format')))
+                                err = "invalid param format"
+                                self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
                             except iw.IWException as e:
-                                self._qR.put(('!ERR!',ts2iso(ts),(cid,str(e))))
+                                self._qR.put((CMD_ERR,ts2iso(ts),[cid,str(e)]))
                         else:
-                            self._qR.put(('!ERR!',ts2iso(ts),
-                                        (cid,"invalid command {0}".format(cmd))))
+                            err = "invalid command {0}".format(cmd)
+                            self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
             else:
                 try:
                     # no token, go to next channel, reset remaining
@@ -138,9 +147,9 @@ class Tuner(threading.Thread):
                     iw.chset(self._vnic,self._chs[self._i][0],self._chs[self._i][1])
                     remaining = 0 # reset remaining timeout
                 except iw.IWException as e:
-                    self._qR.put(('!FAIL!',ts2iso(time.time()),(-1,e)))
+                    self._qR.put((RDO_FAIL,ts2iso(time.time()),[-1,e]))
                 except Exception as e: # blanket exception
-                    self._qR.put(('!FAIL!',ts2iso(time.time()),(-1,e)))
+                    self._qR.put((RDO_FAIL,ts2iso(time.time()),[-1,e]))
 
 class RadioController(mp.Process):
     """ RadioController - handles radio initialization and collection """
@@ -199,7 +208,7 @@ class RadioController(mp.Process):
         self._tuner.start()
 
         # notify Collator we are up
-        self._icomms.put((self._vnic,ts2iso(time.time()),'!RADIO!',self.radio))
+        self._icomms.put((self._vnic,ts2iso(time.time()),RDO_RADIO,self.radio))
 
         # execute sniffing loop
         ix = 0 # index of current frame
@@ -212,56 +221,57 @@ class RadioController(mp.Process):
                 event,ts,msg = self._qT.get_nowait()
             except Empty:
                 # no notices from tuner thread
+
                 try:
                     # pull the frame off and pass it on
-                    l = self._s.recv_into(self._buffer[(ix*N):(ix*N)+N],N)
+                    l = self._s.recv_into(self._buffer[(ix*DIM_N):(ix*DIM_N)+DIM_N],DIM_N)
                     if self._stuner != TUNE_PAUSE:
-                        self._icomms.put((self._vnic,ts2iso(time.time()),
-                                          '!FRAME!',(ix,l)))
-                    ix = (ix+1) % M
+                        ts = ts2iso(time.time())
+                        self._icomms.put((self._vnic,ts,RDO_FRAME,(ix,l)))
+                    ix = (ix+1) % DIM_M
                 except socket.timeout: continue
                 except socket.error as e:
-                    self._cI.send(('err',self._role,'Socket',e))
-                    self._icomms.put((self._vnic,ts2iso(time.time()),'!FAIL!',e))
+                    self._cI.send((IYRI_ERR,self._role,'Socket',e))
+                    self._icomms.put((self._vnic,ts2iso(time.time()),RDO_FAIL,e))
                     break
                 except Exception as e:
                     # blanket 'don't know what happened' exception
-                    self._cI.send(('err',self._role,type(e).__name__,e))
-                    self._icomms.put((self._vnic,ts2iso(time.time()),'!FAIL!',e))
+                    self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
+                    self._icomms.put((self._vnic,ts2iso(time.time()),RDO_FAIL,e))
                     break
             else:
                 # process the notification
-                if event == '!ERR!':
+                if event == CMD_ERR:
                     # bad/failed command from user, notify Iyri
-                    if msg[0] > -1: self._cI.send(('cmderr',self._role,msg[0],msg[1]))
-                elif event == '!FAIL!':
-                    self._cI.send(('err',self._role,'Tuner',msg[1]))
-                    self._icomms.put((self._vnic,ts,'!FAIL!',msg[1]))
-                elif event == '!STATE!':
-                    if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
-                elif event == '!HOLD!':
+                    if msg[0] > -1: self._cI.send((CMD_ERR,self._role,msg[0],msg[1]))
+                elif event == RDO_FAIL:
+                    self._cI.send((IYRI_ERR,self._role,'Tuner',msg[1]))
+                    self._icomms.put((self._vnic,ts,RDO_FAIL,msg[1]))
+                elif event == RDO_STATE:
+                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                elif event == RDO_HOLD:
                     self._stuner = TUNE_HOLD
-                    self._icomms.put((self._vnic,ts,'!HOLD!',msg[1]))
-                    if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
-                elif event == '!SCAN!':
+                    self._icomms.put((self._vnic,ts,RDO_HOLD,msg[1]))
+                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                elif event == RDO_SCAN:
                     self._stuner = TUNE_SCAN
-                    self._icomms.put((self._vnic,ts,'!SCAN!',msg[1]))
-                    if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
-                elif event == '!LISTEN':
+                    self._icomms.put((self._vnic,ts,RDO_SCAN,msg[1]))
+                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                elif event == RDO_LISTEN:
                     self._stuner = TUNE_LISTEN
-                    self._icomms.put((self._vnic,ts,'!LISTEN!',msg[1]))
-                    if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
-                elif event == '!PAUSE!':
+                    self._icomms.put((self._vnic,ts,RDO_LISTEN,msg[1]))
+                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                elif event == RDO_PAUSE:
                     self._stuner = TUNE_PAUSE
-                    self._icomms.put((self._vnic,ts,'!PAUSE!',' '))
-                    if msg[0] > -1: self._cI.send(('cmdack',self._role,msg[0],msg[1]))
-                elif event == '!STOP!': break
+                    self._icomms.put((self._vnic,ts,RDO_PAUSE,' '))
+                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                elif event == POISON: break
 
         # notify Collator we are down & shut down
-        self._icomms.put((self._vnic,ts2iso(time.time()),'!RADIO!',None))
+        self._icomms.put((self._vnic,ts2iso(time.time()),RDO_RADIO,None))
         if not self._shutdown():
             try:
-                self._cI.send(('warn',self._role,'Shutdown',"Incomplete reset"))
+                self._cI.send((IYRI_WARN,self._role,'Shutdown',"Incomplete reset"))
             except EOFError:
                 # most likely Iyri already closed their side
                 pass

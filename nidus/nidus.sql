@@ -250,11 +250,11 @@ CREATE INDEX frame_ts_idx ON frame(ts);
 -- frame_raw table
 -- stores raw bytes of the frame
 DROP TABLE IF EXISTS frame_raw;
-CREATE TABLE frame_path(
+CREATE TABLE frame_raw(
    fid bigint NOT NULL,    -- foreign key to frame id
    raw bytea NOT NULL,     -- unescaped hex of the raw frame
    CONSTRAINT ch_fid CHECK (fid > 0),
-   FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
+   FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
 DROP TABLE IF EXISTS malformed;
@@ -427,7 +427,7 @@ CREATE TABLE wepcrypt(
    fid bigint NOT NULL,      -- foreign key to frame
    iv bytea NOT NULL,        -- hex repr of 3 byte wep iv
    key_id smallint NOT NULL, -- index of wep key (out of 4) used
-   icv bytea NOT NULL,       -- hex repr of f byte wep icv
+   icv bytea NOT NULL,       -- hex repr of 4 byte wep icv
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_key_id CHECK (key_id >= 0 and key_id < 4),
    FOREIGN KEY(fid) REFERENCES frame(frame_id) ON DELETE CASCADE

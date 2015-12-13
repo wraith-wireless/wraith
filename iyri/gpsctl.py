@@ -20,6 +20,7 @@ import mgrs                                # lat/lon to mgrs conversion
 import gps                                 # gps device access
 import multiprocessing as mp               # multiprocessing
 from wraith.utils.timestamps import ts2iso # ts conversion
+from wraith.iyri.constants import *        # token constants
 
 class GPSController(mp.Process):
     """ periodically checks gps for current location """
@@ -58,18 +59,18 @@ class GPSController(mp.Process):
 
         # get and transmit device details
         if not self._devicedetails(): return
-        self._icomms.put((self._dd['id'],ts2iso(time.time()),'!GPSD!',self._dd))
+        self._icomms.put((self._dd['id'],ts2iso(time.time()),GPS_GPSD,self._dd))
 
         # if fixed location, send the frontline trace & stopping details
         if self._fixed: self._icomms.put((self._dd['id'],ts2iso(time.time()),
-                                          '!FLT!',self._defFLT))
+                                          GPS_FLT,self._defFLT))
 
         # 2 Location loop (only if dynamic)
         while not self._fixed:
-            if self._cI.poll(self._poll) and self._cI.recv() == '!STOP!': break
+            if self._cI.poll(self._poll) and self._cI.recv() == POISON: break
             while self._gpsd.waiting():
                 # recheck if we need to stop
-                if self._cI.poll() and self._cI.recv() == '!STOP!': break
+                if self._cI.poll() and self._cI.recv() == POISON: break
                 rpt = self._gpsd.next()
                 if rpt['class'] != 'TPV': continue
                 try:
@@ -87,7 +88,7 @@ class GPSController(mp.Process):
                                'dop':{'xdop':'{0:.3}'.format(self._gpsd.xdop),
                                       'ydop':'{0:.3}'.format(self._gpsd.ydop),
                                       'pdop':'{0:.3}'.format(self._gpsd.pdop)}}
-                        self._icomms.put((self._dd['id'],ts,'!FLT!',flt))
+                        self._icomms.put((self._dd['id'],ts,GPS_FLT,flt))
                         break
                 except (KeyError,AttributeError):
                     # a KeyError means not all values are present, an
@@ -97,18 +98,18 @@ class GPSController(mp.Process):
                     break
 
         # send stop & close out connections
-        self._icomms.put((self._dd['id'],ts2iso(time.time()),'!GPSD!',None))
+        self._icomms.put((self._dd['id'],ts2iso(time.time()),GPS_GPSD,None))
         if self._gpsd: self._gpsd.close()
         self._cI.close()
 
     def _devicedetails(self):
         """ Device Details Loop - get complete details or quit on done """
         while self._dd['flags'] is None: # static is initiated already
-            if self._cI.poll(self._poll) and self._cI.recv() == '!STOP!': return False
+            if self._cI.poll(self._poll) and self._cI.recv() == POISON: return False
             else:
                 # loop while data is on serial, checking each time if we need to stop
                 while self._gpsd.waiting():
-                    if self._cI.poll() and self._cI.recv() == '!STOP!': return False
+                    if self._cI.poll() and self._cI.recv() == POISON: return False
                     dev = self._gpsd.next()
                     try:
                         if dev['class'] == 'VERSION':

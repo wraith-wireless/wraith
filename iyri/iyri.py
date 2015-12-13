@@ -159,12 +159,12 @@ class C2C(threading.Thread):
                 if self._cD in rs:
                     # token from Iryi
                     tkn = self._cD.recv()
-                    if tkn == '!STOP!': break
+                    if tkn == POISON: break
                     else: self._send(tkn)
                 if self._csock in rs:
                     # cmd from client
                     cmd = self._recv()
-                    if cmd: self._cD.send(('cmd','c2c','msg',cmd))
+                    if cmd: self._cD.send((CMD_CMD,'c2c','msg',cmd))
             except (select.error,socket.error): # hide any select errors
                 self._shutdown() # reset everything
             except C2CClientExit:
@@ -306,13 +306,13 @@ class Iryi(object):
             for r in rs:
                 try:
                     l,o,t,m = r.recv()
-                    if l == 'err':
+                    if l == IYRI_ERR:
                         # only process errors invovled during execution
                         if IYRI_CREATED < self.state < IYRI_EXITING:
                             # continue w/out shama if it fails
                             if o == 'shama':
                                 logging.warning("Shama dropped: %s",m)
-                                self._pConns['shama'].send('!STOP!')
+                                self._pConns['shama'].send(POISON)
                                 self._pConns['shama'].close()
                                 del self._pConns['shama']
                                 mp.active_children()
@@ -322,20 +322,20 @@ class Iryi(object):
                                 self.stop()
                         else:
                             logging.warning("Uninitiated error (%) %s from %s",t,m,o)
-                    elif l == 'warn': logging.warning("%s: (%s) %s",o,t,m)
-                    elif l == 'info': logging.info("%s: (%s) %s",o,t,m)
-                    elif l == 'cmd':
+                    elif l == IYRI_WARN: logging.warning("%s: (%s) %s",o,t,m)
+                    elif l == IYRI_INFO: logging.info("%s: (%s) %s",o,t,m)
+                    elif l == CMD_CMD:
                         cid,cmd,rdos,ps = self._processcmd(m)
                         if cid is None: continue
                         for rdo in rdos:
                             logging.info("Client sent %s w/ id %d to %s",cmd,cid,rdo)
                             rmsg = '{0}:{1}:{2}'.format(cmd,cid,'-'.join(ps))
                             self._pConns[rdo].send(rmsg)
-                    elif l == 'cmderr':
+                    elif l == CMD_ERR:
                         resp = "ERR %d \001%s\001\n".format(t,m)
                         self._pConns['c2c'].send(resp)
                         logging.info('Command %d failed: %s',t,m)
-                    elif l == 'cmdack':
+                    elif l == CMD_ACK:
                         resp = "OK %d \001%s\001\n".format(t,m)
                         self._pConns['c2c'].send(resp)
                         logging.info('Command %d succeeded',t)
@@ -381,9 +381,9 @@ class Iryi(object):
                     raise RuntimeError("Backend:PostgreSQL:service not running")
 
             # create circular buffers
-            self._abuffer = memoryview(mp.Array('B',M*N,lock=False))
+            self._abuffer = memoryview(mp.Array('B',DIM_M*DIM_N,lock=False))
             if self._conf['shama']:
-                self._sbuffer = memoryview(mp.Array('B',M*N,lock=False))
+                self._sbuffer = memoryview(mp.Array('B',DIM_M*DIM_N,lock=False))
 
             # start Collator first (IOT accept comms
             logging.info("Initializing subprocesses...")
@@ -491,7 +491,7 @@ class Iryi(object):
         self._halt.set()
         for key in self._pConns:
             try:
-                self._pConns[key].send('!STOP!')
+                self._pConns[key].send(POISON)
                 self._pConns[key].close()
             except IOError:
                 # ignore any broken pipe errors

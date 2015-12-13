@@ -15,8 +15,8 @@ from wraith.wifi.mpdu import MAX_MPDU
 import re
 
 # define the m x n array size for the cirular buffer
-M = 1000     # number of rows for memory view
-N = MAX_MPDU # number of cols (bytes)
+DIM_M = 1000     # number of rows for memory view
+DIM_N = MAX_MPDU # number of cols (bytes)
 
 # number of (initial) threshers
 NTHRESH = 2
@@ -38,7 +38,39 @@ TUNE_LISTEN = 3
 # validation expressions
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr
 MACADDR = re.compile("^([0-9A-F]{2}:){5}([0-9A-F]{2})$")    # re for mac addr (capital letters only)
-GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device id (capital leters only)
+GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device id (capital letters only)
 
 # path for oui text file
 OUIPATH = '../data/oui.txt'
+
+# numeric constants for internal communications
+# IYRI
+POISON        =  0 # poison pill
+IYRI_INFO     =  1 # info message
+IYRI_WARN     =  2 # warning message
+IYRI_ERR      =  3 # error message
+# C2C
+CMD_CMD       =  4 # command from user
+CMD_ERR       =  5 # command failed
+CMD_ACK       =  6 # command succeeded
+# internal comms (to collator)
+GPS_GPSD      =  7 # gps device details
+GPS_FLT       =  8 # frontline trace
+THRESH_THRESH =  9 # thresher up/down
+THRESH_WARN   = 10 # thresher warning
+THRESH_ERR    = 11 # thresher failed
+RDO_RADIO     = 12 # radio up/down
+RDO_FAIL      = 14 # radio failed
+RDO_SCAN      = 15 # radio is scanning
+RDO_LISTEN    = 16 # radio is listening
+RDO_HOLD      = 17 # radio is holding
+RDO_PAUSE     = 18 # radio is paused
+RDO_SPOOF     = 19 # radio has sppofed mac
+RDO_TXPWR     = 20 # radio is transmitting at tx pwr
+RDO_FRAME     = 21 # radio sent frame
+RDO_STATE     = 22 # radio state requested
+# commands to threshers
+COL_SID       = 23 # pass the sid
+COL_RDO       = 24 # pass radio info
+COL_WRITE     = 25 # pass write/don't write
+COL_FRAME     = 26 # pass frame

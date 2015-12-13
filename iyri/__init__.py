@@ -30,6 +30,10 @@ REVISIONS:
    - uses a memoryview to hold captured frames in a circular buffer
    - pushed both processing of frames and data management (db writes) into the
      sensor i.e. no longer passes data to storage manager
+   - replaced string tokens (!TKN!) with numeric constants
+   - writing raw frames
+    o removed seperate 'writer' process, writes handled by thresher
+    o removed writing raw frames to file, stored in db (have to use psycopg2 Binary
 """
 __name__ = 'iyri'
 __license__ = 'GPL v3.0'

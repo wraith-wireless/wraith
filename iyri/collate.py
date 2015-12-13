@@ -27,8 +27,7 @@ from wraith.wifi.iw import regget          # regulatory domain
 from wraith.utils.cmdline import ipaddr    # returns ip address
 from wraith.wifi.oui import parseoui       # parse out oui dict
 from wraith.iyri.thresh import Thresher    # thresher process
-from wraith.iyri.constants import NTHRESH  # num thresher processes
-from wraith.iyri.constants import OUIPATH  # location of oui text file
+from wraith.iyri.constants import *        # constants
 
 class Collator(mp.Process):
     """ Collator - handles further processing of raw frames from the sniffer """
@@ -81,11 +80,11 @@ class Collator(mp.Process):
             if e.pgcode == '23P01': err = "Last session closed incorrectly"
             else: err = "{0}: {1}".format(e.pgcode,e.pgerror)
             self._conn.rollback()
-            self._cI.send(('err','Collator','DB',err))
+            self._cI.send((IYRI_ERR,'Collator','DB',err))
             return
         except Exception as e:
             self._conn.rollback()
-            self._cI.send(('err','Collator',type(e).__name__,e))
+            self._cI.send((IYRI_ERR,'Collator',type(e).__name__,e))
 
         # create threshers & pass sid
         for _ in xrange(NTHRESH):
@@ -96,16 +95,16 @@ class Collator(mp.Process):
                              self._dbstr,ouis)
                 t.start()
                 threshers[t.pid] = {'obj':t,'conn':send}
-                send.send(('!SID!',ts2iso(time.time()),[self._sid]))
+                send.send((COL_SID,ts2iso(time.time()),[self._sid]))
             except RuntimeError as e:
-                self._cI.send(('warn','Collator','Thresher',e))
+                self._cI.send((IYRI_WARN,'Collator','Thresher',e))
         if not len(threshers):
-            self._cI.send(('err','Collator','Thresher',"No Threshers. Quitting..."))
+            self._cI.send((IYRI_ERR,'Collator','Thresher',"No Threshers. Quitting..."))
 
         # execution loop
         while len(threshers):
             # 1. check for stop token
-            if self._cI.poll() and self._cI.recv() == '!STOP!': break
+            if self._cI.poll() and self._cI.recv() == POISON: break
 
             # get any queued data from internal comms
             cs = ts = ev = msg = None
@@ -114,37 +113,37 @@ class Collator(mp.Process):
                 cs,ts,ev,msg = self._icomms.get(True,0.5)
 
                 # events from thresher(s)
-                if ev == '!THRESH!':
+                if ev == THRESH_THRESH:
                     # thresher process up/down message
                     if msg is not None:
                         if msg in threshers:
                             rmsg = "{0} initiated".format(cs)
-                            lvl = 'info'
+                            lvl = IYRI_INFO
                         else:
                             rmsg = "{0} not recognized".format(cs)
-                            lvl = 'warn'
+                            lvl = IYRI_WARN
                         self._cI.send((lvl,'Collator','Thresher',rmsg))
                     else:
                         pid = int(cs.split('-')[1])
                         threshers[pid]['conn'].close()
                         del threshers[pid]
-                elif ev == '!THRESH_WARN!':
-                    self._cI.send(('warn','Collator','Thresher',msg))
-                elif ev == '!THRESH_ERR!':
+                elif ev == THRESH_WARN:
+                    self._cI.send((IYRI_WARN,'Collator','Thresher',msg))
+                elif ev == THRESH_ERR:
                     # warn collator about error then tell process to stop
                     pid = int(cs.split('-')[1])
                     rmsg = "{0}->{1}".format(cs,msg)
-                    self._cI.send(('warn','Collator','Thresher',rmsg))
-                    threshers[pid]['conn'].send(('!STOP!',ts,None))
+                    self._cI.send((IYRI_WARN,'Collator','Thresher',rmsg))
+                    threshers[pid]['conn'].send((POISON,ts,None))
                 # events from gps device
-                elif ev == '!GPSD!':
+                elif ev == GPS_GPSD:
                     # up/down message from gpsd
                     self._submitgpsd(ts,msg)
-                    if msg: self._cI.send(('info','Collator','GPSD','initiated'))
-                    else: self._cI.send(('info','Collator','GPSD','shutdown'))
-                elif ev == '!FLT!': self._submitflt(ts,msg)
+                    if msg: self._cI.send((IYRI_INFO,'Collator','GPSD','initiated'))
+                    else: self._cI.send((IYRI_INFO,'Collator','GPSD','shutdown'))
+                elif ev == GPS_FLT: self._submitflt(ts,msg)
                 # events from radio(s)
-                elif ev == '!RADIO!': #
+                elif ev == RDO_RADIO:
                     # up/down message from radio(s).
                     if msg is not None:
                         # pull out mac and role
@@ -155,22 +154,22 @@ class Collator(mp.Process):
                         # & that role is valid i.e. abad or shama
                         if role in roles:
                             rmsg = "{0} already initiated".format(role)
-                            self._cI.send(('warn','Collator','Radio',rmsg))
+                            self._cI.send((IYRI_WARN,'Collator','Radio',rmsg))
                             continue
                         elif role not in ['abad','shama']:
                             rmsg = "invalid role: {0}".format(role)
-                            self._cI.send(('warn','Collator','Radio',rmsg))
+                            self._cI.send((IYRI_WARN,'Collator','Radio',rmsg))
                             continue
 
                         # update threshers
                         for pid in threshers:
-                            threshers[pid]['conn'].send(('!RADIO!',ts,[mac,role]))
-                            threshers[pid]['conn'].send(('!WRITE!',ts,
-                                                         [mac,msg['record']]))
+                            rec = msg['record']
+                            threshers[pid]['conn'].send((COL_RDO,ts,[mac,role]))
+                            threshers[pid]['conn'].send((COL_WRITE,ts, [mac,rec]))
 
                         # add to radio & role maps
                         rmsg = "{0}:{1} initiated".format(role,cs)
-                        self._cI.send(('info','Collator','Radio',rmsg))
+                        self._cI.send((IYRI_INFO,'Collator','Radio',rmsg))
                         rmap[cs] = mac
                         roles[role] = cs
 
@@ -186,60 +185,60 @@ class Collator(mp.Process):
                                                     'z':msg['z'][i]})
                     else:
                         rmsg = "{0} shutdown".format(cs)
-                        self._cI.send(('info','Collator','Radio',rmsg))
+                        self._cI.send((IYRI_INFO,'Collator','Radio',rmsg))
                         self._submitradio(ts,rmap[cs],None)
                         del rmap[cs]
                         for role in roles:
                             if roles[role] == cs:
                                 del roles[role]
                                 break
-                elif ev == '!FAIL!':
+                elif ev == RDO_FAIL:
                     # notify Iyri, submit fail & delete cs
                     rmsg = "Deleting radio {0}: {1}".format(cs,msg)
-                    self._cI.send(('err','Collator','Radio',rmsg))
+                    self._cI.send((IYRI_ERR,'Collator','Radio',rmsg))
                     self._submitradioevent(ts,[rmap[cs],'fail',msg])
                     del rmap[cs]
-                elif ev == '!SCAN!':
+                elif ev == RDO_SCAN:
                     # compile the scan list into a string before sending
                     rmsg = ','.join(["{0}:{1}".format(c,w) for (c,w) in msg])
-                    self._cI.send(('info',cs,ev.replace('!',''),rmsg))
+                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),rmsg))
                     self._submitradioevent(ts,[rmap[cs],'scan',rmsg])
-                elif ev == '!LISTEN!':
-                    self._cI.send(('info',cs,ev.replace('!',''),msg))
+                elif ev == RDO_LISTEN:
+                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'listen',msg])
-                elif ev == '!HOLD!':
-                    self._cI.send(('info',cs,ev.replace('!',''),msg))
+                elif ev == RDO_HOLD:
+                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'hold',msg])
-                elif ev == '!PAUSE!':
-                    self._cI.send(('info',cs,ev.replace('!',''),msg))
+                elif ev == RDO_PAUSE:
+                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'pause',' '])
-                elif ev == '!SPOOF!':
-                    self._cI.send(('info',cs,ev.replace('!',''),msg))
+                elif ev == RDO_SPOOF:
+                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'spoof',msg])
-                elif ev == '!TXPWR!':
-                    self._cI.send(('info',cs,ev.replace('!',''),msg))
+                elif ev == RDO_TXPWR:
+                    self._cI.send((IYRI_INFO,cs,ev.replace('!',''),msg))
                     self._submitradioevent(ts,[rmap[cs],'txpwr',msg])
-                elif ev == '!FRAME!':
+                elif ev == RDO_FRAME:
                     ix,l = msg
-                    qT.put(('!FRAME!',ts,[rmap[cs],ix,l]))
+                    qT.put((COL_FRAME,ts,[rmap[cs],ix,l]))
                 else: # unidentified event type, notify iyri
                     rmsg = "unknown event. {0}->{1}".format(ev,cs)
-                    self._cI.send(('warn','Collator',cs,rmsg))
+                    self._cI.send((IYRI_WARN,'Collator',cs,rmsg))
             except Empty: continue
             except psql.OperationalError as e: # unrecoverable
                 rmsg = "{0}: {1}".format(e.pgcode,e.pgerror)
-                self._cI.send(('err','Collator','DB',rmsg))
+                self._cI.send((IYRI_ERR,'Collator','DB',rmsg))
             except psql.Error as e: # possible incorrect semantics/syntax
                 self._conn.rollback()
                 rmsg = "{0}: {1}".format(e.pgcode,e.pgerror)
-                self._cI.send(('warn','Collator','SQL',rmsg))
+                self._cI.send((IYRI_WARN,'Collator','SQL',rmsg))
             except IndexError: # something wrong with antenna indexing
-                self._cI.send(('err','Collator',"Radio","misconfigured antennas"))
+                self._cI.send((IYRI_ERR,'Collator',"Radio","misconfigured antennas"))
             except KeyError as e: # (most likely) a radio sent a message without initiating
                 rmsg = "Bad key {0} in event {1}".format(e,ev)
-                self._cI.send(('err','Collator','Key',rmsg))
+                self._cI.send((IYRI_ERR,'Collator','Key',rmsg))
             except Exception as e: # handle catchall error
-                self._cI.send(('warn','Collator',type(e).__name__,e))
+                self._cI.send((IYRI_WARN,'Collator',type(e).__name__,e))
 
         # clean & shut down
         ts = ts2iso(time.time())
@@ -251,13 +250,13 @@ class Collator(mp.Process):
                 self._submitsensor(ts,False)
             except psql.Error:
                 self._conn.rollback()
-                self._cI.send(('warn','Collator','shutdown',"Corrupted DB on exit"))
+                self._cI.send((IYRI_WARN,'Collator','shutdown',"Corrupted DB on exit"))
 
             # stop children and close communications. active_children has side
             # effect of joining
             for pid in threshers:
                 try:
-                    threshers[pid]['conn'].send(('!STOP!',ts,None))
+                    threshers[pid]['conn'].send((POISON,ts,None))
                 except:
                     pass
                 finally:
@@ -273,7 +272,7 @@ class Collator(mp.Process):
         except Exception as e:
             if self._cI:
                 rmsg = "Failed to clean up: {0}".format(e)
-                self._cI.send(('warn','Collator','shutdown',rmsg))
+                self._cI.send((IYRI_WARN,'Collator','shutdown',rmsg))
 
 #### private helper functions
 

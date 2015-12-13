@@ -40,14 +40,14 @@ Iyri:
     261434LNov2015.657 [WARNING] Collator: (Thresher) Unpack error in mpdu at 659:
     261434LNov2015.51 [WARNING] Collator: (Thresher) invalid arguments (00:c0:ca:59:af:a6,712,48) for !FRAME!
     61435LNov2015.360 [WARNING] Collator: (Thresher) Frame 2832 failed at probereq. TypeError: 'NoneType' object is not iterable.
- 58) on some shutdowns, getting...
+    ** It believe that (with current setup of 2 threshers), data in the buffer
+    is being overwritten before the being parsed
+ 58) on shutdowns, getting...
     ^CTraceback (most recent call last):
     File "/usr/lib/python2.7/multiprocessing/queues.py", line 266, in _feed
     send(obj)
     IOError: [Errno 32] Broken pipe
     what process is this comming from?
- 59) remove writer/write to file and add write frames to db as bytea
- 60) replace string tokens i.e. !THRESH_WARN! with defined constants
  61) document differnt comm protocols
 Wifi:
  1) Should we add support for AVS, Prism headers ?
@@ -61,8 +61,5 @@ Wifi:
      - parse timing advance
  5) how to support a-msdu etc
  6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
- 7) compile/use own oui file, not relying on aircrack-ng
-    see http://standards-oui.ieee.org/oui.txt
  8) in iw and iwtools switch to netlink rather than parsing iw/iwconfig/ifconfig output
  9) handle multiple ssids in mgmt frames
-10) mpdu needs to be more robust/resilient in the event of errors

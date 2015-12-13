@@ -6,7 +6,7 @@
  desc: database schema
  includes: nidus.sql 0.0.13 
  changes:
- 
+  - added frame_raw and malformed tables
 """
 __name__ = 'nidus'
 __license__ = 'GPL v3.0'

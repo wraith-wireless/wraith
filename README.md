@@ -42,22 +42,22 @@ Partial support of 802.11-2012
 
 ### b. Iryi (v 0.2.0) : Wraith Sensor
 
-Iryi is a 802.11 sensor consisting of an optional radio (shama), a mandatory
-radio (abad) and a Collator which relays collected data to the backend database.
-802.11 packets are stored in a circular buffer, parsed and inserted in the database.
-Any geolocational data is also stored (if a gps device is present).
+Iryi is a 802.11 sensor consisting of an optional radio (shama), and a mandatory
+radio (abad). 802.11 packets are stored in a circular buffer, parsed and inserted
+in the database. Any geolocational data is also stored (if a gps device is present).
 
 NOTE:
 In earlier versions < 0.1.x, Iyri did not handle database writes/updates. Rather
-this was handled by a an additional module colocated with the database (on the same
-system) that the sensor would pass data to. It was with great relunctance that I
-removed this 'mediator', and moved database functionality directly to the sensor,
-primarily as it would restrict wraith to a single platform i.e. expanding to a
-central database and multiple sensors will be very difficult. However, there were two primary reasons for doing so:
-* I wanted to push more autonomy and intelligence into the sensor which would
-  require the sensor to parse out radiotap and mpdu (no point in doing this twice)
-* frames were being passed through multiple connection, queues and sockets before
-  they eventually made their way to the mediator causing a major delay in processing
+this was handled by a an additional module colocated with the database that the
+sensor would pass data to. It was with great relunctance that I removed this
+'mediator', and moved database functionality directly to the sensor, primarily as
+it would restrict wraith to a single platform i.e. expanding to a central database
+and multiple sensors will be very difficult. However, there were two primary
+reasons for doing so:
+ * I wanted to push more autonomy and intelligence into the sensor which would
+   require the sensor to parse out radiotap and mpdu (no point in doing this twice)
+ * frames were being passed through multiple connection, queues and sockets before
+   they eventually made their way to the mediator causing a major delay in processing
 
 ### d. wraith-rt: GUI
 
@@ -111,4 +111,3 @@ and editing of configuration files, some manipulation of backened storage.
      - collate.py       data collation and forwarding
      - thresh.py        Thresher process for parsing/writing frames
      - iyrid            iyri daemon
- * deprecated           client/server version
