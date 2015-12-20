@@ -2,14 +2,14 @@
 
 """ mpdu.py: Mac Protocol Data Unit (MPDU) parsing.
 
-Parses the 802.11 MAC Protocol Data Unit (MPDU) IAW IEED 802.11-2012 we use Std
-when referring to IEEE Std 802.11-2012
+Parses the 802.11 MAC Protocol Data Unit (MPDU) IAW IEED 802.11-2012 (Std).
+
 NOTE:
  It is recommended not to import * as it may cause conflicts with other modules
 """
 __name__ = 'mpdu'
 __license__ = 'GPL v3.0'
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 __date__ = 'November 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -17,7 +17,6 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import struct
-from binascii import hexlify
 from wraith.utils.bits import *
 
 class MPDUException(Exception): pass                    # generic mpdu exception
@@ -29,12 +28,26 @@ BROADCAST = "ff:ff:ff:ff:ff:ff" # broadcast address
 MAX_MPDU = 7991                 # maximum mpdu size in bytes
 FMT_BO = "="                    # struct format byte order specifier
 
+def validssid(s):
+    """
+     determines if ssid is valid
+     :param s: ssid
+     :returns True if ssid is 32 characters and utf-8, False otherwise:
+    """
+    if len(s) > 32: return False
+    else:
+        try:
+            s.decode('utf-8')
+            return True
+        except:
+            return False
+
 class MPDU(dict):
     """
-     a wrapper class for the underlying mpdu dict
-     a MPDU object is a dict with the following mandatory key/value pairs
-       - mpdu fields: frames will be FRAMECTRL|DURATION|ADDR1 (and fcs if not
-       stripped by the firmware) see Std 8.3.1.3]
+     a wrapper class for the underlying mpdu dict  with the following mandatory
+     key/value pairs
+      FRAMECTRL|DURATION|ADDR1 (and fcs if not
+        stripped by the firmware) see Std 8.3.1.3]
       present: an ordered list of mpdu fields
       offset: the number of bytes read from the first byte of frame upto the msdu
        (including any encryption)
@@ -63,12 +76,11 @@ class MPDU(dict):
      stripped (bytes read from 'end' of frame),
      size (total bytes read),
      present (ordered list of fields present in the MPDU)
-     error (only present if parsing failed) will contain a tuple t = (location,message)
-      where location is a '.' separated list of locations/sublocations and
-      message describes the failure
+     error: list of tuples t = (location,message) where location is a '.'
+     separated list of locations/sublocations and message describes the error
     """
     def __new__(cls,d=None):
-        return super(MPDU,cls).__new__(cls,dict({} if not d else d))
+        return super(MPDU,cls).__new__(cls,dict({'err':[]} if not d else d))
 
     #### PROPERTIES
 
@@ -77,11 +89,8 @@ class MPDU(dict):
 
     @property
     def error(self):
-        """ returns error message if any """
-        try:
-            return self['error']
-        except:
-            return None
+        """ returns error message(s) """
+        return self['err']
 
     @property
     def offset(self):
@@ -118,7 +127,7 @@ class MPDU(dict):
     @property
     def isempty(self):
         """ :returns: True if mpdu is 'uninstantiated' """
-        return not self.present
+        return self.present == []
 
     # The following are the minimum required fields of a mpdu frame
     # and will raise an unistantiated error if not present
@@ -215,6 +224,20 @@ class MPDU(dict):
     def info_els(self):
         return self['info-elements'] if 'info-elements' in self else None
 
+    def getie(self,ies):
+        """
+        :param ies: desired list of info elements
+        :returns: list of of lists of info elements found
+        """
+        ret = [[] for _ in ies]
+        for ie in self.info_els:
+            try:
+                ix = ies.index(ie[0])
+                ret[ix].append(ie[1])
+            except:
+                pass
+        return ret
+
 def parse(f,hasFCS=False):
     """
      parse the mpdu in frame (where frame is stripped of any layer 1 header)
@@ -237,14 +260,15 @@ def parse(f,hasFCS=False):
                                'flags':_fcflags_(vs[1])},
                   'present':['framectrl'],
                   'offset':offset,
-                  'stripped':0})
+                  'stripped':0,
+                  'err':[]})
         vs,m['offset'] = _unpack_from_(_S2F_['duration'] + _S2F_['addr'],f,m['offset'])
         m['duration'] = _duration_(vs[0])
         m['addr1'] = _hwaddr_(vs[1:])
         m['present'].extend(['duration','addr1'])
         if hasFCS:
             m['fcs'],_ = struct.unpack(FMT_BO+'L',f[-4:])
-            frame = f[:-4]
+            f = f[:-4]
             m['stripped'] += 4
     except struct.error as e:
         raise MPDUException("unpacking minimum: {0}".format(e))
@@ -254,8 +278,7 @@ def parse(f,hasFCS=False):
         elif m.type == FT_CTRL: _parsectrl_(f,m)
         elif m.type == FT_DATA: _parsedata_(f,m)
         else:
-            m['error'] = ('framectrl.type','invalid type RSRV')
-            return
+            m['err'].append(('framectrl.type','invalid type RSRV'))
 
         # process encryption
         if m.flags['pf']:
@@ -273,9 +296,9 @@ def parse(f,hasFCS=False):
                 else: _wep_(f,m)
                 if 'l3-crypt' in m: m['present'].append('l3-crypt')
             except struct.error as e:
-                err = ('l3-crypt',"unpacking encryption {0}".format(e))
+                m['err'].append(('l3-crypt',"unpacking encryption {0}".format(e)))
             except Exception as e:
-                err = ('l3-crypt',"testing for encryption {0}".format(e))
+                m['err'].append(('l3-crypt',"testing for encryption {0}".format(e)))
 
     # append the fcs to present if necessary and return the mpdu dict
     if hasFCS: m['present'].append('fcs')
@@ -613,8 +636,7 @@ def _parsemgmt_(f,m):
         m['seqctrl'] = _seqctrl_(v[-1])
         m['present'].extend(['addr2','addr3','seqctrl'])
     except struct.error as e:
-        m['error'] = ('mgmt',"unpacking addr2,addr3,sequctrl {0}".format(e))
-        return
+        m['err'].append(('mgmt',"unpacking addr2,addr3,sequctrl {0}".format(e)))
 
     # HTC fields?
     #if mac.flags['o']:
@@ -650,7 +672,7 @@ def _parsemgmt_(f,m):
             fmt = _S2F_['timestamp'] + _S2F_['capability']
             v,m['offset'] = _unpack_from_(fmt,f,m['offset'])
             m['fixed-params'] = {'timestamp':v[0],
-                               'capability':capinfo_all(v[1])}
+                                 'capability':capinfo_all(v[1])}
             m['present'].append('fixed-params')
         elif m.subtype == ST_MGMT_PROBE_RESP or m.subtype == ST_MGMT_BEACON:
             fmt = _S2F_['timestamp'] + _S2F_['beacon-int'] + _S2F_['capability']
@@ -681,13 +703,10 @@ def _parsemgmt_(f,m):
                 m['action-el'] = f[m['offset']:]
                 m['present'].append('action-els')
                 m['offset'] = len(f)
-        else:
-            # ST_MGMT_ATIM, RSRV_7, RSRV_8 or RSRV_15
-            return
+        #else: # ST_MGMT_ATIM, RSRV_7, RSRV_8 or RSRV_15
     except Exception as e:
-        m['error'] = ('mgmt.{0}'.format(ST_MGMT_TYPES[m.subtype]),
-                      "unpacking/parsing {0}".format(e))
-        return
+        m['err'].append(('mgmt.{0}'.format(ST_MGMT_TYPES[m.subtype]),
+                         "unpacking/parsing {0}".format(e)))
 
     # get information elements if any
     if m['offset'] < len(f):
@@ -716,7 +735,7 @@ def _parsemgmt_(f,m):
                 else:
                     m['info-elements'].append(info)
         except Exception as e:
-            m['error'] = ('mgmt.info-elements',"unpacking {0}".format(e))
+            m['err'].append(('mgmt.info-elements',"unpacking {0}".format(e)))
 
 #### MGMT Frame subfields
 _CAP_INFO_ = {'ess':(1 << 0),
@@ -1068,8 +1087,8 @@ def _parsectrl_(f,m):
             m['addr2'] = _hwaddr_(v)
             m['present'].append('addr2')
         except Exception as e:
-            m['error'] = ('ctrl.{0}'.format(ST_CTRL_TYPES[m.subtype]),
-                          "unpacking {0}".format(e))
+            m['err'].append(('ctrl.{0}'.format(ST_CTRL_TYPES[m.subtype]),
+                             "unpacking {0}".format(e)))
     elif m.subtype == ST_CTRL_BLOCK_ACK_REQ:
         # append addr2 & bar control
         try:
@@ -1077,18 +1096,16 @@ def _parsectrl_(f,m):
             m['addr2'] = _hwaddr_(v)
             m['present'].append('addr2')
         except Exception as e:
-            m['error'] = [('ctrl.ctrl-block-ack-req.addr2',
-                           "unpacking {0}".format(e))]
-            return
+            m['err'].append(('ctrl.ctrl-block-ack-req.addr2',
+                             "unpacking {0}".format(e)))
 
         try:
             v,m['offset'] = _unpack_from_(_S2F_['barctrl'],f,m['offset'])
             m['barctrl'] = _bactrl_(v)
             m['present'].append('barctrl')
         except Exception as e:
-            m['error'] = ('ctrl.ctrl-block-ack-req.barctrl',
-                          "unpacking {0}".format(e))
-            return
+            m['err'].append(('ctrl.ctrl-block-ack-req.barctrl',
+                             "unpacking {0}".format(e)))
 
         # & bar info field
         try:
@@ -1104,7 +1121,7 @@ def _parsectrl_(f,m):
                 if not m['barctrl']['compressed-bm']:
                     # 1 0 -> Reserved
                     m['barctrl']['type'] = 'reserved'
-                    m['barinfo'] = {'unparsed':hexlify(f[m['offset']:])}
+                    m['barinfo'] = {'unparsed':f[m['offset']:]}
                     m['offset'] += len(f[m['offset']:])
                 else:
                     # 1 1 -> Multi-tid BlockAckReq Std 8.3.1.8.4 See Figures Std 8-22, 8-23
@@ -1115,11 +1132,11 @@ def _parsectrl_(f,m):
                             v,m['offset'] = _unpack_from_("HH",f,m['offset'])
                             m['barinfo']['tids'].append(_pertid_(v))
                     except Exception as e:
-                        m['error'] = ('ctrl.ctrl-block-ack-req.barinfo.tids',
-                                      "unpacking {0}".format(e))
+                        m['err'].append(('ctrl.ctrl-block-ack-req.barinfo.tids',
+                                         "unpacking {0}".format(e)))
         except Exception as e:
-            m['error'] = ('ctrl.ctrl-block-ack-req.barinfo',
-                          "unpacking {0}".format(e))
+            m['err'].append(('ctrl.ctrl-block-ack-req.barinfo',
+                             "unpacking {0}".format(e)))
     elif m.subtype == ST_CTRL_BLOCK_ACK:
         # add addr2 & ba control
         try:
@@ -1127,17 +1144,15 @@ def _parsectrl_(f,m):
             m['addr2'] = _hwaddr_(v)
             m['present'].append('addr2')
         except Exception as e:
-            m['error'] = ('ctrl.ctrl-block-ack.addr2',
-                          "unpacking {0}".format(e))
-            return
+            m['err'].append(('ctrl.ctrl-block-ack.addr2',
+                             "unpacking {0}".format(e)))
 
         try:
             v,m['offset'] = _unpack_from_(_S2F_['bactrl'],f,m['offset'])
             m['bactrl'] = _bactrl_(v)
             m['present'].append('bactrl')
         except Exception as e:
-            m['error'] = ('ctrl.ctrl-block-ack.bactrl',"unpacking {0}".format(e))
-            return
+            m['err'].append(('ctrl.ctrl-block-ack.bactrl',"unpacking {0}".format(e)))
 
         # & ba info field
         try:
@@ -1147,18 +1162,18 @@ def _parsectrl_(f,m):
                 if not m['bactrl']['compressed-bm']:
                     # 0 0 -> Basic BlockAck 8.3.1.9.2
                     m['bactrl']['type'] = 'basic'
-                    m['bainfo']['babitmap'] = hexlify(f[m['offset']:m['offset']+128])
+                    m['bainfo']['babitmap'] = f[m['offset']:m['offset']+128]
                     m['offset'] += 128
                 else:
                     # 0 1 -> Compressed BlockAck Std 8.3.1.9.3
                     m['bactrl']['type'] = 'compressed'
-                    m['bainfo']['babitmap'] = hexlify(f[m['offset']:m['offset']+8])
+                    m['bainfo']['babitmap'] = f[m['offset']:m['offset']+8]
                     m['offset'] += 8
             else:
                 if not m['bactrl']['compressed-bm']:
                     # 1 0 -> Reserved
                     m['bactrl']['type'] = 'reserved'
-                    m['bainfo'] = {'unparsed':hexlify(f[m['offset']:])}
+                    m['bainfo'] = {'unparsed':f[m['offset']:]}
                 else:
                     # 1 1 -> Multi-tid BlockAck Std 8.3.1.9.4 see Std Figure 8-28, 8-23
                     m['bactrl']['type'] = 'multi-tid'
@@ -1167,14 +1182,14 @@ def _parsectrl_(f,m):
                         for i in xrange(m['bactrl']['tid-info'] + 1):
                             v,m['offset'] = _unpack_from_("HH",f,m['offset'])
                             pt = _pertid_(v)
-                            pt['babitmap'] = hexlify(f[m['offset']:m['offset']+8])
+                            pt['babitmap'] = f[m['offset']:m['offset']+8]
                             m['bainfo']['tids'].append(pt)
                             m['offset'] += 8
                     except Exception as e:
-                        m['error'] = ('ctrl.ctrl-block-ack.bainfo.tids',
-                                      "unpacking {0}".format(e))
+                        m['err'].append(('ctrl.ctrl-block-ack.bainfo.tids',
+                                         "unpacking {0}".format(e)))
         except Exception as e:
-            m['error'] = ('ctrl.ctrl-block-ack.bainfo',"unpacking {0}".format(e))
+            m['err'].append(('ctrl.ctrl-block-ack.bainfo',"unpacking {0}".format(e)))
     elif m.subtype == ST_CTRL_WRAPPER:
         # Std 8.3.1.10, carriedframectrl is a Frame Control
         try:
@@ -1182,9 +1197,8 @@ def _parsectrl_(f,m):
             m['carriedframectrl'] = v
             m['present'].append('carriedframectrl')
         except Exception as e:
-            m['error'] = ('ctrl.ctrl-wrapper.carriedframectrl',
-                          "unpacking {0}".format(e))
-            return
+            m['err'].append(('ctrl.ctrl-wrapper.carriedframectrl',
+                             "unpacking {0}".format(e)))
 
         # ht control
         try:
@@ -1192,19 +1206,19 @@ def _parsectrl_(f,m):
             m['htc'] = v
             m['present'].append('htc')
         except Exception as e:
-            m['error'] = ('ctrl.ctrl-wrapper.htc',"unpacking {0}".format(e))
-            return
+            m['err'].append(('ctrl.ctrl-wrapper.htc',"unpacking {0}".format(e)))
 
         # carried frame
         try:
-            m['carriedframe'] = hexlify(f[m['offset']:])
+            m['carriedframe'] = f[m['offset']:]
             m['offset'] += len(f[m['offset']:])
             m['present'].extend(['htc','carriedframe'])
         except Exception as e:
-            m['error'] = ('ctrl.ctrl-wrapper.carriedframe',
-                          "unpacking {0}".format(e))
+            m['err'].append(('ctrl.ctrl-wrapper.carriedframe',
+                             "unpacking {0}".format(e)))
     else:
-        m['error'] = ('ctrl',"invalid subtype {0}".format(ST_CTRL_TYPES[m.subtype]))
+        m['err'].append(('ctrl',
+                         "invalid subtype {0}".format(ST_CTRL_TYPES[m.subtype])))
 
 #### Control Frame subfields
 
@@ -1253,7 +1267,7 @@ def _parsedata_(f,m):
         m['seqctrl'] = _seqctrl_(v[-1])
         m['present'].extend(['addr2','addr3','seqctrl'])
     except Exception as e:
-        m['error'] = ('data',"unpacking addr2,addr3,seqctrl {0}".format(e))
+        m['err'].append(('data',"unpacking addr2,addr3,seqctrl {0}".format(e)))
 
     # fourth address?
     if m.flags['td'] and m.flags['fd']:
@@ -1262,7 +1276,7 @@ def _parsedata_(f,m):
             m['addr4'] = _hwaddr_(v)
             m['present'].append('addr4')
         except Exception as e:
-            m['error'] = ('data.addr4',"unpacking {0}".format(e))
+            m['err'].append(('data.addr4',"unpacking {0}".format(e)))
 
     # QoS field?
     if ST_DATA_QOS_DATA <= m.subtype <= ST_DATA_QOS_CFACK_CFPOLL:
@@ -1271,7 +1285,7 @@ def _parsedata_(f,m):
             m['qos'] = _qosctrl_(v)
             m['present'].append('qos')
         except Exception as e:
-            m['error'] = ('data.qos',"unpacking {0}".format(e))
+            m['err'].append(('data.qos',"unpacking {0}".format(e)))
 
         # HTC fields?
         #if mac.flags['o']:
@@ -1300,13 +1314,13 @@ def _wep_(f,m):
         keyid = struct.unpack_from(FMT_BO+_S2F_['wep-keyid'],f,
                                    m['offset']+_WEP_IV_LEN_-1)[0]
         m['l3-crypt'] = {'type':'wep',
-                         'iv':hexlify(f[m['offset']:m['offset']+_WEP_IV_LEN_]),
+                         'iv':f[m['offset']:m['offset']+_WEP_IV_LEN_],
                          'key-id':mostx(_WEP_IV_KEY_START_,keyid),
-                         'icv':hexlify(f[-_WEP_ICV_LEN_:])}
+                         'icv':f[-_WEP_ICV_LEN_:]}
         m['offset'] += _WEP_IV_LEN_
         m['stripped'] += _WEP_ICV_LEN_
     except Exception as e:
-        m['error'] = ('l3-crypt.wep',"parsing {0}".format(e))
+        m['err'].append(('l3-crypt.wep',"parsing {0}".format(e)))
 
 #### TKIP Std 11.4.2.1
 # <MAC HDR>|IV|ExtIV|DATA|MIC|ICV|FCS
@@ -1339,22 +1353,22 @@ def _tkip_(f,m):
     try:
         keyid = struct.unpack_from(FMT_BO+'B',f,m['offset']+_TKIP_KEY_BYTE_)[0]
         m['l3-crypt'] = {'type':'tkip',
-                         'iv':{'tsc1':hexlify(f[m['offset']+_TKIP_TSC1_BYTE_]),
-                               'wep-seed':hexlify(f[m['offset']+_TKIP_WEPSEED_BYTE_]),
-                               'tsc0':hexlify(f[m['offset']+_TKIP_TSC0_BYTE_]),
+                         'iv':{'tsc1':f[m['offset']+_TKIP_TSC1_BYTE_],
+                               'wep-seed':f[m['offset']+_TKIP_WEPSEED_BYTE_],
+                               'tsc0':f[m['offset']+_TKIP_TSC0_BYTE_],
                                'key-id':{'rsrv':leastx(_TKIP_EXT_IV_,keyid),
                                          'ext-iv':midx(_TKIP_EXT_IV_,_TKIP_EXT_IV_LEN_,keyid),
                                          'key-id':mostx(_TKIP_EXT_IV_+_TKIP_EXT_IV_LEN_,keyid)}},
-                         'ext-iv':{'tsc2':hexlify(f[m['offset']+_TKIP_TSC2_BYTE_]),
-                                   'tsc3':hexlify(f[m['offset']+_TKIP_TSC3_BYTE_]),
-                                   'tsc4':hexlify(f[m['offset']+_TKIP_TSC4_BYTE_]),
-                                   'tsc5':hexlify(f[m['offset']+_TKIP_TSC5_BYTE_])},
-                         'mic':hexlify(f[-(_TKIP_MIC_LEN_ + _TKIP_ICV_LEN_):-_TKIP_ICV_LEN_]),
-                         'icv':hexlify(f[-_TKIP_ICV_LEN_:])}
+                         'ext-iv':{'tsc2':f[m['offset']+_TKIP_TSC2_BYTE_],
+                                   'tsc3':f[m['offset']+_TKIP_TSC3_BYTE_],
+                                   'tsc4':f[m['offset']+_TKIP_TSC4_BYTE_],
+                                   'tsc5':f[m['offset']+_TKIP_TSC5_BYTE_]},
+                         'mic':f[-(_TKIP_MIC_LEN_ + _TKIP_ICV_LEN_):-_TKIP_ICV_LEN_],
+                         'icv':f[-_TKIP_ICV_LEN_:]}
         m['offset'] += _TKIP_IV_LEN_
         m['stripped'] += _TKIP_MIC_LEN_ + _TKIP_ICV_LEN_
     except Exception as e:
-        m['error'] = ('l3-crypt.tkip',"parsing {0}".format(e))
+        m['err'].append(('l3-crypt.tkip',"parsing {0}".format(e)))
 
 #### CCMP Std 11.4.3.2
 # <MAC HDR>|CCMP HDR|DATA|MIC|FCS
@@ -1383,21 +1397,21 @@ def _ccmp_(f,m):
     try:
         keyid = struct.unpack_from(FMT_BO+'B',f,m['offset']+_CCMP_KEY_BYTE_)[0]
         m['l3-crypt'] = {'type':'ccmp',
-                       'pn0':hexlify(f[m['offset']+_CCMP_PN0_BYTE_]),
-                       'pn1':hexlify(f[m['offset']+_CCMP_PN1_BYTE_]),
-                       'rsrv':hexlify(f[m['offset']+_CCMP_RSRV_BYTE_]),
+                       'pn0':f[m['offset']+_CCMP_PN0_BYTE_],
+                       'pn1':f[m['offset']+_CCMP_PN1_BYTE_],
+                       'rsrv':f[m['offset']+_CCMP_RSRV_BYTE_],
                        'key-id':{'rsrv':leastx(_CCMP_EXT_IV_,keyid),
                                  'ext-iv':midx(_CCMP_EXT_IV_,_CCMP_EXT_IV_LEN_,keyid),
                                  'key-id':mostx(_CCMP_EXT_IV_+_CCMP_EXT_IV_LEN_,keyid)},
-                       'pn2':hexlify(f[m['offset']+_CCMP_PN2_BYTE_]),
-                       'pn3':hexlify(f[m['offset']+_CCMP_PN3_BYTE_]),
-                       'pn4':hexlify(f[m['offset']+_CCMP_PN4_BYTE_]),
-                       'pn5':hexlify(f[m['offset']+_CCMP_PN0_BYTE_]),
-                       'mic':hexlify(f[-_CCMP_MIC_LEN_:])}
+                       'pn2':f[m['offset']+_CCMP_PN2_BYTE_],
+                       'pn3':f[m['offset']+_CCMP_PN3_BYTE_],
+                       'pn4':f[m['offset']+_CCMP_PN4_BYTE_],
+                       'pn5':f[m['offset']+_CCMP_PN0_BYTE_],
+                       'mic':f[-_CCMP_MIC_LEN_:]}
         m['offset'] += _CCMP_IV_LEN_
         m['stripped'] += _CCMP_MIC_LEN_
     except Exception as e:
-        m['error'] = ('l3-crypt.ccmp',"parsing {0}".format(e))
+        m['err'].append(('l3-crypt.ccmp',"parsing {0}".format(e)))
 
 #### HELPERS
 
@@ -1409,61 +1423,3 @@ def _unpack_from_(fmt,b,o):
     vs = struct.unpack_from(FMT_BO+fmt,b,o)
     if len(vs) == 1: vs = vs[0]
     return vs,o+struct.calcsize(fmt)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

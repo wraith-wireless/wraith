@@ -48,18 +48,24 @@ Iyri:
     send(obj)
     IOError: [Errno 32] Broken pipe
     what process is this comming from?
- 61) document differnt comm protocols
+ 61) document different comm protocols
+ 62) fix probereq,beacon,assocreq,assocresp,reassocreq
 Wifi:
- 1) Should we add support for AVS, Prism headers ?
- 2) radiotap: ensure data pad is handled for atheros cards (any others?)
- 3) in mpdu, fully parse
-    o control wrapper
-    o +htc
-    o info-elements
-     - RSN Std 8.4.2.27, #48
-     - TIM Info-Element #5 from beacons could be useful
-     - parse timing advance
- 5) how to support a-msdu etc
- 6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
- 8) in iw and iwtools switch to netlink rather than parsing iw/iwconfig/ifconfig output
- 9) handle multiple ssids in mgmt frames
+  1) Should we add support for AVS, Prism headers ?
+  2) radiotap: ensure data pad is handled for atheros cards (any others?)
+  3) in mpdu, fully parse
+     o control wrapper
+     o +htc
+     o info-elements
+      - RSN Std 8.4.2.27, #48
+      - TIM Info-Element #5 from beacons could be useful
+      - parse timing advance
+  5) how to support a-msdu etc
+  6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
+  8) in iw and iwtools switch to netlink rather than parsing iw/iwconfig/ifconfig
+     output
+  9) handle multiple ssids in mgmt frames
+ 10) add ability to track multipe errors if frame can be processed further
+Nidus(.sql):
+  1) add table for ssids to handle multiple ssids broadcast in mgmt frames &
+   include bytea field for none utf8 ssids

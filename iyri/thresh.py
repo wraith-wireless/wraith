@@ -2,11 +2,9 @@
 
 """ thresh.py: frame and metadata extraction and file writes
 
-Provides Thresher and PCAPWriter:
- Thresher: processes of frames, stores frame data/metadata to DB.
- PCAPWriter: saves frames to file (if desired)
+Provides Thresher processes of frames, stores frame data/metadata to DB.
 
-Each Process is configured to all for future commands (via tokens) to be used
+Each Process is configured to allow for future commands (via tokens) to be used
 to assist in any as of yet unidentified issues or future upgrades that may be
 desired. Additionally, while each process will stop if given a POISON pill,
 the calling process i.e. the Collator can also send a SIGUSR1 signal to stop
@@ -35,35 +33,6 @@ from wraith.wifi import mcs                 # mcs functions
 from wraith.wifi import channels            # 802.11 channels/RFs
 from wraith.wifi.oui import manufacturer    # oui functions
 import sys,traceback                        # error reporting
-
-def extractie(dM):
-    """
-     extracts info-elements for ssid, supported rates, extended rates & vendors
-     :param dM: mpdu dict
-     :returns: ssid,supported_rates,extended_rates,vendors
-    """
-    ssids = []
-    ss = []
-    es = []
-    vs = []
-    for ie in dM.info_els:
-        if ie[0] == mpdu.EID_SSID: ssids.append(ie[1])
-        if ie[0] == mpdu.EID_SUPPORTED_RATES: ss = ie[1]
-        if ie[0] == mpdu.EID_EXTENDED_RATES: es = ie[1]
-        if ie[0] == mpdu.EID_VEND_SPEC: vs.append(ie[1][0])
-    return ssids,ss,es,vs
-
-def isutf8(s):
-    """
-     determines whether string is utf-8 encodable
-     :param s: string to check
-     :returns: True if s is utf-8 encodable
-    """
-    try:
-        s.decode('utf-8')
-        return True
-    except:
-        return False
 
 class Thresher(mp.Process):
     """
@@ -108,21 +77,19 @@ class Thresher(mp.Process):
         signal.signal(signal.SIGUSR1,self.stop)       # kill signal from Collator
 
         # local variables
-        sid = None                    # current session id
-        rdos = {}                     # radio map hwaddr{'role','buffer','writer'}
-        ouis = {}                     # oui dict
+        sid = None # current session id
+        rdos = {}  # radio map hwaddr{'role','buffer','writer'}
 
         # notify collator we're up
         self._icomms.put((self.cs,ts2iso(time.time()),THRESH_THRESH,self.pid))
 
         while not self._stop:
             # check for tasks or messages
-            tkn = ts = d = None
             rs,_,_ = select.select([self._cC,self._tasks._reader],[],[])
 
             # get each message
             for r in rs:
-                ts1 = ts2iso(time.time()) # get timestamp for this data read
+                ts1 = ts2iso(time.time()) # get data read time
                 try:
                     # get data
                     if r == self._cC: tkn,ts,d = self._cC.recv()
@@ -190,8 +157,10 @@ class Thresher(mp.Process):
     def _processframe(self,sid,rdos,ts,ts1,d):
         """
          inserts frame into db
-
+         :param sid: session id
          :param rdos: radio dict
+         :param ts: timestamp of frame
+         :param ts1: timestamp of data read
          :param d:  data
         """
         # pull frame out of buffer
@@ -199,21 +168,15 @@ class Thresher(mp.Process):
         f = rdos[src]['buffer'][(ix*DIM_N):(ix*DIM_N)+b].tobytes()
 
         # parse the frame
-        fid = None       # current frame id
-        vs = ()          # values for db insert
         lF = len(f)      # & get the total length
         dR = {}          # make an empty rtap dict
         dM = mpdu.MPDU() # & an empty mpdu dict
-        validRTAP = True # rtap was parsed correctly
-        validMPDU = True # mpdu was parsed correctly
         try:
             dR = rtap.parse(f)
             dM = mpdu.parse(f[dR['sz']:],rtap.flags_get(dR['flags'],'fcs'))
         except rtap.RadiotapException: # parsing failed @ radiotap, set empty vals
-            validRTAP = validMPDU = False
             vs = (sid,ts,lF,0,0,[0,lF],0,'none',0)
         except mpdu.MPDUException: # mpdu failed - initialize empty mpdu vals
-            validMPDU = False
             vs = (sid,ts,lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
                   int('a-mpdu' in dR['present']),rtap.flags_get(dR['flags'],'fcs'))
         except Exception as e: # blanket error
@@ -230,6 +193,7 @@ class Thresher(mp.Process):
 
         # individual helper functions will commit database inserts/updates. All
         # db errors will be caught in this try & rollbacks will be executed here
+        fid = None
         try:
             self._next = 'frame'
 
@@ -292,7 +256,7 @@ class Thresher(mp.Process):
 
             # insert the sta, sta_activity
             self._insertsta(fid,sid,ts,addrs)
-            self._insertsta_activity(fid,sid,ts,addrs)
+            self._insertsta_activity(sid,ts,addrs)
 
             # further process mgmt frames?
             self._next = 'mgmt'
@@ -445,7 +409,7 @@ class Thresher(mp.Process):
             self._next = 'crypt'
             if dM.crypt['type'] == 'wep':
                 sql = "insert into wepcrypt (fid,iv,key_id,icv) values (%s,%s,%s,%s);"
-                self._curs.execute(sql,(fid,dM.crypt['iv'],
+                self._curs.execute(sql,(fid,psql.Binary(dM.crypt['iv']),
                                             dM.crypt['key-id'],
                                             dM.crypt['icv']))
             elif dM.crypt['type'] == 'tkip':
@@ -454,29 +418,29 @@ class Thresher(mp.Process):
                                               tsc2,tsc3,tsc4,tsc5,mic,icv)
                        values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
                       """
-                self._curs.execute(sql,(fid,dM.crypt['iv']['tsc1'],
-                                            dM.crypt['iv']['wep-seed'],
-                                            dM.crypt['iv']['tsc0'],
+                self._curs.execute(sql,(fid,psql.Binary(dM.crypt['iv']['tsc1']),
+                                            psql.Binary(dM.crypt['iv']['wep-seed']),
+                                            psql.Binary(dM.crypt['iv']['tsc0']),
                                             dM.crypt['iv']['key-id']['key-id'],
-                                            dM.crypt['ext-iv']['tsc2'],
-                                            dM.crypt['ext-iv']['tsc3'],
-                                            dM.crypt['ext-iv']['tsc4'],
-                                            dM.crypt['ext-iv']['tsc5'],
-                                            dM.crypt['mic'],
-                                            dM.crypt['icv']))
+                                            psql.Binary(dM.crypt['ext-iv']['tsc2']),
+                                            psql.Binary(dM.crypt['ext-iv']['tsc3']),
+                                            psql.Binary(dM.crypt['ext-iv']['tsc4']),
+                                            psql.Binary(dM.crypt['ext-iv']['tsc5']),
+                                            psql.Binary(dM.crypt['mic']),
+                                            psql.Binary(dM.crypt['icv'])))
             elif dM.crypt['type'] == 'ccmp':
                 sql = """
                        insert into ccmpcrypt (fid,pn0,pn1,key_id,pn2,pn3,pn4,pn5,mic)
                        values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
                       """
-                self._curs.execute(sql,(fid,dM.crypt['pn0'],
-                                            dM.crypt['pn1'],
+                self._curs.execute(sql,(fid,psql.Binary(dM.crypt['pn0']),
+                                            psql.Binary(dM.crypt['pn1']),
                                             dM.crypt['key-id']['key-id'],
-                                            dM.crypt['pn2'],
-                                            dM.crypt['pn3'],
-                                            dM.crypt['pn4'],
-                                            dM.crypt['pn5'],
-                                            dM.crypt['mic']))
+                                            psql.Binary(dM.crypt['pn2']),
+                                            psql.Binary(dM.crypt['pn3']),
+                                            psql.Binary(dM.crypt['pn4']),
+                                            psql.Binary(dM.crypt['pn5']),
+                                            psql.Binary(dM.crypt['mic'])))
             self._conn.commit()
 
     def _insertsta(self,fid,sid,ts,addrs):
@@ -518,11 +482,9 @@ class Thresher(mp.Process):
                     addrs[addr]['id'] = self._curs.fetchone()[0]
                     self._conn.commit()
 
-    def _insertsta_activity(self,fid,sid,ts,addrs):
+    def _insertsta_activity(self,sid,ts,addrs):
         """
          inserts activity of all stas in db
-
-         :param fid: frame id
          :param sid: session id
          :param ts: timestamp frame collected
          :param addrs: address dict
@@ -667,7 +629,6 @@ class Thresher(mp.Process):
     def _insertassocreq(self,fid,client,ap,dM):
         """
          inserts the association req from client ot ap
-
          :param fid: frame id
          :param client: associating client id
          :param ap: access point id
@@ -678,19 +639,15 @@ class Thresher(mp.Process):
                                      cf_poll_req,privacy,short_pre,pbcc,
                                      ch_agility,spec_mgmt,qos,short_slot,
                                      apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
-                                     listen_int,ssid,sup_rates,ext_rates,vendors)
+                                     listen_int,sup_rates,ext_rates,vendors)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
               """
-        ssid = None
-        ssids,sup_rs,ext_rs,vendors = extractie(dM)
-        if len(ssids) == 1 and isutf8(ssids[0]): ssid = ssids[0]
-        #if len(ssids) == 1:
-        #    if isutf8(ssids[0]): ssid = ssids[0]
-        #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
-        else:
-            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in assocreq'))
+        ssids,ss,xs,vs = dM.getie([mpdu.EID_SSID,mpdu.EID_SUPPORTED_RATES,
+                                   mpdu.EID_EXTENDED_RATES,mpdu.EID_VEND_SPEC])
+        os = [] # add unique vendor oui
+        for v in vs:
+            if v[0] not in os: os.append(v[0])
         self._curs.execute(sql,(fid,client,ap,
                                 dM.fixed_params['capability']['ess'],
                                 dM.fixed_params['capability']['ibss'],
@@ -709,8 +666,26 @@ class Thresher(mp.Process):
                                 dM.fixed_params['capability']['delayed-ba'],
                                 dM.fixed_params['capability']['immediate-ba'],
                                 dM.fixed_params['listen-int'],
-                                ssid,sup_rs,ext_rs,vendors))
+                                ss,xs,os))
         self._conn.commit()
+
+        # now the ssids
+        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        for ssid in ssids:
+            try:
+                if mpdu.validssid(ssid):
+                    valid = ssid
+                    invalid = None
+                    isvalid = 1
+                else:
+                    valid = None
+                    invalid = psql.Binary(ssid)
+                    isvalid = 0
+                self._curs.execute(sql,(fid,valid,invalid,isvalid))
+            except:
+                raise
+            else:
+                self._conn.commit()
 
     def _insertassocresp(self,assoc,fid,ap,client,dM):
         """
@@ -729,19 +704,15 @@ class Thresher(mp.Process):
                                       cf_poll_req,privacy,short_pre,pbcc,
                                       ch_agility,spec_mgmt,qos,short_slot,
                                       apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
-                                      status,aid,ssid,sup_rates,ext_rates,vendors)
+                                      status,aid,sup_rates,ext_rates,vendors)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
               """
-        ssid = None
-        ssids,sup_rs,ext_rs,vendors = extractie(dM)
-        if len(ssids) == 1 and isutf8(ssids[0]): ssid = ssids[0]
-        #if len(ssids) == 1:
-        #    if isutf8(ssids[0]): ssid = ssids[0]
-        #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
-        else:
-            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in assocresp'))
+        ssids,ss,xs,vs = dM.getie([mpdu.EID_SSID,mpdu.EID_SUPPORTED_RATES,
+                                   mpdu.EID_EXTENDED_RATES,mpdu.EID_VEND_SPEC])
+        os = [] # add unique vendor oui
+        for v in vs:
+            if v[0] not in os: os.append(v[0])
         aid = dM.fixed_params['status-code'] if 'status-code' in dM.fixed_params else None
         self._curs.execute(sql,(fid,client,ap,assoc,
                                 dM.fixed_params['capability']['ess'],
@@ -760,9 +731,27 @@ class Thresher(mp.Process):
                                 dM.fixed_params['capability']['dsss-ofdm'],
                                 dM.fixed_params['capability']['delayed-ba'],
                                 dM.fixed_params['capability']['immediate-ba'],
-                                dM.fixed_params['status-code'],aid,
-                                ssid,sup_rs,ext_rs,vendors))
+                                dM.fixed_params['status-code'],
+                                aid,ss,xs,os))
         self._conn.commit()
+
+        # now the ssids
+        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        for ssid in ssids:
+            try:
+                if mpdu.validssid(ssid):
+                    valid = ssid
+                    invalid = None
+                    isvalid = 1
+                else:
+                    valid = None
+                    invalid = psql.Binary(ssid)
+                    isvalid = 0
+                self._curs.execute(sql,(fid,valid,invalid,isvalid))
+            except:
+                raise
+            else:
+                self._conn.commit()
 
     def _insertreassocreq(self,fid,sid,ts,client,ap,dM):
         """
@@ -800,20 +789,16 @@ class Thresher(mp.Process):
                                        cf_poll_req,privacy,short_pre,pbcc,
                                        ch_agility,spec_mgmt,qos,short_slot,
                                        apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
-                                       listen_int,cur_ap,ssid,sup_rates,ext_rates,
+                                       listen_int,cur_ap,sup_rates,ext_rates,
                                        vendors)
-               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
               """
-        ssid = None
-        ssids,sup_rs,ext_rs,vendors = extractie(dM)
-        if len(ssids) == 1 and isutf8(ssids[0]): ssid = ssids[0]
-        #if len(ssids) == 1:
-        #    if isutf8(ssids[0]): ssid = ssids[0]
-        #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
-        else:
-            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in reassocreq'))
+        ssids,ss,xs,vs = dM.getie([mpdu.EID_SSID,mpdu.EID_SUPPORTED_RATES,
+                                   mpdu.EID_EXTENDED_RATES,mpdu.EID_VEND_SPEC])
+        os = [] # add unique vendor oui
+        for v in vs:
+            if v[0] not in os: os.append(v[0])
         self._curs.execute(sql,(fid,client,ap,
                                 dM.fixed_params['capability']['ess'],
                                 dM.fixed_params['capability']['ibss'],
@@ -832,8 +817,26 @@ class Thresher(mp.Process):
                                 dM.fixed_params['capability']['delayed-ba'],
                                 dM.fixed_params['capability']['immediate-ba'],
                                 dM.fixed_params['listen-int'],
-                                curid,ssid,sup_rs,ext_rs,vendors))
+                                curid,ss,xs,vs))
         self._conn.commit()
+
+        # now the ssids
+        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        for ssid in ssids:
+            try:
+                if mpdu.validssid(ssid):
+                    valid = ssid
+                    invalid = None
+                    isvalid = 1
+                else:
+                    valid = None
+                    invalid = psql.Binary(ssid)
+                    isvalid = 0
+                self._curs.execute(sql,(fid,valid,invalid,isvalid))
+            except:
+                raise
+            else:
+                self._conn.commit()
 
     def _insertprobereq(self,fid,client,ap,dM):
         """
@@ -846,20 +849,34 @@ class Thresher(mp.Process):
          :param dM: mpdu dict
         """
         sql = """
-               insert into probereq (fid,client,ap,ssid,sup_rates,ext_rates,vendors)
-               values (%s,%s,%s,%s,%s,%s,%s);
+               insert into probereq (fid,client,ap,sup_rates,ext_rates,vendors)
+               values (%s,%s,%s,%s,%s,%s);
               """
-        ssid = None
-        ssids,sup_rs,ext_rs,vendors = extractie(dM)
-        if len(ssids) == 1 and isutf8(ssids[0]): ssid = ssids[0]
-        #if len(ssids) == 1:
-        #    if isutf8(ssids[0]): ssid = ssids[0]
-        #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
-        else:
-            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in probereq'))
-        self._curs.execute(sql,(fid,client,ap,ssid,sup_rs,ext_rs,vendors))
+        ssids,ss,xs,vs = dM.getie([mpdu.EID_SSID,mpdu.EID_SUPPORTED_RATES,
+                                   mpdu.EID_EXTENDED_RATES,mpdu.EID_VEND_SPEC])
+        os = [] # add unique vendor oui
+        for v in vs:
+            if v[0] not in os: os.append(v[0])
+        self._curs.execute(sql,(fid,client,ap,ss,xs,os))
         self._conn.commit()
+
+        # now the ssids
+        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        for ssid in ssids:
+            try:
+                if mpdu.validssid(ssid):
+                    valid = ssid
+                    invalid = None
+                    isvalid = 1
+                else:
+                    valid = None
+                    invalid = psql.Binary(ssid)
+                    isvalid = 0
+                self._curs.execute(sql,(fid,valid,invalid,isvalid))
+            except:
+                raise
+            else:
+                self._conn.commit()
 
     def _insertproberesp(self,fid,ap,client,dM):
         """
@@ -875,21 +892,16 @@ class Thresher(mp.Process):
                                       ess,ibss,cf_pollable,cf_poll_req,privacy,
                                       short_pre,pbcc,ch_agility,spec_mgmt,qos,
                                       short_slot,apsd,rdo_meas,dsss_ofdm,del_ba,
-                                      imm_ba,ssid,sup_rates,ext_rates,vendors)
+                                      imm_ba,sup_rates,ext_rates,vendors)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
               """
-        beaconts = hex(dM.fixed_params['timestamp'])[2:] # store the hex (minus '0x')
-        ssid = None
-        ssids,sup_rs,ext_rs,vendors = extractie(dM)
-        if len(ssids) == 1 and isutf8(ssids[0]): ssid = ssids[0]
-        #if len(ssids) == 1:
-        #    if isutf8(ssids[0]): ssid = ssids[0]
-        #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
-        else:
-            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in proberesp'))
-        self._curs.execute(sql,(fid,client,ap,beaconts,
+        ssids,ss,xs,vs = dM.getie([mpdu.EID_SSID,mpdu.EID_SUPPORTED_RATES,
+                                   mpdu.EID_EXTENDED_RATES,mpdu.EID_VEND_SPEC])
+        os = [] # add unique vendor oui
+        for v in vs:
+            if v[0] not in os: os.append(v[0])
+        self._curs.execute(sql,(fid,client,ap,dM.fixed_params['timestamp'],
                                 dM.fixed_params['beacon-int'],
                                 dM.fixed_params['capability']['ess'],
                                 dM.fixed_params['capability']['ibss'],
@@ -907,8 +919,26 @@ class Thresher(mp.Process):
                                 dM.fixed_params['capability']['dsss-ofdm'],
                                 dM.fixed_params['capability']['delayed-ba'],
                                 dM.fixed_params['capability']['immediate-ba'],
-                                ssid,sup_rs,ext_rs,vendors))
+                                ss,xs,os))
         self._conn.commit()
+
+        # now the ssids
+        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        for ssid in ssids:
+            try:
+                if mpdu.validssid(ssid):
+                    valid = ssid
+                    invalid = None
+                    isvalid = 1
+                else:
+                    valid = None
+                    invalid = psql.Binary(ssid)
+                    isvalid = 0
+                self._curs.execute(sql,(fid,valid,invalid,isvalid))
+            except:
+                raise
+            else:
+                self._conn.commit()
 
     def _insertbeacon(self,fid,ap,dM):
         """
@@ -923,21 +953,16 @@ class Thresher(mp.Process):
                                    cf_pollable,cf_poll_req,privacy,short_pre,
                                    pbcc,ch_agility,spec_mgmt,qos,short_slot,
                                    apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
-                                   ssid,sup_rates,ext_rates,vendors)
+                                   sup_rates,ext_rates,vendors)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                       %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
               """
-        beaconts = hex(dM.fixed_params['timestamp'])[2:] # store the hex (minus '0x')
-        ssid = None
-        ssids,sup_rs,ext_rs,vendors = extractie(dM)
-        if len(ssids) == 1 and isutf8(ssids[0]): ssid = ssids[0]
-        #if len(ssids) == 1:
-        #    if isutf8(ssids[0]): ssid = ssids[0]
-        #    else:
-        #        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,"non utf-8 found in ssid"))
-        else:
-            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_WARN,'multiple ssids in assocreq'))
-        self._curs.execute(sql,(fid,ap,beaconts,
+        ssids,ss,xs,vs = dM.getie([mpdu.EID_SSID,mpdu.EID_SUPPORTED_RATES,
+                                   mpdu.EID_EXTENDED_RATES,mpdu.EID_VEND_SPEC])
+        os = [] # add unique vendor oui
+        for v in vs:
+            if v[0] not in os: os.append(v[0])
+        self._curs.execute(sql,(fid,ap,dM.fixed_params['timestamp'],
                                 dM.fixed_params['beacon-int'],
                                 dM.fixed_params['capability']['ess'],
                                 dM.fixed_params['capability']['ibss'],
@@ -955,8 +980,27 @@ class Thresher(mp.Process):
                                 dM.fixed_params['capability']['dsss-ofdm'],
                                 dM.fixed_params['capability']['delayed-ba'],
                                 dM.fixed_params['capability']['immediate-ba'],
-                                ssid,sup_rs,ext_rs,vendors))
+                                ss,xs,os))
         self._conn.commit()
+
+        # now the ssids
+        self._next = 'ssids'
+        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        for ssid in ssids:
+            try:
+                if mpdu.validssid(ssid):
+                    valid = ssid
+                    invalid = None
+                    isvalid = 1
+                else:
+                    valid = None
+                    invalid = psql.Binary(ssid)
+                    isvalid = 0
+                self._curs.execute(sql,(fid,valid,invalid,isvalid))
+            except:
+                raise
+            else:
+                self._conn.commit()
 
     def _insertdisassaoc(self,fid,rx,tx,dM):
         """

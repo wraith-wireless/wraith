@@ -543,6 +543,22 @@ CREATE TABLE sta_activity(
 
 -- Management Frames
 
+-- ssids table
+-- one row for each ssid broadcast in a mgmt frame (probereq,beacon,assocreq,
+-- assocresp,reassocreq). provides bytea row for invalid ssids i.e. longer than
+-- 32 char or not utf-8.
+-- NOTE: any of above frames types with no row in this table implies a cloaked
+-- ssid
+DROP TABLE IF EXISTS ssids;
+CREATE TABLE ssids(
+  fid bigint NOT NULL,          -- fk to frame
+  valid VARCHAR(32),            -- valid ssid (=< 32 chars & utf-8)
+  invalid bytea,                -- invalid ssid (> 32 chars or not utf-8)
+  isvalid smallint default '1', -- indicates ssid is valid
+  CONSTRAINT ch_isvalid CHECK (isvalid >= 0 and isvalid <=1),
+  FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE
+);
+
 -- assocreq table
 -- similar to beacon table, the assocreq references the sid it was seen in, the
 -- frame it is part of and the id of the AP as well as the id of the requesting
@@ -569,7 +585,6 @@ CREATE TABLE assocreq(
   del_ba smallint default '0',      -- delayed block ack supported
   imm_ba smallint default '0',      -- immediate block ack supported
   listen_int integer NOT NULL,      -- listen interval in microseconds
-  ssid VARCHAR(32),                 -- the ssid of this network (NULL for cloaked,
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
@@ -629,7 +644,6 @@ CREATE TABLE assocresp(
   imm_ba smallint default '0',      -- immediate block ack supported
   status integer NOT NULL,          -- status code - 0 means success
   aid integer,                      -- if successful, the sta's AID
-  ssid VARCHAR(32),                 -- the ssid of this network (NULL for cloaked,
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
@@ -685,7 +699,6 @@ CREATE TABLE reassocreq(
   imm_ba smallint default '0',      -- immediate block ack supported
   listen_int integer NOT NULL,      -- listen interval in microseconds
   cur_ap integer NOT NULL,          -- id of currently associated ap
-  ssid VARCHAR(32),                 -- the ssid of this network (NULL for cloaked,
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
@@ -726,7 +739,6 @@ CREATE TABLE probereq(
   fid bigint NOT NULL,      -- fk to frame
   client integer NOT NULL,  -- fk to STA - this is the client
   ap integer,               -- fk to STA - this is the AP
-  ssid VARCHAR(32),         -- the ssid of this network (NULL for cloaked,
   sup_rates decimal(5,1)[], -- list of supported rates
   ext_rates decimal(5,1)[], -- list of extended rates
   vendors char(8)[],        -- list of (unique) vendor ouis found in info-elements
@@ -747,7 +759,7 @@ CREATE TABLE proberesp(
   fid bigint NOT NULL,              -- fk to frame
   client integer NOT NULL,          -- fk to STA - this is the requesting STA
   ap integer NOT NULL,              -- fk to STA - this is the bss
-  beacon_ts bytea NOT NULL,         -- beacon ts (as hex due to lack of 8-byte unsigned in postgres
+  beacon_ts numeric(19) NOT NULL,    -- beacon ts
   beacon_int integer NOT NULL,      -- beacon interval in microseconds
   ess smallint default '0',         -- ess bit (comes from an AP)
   ibss smallint default '0',        -- ibss bit (comes from an ibss)
@@ -772,6 +784,7 @@ CREATE TABLE proberesp(
   CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_client CHECK (client > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
+  CONSTRAINT ch_beacon_ts CHECK (beacon_ts > 0),
   CONSTRAINT ch_beacon_int CHECK (beacon_int > 0),
   CONSTRAINT ch_ess CHECK (ess >=0 and ess <=1),
   CONSTRAINT ch_ibss CHECK (ibss >=0 and ibss <=1),
@@ -804,7 +817,7 @@ DROP TABLE IF EXISTS beacon;
 CREATE TABLE beacon(
   fid bigint NOT NULL,              -- fk to frame
   ap integer NOT NULL,              -- fk to STA - this is the bss
-  beacon_ts bytea NOT NULL,         -- beacon ts (as hex due to lack of 8-byte unsigned in postgres
+  beacon_ts numeric(19) NOT NULL,   -- beacon ts
   beacon_int integer NOT NULL,      -- beacon interval in microseconds
   ess smallint default '0',         -- ess bit (comes from an AP)
   ibss smallint default '0',        -- ibss bit (comes from an ibss)
@@ -822,12 +835,12 @@ CREATE TABLE beacon(
   dsss_ofdm smallint default '0',   -- deprecated
   del_ba smallint default '0',      -- delayed block ack supported
   imm_ba smallint default '0',      -- immediate block ack supported
-  ssid VARCHAR(32),                 -- the ssid of this network (NULL for cloaked)
   sup_rates decimal(5,1)[],         -- list of supported rates
   ext_rates decimal(5,1)[],         -- list of extended rates
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
   CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
+  CONSTRAINT ch_beacon_ts CHECK (beacon_ts > 0),
   CONSTRAINT ch_beacon_int CHECK (beacon_int > 0),
   CONSTRAINT ch_ess CHECK (ess >=0 and ess <=1),
   CONSTRAINT ch_ibss CHECK (ibss >=0 and ibss <=1),

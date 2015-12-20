@@ -7,6 +7,8 @@
  includes: nidus.sql 0.0.13 
  changes:
   - added frame_raw and malformed tables
+  - added ssids table for multiple ssids in mgmt frames
+  - changed beacon_ts from type bytea to numeric(19)
 """
 __name__ = 'nidus'
 __license__ = 'GPL v3.0'
