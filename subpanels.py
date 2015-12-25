@@ -32,11 +32,6 @@ from wraith.utils import timestamps        # valid data/time
 from wraith.utils import landnav           # lang nav utilities
 from wraith.utils import cmdline           # cmdline functionality
 
-# Validation reg. exp.
-IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr
-MACADDR = re.compile("^([0-9A-F]{2}:){5}([0-9A-F]{2})$")    # re for mac addr (capital letters only)
-GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device id (capital leters only)
-
 # Some constants
 COPY = u"\N{COPYRIGHT SIGN}"
 

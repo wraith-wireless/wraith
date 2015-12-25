@@ -12,7 +12,6 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 from wraith.wifi.mpdu import MAX_MPDU
-import re
 
 # define the m x n array size for the cirular buffer
 DIM_M = 1000     # number of rows for memory view
@@ -36,11 +35,6 @@ TUNE_SCAN   = 0
 TUNE_HOLD   = 1
 TUNE_PAUSE  = 2
 TUNE_LISTEN = 3
-
-# validation expressions
-IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr
-MACADDR = re.compile("^([0-9A-F]{2}:){5}([0-9A-F]{2})$")    # re for mac addr (capital letters only)
-GPSDID = re.compile("^[0-9A-F]{4}:[0-9A-F]{4}$")            # re for gps device id (capital letters only)
 
 # path for oui text file
 OUIPATH = '../data/oui.txt'

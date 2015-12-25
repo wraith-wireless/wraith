@@ -22,25 +22,17 @@ __status__ = 'Development'
 import signal                               # handle signals
 import select                               # for select
 import time                                 # timestamps
-import sys                                  # error reporting
-import traceback                            # traceback/error reporting
 import multiprocessing as mp                # multiprocessing
 import psycopg2 as psql                     # postgresql api
 from wraith.utils.timestamps import ts2iso  # timestamp conversion
 from dateutil import parser as dtparser     # parse out timestamps
-from wraith.iyri.constants import *         # constants
 import wraith.wifi.radiotap as rtap         # 802.11 layer 1 parsing
 from wraith.wifi import mpdu                # 802.11 layer 2 parsing
 from wraith.wifi import mcs                 # mcs functions
 from wraith.wifi import channels            # 802.11 channels/RFs
 from wraith.wifi.oui import manufacturer    # oui functions
-
-def tb():
-    """
-     ugly print traceback
-     :returns: string representation of the traceback
-    """
-    return repr(traceback.format_tb(sys.exc_info()[2]))
+from wraith.utils.valrep import tb          # for traceback
+from wraith.iyri.constants import *         # constants
 
 class Thresher(mp.Process):
     """

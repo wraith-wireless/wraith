@@ -38,13 +38,11 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import os                                       # for path validations
-import re                                       # for regular expressions
 import signal                                   # signal processing
 import time                                     # for sleep, timestamps
 import logging                                  # log
 import logging.config                           # log configuration
 import logging.handlers                         # handlers for log
-import sys,traceback                            # error/traceback reporting
 import multiprocessing as mp                    # multiprocessing process, events etc
 import ConfigParser                             # reading configuration files
 import socket,threading                         # for the c2c server
@@ -53,64 +51,15 @@ from wraith.iyri import __version__ as ivers    # for iyri version
 from wraith.iyri.collate import Collator        # the collator
 from wraith.iyri.rdoctl import RadioController  # Radio object etc
 from wraith.iyri.gpsctl import GPSController    # gps device
-from wraith.wifi import iw,channels             # channel specifications
+from wraith.wifi import iw                      # regset/get & channels
 from wraith.wifi.iwtools import wifaces         # check for interface presents
 from wraith.utils.cmdline import runningprocess # check for psql running
+from wraith.utils import valrep                 # validation functionality
 from wraith.iyri.constants import *             # buffer dims
-
-# auxiliary function - pulled out of Iryi class so it can be used elsewhere
-# with minimal hassle
-def parsechlist(pattern,ptype):
-    """
-      parses a channel list pattern
-      :param pattern: see iyri.conf for  channel list definition
-      :param ptype: oneof {'scan'|'pass'}
-      :returns: a list of tuples t = (channel,chwidth) defined in pattern
-    """
-    # parse channel portion
-    if not pattern: chs,ws = [],[]
-    else:
-        chs,ws = pattern.split(':') # split the pattern by ch,width separator
-
-        if not chs: chs = []
-        else:
-            if chs.lower().startswith('b'): # band specification
-                band = chs[1:]
-                if band == '2.4': chs = sorted(channels.ISM_24_C2F.keys())
-                elif band == '5': chs = sorted(channels.UNII_5_C2F.keys())
-                else:
-                    err = "Band spec: %s for %s not supported".format(chs,ptype)
-                    raise ValueError(err)
-            elif '-' in chs: # range specification
-                [l,u] = chs.split('-')
-                chs = [c for c in xrange(int(l),int(u)+1) if c in channels.channels()]
-            else: # list or single specification
-                try:
-                    chs = [int(c) for c in chs.split(',')]
-                except ValueError:
-                    err = "Invalid channel list spec: {0} for {1}".format(chs,ptype)
-                    raise ValueError(err)
-
-            # parse width portion
-            if not ws or ws.lower() == 'all': ws = []
-            else:
-                if ws.lower() == "noht": ws = [None,'HT20']
-                elif ws.lower() == "ht": ws = ['HT40+','HT40-']
-                else:
-                    err = "Invalid spec for width {0} for {1}".format(ws,ptype)
-                    raise ValueError(err)
-
-    # compile all possible combinations
-    if (chs,ws) == ([],[]):
-        if ptype == 'scan':
-            return [(ch,chw) for chw in iw.IW_CHWS for ch in channels.channels()]
-    elif not chs: return [(ch,chw) for chw in ws for ch in channels.channels()]
-    elif not ws: return [(ch,chw) for chw in iw.IW_CHWS for ch in chs]
-    else: return [(ch,chw) for chw in ws for ch in chs]
 
 #### set up log -> have to configure absolute path
 GPATH = os.path.dirname(os.path.abspath(__file__))
-logpath = os.path.join(GPATH,'iyri.log.conf')
+logpath = os.path.join(os.path.dirname(os.path.abspath(__file__)),'iyri.log.conf')
 logging.config.fileConfig(logpath)
 
 class C2CClientExit(Exception): pass
@@ -427,7 +376,7 @@ class Iryi(object):
             self._state = IYRI_INVALID
         except (EOFError,OSError): pass # hide any closed pipe errors
         except Exception as e: # catchall
-            logging.error(repr(traceback.format_tb(sys.exc_info()[2])))
+            logging.error("Unidentified: %s %s\n%s",type(e).__name__,e,valrep.tb())
             self._state = IYRI_INVALID
         else:
             # start children execution
@@ -507,7 +456,7 @@ class Iryi(object):
                 self._conf['gps']['dir'] = cp.getfloat('GPS','heading')
             else:
                 self._conf['gps']['id'] = cp.get('GPS','devid').upper()
-                if re.match(GPSDID,self._conf['gps']['id']) is None:
+                if not valrep.validgpsdid(self._conf['gps']['id']):
                     raise RuntimeError("Invalid GPS device id specification")
                 self._conf['gps']['port'] = cp.getint('GPS','port')
                 self._conf['gps']['poll'] = cp.getfloat('GPS','poll')
@@ -520,8 +469,7 @@ class Iryi(object):
                                    'db':cp.get('Storage','db'),
                                    'user':cp.get('Storage','user'),
                                    'pwd':cp.get('Storage','pwd')}
-            if re.match(IPADDR,self._conf['store']['host']) is None and\
-               self._conf['store']['host'] != 'localhost':
+            if not valrep.validaddr(self._conf['store']['host']):
                 raise RuntimeError("Invalid IP address for storage host")
 
             # Local section
@@ -572,7 +520,7 @@ class Iryi(object):
         # get optional properties
         if cp.has_option(rtype,'spoof'):
             spoof = cp.get(rtype,'spoof').upper()
-            if re.match(MACADDR,spoof) is None:
+            if not valrep.validhwaddr(spoof):
                 logging.warn("Invalid spoofed MAC addr %s specified",spoof)
             else:
                 r['spoofed'] = spoof
@@ -613,8 +561,8 @@ class Iryi(object):
         # get scan pattern
         r['dwell'] = cp.getfloat(rtype,'dwell')
         if r['dwell'] <= 0: raise ValueError("dwell must be > 0")
-        r['scan'] = parsechlist(cp.get(rtype,'scan'),'scan')
-        r['pass'] = parsechlist(cp.get(rtype,'pass'),'pass')
+        r['scan'] = valrep.channellist(cp.get(rtype,'scan'),'scan')
+        r['pass'] = valrep.channellist(cp.get(rtype,'pass'),'pass')
         if cp.has_option(rtype,'scan_start'):
             try:
                 scanspec = cp.get(rtype,'scan_start')
@@ -696,7 +644,7 @@ class Iryi(object):
                 elif cmd == 'spoof': # spoof will be macaddr
                     if len(ps) != 6: raise RuntimeError
                     ps = ':'.join(ps).upper() # rejoin the mac
-                    if re.match(MACADDR,ps) is None: raise RuntimeError
+                    if not valrep.validhwaddr(ps): raise RuntimeError
             except:
                 resp = "ERR {0} \001invalid params\001\n".format(cmdid)
                 self._pConns['c2c'].send(resp)
