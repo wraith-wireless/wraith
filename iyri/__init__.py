@@ -43,6 +43,10 @@ REVISIONS:
   includes: iyri 0.1.0 collate 0.1.2 constants 0.0.1 gpsctl 0.0.1 rdoctl 0.1.0
    thresh 0.0.4 iyrid iyri.conf iyri.log.conf iyrid
   changes:
+   - Threshers created when workload exceeds specified threshhold and killed when
+    workloads fall below specified threshhold
+    o based on constants MIN_TRESH, MAX_THRESH and WRK_THRESH
+   - removed artifacts hanging around from previous revisions
 
 """
 __name__ = 'iyri'

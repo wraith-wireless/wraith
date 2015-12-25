@@ -2,7 +2,7 @@
 
 """ rdoctl.py: Radio Controller
 
-An interface to an underlying radio (wireless nic). Tunes and sniffs a radio
+An interface to an underlying radio (wireless nic). Tunes and sniffs a radio,
 forwarding data to the Collator.
 """
 __name__ = 'rdoctl'
@@ -22,11 +22,11 @@ from Queue import Queue, Empty             # thread-safe queue
 import multiprocessing as mp               # for Process
 from wraith.wifi import iw                 # iw command line interface
 import wraith.wifi.iwtools as iwt          # nic command line interaces
-from wraith.iyri.constants import *        # tuner states & buffer dims
 from wraith.utils.timestamps import ts2iso # time stamp conversion
+from wraith.iyri.constants import *        # tuner states & buffer dims
 
 class Tuner(threading.Thread):
-    """ 'tunes' the radio's current channel and width """
+    """ tune' the radio's channel and width """
     def __init__(self,q,conn,iface,scan,dwell,i,pause=False):
         """
          :param q: msg queue between RadioController and this Thread
@@ -38,17 +38,17 @@ class Tuner(threading.Thread):
          :param pause: start paused?
         """
         threading.Thread.__init__(self)
+        self._state = TUNE_PAUSE if pause else TUNE_SCAN
         self._qR = q        # event queue to RadioController
         self._cI = conn     # connection from Iyri to tuner
         self._vnic = iface  # this radio's vnic
         self._chs = scan    # scan list
         self._ds = dwell    # corresponding dwell times
         self._i = i         # initial/current index into scan/dwell
-        self._state = TUNE_PAUSE if pause else TUNE_SCAN # initial state
 
     @property
-    def channel(self): return '{0}:{1}'.format(self._chs[self._i][0],
-                                               self._chs[self._i][1])
+    def channel(self):
+        return '{0}:{1}'.format(self._chs[self._i][0],self._chs[self._i][1])
 
     def run(self):
         """ switch channels based on associted dwell times """
@@ -123,7 +123,7 @@ class Tuner(threading.Thread):
                                 err = "redundant command"
                                 self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
                         elif cmd == 'listen':
-                            # for listen, we ignore reduandacies as some other
+                            # for listen, ignore reduandacies as some other
                             # process may have changed the channel
                             try:
                                 ch,chw = ps.split('-')
@@ -156,7 +156,6 @@ class RadioController(mp.Process):
     def __init__(self,comms,conn,buff,conf):
         """
          initialize radio for collection
-
          :param comms: internal communication to Collator
          :param conn: connection to/from Iyri
          :param buff: the circular buffer for frames
@@ -523,6 +522,7 @@ class RadioController(mp.Process):
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
             self._cI.close()
+        except (EOFError,IOError): pass
         except:
             clean = False
         return clean

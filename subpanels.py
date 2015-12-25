@@ -379,7 +379,7 @@ class CalculatePanel(gui.SimplePanel):
             if self._entries[i].get():
                 formula = formula.replace('${0}'.format(i),
                                           "{0}('{1}')".format((self._inputs[i][2],
-                                                               self._entries[i].get()))
+                                                               self._entries[i].get())))
             else:
                 self.err('Error',"All entries must be filled in")
                 return
@@ -1208,7 +1208,7 @@ class SessionsPanel(gui.DBPollingTabularPanel):
                 if cur['Frames'] != nF: self._tree.set(sid,'Frames',nF)
             else:         # session not present
                 self._tree.insert('','end',iid=sid,values=(sid,host,kern,start,stop,
-                                                           devid,recon,coll,nF))
+                                                           devid,recon,surveil,nF))
 
     def treerc(self,event):
         """ show delete context menu for the specified item """

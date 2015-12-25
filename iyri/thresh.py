@@ -22,6 +22,8 @@ __status__ = 'Development'
 import signal                               # handle signals
 import select                               # for select
 import time                                 # timestamps
+import sys                                  # error reporting
+import traceback                            # traceback/error reporting
 import multiprocessing as mp                # multiprocessing
 import psycopg2 as psql                     # postgresql api
 from wraith.utils.timestamps import ts2iso  # timestamp conversion
@@ -32,7 +34,13 @@ from wraith.wifi import mpdu                # 802.11 layer 2 parsing
 from wraith.wifi import mcs                 # mcs functions
 from wraith.wifi import channels            # 802.11 channels/RFs
 from wraith.wifi.oui import manufacturer    # oui functions
-import sys,traceback                        # error reporting
+
+def tb():
+    """
+     ugly print traceback
+     :returns: string representation of the traceback
+    """
+    return repr(traceback.format_tb(sys.exc_info()[2]))
 
 class Thresher(mp.Process):
     """
@@ -50,18 +58,18 @@ class Thresher(mp.Process):
          :param ouis: oui dict
         """
         mp.Process.__init__(self)
-        self._icomms = comms # communications queue
-        self._tasks = q      # connection from Collator
-        self._cC = conn      # token connection from Collator
-        self._abuff = abad   # abad buffer
-        self._sbuff = shama  # shama buffer
-        self._conn = None    # db connection
-        self._l = lSta       # sta lock
-        self._curs = None    # our cursor
-        self._ouis = ouis    # oui dict
-        self._stop = False   # stop flag
-        self._write = False  # write flag
-        self._next = None    # next operation to execute
+        self._icomms = comms  # communications queue
+        self._tasks = q       # connection from Collator
+        self._cC = conn       # token connection from Collator
+        self._abuff = abad    # abad buffer
+        self._sbuff = shama   # shama buffer
+        self._conn = None     # db connection
+        self._l = lSta        # sta lock
+        self._curs = None     # our cursor
+        self._ouis = ouis     # oui dict
+        self._stop = False    # stop flag
+        self._write = False   # write flag
+        self._next = None     # next operation to execute
         self._setup(dbstr)
 
     def terminate(self): pass
@@ -77,15 +85,18 @@ class Thresher(mp.Process):
         signal.signal(signal.SIGUSR1,self.stop)       # kill signal from Collator
 
         # local variables
-        sid = None # current session id
-        rdos = {}  # radio map hwaddr{'role','buffer','writer'}
+        sid = None  # current session id
+        rdos = {}   # radio map hwaddr{'role','buffer','record'}
 
         # notify collator we're up
         self._icomms.put((self.cs,ts2iso(time.time()),THRESH_THRESH,self.pid))
 
         while not self._stop:
             # check for tasks or messages
-            rs,_,_ = select.select([self._cC,self._tasks._reader],[],[])
+
+            # do not check task queue until sid has been set
+            if sid is None: rs,_,_ = select.select([self._cC],[],[])
+            else: rs,_,_ = select.select([self._cC,self._tasks._reader],[],[])
 
             # get each message
             for r in rs:
@@ -95,7 +106,8 @@ class Thresher(mp.Process):
                     if r == self._cC: tkn,ts,d = self._cC.recv()
                     else: tkn,ts,d = self._tasks.get(0.5)
 
-                    # & process it
+                    # & process it - no error checking is done assuming that
+                    # both roles and tokens sent will be correct/valid
                     if tkn == POISON: self._stop = True
                     elif tkn == COL_SID: sid = d[0]
                     elif tkn == COL_RDO:
@@ -103,26 +115,14 @@ class Thresher(mp.Process):
                         rdos[d[0]] = {'role':d[1],'buffer':None,'record':False}
                         if d[1] == 'abad': rdos[d[0]]['buffer'] = self._abuff
                         elif d[1] == 'shama': rdos[d[0]]['buffer'] = self._sbuff
-                        else:
-                            msg = "Invalid role for radio: {0}".format(d[1])
-                            self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
                     elif tkn == COL_WRITE:
                         rdos[d[0]]['record'] = d[1]
                     elif tkn == COL_FRAME:
                         self._processframe(sid,rdos,ts,ts1,d)
-                    else:
-                        msg = "invalid token {0}".format(tkn)
-                        self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
-                except (IndexError,ValueError,KeyError) as e:
-                    _,_,etrace = sys.exc_info()
-                    msg = "{0} {1}\n{2}".format(type(e).__name__,e,
-                                                repr(traceback.format_tb(etrace)))
-                    self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
                 except Exception as e:
-                    _,_,etrace = sys.exc_info()
-                    msg = "{0} {1}\n{2}".format(type(e).__name__,e,
-                                                repr(traceback.format_tb(etrace)))
-                    self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
+                    # blanket exception, catch all and notify collator
+                    msg = "{0} {1}\n{2}".format(type(e).__name__,e,tb())
+                    self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None,None)))
 
         # notify collector we're down
         if self._curs: self._curs.close()
@@ -163,15 +163,16 @@ class Thresher(mp.Process):
          :param ts1: timestamp of data read
          :param d:  data
         """
-        # pull frame out of buffer
-        src,ix,b = d[0],d[1],d[2] # hwaddr,index,nBytes
-        f = rdos[src]['buffer'][(ix*DIM_N):(ix*DIM_N)+b].tobytes()
+        # (1) pull frame out of buffer
+        src,idx,b = d[0],d[1],d[2] # hwaddr,index,nBytes
+        f = rdos[src]['buffer'][(idx*DIM_N):(idx*DIM_N)+b].tobytes()
 
-        # parse the frame
-        lF = len(f)      # & get the total length
+        # (2) parse the frame
+        fid = None       # set an invalid frame id
         dR = {}          # make an empty rtap dict
         dM = mpdu.MPDU() # & an empty mpdu dict
         try:
+            lF = len(f)      # get the total length
             dR = rtap.parse(f)
             dM = mpdu.parse(f[dR['sz']:],rtap.flags_get(dR['flags'],'fcs'))
         except rtap.RadiotapException: # parsing failed @ radiotap, set empty vals
@@ -180,10 +181,8 @@ class Thresher(mp.Process):
             vs = (sid,ts,lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
                   int('a-mpdu' in dR['present']),rtap.flags_get(dR['flags'],'fcs'))
         except Exception as e: # blanket error
-            _,_,etrace = sys.exc_info()
-            msg = "Parsing Error. {0} {1}\n{2}".format(type(e).__name__,e,
-                                                       repr(traceback.format_tb(etrace)))
-            self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
+            msg = "Parsing Error. {0} {1}\n{2}".format(type(e).__name__,e,tb())
+            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,src,idx)))
             return
         else:
             vs = (sid,ts,lF,dR['sz'],dM.offset,
@@ -191,13 +190,13 @@ class Thresher(mp.Process):
                   dR['flags'],int('a-mpdu' in dR['present']),
                   rtap.flags_get(dR['flags'],'fcs'))
 
-        # individual helper functions will commit database inserts/updates. All
-        # db errors will be caught in this try & rollbacks will be executed here
-        fid = None
+        # (3) store the frame
+        # NOTE: individual helper functions will commit database inserts/updates
+        # but allow exceptions to fall through as db errors will be caught in this
+        # try & rollbacks will be executed here
         try:
-            self._next = 'frame'
-
             # insert the frame and get frame's id
+            self._next = 'frame'
             sql = """
                    insert into frame (sid,ts,bytes,bRTAP,bMPDU,data,flags,ampdu,fcs)
                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s) returning frame_id;
@@ -206,17 +205,6 @@ class Thresher(mp.Process):
             fid = self._curs.fetchone()[0]
             self._conn.commit()
 
-            # notify collator & insert malformed if we had any issues
-            if dM.error:
-                self._icomms.put((self.cs,ts1,THRESH_WARN,
-                                  "Frame {0}. Bad MPDU".format(fid)))
-                sql = """
-                       insert into malformed (fid,location,reason)
-                       values (%s,%s,%s);
-                      """
-                self._curs.execute(sql,(fid,dM.error[0],dM.error[1]))
-                self._conn.commit()
-
             # write raw bytes if specified
             if rdos[src]['record']:
                 self._next = 'frame_raw'
@@ -224,74 +212,78 @@ class Thresher(mp.Process):
                 self._curs.execute(sql,(fid,psql.Binary(f)))
                 self._conn.commit()
 
-            # NOTE: the next two "parts" storing and extracting are mutually
-            # exlusive & are required to occur sequentially, thus could be
-            # handled by threads/processes
+            # insert malformed if we had any issues
+            for err in dM.error:
+                sql = """
+                       insert into malformed (fid,location,reason)
+                       values (%s,%s,%s);
+                      """
+                self._curs.execute(sql,(fid,err[0],err[1]))
+                self._conn.commit()
 
-            # (1) store frame details in db
+                # notify collator, but we want to continue attempting to store
+                # as much as possible so set src and index to None
+                msg = "Frame {0}. Bad MPDU {1}".format(fid,err)
+                self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None,None)))
+
+            # NOTE: the next two "parts" storing and extracting are mutually
+            # exlusive & are not required to occur sequentially, thus could be
+            # handled by threads/processes in future iterations
+
+            # (a) store frame details in db
             self._next = 'store'
             self._insertrtap(fid,src,dR)
-            if not dM.isempty: self._insertmpdu(fid,dM)
-            else: return
+            if not dM.isempty:
+                self._insertmpdu(fid,dM)
 
-            # (2) extract
-            self._next = 'extract'
-            # sta addresses
-            # Fct        To From    Addr1    Addr2  Addr3  Addr4
-            # IBSS/Intra  0    0    RA=DA    TA=SA  BSSID    N/A
-            # From AP     0    1    RA=DA TA=BSSID     SA    N/A
-            # To AP       1    0 RA=BSSID    TA=SA     DA    N/A
-            # Wireless DS 1    1 RA=BSSID TA=BSSID DA=WDS SA=WDS
+                # (b) extract
+                self._next = 'extract'
 
-            # pull unique addresses of stas from mpdu into the addr dict
-            # having the form: <hwaddr>->{'loc:[<i..n>], where i=1..4
-            #                             'id':<sta_id>}
-            # NOTE: insertsta modifies the addrs dict in place assigning ids to
-            # each nonbroadcast address
-            addrs = {}
-            for i,a in enumerate(['addr1','addr2','addr3','addr4']):
-                if not a in dM: break
-                if dM[a] in addrs: addrs[dM[a]]['loc'].append(i+1)
-                else: addrs[dM[a]] = {'loc':[i+1],'id':None}
+                # pull unique addresses of stas from mpdu into the addr dict
+                # having the form: <hwaddr>->{'loc:[<i..n>], where i=1..4
+                #                             'id':<sta_id>}
+                # NOTE: insertsta modifies the addrs dict in place assigning ids
+                # to each nonbroadcast address
+                # sta addresses
+                # Fct        To From    Addr1    Addr2  Addr3  Addr4
+                # IBSS/Intra  0    0    RA=DA    TA=SA  BSSID    N/A
+                # From AP     0    1    RA=DA TA=BSSID     SA    N/A
+                # To AP       1    0 RA=BSSID    TA=SA     DA    N/A
+                # Wireless DS 1    1 RA=BSSID TA=BSSID DA=WDS SA=WDS
+                addrs = {}
+                for i,a in enumerate(['addr1','addr2','addr3','addr4']):
+                    if not a in dM: break
+                    if dM[a] in addrs: addrs[dM[a]]['loc'].append(i+1)
+                    else: addrs[dM[a]] = {'loc':[i+1],'id':None}
 
-            # insert the sta, sta_activity
-            self._insertsta(fid,sid,ts,addrs)
-            self._insertsta_activity(sid,ts,addrs)
+                # insert the sta, sta_activity
+                self._insertsta(fid,sid,ts,addrs)
+                self._insertsta_activity(sid,ts,addrs)
 
-            # further process mgmt frames?
-            self._next = 'mgmt'
-            if dM.type == mpdu.FT_MGMT: self._processmgmt(fid,sid,ts,addrs,dM)
+                # further process mgmt frames?
+                if dM.type == mpdu.FT_MGMT:
+                    self._next = 'mgmt'
+                    self._processmgmt(fid,sid,ts,addrs,dM)
+
+            # notify collator, we're done
+            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_DONE,(None,idx,fid)))
         except psql.OperationalError as e: # unrecoverable
-            if fid:
-                msg = "Frame {0} insert failed at {1}. {2}: {3}.".format(fid,
-                                                                         self._next,
-                                                                         e.pgcode,
-                                                                         e.pgerror)
-            else:
-                msg = "Failed to insert frame. {0}: {1}.".format(e.pgcode,e.pgerror)
-            self._icomms.put((self.cs,ts1,THRESH_ERR,msg))
+            # NOTE: for now we do not exit on unrecoverable error but allow
+            # collator to send the poison pill
+            args = (fid,self._next,e.pgcode,e.pgerror)
+            msg = "<PSQL> Frame {0} failed at {1}. {2}->{3}.".format(*args)
+            self._icomms.put((self.cs,ts1,THRESH_ERR,(msg,src,idx)))
         except psql.Error as e:
+            # rollback to avoid db errors
             self._conn.rollback()
-            if fid:
-                msg = "<PSQL> Frame {0} failed at {1}. {2}: {3}.".format(fid,
-                                                                         self._next,
-                                                                         e.pgcode,
-                                                                         e.pgerror)
-            else:
-                msg = "<PSQL> Failed to insert frame. {0}: {1}.".format(e.pgcode,
-                                                                        e.pgerror)
-            self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
+            args = (fid,self._next,e.pgcode,e.pgerror)
+            msg = "<PSQL> Frame {0} failed at {1}. {2}->{3}.".format(*args)
+            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,src,idx)))
         except Exception as e:
-            _,_,etrace = sys.exc_info()
-            self._conn.rollback()
-            if fid:
-                msg = "{0} {1} in frame {2}\n{3}".format(type(e).__name__,
-                                                         e,fid,
-                                                         repr(traceback.format_tb(etrace)))
-            else:
-                msg = "{0} {1}\n{2}".format(type(e).__name__,e,
-                                            repr(traceback.format_tb(etrace)))
-            self._icomms.put((self.cs,ts1,THRESH_WARN,msg))
+            self._conn.commit() # commit anything that may be pending
+            args = (fid,self._next,type(e).__name__,e,tb())
+            msg = "<UNK> Frame {0} failed at {1}. {2}->{3}\n{4}.".format(*args)
+            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,src,idx)))
 
     #### All below _insert functions will allow db exceptions to pass through to caller
 

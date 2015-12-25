@@ -82,4 +82,4 @@ IYRILOG    = '/var/log/wraith/iyri.log' # path to iyri log
 IYRIPID    = '/var/run/iyrid.pid'       # path to iyri pidfile
 WRAITHCONF = 'wraith.conf'              # path to wraith config file
 IYRICONF   = 'iyri/iyri.conf'           # path to iyri config file
-OUI        = 'data/oui.txt'             # path to oui.txt
+OUIPATH    = 'data/oui.txt'             # path to oui.txt

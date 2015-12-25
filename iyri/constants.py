@@ -18,15 +18,17 @@ import re
 DIM_M = 1000     # number of rows for memory view
 DIM_N = MAX_MPDU # number of cols (bytes)
 
-# number of (initial) threshers
-NTHRESH = 2
+# thresher constants
+MIN_THRESH = 2  # minimum (and initial) number of threshers
+MAX_THRESH = 15 # maximum number of threshers
+WRK_THRESH = 50 # no more the WRK_THRESH outstanding frames per thresher
 
 # iyri states
-IYRI_INVALID         = -1 # iyri is unuseable
-IYRI_CREATED         =  0 # iyri is created but not yet started
-IYRI_RUNNING         =  1 # iyri is currently executing
-IYRI_EXITING         =  5 # iyri has finished execution loop
-IYRI_DESTROYED       =  6 # iyri is destroyed
+IYRI_INVALID   = -1 # iyri is unuseable
+IYRI_CREATED   =  0 # iyri is created but not yet started
+IYRI_RUNNING   =  1 # iyri is currently executing
+IYRI_EXITING   =  5 # iyri has finished execution loop
+IYRI_DESTROYED =  6 # iyri is destroyed
 
 # tuner states
 TUNE_DESC = ['scan','hold','pause','listen']
@@ -59,7 +61,8 @@ GPS_FLT       =  8 # frontline trace
 THRESH_THRESH =  9 # thresher up/down
 THRESH_WARN   = 10 # thresher warning
 THRESH_ERR    = 11 # thresher failed
-RDO_RADIO     = 12 # radio up/down
+THRESH_DONE   = 12 # thresher has finiahed a frame
+RDO_RADIO     = 13 # radio up/down
 RDO_FAIL      = 14 # radio failed
 RDO_SCAN      = 15 # radio is scanning
 RDO_LISTEN    = 16 # radio is listening
@@ -67,10 +70,15 @@ RDO_HOLD      = 17 # radio is holding
 RDO_PAUSE     = 18 # radio is paused
 RDO_SPOOF     = 19 # radio has sppofed mac
 RDO_TXPWR     = 20 # radio is transmitting at tx pwr
-RDO_FRAME     = 21 # radio sent frame
-RDO_STATE     = 22 # radio state requested
+RDO_STATE     = 21 # radio state requested
+RDO_FRAME     = 22 # radio sent frame
 # commands to threshers
 COL_SID       = 23 # pass the sid
 COL_RDO       = 24 # pass radio info
 COL_WRITE     = 25 # pass write/don't write
 COL_FRAME     = 26 # pass frame
+
+# RADIO CONSTANTS string desc corresponds with nidus RADIOSTATE
+RDO_DESC = {RDO_RADIO:'up/down',RDO_FAIL:'fail',RDO_SCAN:'scan',RDO_LISTEN:'listen',
+            RDO_HOLD:'hold',RDO_PAUSE:'pause',RDO_SPOOF:'spoof',RDO_TXPWR:'txpwr',
+            RDO_STATE:'state'}

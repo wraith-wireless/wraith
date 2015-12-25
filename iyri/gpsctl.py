@@ -62,14 +62,14 @@ class GPSController(mp.Process):
         self._icomms.put((self._dd['id'],ts2iso(time.time()),GPS_GPSD,self._dd))
 
         # if fixed location, send the frontline trace & stopping details
-        if self._fixed: self._icomms.put((self._dd['id'],ts2iso(time.time()),
-                                          GPS_FLT,self._defFLT))
+        if self._fixed:
+            self._icomms.put((self._dd['id'],ts2iso(time.time()),GPS_FLT,self._defFLT))
 
         # 2 Location loop (only if dynamic)
         while not self._fixed:
             if self._cI.poll(self._poll) and self._cI.recv() == POISON: break
             while self._gpsd.waiting():
-                # recheck if we need to stop
+                # recheck if we need to stop so we don't get stuck in here
                 if self._cI.poll() and self._cI.recv() == POISON: break
                 rpt = self._gpsd.next()
                 if rpt['class'] != 'TPV': continue
@@ -106,27 +106,29 @@ class GPSController(mp.Process):
         """ Device Details Loop - get complete details or quit on done """
         while self._dd['flags'] is None: # static is initiated already
             if self._cI.poll(self._poll) and self._cI.recv() == POISON: return False
-            else:
-                # loop while data is on serial, checking each time if we need to stop
-                while self._gpsd.waiting():
-                    if self._cI.poll() and self._cI.recv() == POISON: return False
-                    dev = self._gpsd.next()
-                    try:
-                        if dev['class'] == 'VERSION':
-                            self._dd['version'] = dev['release']
-                        elif dev['class'] == 'DEVICE':
-                            # flags not present until identifiable packets come
-                            # from device
-                            self._dd['flags'] = dev['flags']
-                            self._dd['driver'] = dev['driver']
-                            self._dd['bps'] = dev['bps']
-                            self._dd['path'] = dev['path']
-                    except KeyError:
-                        pass
-                    except:
-                        return False
+
+            # loop while data is on serial, checking each time if we need to stop
+            while self._gpsd.waiting():
+                if self._cI.poll() and self._cI.recv() == POISON: return False
+
+                dev = self._gpsd.next()
+                try:
+                    if dev['class'] == 'VERSION':
+                        self._dd['version'] = dev['release']
+                    elif dev['class'] == 'DEVICE':
+                        # flags not present until identifiable packets come
+                        # from device
+                        self._dd['flags'] = dev['flags']
+                        self._dd['driver'] = dev['driver']
+                        self._dd['bps'] = dev['bps']
+                        self._dd['path'] = dev['path']
+                except KeyError: pass
+                except:
+                    return False
+
+        # notify Iyri
         rmsg = "GPS v{0} connected".format(self._dd['version'])
-        self._cI.send(('info','GPSD','Connect',rmsg))
+        self._cI.send((IYRI_INFO,'GPSD','Connect',rmsg))
         return True
 
     def _setup(self,conf):
@@ -137,8 +139,7 @@ class GPSController(mp.Process):
         # if dynamic, attempt connect to device otherwise configure static flt
         self._fixed = True if conf['fixed'] else False
         self._m = mgrs.MGRS()
-        if not self._fixed:
-            # pull out parameters & configure empty device details
+        if not self._fixed: # pull out parameters & configure empty device details
             self._poll = conf['poll']
             self._qpx = conf['epx']
             self._qpy = conf['epy']

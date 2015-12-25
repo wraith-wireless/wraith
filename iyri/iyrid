@@ -2,12 +2,9 @@
  
 ### BEGIN INIT INFO
 # Provides:          iyri (Wraith Sensor Daemon)
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
 # Short-Description: Initiates Iyri, an Wraith sensor
-### END INIT INFO
-
 # Author: Dale Patterson <wraith.wireless@yandex.com>
+### END INIT INFO
 
 # Change the next 3 lines to suit where script is installed and what its called
 PATH=/sbin:/bin:/usr/sbin:/usr/bin

@@ -42,14 +42,14 @@ Iyri:
     61435LNov2015.360 [WARNING] Collator: (Thresher) Frame 2832 failed at probereq. TypeError: 'NoneType' object is not iterable.
     ** It believe that (with current setup of 2 threshers), data in the buffer
     is being overwritten before the being parsed
- 58) on shutdowns, getting...
+ 58) on some shutdowns, getting...
     ^CTraceback (most recent call last):
     File "/usr/lib/python2.7/multiprocessing/queues.py", line 266, in _feed
     send(obj)
     IOError: [Errno 32] Broken pipe
-    what process is this comming from?
+    need to locate what process(es) is this comming from?
  61) document different comm protocols
- 62) fix probereq,beacon,assocreq,assocresp,reassocreq
+ 63) format tracebacks to logging better
 Wifi:
   1) Should we add support for AVS, Prism headers ?
   2) radiotap: ensure data pad is handled for atheros cards (any others?)
@@ -67,5 +67,3 @@ Wifi:
   9) handle multiple ssids in mgmt frames
  10) add ability to track multipe errors if frame can be processed further
 Nidus(.sql):
-  1) add table for ssids to handle multiple ssids broadcast in mgmt frames &
-   include bytea field for none utf8 ssids

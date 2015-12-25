@@ -16,7 +16,7 @@ import urllib2
 import os
 import sys
 import time
-from wraith import OUI, __version__ as v
+from wraith import OUIPATH
 from wraith.utils.timestamps import ts2iso
 
 def parseoui(path = None):
@@ -31,7 +31,7 @@ def parseoui(path = None):
 
     if path is None:
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            os.path.abspath('../'+OUI))
+                            os.path.abspath('../'+OUIPATH))
 
     try:
         fin = open(path)
@@ -60,7 +60,7 @@ def fetch():
     """ retrieves oui.txt from IEEE and writes to data file """
     ouiurl = 'http://standards-oui.ieee.org/oui.txt'
     ouipath = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           os.path.abspath('../'+OUI))
+                           os.path.abspath('../'+OUIPATH))
     if not os.path.isdir(os.path.dirname(ouipath)):
         print "Path to data is incorrect {0}".format(ouipath)
         sys.exit(1)

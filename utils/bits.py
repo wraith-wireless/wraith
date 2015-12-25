@@ -48,6 +48,7 @@ def bitmask_get(bm,mn,f):
 
      :param bm: bitmask
      :param mn: magic number
+     :param f: flag to retrieve
      :returns: defined names
     """
     return int(bm[f] & mn == bm[f])
