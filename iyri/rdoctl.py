@@ -455,8 +455,7 @@ class RadioController(mp.Process):
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
                 iwt.ifconfig(self._nic,'up')
-            except (iw.IWException,iwt.IWToolsException):
-                pass
+            except (iw.IWException,iwt.IWToolsException): pass
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
@@ -466,8 +465,7 @@ class RadioController(mp.Process):
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
                 iwt.ifconfig(self._nic,'up')
-            except (iw.IWException,iwt.IWToolsException):
-                pass
+            except (iw.IWException,iwt.IWToolsException): pass
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
@@ -478,8 +476,7 @@ class RadioController(mp.Process):
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
                 iwt.ifconfig(self._nic,'up')
-            except (iw.IWException,iwt.IWToolsException):
-                pass
+            except (iw.IWException,iwt.IWToolsException): pass
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
@@ -489,8 +486,7 @@ class RadioController(mp.Process):
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
                 iwt.ifconfig(self._nic,'up')
-            except (iw.IWException,iwt.IWToolsException):
-                pass
+            except (iw.IWException,iwt.IWToolsException): pass
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
