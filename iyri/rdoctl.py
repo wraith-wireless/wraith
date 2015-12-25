@@ -220,7 +220,7 @@ class RadioController(mp.Process):
                 event,ts,msg = self._qT.get_nowait()
             except Empty: # no notices from tuner thread
                 try:
-                    # pull the frame off and pass it on
+                    # pull the frame (if any) off and pass it on
                     l = self._s.recv_into(self._buffer[(ix*DIM_N):(ix*DIM_N)+DIM_N],DIM_N)
                     if self._stuner != TUNE_PAUSE:
                         ts = ts2iso(time.time())
@@ -232,13 +232,13 @@ class RadioController(mp.Process):
                     self._icomms.put((self._vnic,ts2iso(time.time()),RDO_FAIL,e))
                     break
                 except Exception as e:
-                    # blanket 'don't know what happened' exception
                     self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
                     self._icomms.put((self._vnic,ts2iso(time.time()),RDO_FAIL,e))
                     break
             else:
                 # process the notification
-                if event == CMD_ERR:
+                if event == POISON: break
+                elif event == CMD_ERR:
                     # bad/failed command from user, notify Iyri
                     if msg[0] > -1: self._cI.send((CMD_ERR,self._role,msg[0],msg[1]))
                 elif event == RDO_FAIL:
@@ -264,16 +264,13 @@ class RadioController(mp.Process):
                     if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
                 elif event == RDO_STATE:
                     if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
-                elif event == POISON: break
 
         # notify Collator we are down & shut down
         self._icomms.put((self._vnic,ts2iso(time.time()),RDO_RADIO,None))
         if not self._shutdown():
             try:
                 self._cI.send((IYRI_WARN,self._role,'Shutdown',"Incomplete reset"))
-            except EOFError:
-                # most likely Iyri already closed their side
-                pass
+            except (EOFError,IOError): pass
 
     @property
     def radio(self):
@@ -357,8 +354,7 @@ class RadioController(mp.Process):
             cs = wiface.split(self._role)
             try:
                 if len(cs) > 1: ns.append(int(cs[1]))
-            except ValueError:
-                pass
+            except ValueError: pass
         n = 0 if not 0 in ns else max(ns)+1
         self._vnic = "iyri{0}".format(n)
 
