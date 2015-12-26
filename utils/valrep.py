@@ -124,6 +124,7 @@ def channellist(pattern,ptype='scan'):
     elif not chs: return [(ch,chw) for chw in ws for ch in channels.channels()]
     elif not ws: return [(ch,chw) for chw in iw.IW_CHWS for ch in chs]
     else: return [(ch,chw) for chw in ws for ch in chs]
+    return [],[]
 
 def tb():
     """

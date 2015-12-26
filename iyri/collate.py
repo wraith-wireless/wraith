@@ -138,7 +138,7 @@ class Collator(mp.Process):
                     wmsg,src,idx = msg
                     try:
                         del tmap[src][idx]
-                    except:
+                    except Exception as e:
                         pass
 
                     # can we delete the task map?
@@ -175,9 +175,10 @@ class Collator(mp.Process):
                 elif ev == RDO_RADIO:
                     # up/down message from radio(s).
                     if msg is not None:
-                        # pull out mac and role
+                        # pull out mac, role & record
                         mac = msg['mac']
                         role = msg['role']
+                        rec = msg['record']
 
                         # shouldn't happen but make sure radio doesn't initate twice
                         # & that role is valid i.e. abad or shama
@@ -199,7 +200,6 @@ class Collator(mp.Process):
 
                         # & update current threshers
                         for pid in threshers:
-                            rec = msg['record']
                             threshers[pid]['conn'].send((COL_RDO,ts,[mac,role]))
                             threshers[pid]['conn'].send((COL_WRITE,ts, [mac,rec]))
 
@@ -256,7 +256,7 @@ class Collator(mp.Process):
                     for fs in [tmap[src] for src in tmap]: nf += len(fs)
                     if nf / nt > WRK_THRESH and nt < MAX_THRESH:
                         # notify Iyri & start a new thresher
-                        rmsg = "Upgrading to {0} threshers".format(nt-1)
+                        rmsg = "Upgrading to {0} threshers".format(nt+1)
                         self._cI.send((IYRI_INFO,'Collator','Thresher',rmsg))
                         try:
                             recv,send = mp.Pipe(False)

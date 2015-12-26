@@ -35,7 +35,8 @@ def parse(f):
     """
     # parse header and present flags
     (v,l,p) = header(f)
-    if v != 0 or len(f) < l: raise RadiotapException("Invalid frame")
+    if v != 0: raise RadiotapException("Invalid version {0}".format(v))
+    if len(f) < l: raise RadiotapException("Invalid length {0}".format(l))
     flags = present_list(p)
 
     # for the flags that are true, add a format specifier and unpack
@@ -77,7 +78,7 @@ def header(f):
     try:
         return struct.unpack(_HDR_,f[:_HDR_SZ_])
     except struct.error:
-        raise RadiotapException("invalid frame")
+        raise RadiotapException("invalid header")
 
 _VER_ =  FMT_BO + "B"
 _VER_SZ_ = struct.calcsize(_VER_)
@@ -90,7 +91,7 @@ def version(f):
     try:
         return struct.unpack(_VER_,f[:_VER_SZ_])[0]
     except struct.error:
-        raise RadiotapException("invalid frame")
+        raise RadiotapException("invalid version")
 
 _LEN_ =  FMT_BO + "BxH"
 _LEN_SZ_ = struct.calcsize(_LEN_)
@@ -104,7 +105,7 @@ def length(f):
     try:
         (v,l) = struct.unpack(_LEN_,f[:_LEN_SZ_])
     except struct.error:
-        raise RadiotapException("invalid frame")
+        raise RadiotapException("invalid length")
     if v: raise RadiotapException("invalid vers. {0}".format(v))
     return l
 
@@ -119,7 +120,7 @@ def pflags(f):
     try:
         (v,l,p) = struct.unpack(_HDR_,f[:_HDR_SZ_])
     except struct.error:
-        raise RadiotapException("frame")
+        raise RadiotapException("invalid pflags")
     if v: raise RadiotapException("invalid vers. {0}".format(v))
     return p
           

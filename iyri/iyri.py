@@ -39,7 +39,7 @@ __status__ = 'Development'
 
 import os                                       # for path validations
 import signal                                   # signal processing
-import time                                     # for sleep, timestamps
+from time import sleep                          # for sleep
 import logging                                  # log
 import logging.config                           # log configuration
 import logging.handlers                         # handlers for log
@@ -419,7 +419,7 @@ class Iryi(object):
             except (EOFError,IOError): pass # ignore any broken pipe errors
 
         # active_children has the side effect of joining the processes
-        while mp.active_children(): time.sleep(0.5)
+        while mp.active_children(): sleep(0.5)
         if self._c2c:
             while self._c2c.is_alive(): self._c2c.join(0.5)
         logging.info("Sub-processes stopped")

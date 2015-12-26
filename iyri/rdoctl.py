@@ -14,7 +14,7 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import time                                # timestamps
+from time import time                      # timestamps
 import signal                              # handling signals
 import socket                              # reading frames
 import threading                           # for the tuner thread
@@ -53,7 +53,7 @@ class Tuner(threading.Thread):
     def run(self):
         """ switch channels based on associted dwell times """
         # starting paused or scanning?
-        ts = ts2iso(time.time())
+        ts = ts2iso(time())
         if self._state == TUNE_PAUSE: self._qR.put((RDO_PAUSE,ts,[-1,' ']))
         else: self._qR.put((RDO_SCAN,ts,[-1,self._chs]))
 
@@ -69,10 +69,10 @@ class Tuner(threading.Thread):
             else: to = self._ds[self._i] if not remaining else remaining
 
             # get timestamp
-            ts1 = time.time()
+            ts1 = time()
             if self._cI.poll(to): # get token and timestamp
                 tkn = self._cI.recv()
-                ts = time.time()
+                ts = time()
 
                 # tokens will have 2 flavor's POISON and 'cmd:cmdid:params'
                 # where params is empty (for POISON) or a '-' separated list
@@ -147,9 +147,9 @@ class Tuner(threading.Thread):
                     iw.chset(self._vnic,self._chs[self._i][0],self._chs[self._i][1])
                     remaining = 0 # reset remaining timeout
                 except iw.IWException as e:
-                    self._qR.put((RDO_FAIL,ts2iso(time.time()),[-1,e]))
+                    self._qR.put((RDO_FAIL,ts2iso(time()),[-1,e]))
                 except Exception as e: # blanket exception
-                    self._qR.put((RDO_FAIL,ts2iso(time.time()),[-1,e]))
+                    self._qR.put((RDO_FAIL,ts2iso(time()),[-1,e]))
 
 class RadioController(mp.Process):
     """ RadioController - handles radio initialization and collection """
@@ -207,7 +207,7 @@ class RadioController(mp.Process):
         self._tuner.start()
 
         # notify Collator we are up
-        self._icomms.put((self._vnic,ts2iso(time.time()),RDO_RADIO,self.radio))
+        self._icomms.put((self._vnic,ts2iso(time()),RDO_RADIO,self.radio))
 
         # execute sniffing loop
         ix = 0 # index of current frame
@@ -223,17 +223,17 @@ class RadioController(mp.Process):
                     # pull the frame (if any) off and pass it on
                     l = self._s.recv_into(self._buffer[(ix*DIM_N):(ix*DIM_N)+DIM_N],DIM_N)
                     if self._stuner != TUNE_PAUSE:
-                        ts = ts2iso(time.time())
+                        ts = ts2iso(time())
                         self._icomms.put((self._vnic,ts,RDO_FRAME,(ix,l)))
                     ix = (ix+1) % DIM_M
                 except socket.timeout: continue
                 except socket.error as e:
                     self._cI.send((IYRI_ERR,self._role,'Socket',e))
-                    self._icomms.put((self._vnic,ts2iso(time.time()),RDO_FAIL,e))
+                    self._icomms.put((self._vnic,ts2iso(time()),RDO_FAIL,e))
                     break
                 except Exception as e:
                     self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
-                    self._icomms.put((self._vnic,ts2iso(time.time()),RDO_FAIL,e))
+                    self._icomms.put((self._vnic,ts2iso(time()),RDO_FAIL,e))
                     break
             else:
                 # process the notification
@@ -266,7 +266,7 @@ class RadioController(mp.Process):
                     if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
 
         # notify Collator we are down & shut down
-        self._icomms.put((self._vnic,ts2iso(time.time()),RDO_RADIO,None))
+        self._icomms.put((self._vnic,ts2iso(time()),RDO_RADIO,None))
         if not self._shutdown():
             try:
                 self._cI.send((IYRI_WARN,self._role,'Shutdown',"Incomplete reset"))
@@ -413,9 +413,9 @@ class RadioController(mp.Process):
             self._hop = 0
             while scan:
                 try:
-                    t = time.time()
+                    t = time()
                     iw.chset(self._vnic,scan[i][0],scan[i][1])
-                    self._hop += (time.time() - t)
+                    self._hop += (time() - t)
                     i += 1
                 except iw.IWException as e:
                     # if invalid argument, drop the channel otherwise reraise error
@@ -424,7 +424,6 @@ class RadioController(mp.Process):
                     else:
                         raise
                 except IndexError:
-                    # all channels checked
                     break
             if not scan: raise ValueError("Empty scan pattern")
 
@@ -451,20 +450,16 @@ class RadioController(mp.Process):
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
                 iwt.ifconfig(self._nic,'up')
+                if self._s: self._s.close()
             except (iw.IWException,iwt.IWToolsException): pass
-            if self._s:
-                self._s.shutdown(socket.SHUT_RD)
-                self._s.close()
             raise RuntimeError("{0}:Raw Socket:{1}".format(self._role,e))
         except iw.IWException as e:
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
                 iwt.ifconfig(self._nic,'up')
+                if self._s: self._s.close()
             except (iw.IWException,iwt.IWToolsException): pass
-            if self._s:
-                self._s.shutdown(socket.SHUT_RD)
-                self._s.close()
             err = "{0}:iw.chset:Failed to set channel: {1}".format(self._role,e)
             raise RuntimeError(err)
         except (ValueError,TypeError) as e:
@@ -472,20 +467,18 @@ class RadioController(mp.Process):
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
                 iwt.ifconfig(self._nic,'up')
+                if self._s: self._s.close()
             except (iw.IWException,iwt.IWToolsException): pass
-            if self._s:
-                self._s.shutdown(socket.SHUT_RD)
-                self._s.close()
             raise RuntimeError("{0}:config:{1}".format(self._role,e))
         except Exception as e: # blanket exception
             try:
                 iw.devdel(self._vnic)
                 iw.phyadd(self._phy,self._nic)
                 iwt.ifconfig(self._nic,'up')
+                if self._s:
+                    self._s.shutdown(socket.SHUT_RD)
+                    self._s.close()
             except (iw.IWException,iwt.IWToolsException): pass
-            if self._s:
-                self._s.shutdown(socket.SHUT_RD)
-                self._s.close()
             raise RuntimeError("{0}:Unknown:{1}".format(self._role,e))
 
     def _shutdown(self):

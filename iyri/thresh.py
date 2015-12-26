@@ -4,11 +4,9 @@
 
 Provides Thresher processes of frames, stores frame data/metadata to DB.
 
-Each Process is configured to allow for future commands (via tokens) to be used
+Threshers are configured to allow for future commands (via tokens) to be used
 to assist in any as of yet unidentified issues or future upgrades that may be
-desired. Additionally, while each process will stop if given a POISON pill,
-the calling process i.e. the Collator can also send a SIGUSR1 signal to stop
-the process out of order, i.e preemptively
+desired.
 """
 __name__ = 'thresh'
 __license__ = 'GPL v3.0'
@@ -21,12 +19,12 @@ __status__ = 'Development'
 
 import signal                               # handle signals
 import select                               # for select
-import time                                 # timestamps
+from time import time                       # timestamps
 import multiprocessing as mp                # multiprocessing
 import psycopg2 as psql                     # postgresql api
-from wraith.utils.timestamps import ts2iso  # timestamp conversion
 from dateutil import parser as dtparser     # parse out timestamps
 import wraith.wifi.radiotap as rtap         # 802.11 layer 1 parsing
+from wraith.utils.timestamps import ts2iso  # timestamp conversion
 from wraith.wifi import mpdu                # 802.11 layer 2 parsing
 from wraith.wifi import mcs                 # mcs functions
 from wraith.wifi import channels            # 802.11 channels/RFs
@@ -35,9 +33,7 @@ from wraith.utils.valrep import tb          # for traceback
 from wraith.iyri.constants import *         # constants
 
 class Thresher(mp.Process):
-    """
-     Thresher process frames and inserts frame data in database
-    """
+    """ Thresher process frames and inserts frame data in database """
     def __init__(self,comms,q,conn,lSta,abad,shama,dbstr,ouis):
         """
          :param comms: internal communication (to Collator)
@@ -71,7 +67,7 @@ class Thresher(mp.Process):
 
     def run(self):
         """ execute frame process loop """
-        # ignore signals used by main program
+        # ignore signals used by main program & add signal for stop
         signal.signal(signal.SIGINT,signal.SIG_IGN)   # CTRL-C and kill -INT stop
         signal.signal(signal.SIGTERM,signal.SIG_IGN)  # kill -TERM stop
         signal.signal(signal.SIGUSR1,self.stop)       # kill signal from Collator
@@ -81,7 +77,7 @@ class Thresher(mp.Process):
         rdos = {}   # radio map hwaddr{'role','buffer','record'}
 
         # notify collator we're up
-        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_THRESH,self.pid))
+        self._icomms.put((self.cs,ts2iso(time()),THRESH_THRESH,self.pid))
 
         while not self._stop:
             # check for tasks or messages
@@ -92,7 +88,7 @@ class Thresher(mp.Process):
 
             # get each message
             for r in rs:
-                ts1 = ts2iso(time.time()) # get data read time
+                ts1 = ts2iso(time()) # get data read time
                 try:
                     # get data
                     if r == self._cC: tkn,ts,d = self._cC.recv()
@@ -119,14 +115,13 @@ class Thresher(mp.Process):
         # notify collector we're down
         if self._curs: self._curs.close()
         if self._conn: self._conn.close()
-        self._icomms.put((self.cs,ts2iso(time.time()),THRESH_THRESH,None))
+        self._icomms.put((self.cs,ts2iso(time()),THRESH_THRESH,None))
 
     def stop(self,signum=None,stack=None): self._stop = True
 
     def _setup(self,dbstr):
         """
          initialize db connection
-
          :param dbstr: db connection string
         """
         try:
@@ -164,23 +159,27 @@ class Thresher(mp.Process):
         dR = {}          # make an empty rtap dict
         dM = mpdu.MPDU() # & an empty mpdu dict
         try:
-            lF = len(f)      # get the total length
+            lF = len(f)
             dR = rtap.parse(f)
             dM = mpdu.parse(f[dR['sz']:],rtap.flags_get(dR['flags'],'fcs'))
-        except rtap.RadiotapException: # parsing failed @ radiotap, set empty vals
-            vs = (sid,ts,lF,0,0,[0,lF],0,'none',0)
-        except mpdu.MPDUException: # mpdu failed - initialize empty mpdu vals
+            vs = (sid,ts,lF,dR['sz'],dM.offset,[(dR['sz']+dM.offset),(lF-dM.stripped)],
+                  dR['flags'],int('a-mpdu' in dR['present']),
+                  rtap.flags_get(dR['flags'],'fcs'))
+        except rtap.RadiotapException as e:
+            # parsing failed @ radiotap, set empty vals & alert Collator
+            msg = "Parsing failed at radiotap: {0} in buffer[{1}]".format(e,idx)
+            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None,None)))
+            vs = (sid,ts,lF,0,0,[0,lF],0,0,0)
+        except mpdu.MPDUException as e:
+            # mpdu failed - initialize empty mpdu vals & alert Collator
+            msg = "Parsing failed at mpdu: {0} in buffer[{1}]".format(e,idx)
+            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None,None)))
             vs = (sid,ts,lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
                   int('a-mpdu' in dR['present']),rtap.flags_get(dR['flags'],'fcs'))
         except Exception as e: # blanket error
             msg = "Parsing Error. {0} {1}\n{2}".format(type(e).__name__,e,tb())
             self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,src,idx)))
             return
-        else:
-            vs = (sid,ts,lF,dR['sz'],dM.offset,
-                  [(dR['sz']+dM.offset),(lF-dM.stripped)],
-                  dR['flags'],int('a-mpdu' in dR['present']),
-                  rtap.flags_get(dR['flags'],'fcs'))
 
         # (3) store the frame
         # NOTE: individual helper functions will commit database inserts/updates
@@ -258,7 +257,7 @@ class Thresher(mp.Process):
                     self._processmgmt(fid,sid,ts,addrs,dM)
 
             # notify collator, we're done
-            self._icomms.put((self.cs,ts2iso(time.time()),THRESH_DONE,(None,idx,fid)))
+            self._icomms.put((self.cs,ts2iso(time()),THRESH_DONE,(None,src,idx)))
         except psql.OperationalError as e: # unrecoverable
             # NOTE: for now we do not exit on unrecoverable error but allow
             # collator to send the poison pill
@@ -282,7 +281,6 @@ class Thresher(mp.Process):
     def _insertrtap(self,fid,src,dR):
         """
          insert radiotap data into db
-
          :param fid: frame id
          :param src: collectors hw addr
          :param dR: parsed radiotap dict
@@ -344,7 +342,6 @@ class Thresher(mp.Process):
     def _insertmpdu(self,fid,dM):
         """
          insert mpdu data into db
-
          :param fid: frame id
          :param dM: parsed mpdu dict
         """
@@ -430,7 +427,6 @@ class Thresher(mp.Process):
     def _insertsta(self,fid,sid,ts,addrs):
         """
          insert unique sta from frame into db
-
          :param fid: frame id
          :param sid: session id
          :param ts: timestamp frame collected
@@ -495,8 +491,6 @@ class Thresher(mp.Process):
 
                 if not row:
                     # sta has not been seen this session
-                    # commit the transaction because we were experiencing
-                    # duplicate key issues w/o commit
                     if mode == 'tx': fh = lh = ts
                     else: fs = ls = ts
                     sql = """
@@ -508,7 +502,7 @@ class Thresher(mp.Process):
                     self._conn.commit()
                 else:
                     # sta has been seen this session
-                    # we have to convert the frame ts to a datatime obj w/ tx
+                    # we have to convert the frame ts to a datatime obj w/ tz
                     # to compare with the db's ts
                     tstz = dtparser.parse(ts+"+00:00")
                     if mode == 'tx':
@@ -552,7 +546,6 @@ class Thresher(mp.Process):
     def _processmgmt(self,fid,sid,ts,addrs,dM):
         """
          insert individual mgmt frames
-
          :param fid: frame id
          :param sid: session id
          :param sid: session id
@@ -676,7 +669,6 @@ class Thresher(mp.Process):
          inserts the (re)association resp from ap to client NOTE: Since both
          association response and reassociation response have the same format,
          they are saved to the same table identified by the type 'assoc'
-
          :param fid: frame id
          :param assoc: association type
          :param client: associating client id

@@ -18,7 +18,7 @@ DIM_M = 1000     # number of rows for memory view
 DIM_N = MAX_MPDU # number of cols (bytes)
 
 # thresher constants
-MIN_THRESH = 2  # minimum (and initial) number of threshers
+MIN_THRESH =  5 # minimum (and initial) number of threshers
 MAX_THRESH = 15 # maximum number of threshers
 WRK_THRESH = 50 # no more the WRK_THRESH outstanding frames per thresher
 

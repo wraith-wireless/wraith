@@ -13,7 +13,7 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import time                                # for timestamps
+from time import time                      # for timestamps
 import socket                              # connection to gps device
 import signal                              # handling signals
 import mgrs                                # lat/lon to mgrs conversion
@@ -59,11 +59,11 @@ class GPSController(mp.Process):
 
         # get and transmit device details
         if not self._devicedetails(): return
-        self._icomms.put((self._dd['id'],ts2iso(time.time()),GPS_GPSD,self._dd))
+        self._icomms.put((self._dd['id'],ts2iso(time()),GPS_GPSD,self._dd))
 
         # if fixed location, send the frontline trace & stopping details
         if self._fixed:
-            self._icomms.put((self._dd['id'],ts2iso(time.time()),GPS_FLT,self._defFLT))
+            self._icomms.put((self._dd['id'],ts2iso(time()),GPS_FLT,self._defFLT))
 
         # 2 Location loop (only if dynamic)
         while not self._fixed:
@@ -76,7 +76,7 @@ class GPSController(mp.Process):
                 try:
                     if rpt['epx'] > self._qpx or rpt['epy'] > self._qpy: continue
                     else:
-                        ts = ts2iso(time.time())
+                        ts = ts2iso(time())
                         flt = {'id':self._dd['id'],
                                'fix':rpt['mode'],
                                'coord':self._m.toMGRS(rpt['lat'],rpt['lon']),
@@ -98,7 +98,7 @@ class GPSController(mp.Process):
                     break
 
         # send stop & close out connections
-        self._icomms.put((self._dd['id'],ts2iso(time.time()),GPS_GPSD,None))
+        self._icomms.put((self._dd['id'],ts2iso(time()),GPS_GPSD,None))
         if self._gpsd: self._gpsd.close()
         self._cI.close()
 
