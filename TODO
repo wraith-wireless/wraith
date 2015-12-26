@@ -35,21 +35,11 @@ Iyri:
  55) start gpsd if it does not start automatically (assuming gps device is
      plugged in)
  56) test c2c after switch to single platform
- 57) getting bad mpdus sometimes - is this just malformed packets or is it an
-     error with the thresher? write out bad frames to logs to parse later
-    261434LNov2015.657 [WARNING] Collator: (Thresher) Unpack error in mpdu at 659:
-    261434LNov2015.51 [WARNING] Collator: (Thresher) invalid arguments (00:c0:ca:59:af:a6,712,48) for !FRAME!
-    61435LNov2015.360 [WARNING] Collator: (Thresher) Frame 2832 failed at probereq. TypeError: 'NoneType' object is not iterable.
-    ** It believe that (with current setup of 2 threshers), data in the buffer
-    is being overwritten before the being parsed
- 58) on some shutdowns, getting...
-    ^CTraceback (most recent call last):
-    File "/usr/lib/python2.7/multiprocessing/queues.py", line 266, in _feed
-    send(obj)
-    IOError: [Errno 32] Broken pipe
-    need to locate what process(es) is this comming from?
  61) document different comm protocols
  63) format tracebacks to logging better
+ 64) threshers
+  o add/remove is too sporadic
+  o handle situations where MAX_THRESH is reached
 Wifi:
   1) Should we add support for AVS, Prism headers ?
   2) radiotap: ensure data pad is handled for atheros cards (any others?)
