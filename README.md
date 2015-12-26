@@ -18,7 +18,7 @@ drill down as necessary to a single device. Wraith allows the user to decide wha
 data to view, how to view it and 'when' to view it.
 
 ## 2. REQUIREMENTS: 
- * linux (preferred 3.x kernel, tested on 3.13.0-65)
+ * linux (tested on 3.13.x kernel)
    - NOTE: some cards i.e. rosewill usb nics were not fully supported through iw
      on earlier 3.13.x kernels
  * Python 2.7
@@ -28,19 +28,19 @@ data to view, how to view it and 'when' to view it.
  * mgrs 1.1
  * macchanger 1.7.0
 
-## 3. MODULES: Currently consists of three components/modules
+## 3. MODULES: Currently consists of three main components/modules: Wifi, Iyri and
+the GUI and three secondary modules: utils, widgets, and nidus.
 
-###  a. Wifi (v 0.0.5): 802.11 network interface objects and functions
+###  a. wifi (v 0.0.5): 802.11 network interface objects and functions
 
 Objects/functions to manipulate wireless nics and parse 802.11 captures.
-Partial support of 802.11-2012
 
 #### Standards
 * Currently Supported: 802.11a\b\g
 * Partially Supported: 802.11n
 * Not Supported: 802.11s\y\u\ac\ad\af
 
-### b. Iryi (v 0.2.0) : Wraith Sensor
+### b. iryi (v 0.2.1): Wraith Sensor
 
 Iryi is a 802.11 sensor consisting of an optional radio (shama), and a mandatory
 radio (abad). 802.11 packets are stored in a circular buffer, parsed and inserted
@@ -56,13 +56,30 @@ and multiple sensors will be very difficult. However, there were two primary
 reasons for doing so:
  * I wanted to push more autonomy and intelligence into the sensor which would
    require the sensor to parse out radiotap and mpdu (no point in doing this twice)
- * frames were being passed through multiple connection, queues and sockets before
-   they eventually made their way to the mediator causing a major delay in processing
+ * frames (as strings) were being passed through multiple connection, queues and
+   sockets before they eventually made their way to the mediator causing a major
+   delay in processing
 
 ### d. wraith-rt: GUI
 
 In progress gui. Currently configured to provide start/stop of services, display
 and editing of configuration files, some manipulation of backened storage.
+
+### e. utils: utility functionality
+
+Provides various functions used throughout wraith. See Architecture section for
+further information.
+
+### f. widgets: gui super classes
+
+Defines a graphic suite based on Tkinter/ttk where a set of non-modal panels operate
+under the control of a master panel and execute tasks, display information
+independently of or in conjuction with this panel and other panels. (Think undocked
+windows).
+
+### g. nidus: database
+
+Provides the Postgresql database schema, nidus.sql.
 
 ## 4. ARCHITECTURE/HEIRARCHY: Brief Overview of the project file structure
 
@@ -87,6 +104,9 @@ and editing of configuration files, some manipulation of backened storage.
     - cmdline.py        various cmdline utilities for testing processes
     - simplepcap.py     pcap writer
     - brine.py          support for pickling connection objects
+    - valrep.py         validation and reporting functionality
+ *  data                data folder
+    - oui.txt           tab seperated oui manufacturer file
  *  wifi                subpackage for wifi related
      - \_\_init\_\_.py  initialize radio subpackage
      - iwtools.py       iwconfig, ifconfig interface and nic utilities

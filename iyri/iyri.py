@@ -59,7 +59,7 @@ from wraith.iyri.constants import *             # buffer dims
 
 #### set up log -> have to configure absolute path
 GPATH = os.path.dirname(os.path.abspath(__file__))
-logpath = os.path.join(os.path.dirname(os.path.abspath(__file__)),'iyri.log.conf')
+logpath = os.path.join(os.path.dirname(GPATH),'iyri.log.conf')
 logging.config.fileConfig(logpath)
 
 class C2CClientExit(Exception): pass
@@ -473,7 +473,24 @@ class Iryi(object):
                 raise RuntimeError("Invalid IP address for storage host")
 
             # Local section
-            self._conf['local'] = {'region':None,'c2c':2526}
+            # thresher related are required, ouipath, c2c and region are optional
+            # get required
+            self._conf['local'] = {'thresher':{},
+                                   'opath':None,
+                                   'region':None,
+                                   'c2c':2526}
+            self._conf['local']['thresher']['min'] = cp.getint('Local','mint')
+            self._conf['local']['thresher']['max'] = cp.getint('Local','maxt')
+            self._conf['local']['thresher']['wrk'] = cp.getint('Local','wrkt')
+
+            # get optional
+            if cp.has_option('Local','OUI'):
+                path = os.path.abspath(cp.get('Local','OUI'))
+                if os.path.isfile(path):
+                    self._conf['local']['opath'] = path
+                else:
+                    logging.warning("OUI file {0} is not a file".format(path))
+
             if cp.has_option('Local','C2C'):
                 try:
                     self._conf['local']['c2c'] = cp.getint('Local','C2C')

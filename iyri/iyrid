@@ -11,8 +11,7 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON=/home/<user>/workspace/projects/Python/wraith/iyri/iyri.py
 DAEMON_NAME=iyrid
 
-# uncomment below, replace <user> with login to run as user
-#DAEMON_USER=<user>
+#DAEMON_USER=root
 
 # The process ID of the script when it runs is stored here:
 PIDFILE=/var/run/$DAEMON_NAME.pid
@@ -21,17 +20,10 @@ PIDFILE=/var/run/$DAEMON_NAME.pid
 . /lib/lsb/init-functions
 
 do_start() {
-    # if running at user level, uncomment the below two lines & the three lines
-    # prior to log_end_msg $? This will set the raw socket before initiating the
-    # sensor allowing iyri to bind it - have to sleep to allow sensor to initiate
-    # fully before remove raw capture capability
-    #log_daemon_msg "Setting capability cap_net_raw"
-    #setcap cap_net_raw=+ep /usr/bin/python2.7
     log_daemon_msg "Starting $DAEMON_NAME"
     start-stop-daemon --start --background --pidfile $PIDFILE --make-pid --startas $DAEMON
-    #sleep 2
-    #log_daemon_msg "Removing capability cap_net_raw"
-    #setcap cap_net_raw=-ep /usr/bin/python2.7
+    # sleep, giving time for iyri to succeed/fail
+    sleep 2
     log_end_msg $?
 }
 

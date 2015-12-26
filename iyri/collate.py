@@ -53,6 +53,7 @@ class Collator(mp.Process):
         self._sb = sb        # shama's buffer
         self._save = None    # save options
         self._dbstr = {}     # db connection string
+        self._local = {}     # thresher & oui path parameters
         self._setup(conf)
 
     def terminate(self): pass
@@ -64,13 +65,16 @@ class Collator(mp.Process):
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
         # function local variables
-        lSta = mp.Lock()         # sta lock
-        qT = mp.Queue()          # thresher task queue
-        ouis = parseoui(OUIPATH) # oui dict
-        tmap = {}                # maps src (hwaddr) to frames list
-        rmap = {}                # maps callsigns (vnic) to hwaddr
-        imap = {}                # maps thresher init values to hwaddr
-        threshers = {}           # pid->{'obj':Thresher,'conn':connection}
+        ouis = parseoui(self._local['opath']) # oui dict
+        mint = self._local['min']             # min/initial # of threshers
+        maxt = self._local['max']             # maximum # of threshers
+        wrkt = self._local['wrk']             # threshold
+        lSta = mp.Lock()                      # sta lock
+        qT = mp.Queue()                       # thresher task queue
+        tmap = {}                             # maps src (hwaddr) to frames list
+        rmap = {}                             # maps callsigns (vnic) to hwaddr
+        imap = {}                             # maps thresher init values to hwaddr
+        threshers = {}                        # pid->{'obj':Thresher,'conn':connection}
 
         # send sensor up notification and platform details
         try:
@@ -88,7 +92,7 @@ class Collator(mp.Process):
             self._cI.send((IYRI_ERR,'Collator',type(e).__name__,e))
 
         # create threshers & pass sid
-        for _ in xrange(MIN_THRESH):
+        for _ in xrange(mint):
             try:
                 recv,send = mp.Pipe(False)
                 t = Thresher(self._icomms,qT,recv,
@@ -153,11 +157,12 @@ class Collator(mp.Process):
                         self._cI.send((IYRI_WARN,'Collator','Thresher',rmsg))
                         threshers[pid]['conn'].send((POISON,ts,None))
                     else:
-                        # can we stop a thresher?
+                        # can we stop a thresher? - IOT avoid start/stop
+                        # situations, half the threshold
                         nt = len(threshers)
                         nf = 0
                         for fs in [tmap[src] for src in tmap]: nf += len(fs)
-                        if nf / nt < WRK_THRESH and nt > MIN_THRESH:
+                        if (nf / nt) < (wrkt / 2) and nt > mint:
                             # notify Iyri & kill first thresher
                             rmsg = "Downgrading to {0} threshers".format(nt-1)
                             self._cI.send((IYRI_INFO,'Collator','Thresher',rmsg))
@@ -254,7 +259,7 @@ class Collator(mp.Process):
                     nt = len(threshers)
                     nf = 0
                     for fs in [tmap[src] for src in tmap]: nf += len(fs)
-                    if nf / nt > WRK_THRESH and nt < MAX_THRESH:
+                    if nf / nt > wrkt and nt < maxt:
                         # notify Iyri & start a new thresher
                         rmsg = "Upgrading to {0} threshers".format(nt+1)
                         self._cI.send((IYRI_INFO,'Collator','Thresher',rmsg))
@@ -340,6 +345,8 @@ class Collator(mp.Process):
         """
         try:
             self._dbstr = conf['store']
+            self._local = conf['local']['thresher']
+            self._local['opath'] = conf['local']['path']
             # connect to db
             self._conn = psql.connect(host=self._dbstr['host'],
                                       port=self._dbstr['port'],

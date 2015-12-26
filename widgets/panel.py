@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """ panel.py - defines a suite of graphical windows called panes
 
-Defines a graphic suite based on Tix where a set of non-modal panels operate under
-the control of a master panel and execute tasks, display information independently
-of or in conjuction with this panel and other panels. (Think undocked windows)
-Panels can be configured so that they can be opened, closed, "raised", minimized
-by the user or only by a calling panel.
+Defines a graphic suite based on Tkinter and ttk where a set of non-modal panels
+operate under the control of a master panel and execute tasks, display information
+independently of or in conjuction with this panel and other panels. (Think undocked
+windows). Panels can be configured so that they can be opened, closed, raised,
+minimized by the user or only by a calling panel.
 
 Conventions: As there are several conventions used to differentiate between Tk/Tcl
  master/child attributes and these are sometimes conflicting in their use throughout

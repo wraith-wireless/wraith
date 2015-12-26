@@ -18,9 +18,9 @@ DIM_M = 1000     # number of rows for memory view
 DIM_N = MAX_MPDU # number of cols (bytes)
 
 # thresher constants
-MIN_THRESH =  5 # minimum (and initial) number of threshers
-MAX_THRESH = 15 # maximum number of threshers
-WRK_THRESH = 50 # no more the WRK_THRESH outstanding frames per thresher
+#MIN_THRESH =  5 # minimum (and initial) number of threshers
+#MAX_THRESH = 15 # maximum number of threshers
+#WRK_THRESH = 50 # no more the WRK_THRESH outstanding frames per thresher
 
 # iyri states
 IYRI_INVALID   = -1 # iyri is unuseable
@@ -37,7 +37,7 @@ TUNE_PAUSE  = 2
 TUNE_LISTEN = 3
 
 # path for oui text file
-OUIPATH = '../data/oui.txt'
+#OUIPATH = '../data/oui.txt'
 
 # numeric constants for internal communications
 # IYRI

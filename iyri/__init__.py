@@ -47,6 +47,7 @@ REVISIONS:
     workloads fall below specified threshhold
     o based on constants MIN_TRESH, MAX_THRESH and WRK_THRESH
    - removed artifacts hanging around from previous revisions
+   - moved constants to conf file (after testing)
 
 """
 __name__ = 'iyri'
