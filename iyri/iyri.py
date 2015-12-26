@@ -59,7 +59,7 @@ from wraith.iyri.constants import *             # buffer dims
 
 #### set up log -> have to configure absolute path
 GPATH = os.path.dirname(os.path.abspath(__file__))
-logpath = os.path.join(os.path.dirname(GPATH),'iyri.log.conf')
+logpath = os.path.join(GPATH,'iyri.log.conf')
 logging.config.fileConfig(logpath)
 
 class C2CClientExit(Exception): pass
@@ -485,7 +485,7 @@ class Iryi(object):
 
             # get optional
             if cp.has_option('Local','OUI'):
-                path = os.path.abspath(cp.get('Local','OUI'))
+                path = os.path.join(GPATH,os.path.abspath(cp.get('Local','OUI')))
                 if os.path.isfile(path):
                     self._conf['local']['opath'] = path
                 else:
@@ -502,7 +502,7 @@ class Iryi(object):
                 if len(reg) != 2:
                     logging.warning("Regulatory domain %s is invalid",reg)
                 else:
-                    self._conf['local']['region'] = cp.get('Local','region')
+                    self._conf['local']['region'] = reg
         except (ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
             raise IryiConfException(e)
         except (RuntimeError,ValueError) as e:
@@ -654,7 +654,8 @@ class Iryi(object):
                 if len(ps) not in [2,6]: raise RuntimeError
                 if cmd == 'listen': # listen will be ch:chw
                     int(ps[0])
-                    if ps[1] not in ['None','HT20','HT40+','HT40-']: raise RuntimeError
+                    if ps[1] not in ['None','HT20','HT40+','HT40-']:
+                        raise RuntimeError
                 elif cmd == 'txpwr': # txpwr will be pwr:opt
                     int(ps[0])
                     if ps[1] not in ['fixed','auto','limit']: raise RuntimeError
@@ -672,7 +673,6 @@ class Iryi(object):
 
 if __name__ == '__main__':
     try:
-        logging.info("Iryi %s",ivers)
         sensor = Iryi()
         sensor.run()
     except IryiConfException as e:

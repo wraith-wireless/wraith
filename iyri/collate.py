@@ -346,8 +346,7 @@ class Collator(mp.Process):
         try:
             self._dbstr = conf['store']
             self._local = conf['local']['thresher']
-            self._local['opath'] = conf['local']['path']
-            # connect to db
+            self._local['opath'] = conf['local']['opath']
             self._conn = psql.connect(host=self._dbstr['host'],
                                       port=self._dbstr['port'],
                                       dbname=self._dbstr['db'],

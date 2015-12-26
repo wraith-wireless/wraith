@@ -784,7 +784,7 @@ CREATE TABLE proberesp(
   CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_client CHECK (client > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
-  CONSTRAINT ch_beacon_ts CHECK (beacon_ts > 0),
+  CONSTRAINT ch_beacon_ts CHECK (beacon_ts >= 0),
   CONSTRAINT ch_beacon_int CHECK (beacon_int > 0),
   CONSTRAINT ch_ess CHECK (ess >=0 and ess <=1),
   CONSTRAINT ch_ibss CHECK (ibss >=0 and ibss <=1),
@@ -840,7 +840,7 @@ CREATE TABLE beacon(
   vendors char(8)[],                -- list of (unique) vendor ouis found in info-elements
   CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_ap CHECK (ap > 0),
-  CONSTRAINT ch_beacon_ts CHECK (beacon_ts > 0),
+  CONSTRAINT ch_beacon_ts CHECK (beacon_ts >= 0),
   CONSTRAINT ch_beacon_int CHECK (beacon_int > 0),
   CONSTRAINT ch_ess CHECK (ess >=0 and ess <=1),
   CONSTRAINT ch_ibss CHECK (ibss >=0 and ibss <=1),
