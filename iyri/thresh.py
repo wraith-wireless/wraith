@@ -150,9 +150,24 @@ class Thresher(mp.Process):
          :param ts1: timestamp of data read
          :param d:  data
         """
-        # (1) pull frame out of buffer
-        src,idx,b = d[0],d[1],d[2] # hwaddr,index,nBytes
-        f = rdos[src]['buffer'][(idx*DIM_N):(idx*DIM_N)+b].tobytes()
+        # (1) pull frame out of buffer & notify Collator
+        src = idx = b = None
+        try:
+            # shouldn't be any errors associated with this
+            src,idx,b = d[0],d[1],d[2] # hwaddr,index,nBytes
+            f = rdos[src]['buffer'][(idx*DIM_N):(idx*DIM_N)+b].tobytes()
+        except Exception as e:
+            tr = tb()
+            te = type(e).__name__
+            ets = ts2iso(time())
+            if src is None:
+                msg = "Failed extracting data: {0}->{1}\n{2}".format(te,e,tr)
+                self._icomms.put(self.cs,ets,THRESH_ERR,(msg,None,None))
+            else:
+                msg = "Failed extracting frame: {0}->{1}\n{2}".format(te,e,tr)
+                self._icomms.put(self.cs,ets,THRESH_ERR,(msg,src,idx))
+        else:
+            self._icomms.put((self.cs,ts2iso(time()),THRESH_DQ,(None,src,idx)))
 
         # (2) parse the frame
         fid = None       # set an invalid frame id

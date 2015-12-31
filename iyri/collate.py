@@ -6,6 +6,17 @@ Processes and stores
  1) frames from the radio(s)
  2) gps device data and frontline traces collected by GPSController
  3) messages from tuner(s) and sniffer(s)
+
+The Collator uses a dict(tmap) of pending frames to determine when/if to create
+and/or destroy threshers. The dict has the form tmap[radio] = idx -> state where
+radio is the (hwaddr) of the collecting radio, idx is the index of the frame in
+the buffer and state is oneof {0|1} such that 0 denotes that frame buffer[idx] has
+been "pulled" of the buffer but is still being processed and 1 denotes that frame
+buffer[idx] is still on the buffer (and no entry denotes that no frame is at idx).
+The Collator will use the number of frames (regardless of state) to determine
+whether to increase/decrease the number of threshers and will alert iyri when
+a frame has been overwritten that is, the state of the frame at idx is 1 and
+another frame has been written to that index.
 """
 __name__ = 'collate'
 __license__ = 'GPL v3.0'
@@ -137,6 +148,10 @@ class Collator(mp.Process):
                         # & notify iyri
                         rmsg = "{0} down".format(cs)
                         self._cI.send((IYRI_INFO,'Collator','Thresher',rmsg))
+                elif ev == THRESH_DQ:
+                    # frames has been pulled off buffer
+                    _,src,idx = msg
+                    tmap[src][idx] = 0
                 elif ev == THRESH_WARN or ev == THRESH_ERR or ev == THRESH_DONE:
                     # update task list & notify iyri
                     wmsg,src,idx = msg
@@ -158,7 +173,7 @@ class Collator(mp.Process):
                         threshers[pid]['conn'].send((POISON,ts,None))
                     else:
                         # can we stop a thresher? - IOT avoid start/stop
-                        # situations, half the threshold
+                        # flucuation, half the threshold
                         nt = len(threshers)
                         nf = 0
                         for fs in [tmap[src] for src in tmap]: nf += len(fs)
@@ -225,8 +240,9 @@ class Collator(mp.Process):
                         self._submitradio(ts,rmap[cs],None)
 
                         # delete our maps (only delete tasks if its empty)
-                        if not tmap[rmap[cs]]: del tmap[rmap[cs]]
-                        del imap[rmap[cs]]
+                        hwaddr = rmap[cs]
+                        if not tmap[hwaddr]: del tmap[hwaddr]
+                        del imap[hwaddr]
                         del rmap[cs]
                 elif ev == RDO_FAIL:
                     # notify Iyri & submit fail
@@ -249,15 +265,17 @@ class Collator(mp.Process):
 
                     # update tmap list, and put frame on thresher queue
                     hwaddr = rmap[cs]
-                    if not idx in tmap[hwaddr]: tmap[hwaddr][idx] = None
-                    else:
+                    if idx in tmap[hwaddr] and tmap[hwaddr][idx] == 1:
                         rmsg = "src {0} buffer[{1}] overwritten".format(cs,idx)
                         self._cI.send((IYRI_WARN,'Collator','overwrite',rmsg))
+                    else:
+                        tmap[hwaddr][idx] = 1
                     qT.put((COL_FRAME,ts,[hwaddr,idx,l]))
 
                     # do we need to add a thresher?
                     nt = len(threshers)
                     nf = 0
+                    #for fs in [tmap[src] for src in tmap]: nf += sum(fs.values())
                     for fs in [tmap[src] for src in tmap]: nf += len(fs)
                     if nf / nt > wrkt and nt < maxt:
                         # notify Iyri & start a new thresher

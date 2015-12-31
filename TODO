@@ -1,5 +1,8 @@
 Overall:
-
+  1) How to handle db constraint errors? i.e. invalid packets
+   o log as alert? and write invalid packet?
+   o modify constraint(s) to allow invalid packets
+   o modify mpdu to log as error/warning?
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -38,8 +41,11 @@ Iyri:
  61) document different comm protocols
  63) format tracebacks to logging better
  64) threshers
-  o add/remove is too sporadic
+  o add/remove is too sporadic (FIXED)
   o handle situations where MAX_THRESH is reached
+ 65) look into using a priority queue for the internal comms (to Collator)
+ 66) switch tuner from thread to process
+ 67) should we have one Collator per radio or continue with one and only one
 Wifi:
   1) Should we add support for AVS, Prism headers ?
   2) radiotap: ensure data pad is handled for atheros cards (any others?)
