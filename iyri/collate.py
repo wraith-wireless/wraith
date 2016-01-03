@@ -29,7 +29,7 @@ __status__ = 'Development'
 
 import platform,sys                        # system & interpreter details
 import signal                              # signal processing
-import time                                # sleep and timestamps
+from time import time, sleep               # sleep and timestamps
 import socket                              # connection to gps device
 from Queue import Empty                    # queue empty exception
 import multiprocessing as mp               # multiprocessing
@@ -69,6 +69,9 @@ class Collator(mp.Process):
 
     def terminate(self): pass
 
+    @property
+    def cs(self): return 'collatorr-{0}'.format(self.pid)
+
     def run(self):
         """ run execution loop """
         # ignore signals being used by main program
@@ -89,7 +92,7 @@ class Collator(mp.Process):
 
         # send sensor up notification and platform details
         try:
-            self._submitsensor(ts2iso(time.time()),True)
+            self._submitsensor(ts2iso(time()),True)
             self._submitplatform()
         except psql.Error as e:
             # sensor submit failed, no point continuing
@@ -111,13 +114,14 @@ class Collator(mp.Process):
                              self._dbstr,ouis)
                 t.start()
                 threshers[t.pid] = {'obj':t,'conn':send}
-                send.send((COL_SID,ts2iso(time.time()),[self._sid]))
+                send.send((COL_SID,ts2iso(time()),[self._sid]))
             except RuntimeError as e:
                 self._cI.send((IYRI_WARN,'Collator','Thresher',e))
 
-        # notify Collator if no theshers were created
-        if not len(threshers):
-            self._cI.send((IYRI_ERR,'Collator','Thresher',"No Threshers. Quitting..."))
+        # notify iyri of # threshers created
+        if threshers:
+            self._cI.send((IYRI_INFO,'Collator','Thresher',
+                           "{0} threshers created".format(len(threshers))))
 
         # execution loop
         while len(threshers):
@@ -130,7 +134,7 @@ class Collator(mp.Process):
                 cs,ts,ev,msg = self._icomms.get(True,0.5)
 
                 # events from thresher(s)
-                # NOTE: all events (exluding THRESH_THRESH) will return data
+                # NOTE: all Thresh events (exluding THRESH_THRESH) will return data
                 # as a triple t = (string message,src,buffer index)
                 # where any individual item in the triple could be None
                 if ev == THRESH_THRESH:
@@ -140,12 +144,10 @@ class Collator(mp.Process):
                         rmsg = "{0} up".format(cs)
                         self._cI.send((IYRI_INFO,'Collator','Thresher',rmsg))
                     else:
-                        # thresher down - remove from thresher dict
+                        # thresher down - remove from thresher dict & notify iyri
                         pid = int(cs.split('-')[1])
                         threshers[pid]['conn'].close()
                         del threshers[pid]
-
-                        # & notify iyri
                         rmsg = "{0} down".format(cs)
                         self._cI.send((IYRI_INFO,'Collator','Thresher',rmsg))
                 elif ev == THRESH_DQ:
@@ -157,7 +159,7 @@ class Collator(mp.Process):
                     wmsg,src,idx = msg
                     try:
                         del tmap[src][idx]
-                    except Exception as e:
+                    except:
                         pass
 
                     # can we delete the task map?
@@ -182,7 +184,7 @@ class Collator(mp.Process):
                             rmsg = "Downgrading to {0} threshers".format(nt-1)
                             self._cI.send((IYRI_INFO,'Collator','Thresher',rmsg))
                             pid = threshers.keys()[0]
-                            ts1 = ts2iso(time.time())
+                            ts1 = ts2iso(time())
                             threshers[pid]['conn'].send((POISON,ts1,None))
                 # events from gps device
                 elif ev == GPS_GPSD:
@@ -293,7 +295,7 @@ class Collator(mp.Process):
                             # update new thesher then send sid
                             p = t.pid
                             for mac in imap:
-                                ts1 = ts2iso(time.time())
+                                ts1 = ts2iso(time())
                                 rec = imap[mac]['record']
                                 role = imap[mac]['role']
                                 threshers[p]['conn'].send((COL_RDO,ts1,[mac,role]))
@@ -321,8 +323,18 @@ class Collator(mp.Process):
                 self._cI.send((IYRI_WARN,'Collator',type(e).__name__,e))
 
         # clean & shut down
-        ts = ts2iso(time.time())
+        ts = ts2iso(time())
         try:
+            # stop and wait on children
+            for pid in threshers:
+                try:
+                    threshers[pid]['conn'].send((POISON,ts,None))
+                except:
+                    pass
+                finally:
+                    threshers[pid]['conn'].close()
+            while mp.active_children(): sleep(0.5)
+
             try:
                 # notify Nidus of sensor - check if radio(s), gpsd closed out
                 for cs in rmap: self._submitradio(ts,rmap[cs],None)
@@ -331,19 +343,6 @@ class Collator(mp.Process):
             except psql.Error:
                 self._conn.rollback()
                 self._cI.send((IYRI_WARN,'Collator','shutdown',"Corrupted DB on exit"))
-
-            # stop children and close communications. active_children has side
-            # effect of joining
-            for pid in threshers:
-                try:
-                    threshers[pid]['conn'].send((POISON,ts,None))
-                except:
-                    pass
-                finally:
-                    threshers[pid]['conn'].close()
-
-            # wait for children & join processes
-            while mp.active_children(): time.sleep(0.5)
 
             if self._curs: self._curs.close()
             if self._conn: self._conn.close()
@@ -372,6 +371,8 @@ class Collator(mp.Process):
                                       password=self._dbstr['pwd'])
             self._curs = self._conn.cursor()
             self._curs.execute("set time zone 'UTC';")
+            #self._curs.execute("show max_connections;")
+            #self._mc = self._curs.fetchone()[0]
             self._conn.commit()
         except psql.OperationalError as e:
             if e.__str__().find('connect') > 0:

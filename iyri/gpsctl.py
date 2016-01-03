@@ -6,8 +6,8 @@ Processes and forwards GPS device and locational data
 """
 __name__ = 'gpsctl'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.1'
-__date__ = 'September 2015'
+__version__ = '0.0.2'
+__date__ = 'January 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -58,15 +58,16 @@ class GPSController(mp.Process):
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
         # get and transmit device details
-        if not self._devicedetails(): return
-        self._icomms.put((self._dd['id'],ts2iso(time()),GPS_GPSD,self._dd))
+        ret = self._devicedetails()
+        if ret: self._icomms.put(('gpsd',ts2iso(time()),GPS_GPSD,self._dd))
 
-        # if fixed location, send the frontline trace & stopping details
+        # if fixed location, send one frontline trace & tell iyri we're quitting
         if self._fixed:
-            self._icomms.put((self._dd['id'],ts2iso(time()),GPS_FLT,self._defFLT))
+            self._icomms.put(('gpsd',ts2iso(time()),GPS_FLT,self._defFLT))
+            self._cI.send((IYRI_DONE,'gpsd','done','static'))
 
-        # 2 Location loop (only if dynamic)
-        while not self._fixed:
+        # 2 Location loop (only if dynamic))
+        while ret and not self._fixed:
             if self._cI.poll(self._poll) and self._cI.recv() == POISON: break
             while self._gpsd.waiting():
                 # recheck if we need to stop so we don't get stuck in here
@@ -77,8 +78,7 @@ class GPSController(mp.Process):
                     if rpt['epx'] > self._qpx or rpt['epy'] > self._qpy: continue
                     else:
                         ts = ts2iso(time())
-                        flt = {'id':self._dd['id'],
-                               'fix':rpt['mode'],
+                        flt = {'fix':rpt['mode'],
                                'coord':self._m.toMGRS(rpt['lat'],rpt['lon']),
                                'epy':rpt['epy'],
                                'epx':rpt['epx'],
@@ -88,7 +88,7 @@ class GPSController(mp.Process):
                                'dop':{'xdop':'{0:.3}'.format(self._gpsd.xdop),
                                       'ydop':'{0:.3}'.format(self._gpsd.ydop),
                                       'pdop':'{0:.3}'.format(self._gpsd.pdop)}}
-                        self._icomms.put((self._dd['id'],ts,GPS_FLT,flt))
+                        self._icomms.put(('gpsd',ts,GPS_FLT,flt))
                         break
                 except (KeyError,AttributeError):
                     # a KeyError means not all values are present, an
@@ -98,7 +98,7 @@ class GPSController(mp.Process):
                     break
 
         # send stop & close out connections
-        self._icomms.put((self._dd['id'],ts2iso(time()),GPS_GPSD,None))
+        if ret: self._icomms.put(('gpsd',ts2iso(time()),GPS_GPSD,None))
         if self._gpsd: self._gpsd.close()
         self._cI.close()
 
@@ -126,9 +126,6 @@ class GPSController(mp.Process):
                 except:
                     return False
 
-        # notify Iyri
-        rmsg = "GPS v{0} connected".format(self._dd['version'])
-        self._cI.send((IYRI_INFO,'GPSD','Connect',rmsg))
         return True
 
     def _setup(self,conf):
@@ -158,7 +155,7 @@ class GPSController(mp.Process):
                 raise RuntimeError(e)
         else:
             # save default location
-            self._defFLT = {'id':self._dd['id'],'fix':-1,
+            self._defFLT = {'fix':-1,
                             'coord':self._m.toMGRS(conf['lat'],conf['lon']),
                             'epy':0.0,'epx':0.0,'spd':0.0,
                             'alt':conf['alt'],'dir':conf['dir'],

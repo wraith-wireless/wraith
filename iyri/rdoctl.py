@@ -1,155 +1,34 @@
-#!/usr/bin/env python
+#1/usr/bin/env python
 
 """ rdoctl.py: Radio Controller
 
-An interface to an underlying radio (wireless nic). Tunes and sniffs a radio,
-forwarding data to the Collator.
+An interface to an underlying radio (wireless nic). Collects all frames and
+forwards to the Collator.
+
+RadioController will spawn a Tuner to handle all channel switching etc.
+
+The convention used here is to allow the Tuner to receive all notifications
+from iyri because they may contain user commands.
 """
 __name__ = 'rdoctl'
 __license__ = 'GPL v3.0'
-__version__ = '0.1.0'
-__date__ = 'August 2015'
+__version__ = '0.1.1'
+__date__ = 'January 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-from time import time                      # timestamps
+from time import time,sleep                # current time, waiting
 import signal                              # handling signals
 import socket                              # reading frames
-import threading                           # for the tuner thread
-from Queue import Queue, Empty             # thread-safe queue
+from Queue import Empty             # thread-safe queue
 import multiprocessing as mp               # for Process
 from wraith.wifi import iw                 # iw command line interface
 import wraith.wifi.iwtools as iwt          # nic command line interaces
 from wraith.utils.timestamps import ts2iso # time stamp conversion
+from wraith.iyri.tuner import Tuner        # our tuner
 from wraith.iyri.constants import *        # tuner states & buffer dims
-
-class Tuner(threading.Thread):
-    """ tune' the radio's channel and width """
-    def __init__(self,q,conn,iface,scan,dwell,i,pause=False):
-        """
-         :param q: msg queue between RadioController and this Thread
-         :param conn: token connnection from iyri
-         :param iface: interface name of card
-         :param scan: scan list of channel tuples (ch,chw)
-         :param dwell: dwell list. for each i stay on ch in scan[i] for dwell[i]
-         :param i: initial channel index
-         :param pause: start paused?
-        """
-        threading.Thread.__init__(self)
-        self._state = TUNE_PAUSE if pause else TUNE_SCAN
-        self._qR = q        # event queue to RadioController
-        self._cI = conn     # connection from Iyri to tuner
-        self._vnic = iface  # this radio's vnic
-        self._chs = scan    # scan list
-        self._ds = dwell    # corresponding dwell times
-        self._i = i         # initial/current index into scan/dwell
-
-    @property
-    def channel(self):
-        return '{0}:{1}'.format(self._chs[self._i][0],self._chs[self._i][1])
-
-    def run(self):
-        """ switch channels based on associted dwell times """
-        # starting paused or scanning?
-        ts = ts2iso(time())
-        if self._state == TUNE_PAUSE: self._qR.put((RDO_PAUSE,ts,[-1,' ']))
-        else: self._qR.put((RDO_SCAN,ts,[-1,self._chs]))
-
-        # execution loop - wait on the internal connection for each channels
-        # dwell time. IOT avoid a state where we would continue to scan the same
-        # channel, i.e. 'state' commands, use a remaining time counter
-        remaining = 0       # remaining dwell time counter
-        dwell = self._ds[0] # save original dwell time
-        while True:
-            # set the poll timeout to remaining if we need to finish this scan
-            # or to None if we are in a static state
-            if self._state in [TUNE_PAUSE,TUNE_HOLD,TUNE_LISTEN]: to = None
-            else: to = self._ds[self._i] if not remaining else remaining
-
-            # get timestamp
-            ts1 = time()
-            if self._cI.poll(to): # get token and timestamp
-                tkn = self._cI.recv()
-                ts = time()
-
-                # tokens will have 2 flavor's POISON and 'cmd:cmdid:params'
-                # where params is empty (for POISON) or a '-' separated list
-                if tkn == POISON:
-                    self._qR.put((POISON,ts2iso(ts),[-1,' ']))
-                    break
-                else:
-                    # calculate time remaining for this channel
-                    if not remaining: remaining = self._ds[self._i] - (ts-ts1)
-                    else: remaining -= (ts-ts1)
-
-                    # parse the requested command
-                    try:
-                        cmd,cid,ps = tkn.split(':') # force into 3 components
-                        cid = int(cid)
-                    except:
-                        err = "invalid command format"
-                        self._qR.put((CMD_ERR,ts2iso(ts),[-1,err]))
-                    else:
-                        if cmd == 'state':
-                            self._qR.put((RDO_STATE,ts2iso(ts),
-                                          [cid,TUNE_DESC[self._state]]))
-                        elif cmd == 'scan':
-                            if self._state != TUNE_SCAN:
-                                self._state = TUNE_SCAN
-                                self._qR.put((RDO_SCAN,ts2iso(ts),[cid,self._chs]))
-                            else:
-                                err = "redundant command"
-                                self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
-                        elif cmd == 'txpwr':
-                            err = "not currently supported"
-                            self._qR.put((RDO_HOLD,ts2iso(ts),[cid,err]))
-                        elif cmd == 'spoof':
-                            err = "not currently supported"
-                            self._qR.put((RDO_HOLD,ts2iso(ts),[cid,err]))
-                        elif cmd == 'hold':
-                            if self._state != TUNE_HOLD:
-                                self._state = TUNE_HOLD
-                                self._qR.put((RDO_HOLD,ts2iso(ts),[cid,self.channel]))
-                            else:
-                                err = "redundant command"
-                                self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
-                        elif cmd == 'pause':
-                            if self._state != TUNE_PAUSE:
-                                self._state = TUNE_PAUSE
-                                self._qR.put((RDO_PAUSE,ts2iso(ts),[cid,self.channel]))
-                            else:
-                                err = "redundant command"
-                                self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
-                        elif cmd == 'listen':
-                            # for listen, ignore reduandacies as some other
-                            # process may have changed the channel
-                            try:
-                                ch,chw = ps.split('-')
-                                if chw == 'None': chw = None
-                                iw.chset(self._vnic,ch,chw)
-                                self._state = TUNE_LISTEN
-                                details = "{0}:{1}".format(ch,chw)
-                                self._qR.put((RDO_LISTEN,ts2iso(ts),[cid,details]))
-                            except ValueError:
-                                err = "invalid param format"
-                                self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
-                            except iw.IWException as e:
-                                self._qR.put((CMD_ERR,ts2iso(ts),[cid,str(e)]))
-                        else:
-                            err = "invalid command {0}".format(cmd)
-                            self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
-            else:
-                try:
-                    # no token, go to next channel, reset remaining
-                    self._i = (self._i+1) % len(self._chs)
-                    iw.chset(self._vnic,self._chs[self._i][0],self._chs[self._i][1])
-                    remaining = 0 # reset remaining timeout
-                except iw.IWException as e:
-                    self._qR.put((RDO_FAIL,ts2iso(time()),[-1,e]))
-                except Exception as e: # blanket exception
-                    self._qR.put((RDO_FAIL,ts2iso(time()),[-1,e]))
 
 class RadioController(mp.Process):
     """ RadioController - handles radio initialization and collection """
@@ -167,25 +46,27 @@ class RadioController(mp.Process):
         self._icomms = comms      # communications queue
         self._cI = conn           # message connection to/from Iyri
         self._buffer = buff       # buffer for frames
-        self._qT = None           # queue between tuner and us
+        self._qT = None           # queue for tuner messages
         self._role = None         # role this radio plays
         self._nic = None          # radio network interface controller name
         self._mac = None          # real mac address
         self._phy = None          # the phy of the device
         self._vnic = None         # virtual monitor name
         self._std = None          # supported standards
+        self._scan = []           # scan list
         self._hop = None          # hop time
         self._interval = None     # interval time
         self._chs = []            # supported channels
+        self._ds = []             # dwell times list
         self._txpwr = 0           # current tx power
         self._driver = None       # the driver
         self._chipset = None      # the chipset
         self._spoofed = ""        # spoofed mac address
         self._record = False      # write frames to file?
         self._desc = None         # optional description
+        self._paused = False      # initial state: pause on True, scan otherwise
+        self._chi = 0             # initial channel index
         self._s = None            # the raw socket
-        self._tuner = None        # tuner thread
-        self._stuner = None       # tuner state
         self._antenna = {'num':0, # antenna details
                          'gain':None,
                          'type':None,
@@ -204,66 +85,84 @@ class RadioController(mp.Process):
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
         # start tuner thread
-        self._tuner.start()
-
-        # notify Collator we are up
-        self._icomms.put((self._vnic,ts2iso(time()),RDO_RADIO,self.radio))
+        stuner = TUNE_PAUSE if self._paused else TUNE_SCAN
+        try:
+            qT = mp.Queue()
+            tuner = Tuner(qT,self._cI,self._vnic,self._scan,self._ds,self._chi,stuner)
+            tuner.start()
+            self._icomms.put((self._vnic,ts2iso(time()),RDO_RADIO,self.radio))
+        except Exception as e:
+            self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
+            self._icomms.put((self._vnic,ts2iso(time()),RDO_FAIL,e))
+        else:
+            msg = "tuner-{0} up".format(tuner.pid)
+            self._cI.send((IYRI_INFO,self._role,'Tuner',msg))
 
         # execute sniffing loop
-        ix = 0 # index of current frame
+        # RadioController will check for any notifications from the Tuner, a tuple
+        # t = (event,timestamp,message) where message is another tuple of the form
+        # m = (cmdid,description) such that cmdid != -1 if this command comes from
+        # an external source. If there are no notifications from Tuner, check if
+        # any frames are queued on the socket and read them in to the buffer.
+        # If we're paused, read into a null buffer
+        ix = 0      # index of current frame
+        m = DIM_M   # save some space with
+        n = DIM_N   # these
+        err = False # error state, do nothing until we get POISON pill
         while True:
             try:
-                # check for any notifications from tuner thread
-                # a tuple t=(event,timestamp,message) where message is another
-                # tuple m=(cmdid,description) such that cmdid != -1 if this
-                # command comes from an external source
-                event,ts,msg = self._qT.get_nowait()
-            except Empty: # no notices from tuner thread
-                try:
-                    # pull the frame (if any) off and pass it on
-                    l = self._s.recv_into(self._buffer[(ix*DIM_N):(ix*DIM_N)+DIM_N],DIM_N)
-                    if self._stuner != TUNE_PAUSE:
-                        ts = ts2iso(time())
-                        self._icomms.put((self._vnic,ts,RDO_FRAME,(ix,l)))
-                    ix = (ix+1) % DIM_M
-                except socket.timeout: continue
-                except socket.error as e:
-                    self._cI.send((IYRI_ERR,self._role,'Socket',e))
-                    self._icomms.put((self._vnic,ts2iso(time()),RDO_FAIL,e))
-                    break
-                except Exception as e:
-                    self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
-                    self._icomms.put((self._vnic,ts2iso(time()),RDO_FAIL,e))
-                    break
-            else:
-                # process the notification
-                if event == POISON: break
-                elif event == CMD_ERR:
-                    # bad/failed command from user, notify Iyri
-                    if msg[0] > -1: self._cI.send((CMD_ERR,self._role,msg[0],msg[1]))
-                elif event == RDO_FAIL:
+                # pull any notification from Tuner & process
+                ev,ts,msg = qT.get_nowait()
+                if ev == POISON: break
+                elif ev == CMD_ERR:
+                    self._cI.send((CMD_ERR,self._role,msg[0],msg[1]))
+                elif ev == RDO_FAIL:
                     self._cI.send((IYRI_ERR,self._role,'Tuner',msg[1]))
                     self._icomms.put((self._vnic,ts,RDO_FAIL,msg[1]))
-                elif event == RDO_STATE:
-                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
-                elif event == RDO_HOLD:
-                    self._stuner = TUNE_HOLD
+                elif ev == RDO_STATE:
+                    self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                elif ev == RDO_HOLD:
+                    stuner = TUNE_HOLD
                     self._icomms.put((self._vnic,ts,RDO_HOLD,msg[1]))
-                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
-                elif event == RDO_SCAN:
-                    self._stuner = TUNE_SCAN
+                    if msg[0] != -1:
+                        self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                elif ev == RDO_SCAN:
+                    stuner = TUNE_SCAN
                     self._icomms.put((self._vnic,ts,RDO_SCAN,msg[1]))
-                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
-                elif event == RDO_LISTEN:
-                    self._stuner = TUNE_LISTEN
+                    if msg[0] != -1:
+                        self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                elif ev == RDO_LISTEN:
+                    stuner = TUNE_LISTEN
                     self._icomms.put((self._vnic,ts,RDO_LISTEN,msg[1]))
-                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
-                elif event == RDO_PAUSE:
-                    self._stuner = TUNE_PAUSE
+                    if msg[0] > -1:
+                        self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                elif ev == RDO_PAUSE:
+                    stuner = TUNE_PAUSE
                     self._icomms.put((self._vnic,ts,RDO_PAUSE,' '))
-                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
-                elif event == RDO_STATE:
-                    if msg[0] > -1: self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+                    if msg[0] > -1:
+                        self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
+            except Empty: # no notices from Tuner
+                if err: continue # error state, wait till iyri sends poison pill
+                try:
+                    # if paused, pull any frame off and ignore otherwise pass on
+                    if stuner == TUNE_PAUSE: _ = self._s.recv(n)
+                    else:
+                        l = self._s.recv_into(self._buffer[(ix*n):(ix*n)+n],n)
+                        ts = ts2iso(time())
+                        self._icomms.put((self._vnic,ts,RDO_FRAME,(ix,l)))
+                        ix = (ix+1) % m
+                except socket.timeout: pass
+                except socket.error as e:
+                    err = True
+                    self._cI.send((IYRI_ERR,self._role,'Socket',e))
+                    self._icomms.put((self._vnic,ts2iso(time()),RDO_FAIL,e))
+                except Exception as e:
+                    err = True
+                    self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
+                    self._icomms.put((self._vnic,ts2iso(time()),RDO_FAIL,e))
+
+        # ensure Tuner has finished
+        while mp.active_children(): sleep(0.5)
 
         # notify Collator we are down & shut down
         self._icomms.put((self._vnic,ts2iso(time()),RDO_RADIO,None))
@@ -311,8 +210,10 @@ class RadioController(mp.Process):
         # 1) set radio properties as specified in conf
         if conf['nic'] not in iwt.wifaces():
             raise RuntimeError("{0}:iwtools.wifaces:not found".format(conf['role']))
-        self._nic = conf['nic']
-        self._role = conf['role']
+        self._nic = conf['nic']        # save nic name
+        self._role = conf['role']      # & role
+        self._paused = conf['paused']  # & initial state (paused|scan)
+        self._record = conf['record']  # & write frames
 
         # get the phy and associated interfaces
         try:
@@ -340,9 +241,6 @@ class RadioController(mp.Process):
                 self._spoofed = iwt.sethwaddr(self._nic,mac)
             except iwt.IWToolsException as e:
                 raise RuntimeError("{0}:iwtools.sethwaddr:{1}".format(self._role,e))
-
-        # write the frames?
-        self._record = conf['record']
 
         # 2) prepare specified nic for monitoring and bind it
         # delete all associated interfaces - we want full control
@@ -426,6 +324,7 @@ class RadioController(mp.Process):
                 except IndexError:
                     break
             if not scan: raise ValueError("Empty scan pattern")
+            else: self._scan = scan
 
             # calculate avg hop time, and interval time
             # NOTE: these are not currently used but may be useful later
@@ -433,52 +332,25 @@ class RadioController(mp.Process):
             self._interval = len(scan) * conf['dwell'] + len(scan) * self._hop
 
             # create list of dwell times
-            ds = [conf['dwell']] * len(scan)
+            self._ds = [conf['dwell']] * len(self._scan)
 
             # get start ch & set the initial channel
             try:
-                ch_i = scan.index(conf['scan_start'])
-            except ValueError:
-                ch_i = 0
-            iw.chset(self._vnic,scan[ch_i][0],scan[ch_i][1])
-
-            # initialize tuner thread
-            self._qT = Queue()
-            self._tuner = Tuner(self._qT,self._cI,self._vnic,scan,ds,ch_i,conf['paused'])
+                self._chi = scan.index(conf['scan_start'])
+            except ValueError: pass
+            iw.chset(self._vnic,scan[self._chi][0],scan[self._chi][1])
         except socket.error as e:
-            try:
-                iw.devdel(self._vnic)
-                iw.phyadd(self._phy,self._nic)
-                iwt.ifconfig(self._nic,'up')
-                if self._s: self._s.close()
-            except (iw.IWException,iwt.IWToolsException): pass
+            self._shutdown()
             raise RuntimeError("{0}:Raw Socket:{1}".format(self._role,e))
         except iw.IWException as e:
-            try:
-                iw.devdel(self._vnic)
-                iw.phyadd(self._phy,self._nic)
-                iwt.ifconfig(self._nic,'up')
-                if self._s: self._s.close()
-            except (iw.IWException,iwt.IWToolsException): pass
+            self._shutdown()
             err = "{0}:iw.chset:Failed to set channel: {1}".format(self._role,e)
             raise RuntimeError(err)
         except (ValueError,TypeError) as e:
-            try:
-                iw.devdel(self._vnic)
-                iw.phyadd(self._phy,self._nic)
-                iwt.ifconfig(self._nic,'up')
-                if self._s: self._s.close()
-            except (iw.IWException,iwt.IWToolsException): pass
+            self._shutdown()
             raise RuntimeError("{0}:config:{1}".format(self._role,e))
         except Exception as e: # blanket exception
-            try:
-                iw.devdel(self._vnic)
-                iw.phyadd(self._phy,self._nic)
-                iwt.ifconfig(self._nic,'up')
-                if self._s:
-                    self._s.shutdown(socket.SHUT_RD)
-                    self._s.close()
-            except (iw.IWException,iwt.IWToolsException): pass
+            self._shutdown()
             raise RuntimeError("{0}:Unknown:{1}".format(self._role,e))
 
     def _shutdown(self):
@@ -486,28 +358,15 @@ class RadioController(mp.Process):
         # try shutting down & resetting radio (if it failed we may not be able to)
         clean = True
         try:
-            try:
-                self._tuner.join()
-            except:
-                clean = False
-            else:
-                self._tuner = None
-
-            try:
-                iw.devdel(self._vnic)
-                iw.phyadd(self._phy,self._nic)
-                if self._spoofed:
-                    iwt.ifconfig(self._nic,'down')
-                    iwt.resethwaddr(self._nic)
-                iwt.ifconfig(self._nic,'up')
-            except iw.IWException:
-                clean = False
-
+            iw.devdel(self._vnic)
+            iw.phyadd(self._phy,self._nic)
+            if self._spoofed: iwt.resethwaddr(self._nic)
+            iwt.ifconfig(self._nic,'up')
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
             self._cI.close()
+        except iw.IWException: clean = False
         except (EOFError,IOError): pass
-        except:
-            clean = False
+        except: clean = False
         return clean

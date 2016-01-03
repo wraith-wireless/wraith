@@ -244,19 +244,29 @@ class Iryi(object):
                 try:
                     # get message(s) a tuple: (level,originator,type,message)
                     l,o,t,m = r.recv()
-                    if l == IYRI_ERR and IYRI_CREATED < self.state < IYRI_EXITING:
-                        if o == 'shama': # continue w/out shama if it fails
-                            logging.warning("Shama dropped: %s",m)
-                            self._pConns['shama'].send(POISON)
-                            self._pConns['shama'].close()
-                            del self._pConns['shama']
-                            mp.active_children()
-                            self._sr = None
-                        else:
-                            logging.error("%s failed (%s) %s",o,t,m)
-                            self._halt.set()
+                    if l == IYRI_ERR:
+                        # only care about errors we get while running
+                        if IYRI_CREATED < self.state < IYRI_EXITING:
+                            if o == 'shama': # continue w/out shama if it fails
+                                logging.warning("Shama dropped: %s",m)
+                                self._pConns['shama'].send(POISON)
+                                self._pConns['shama'].close()
+                                del self._pConns['shama']
+                                mp.active_children() # join without blocking
+                                self._sr = None
+                            else:
+                                logging.error("%s failed (%s) %s",o,t,m)
+                                self.stop()
                     elif l == IYRI_WARN: logging.warning("%s: (%s) %s",o,t,m)
                     elif l == IYRI_INFO: logging.info("%s: (%s) %s",o,t,m)
+                    elif l == IYRI_DONE:
+                        # the GPSController will send one FLT and quit if the
+                        # location is static - handle this case here
+                        if o == 'gpsd':
+                            self._pConns['gpsd'].close()
+                            del self._pConns['gpsd']
+                            self._gpsd = None
+                            mp.active_children()
                     elif l == CMD_CMD:
                         cid,cmd,rdos,ps = self._processcmd(m)
                         if cid is None: continue
@@ -318,7 +328,8 @@ class Iryi(object):
             else:
                 sbuffer = None
 
-            # start Collator first (IOT accept comms)
+            # start Collator first (IOT accept comms) -> don't catch the exception
+            # here if it fails but allow it to pass to the outer loop
             logging.info("Initializing subprocesses...")
             logging.info("Starting Collator...")
             (conn1,conn2) = mp.Pipe()
@@ -330,10 +341,11 @@ class Iryi(object):
             try:
                 (conn1,conn2) = mp.Pipe()
                 self._gpsd = GPSController(self._ic,conn2,self._conf['gps'])
+                self._pConns['gpsd'] = conn1
             except RuntimeError as e:
                 logging.warning("GPSD failed: %s, continuing w/out" % e)
-            else:
-                self._pConns['gpsd'] = conn1
+                conn1.close()
+                conn2.close()
 
             # set the region? if so, do it prior to starting the radio(s)
             rd = self._conf['local']['region']
@@ -342,7 +354,8 @@ class Iryi(object):
                 self._rd = iw.regget()
                 iw.regset(rd)
 
-            # abad radio is mandatory
+            # abad radio is mandatory -> as with the Collator, we cannot continue
+            # w/out this one, allow the outer block to catch any failures
             amode = smode = None
             amode = 'paused' if self._conf['abad']['paused'] else 'scan'
             logging.info("Starting Abad...")
@@ -360,6 +373,8 @@ class Iryi(object):
                     self._pConns['shama'] = conn1
                 except RuntimeError as e:
                     logging.warning("Shama failed: %s, continuing w/out",e)
+                    conn1.close()
+                    conn2.close()
 
             # c2c socket -> on failure log it and keep going
             logging.info("Starting C2C...")
@@ -369,6 +384,8 @@ class Iryi(object):
                 self._pConns['c2c'] = conn1
             except Exception as e:
                 logging.warn("C2C failed: %s, continuing without",e)
+                conn1.close()
+                conn2.close()
         except RuntimeError as e:
             # e should have the form "Major:Minor:Description"
             ms = e.message.split(':')
@@ -382,22 +399,38 @@ class Iryi(object):
             # start children execution
             self._state = IYRI_CREATED
             self._collator.start()
-            logging.info("Collator started")
+            logging.info("Collator-%d started",self._collator.pid)
             if self._gpsd:
                 self._gpsd.start()
-                logging.info("GPS started")
+                logging.info("GPS-%d started",self._gpsd.pid)
             self._ar.start()
-            logging.info("Abad started in %s mode",amode)
+            logging.info("Abad-%d started in %s mode",self._ar.pid,amode)
             if self._sr:
                 self._sr.start()
-                logging.info("Shama started in %s mode",smode)
+                logging.info("Shama-%d started in %s mode",self._sr.pid,smode)
             if self._c2c:
                 logging.info("C2C listening on port %d",self._conf['local']['c2c'])
 
     def _destroy(self):
         """ destroy Iryi cleanly """
-        # change our state
+        # change our state & halt main execution loop
         self._state = IYRI_EXITING
+        self._halt.set()
+
+        # stop c2c server
+        logging.info("Stopping C2C")
+        if self._c2c and self._c2c.is_alive(): self._c2c.join()
+        logging.info("C2C stopped")
+
+        # ssend out poison pills to stop workds
+        logging.info("Stopping Sub-processes...")
+        for key in self._pConns:
+            try:
+                self._pConns[key].send(POISON)
+                self._pConns[key].close()
+            except (EOFError,IOError): pass # ignore any broken pipe errors
+        while mp.active_children(): sleep(0.5)
+        logging.info("Sub-processes stopped")
 
         # reset regulatory domain if necessary
         if self._rd:
@@ -408,21 +441,6 @@ class Iryi(object):
                 logging.info("Regulatory domain reset")
             except:
                 logging.warning("Failed to reset regulatory domain")
-
-        # halt main execution loop & send out poison pills
-        logging.info("Stopping Sub-processes...")
-        self._halt.set()
-        for key in self._pConns:
-            try:
-                self._pConns[key].send(POISON)
-                self._pConns[key].close()
-            except (EOFError,IOError): pass # ignore any broken pipe errors
-
-        # active_children has the side effect of joining the processes
-        while mp.active_children(): sleep(0.5)
-        if self._c2c:
-            while self._c2c.is_alive(): self._c2c.join(0.5)
-        logging.info("Sub-processes stopped")
 
         # change our state
         self._state = IYRI_DESTROYED

@@ -31,7 +31,7 @@ REVISIONS:
    - uses a memoryview to hold captured frames in a circular buffer
    - pushed both processing of frames and data management (db writes) into the
      sensor i.e. no longer passes data to storage manager
-   - replaced string tokens (!TKN!) with numeric constants
+   - replaced string tokens with numeric constants
    - writing raw frames
     o removed seperate 'writer' process, writes handled by thresher
     o removed writing raw frames to file, stored in db (have to use psycopg2 Binary
@@ -40,7 +40,7 @@ REVISIONS:
    condition introduced by circular buffer where frames are being overwritten
    before they are processed and remove threshers when possible to remove
    overhead of unecessary processes.
-  includes: iyri 0.1.0 collate 0.1.2 constants 0.0.1 gpsctl 0.0.1 rdoctl 0.1.0
+  includes: iyri 0.1.0 collate 0.1.2 constants 0.0.1 gpsctl 0.0.2 rdoctl 0.1.1
    thresh 0.0.4 iyrid iyri.conf iyri.log.conf iyrid
   changes:
    - Threshers created when workload exceeds specified threshhold and killed when
@@ -48,6 +48,11 @@ REVISIONS:
     o based on constants MIN_TRESH, MAX_THRESH and WRK_THRESH
    - removed artifacts hanging around from previous revisions
    - moved constants to conf file (after testing)
+   - made the Tuner a process
+   - fixed exiting errors with RadioController
+   - stopping writing frames to buffer when radio is paused
+   - fixed GPSController, it was quitting without iyri tracking on static location
+   - found & fixed several bugs such as iyri not shutting down on sub-process errors
 
 """
 __name__ = 'iyri'

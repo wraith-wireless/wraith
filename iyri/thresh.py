@@ -80,8 +80,6 @@ class Thresher(mp.Process):
         self._icomms.put((self.cs,ts2iso(time()),THRESH_THRESH,self.pid))
 
         while not self._stop:
-            # check for tasks or messages
-
             # do not check task queue until sid has been set
             if sid is None: rs,_,_ = select.select([self._cC],[],[])
             else: rs,_,_ = select.select([self._cC,self._tasks._reader],[],[])

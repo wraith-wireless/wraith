@@ -38,13 +38,25 @@ Iyri:
  55) start gpsd if it does not start automatically (assuming gps device is
      plugged in)
  56) test c2c after switch to single platform
- 61) document different comm protocols
+ 61) document different comm protocols used internally
  63) format tracebacks to logging better
- 64) threshers
+ 64) threshers and the buffer
   o add/remove is too sporadic (FIXED)
-  o handle situations where MAX_THRESH is reached
+  o do we sanity check the constants? postgre will allow only a certain # of
+    connections
+    show max_connections; -> on my system 100
+    select count(*) from pg_stat_activity; -> number of current connections?
+  o handle situations where MAX_THRESH is reached tested w/ one radio, the buffer
+    eventually gets full and overwritten so, when two radios are used this problem
+    will occur much more rapidly, the problem is the collator can only identify
+    overwritten frames after the fact
+    - should we create a secondary buffer in collator (for each radio)? we
+      can copy the contents from the primary buffer to the secondary easily with
+      secondary[idx:l] = primary[idx:l]. This way, the collator can drop packets
+      if/when the secondary buffer reaches fullness
+    - should we just increase the size of the buffers to say 10000 or some other
+      large number. Using this approach, at what point does it become less efficient?
  65) look into using a priority queue for the internal comms (to Collator)
- 66) switch tuner from thread to process
  67) should we have one Collator per radio or continue with one and only one
 Wifi:
   1) Should we add support for AVS, Prism headers ?
@@ -62,5 +74,5 @@ Wifi:
      output
   9) handle multiple ssids in mgmt frames
  10) add ability to track multipe errors if frame can be processed further
- 11) add argument/argparser for oui path in fetch
 Nidus(.sql):
+  1) create different users (w/ varying roles/authorities)

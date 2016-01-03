@@ -17,11 +17,6 @@ from wraith.wifi.mpdu import MAX_MPDU
 DIM_M = 1000     # number of rows for memory view
 DIM_N = MAX_MPDU # number of cols (bytes)
 
-# thresher constants
-#MIN_THRESH =  5 # minimum (and initial) number of threshers
-#MAX_THRESH = 15 # maximum number of threshers
-#WRK_THRESH = 50 # no more the WRK_THRESH outstanding frames per thresher
-
 # iyri states
 IYRI_INVALID   = -1 # iyri is unuseable
 IYRI_CREATED   =  0 # iyri is created but not yet started
@@ -36,44 +31,43 @@ TUNE_HOLD   = 1
 TUNE_PAUSE  = 2
 TUNE_LISTEN = 3
 
-# path for oui text file
-#OUIPATH = '../data/oui.txt'
-
 # numeric constants for internal communications
 # IYRI
 POISON        =  0 # poison pill
 IYRI_INFO     =  1 # info message
 IYRI_WARN     =  2 # warning message
 IYRI_ERR      =  3 # error message
+IYRI_DONE     =  4 # done message (currently only used by gpsd)
 # C2C
-CMD_CMD       =  4 # command from user
-CMD_ERR       =  5 # command failed
-CMD_ACK       =  6 # command succeeded
+CMD_CMD       =  5 # command from user
+CMD_ERR       =  6 # command failed
+CMD_ACK       =  7 # command succeeded
 # internal comms (to collator)
-GPS_GPSD      =  7 # gps device details
-GPS_FLT       =  8 # frontline trace
-THRESH_THRESH =  9 # thresher up/down
-THRESH_WARN   = 10 # thresher warning
-THRESH_ERR    = 11 # thresher failed
-THRESH_DQ     = 12 # thresher popped frame from buffer
-THRESH_DONE   = 13 # thresher has finiahed a frame
-RDO_RADIO     = 14 # radio up/down
-RDO_FAIL      = 15 # radio failed
-RDO_SCAN      = 16 # radio is scanning
-RDO_LISTEN    = 17 # radio is listening
-RDO_HOLD      = 18 # radio is holding
-RDO_PAUSE     = 19 # radio is paused
-RDO_SPOOF     = 20 # radio has sppofed mac
-RDO_TXPWR     = 21 # radio is transmitting at tx pwr
-RDO_STATE     = 22 # radio state requested
-RDO_FRAME     = 23 # radio sent frame
+GPS_GPSD      =  8 # gps device details
+GPS_FLT       =  9 # frontline trace
+THRESH_THRESH = 10 # thresher up/down
+THRESH_WARN   = 11 # thresher warning
+THRESH_ERR    = 12 # thresher failed
+THRESH_DQ     = 13 # thresher popped frame from buffer
+THRESH_DONE   = 14 # thresher has finiahed a frame
+RDO_RADIO     = 15 # radio up/down
+RDO_FAIL      = 16 # radio failed
+RDO_SCAN      = 17 # radio is scanning
+RDO_LISTEN    = 18 # radio is listening
+RDO_HOLD      = 19 # radio is holding
+RDO_PAUSE     = 20 # radio is paused
+RDO_SPOOF     = 21 # radio has sppofed mac
+RDO_TXPWR     = 22 # radio is transmitting at tx pwr
+RDO_STATE     = 23 # radio state requested
+RDO_FRAME     = 24 # radio sent frame
 # commands to threshers
-COL_SID       = 24 # pass the sid
-COL_RDO       = 25 # pass radio info
-COL_WRITE     = 26 # pass write/don't write
-COL_FRAME     = 27 # pass frame
+COL_SID       = 25 # pass the sid
+COL_RDO       = 26 # pass radio info
+COL_WRITE     = 27 # pass write/don't write
+COL_FRAME     = 28 # pass frame
 
-# RADIO CONSTANTS string desc corresponds with nidus RADIOSTATE
+# RADIO CONSTANTS string desc corresponds with nidus RADIOSTATE -> these are
+# set here to provide a string message for the states
 RDO_DESC = {RDO_RADIO:'up/down',RDO_FAIL:'fail',RDO_SCAN:'scan',RDO_LISTEN:'listen',
             RDO_HOLD:'hold',RDO_PAUSE:'pause',RDO_SPOOF:'spoof',RDO_TXPWR:'txpwr',
             RDO_STATE:'state'}
