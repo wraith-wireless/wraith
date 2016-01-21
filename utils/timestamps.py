@@ -11,7 +11,11 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Production'
 
 import datetime as dt
+from time import time
 from dateutil import parser as dtparser
+
+# returns an iso formated utc timestamp
+def isots(): return dt.datetime.utcfromtimestamp(time()).isoformat()
 
 # convert unix timestamp to utc in isoformat
 def ts2iso(ts): return dt.datetime.utcfromtimestamp(ts).isoformat()
@@ -26,7 +30,7 @@ def validdate(s): # confirm string s is of the form YYYY-MM-DD and is a valid da
     except:
         return False
 
-def validtime(s): # confirm string s is of the form HH:MM[:SS] and is a valid time
+def validtime(s): # confirm string s a valid time of the form HH:MM[:SS]
     try:
         dt.datetime.strptime(s,'%H:%M:%S')
         return True

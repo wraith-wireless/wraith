@@ -5,10 +5,12 @@
 An interface to an underlying radio (wireless nic). Collects all frames and
 forwards to the Collator.
 
-RadioController will spawn a Tuner to handle all channel switching etc.
+RadioController will 'fork' a Tuner to handle all channel switching etc and
+will concentrate only on pulling frames off the 'wire'.
 
 The convention used here is to allow the Tuner to receive all notifications
-from iyri because they may contain user commands.
+from iyri because they may contain user commands. The Tuner will then pass on
+to the RadioController
 """
 __name__ = 'rdoctl'
 __license__ = 'GPL v3.0'
@@ -22,11 +24,11 @@ __status__ = 'Development'
 from time import time,sleep                # current time, waiting
 import signal                              # handling signals
 import socket                              # reading frames
-from Queue import Empty             # thread-safe queue
+from Queue import Empty                    # queue empty exception
 import multiprocessing as mp               # for Process
 from wraith.wifi import iw                 # iw command line interface
 import wraith.wifi.iwtools as iwt          # nic command line interaces
-from wraith.utils.timestamps import ts2iso # time stamp conversion
+from wraith.utils.timestamps import isots  # converted timestamp
 from wraith.iyri.tuner import Tuner        # our tuner
 from wraith.iyri.constants import *        # tuner states & buffer dims
 
@@ -90,10 +92,10 @@ class RadioController(mp.Process):
             qT = mp.Queue()
             tuner = Tuner(qT,self._cI,self._vnic,self._scan,self._ds,self._chi,stuner)
             tuner.start()
-            self._icomms.put((self._vnic,ts2iso(time()),RDO_RADIO,self.radio))
+            self._icomms.put((self._vnic,isots(),RDO_RADIO,self.radio))
         except Exception as e:
             self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
-            self._icomms.put((self._vnic,ts2iso(time()),RDO_FAIL,e))
+            self._icomms.put((self._vnic,isots(),RDO_FAIL,e))
         else:
             msg = "tuner-{0} up".format(tuner.pid)
             self._cI.send((IYRI_INFO,self._role,'Tuner',msg))
@@ -148,24 +150,24 @@ class RadioController(mp.Process):
                     if stuner == TUNE_PAUSE: _ = self._s.recv(n)
                     else:
                         l = self._s.recv_into(self._buffer[(ix*n):(ix*n)+n],n)
-                        ts = ts2iso(time())
-                        self._icomms.put((self._vnic,ts,RDO_FRAME,(ix,l)))
+                        self._icomms.put((self._vnic,isots(),RDO_FRAME,(ix,l)))
                         ix = (ix+1) % m
                 except socket.timeout: pass
                 except socket.error as e:
                     err = True
                     self._cI.send((IYRI_ERR,self._role,'Socket',e))
-                    self._icomms.put((self._vnic,ts2iso(time()),RDO_FAIL,e))
+                    self._icomms.put((self._vnic,isots(),RDO_FAIL,e))
                 except Exception as e:
                     err = True
                     self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
-                    self._icomms.put((self._vnic,ts2iso(time()),RDO_FAIL,e))
+                    self._icomms.put((self._vnic,isots(),RDO_FAIL,e))
 
         # ensure Tuner has finished
         while mp.active_children(): sleep(0.5)
 
-        # notify Collator we are down & shut down
-        self._icomms.put((self._vnic,ts2iso(time()),RDO_RADIO,None))
+        # notify Iyri and Collator we are down & shut down
+        self._cI.send((IYRI_DONE,self._role,'done','done'))
+        self._icomms.put((self._vnic,isots(),RDO_RADIO,None))
         if not self._shutdown():
             try:
                 self._cI.send((IYRI_WARN,self._role,'Shutdown',"Incomplete reset"))

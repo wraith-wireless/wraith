@@ -2,16 +2,12 @@
 
 """ thresh.py: frame and metadata extraction and file writes
 
-Provides Thresher processes of frames, stores frame data/metadata to DB.
-
-Threshers are configured to allow for future commands (via tokens) to be used
-to assist in any as of yet unidentified issues or future upgrades that may be
-desired.
+Processings of frames, stores frame data/metadata to DB.
 """
 __name__ = 'thresh'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.4'
-__date__ = 'October 2015'
+__version__ = '0.0.5'
+__date__ = 'January 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -19,12 +15,11 @@ __status__ = 'Development'
 
 import signal                               # handle signals
 import select                               # for select
-from time import time                       # timestamps
 import multiprocessing as mp                # multiprocessing
 import psycopg2 as psql                     # postgresql api
 from dateutil import parser as dtparser     # parse out timestamps
 import wraith.wifi.radiotap as rtap         # 802.11 layer 1 parsing
-from wraith.utils.timestamps import ts2iso  # timestamp conversion
+from wraith.utils.timestamps import isots   # converted timestamp
 from wraith.wifi import mpdu                # 802.11 layer 2 parsing
 from wraith.wifi import mcs                 # mcs functions
 from wraith.wifi import channels            # 802.11 channels/RFs
@@ -34,14 +29,13 @@ from wraith.iyri.constants import *         # constants
 
 class Thresher(mp.Process):
     """ Thresher process frames and inserts frame data in database """
-    def __init__(self,comms,q,conn,lSta,abad,shama,dbstr,ouis):
+    def __init__(self,comms,q,conn,lSta,buff,dbstr,ouis):
         """
          :param comms: internal communication (to Collator)
          :param q: task queue from Collator
          :param conn: token connection from Collator
          :param lSta: lock for sta and sta activity inserts/updates
-         :param abad: Abad buffer
-         :param shama: Shama buffer
+         :param buff: buffer
          :param dbstr: db connection string
          :param ouis: oui dict
         """
@@ -49,14 +43,11 @@ class Thresher(mp.Process):
         self._icomms = comms  # communications queue
         self._tasks = q       # connection from Collator
         self._cC = conn       # token connection from Collator
-        self._abuff = abad    # abad buffer
-        self._sbuff = shama   # shama buffer
+        self._buff = buff     # frame buffer
         self._conn = None     # db connection
         self._l = lSta        # sta lock
         self._curs = None     # our cursor
         self._ouis = ouis     # oui dict
-        self._stop = False    # stop flag
-        self._write = False   # write flag
         self._next = None     # next operation to execute
         self._setup(dbstr)
 
@@ -70,52 +61,45 @@ class Thresher(mp.Process):
         # ignore signals used by main program & add signal for stop
         signal.signal(signal.SIGINT,signal.SIG_IGN)   # CTRL-C and kill -INT stop
         signal.signal(signal.SIGTERM,signal.SIG_IGN)  # kill -TERM stop
-        signal.signal(signal.SIGUSR1,self.stop)       # kill signal from Collator
 
         # local variables
-        sid = None  # current session id
-        rdos = {}   # radio map hwaddr{'role','buffer','record'}
+        sid = None   # current session id
+        rdos = {}    # radio map hwaddr->write = oneof {True|False}
+        stop = False # stop flag
 
         # notify collator we're up
-        self._icomms.put((self.cs,ts2iso(time()),THRESH_THRESH,self.pid))
+        self._icomms.put((self.cs,isots(),THRESH_THRESH,self.pid))
 
-        while not self._stop:
-            # do not check task queue until sid has been set
-            if sid is None: rs,_,_ = select.select([self._cC],[],[])
-            else: rs,_,_ = select.select([self._cC,self._tasks._reader],[],[])
+        while not stop:
+            try:
+                # do not check task queue until sid has been set
+                ins = [self._cC,self._tasks._reader] if sid else [self._cC]
+                (rs,_,_ )= select.select(ins,[],[])
+            except select.error as e: # hide (4,'Interupted system call') errors
+                if e[0] == 4: continue
+                rs = []
 
             # get each message
             for r in rs:
-                ts1 = ts2iso(time()) # get data read time
+                ts1 = isots() # get data read time
                 try:
-                    # get data
-                    if r == self._cC: tkn,ts,d = self._cC.recv()
-                    else: tkn,ts,d = self._tasks.get(0.5)
-
-                    # & process it - no error checking is done assuming that
-                    # both roles and tokens sent will be correct/valid
-                    if tkn == POISON: self._stop = True
+                    # get & process data
+                    if r == self._cC: (tkn,ts,d) = self._cC.recv()
+                    else: (tkn,ts,d) = self._tasks.get(0.5)
+                    if tkn == POISON: stop = True
                     elif tkn == COL_SID: sid = d[0]
-                    elif tkn == COL_RDO:
-                        # fill in radio map, assigning buffer and writer
-                        rdos[d[0]] = {'role':d[1],'buffer':None,'record':False}
-                        if d[1] == 'abad': rdos[d[0]]['buffer'] = self._abuff
-                        elif d[1] == 'shama': rdos[d[0]]['buffer'] = self._sbuff
-                    elif tkn == COL_WRITE:
-                        rdos[d[0]]['record'] = d[1]
-                    elif tkn == COL_FRAME:
-                        self._processframe(sid,rdos,ts,ts1,d)
+                    elif tkn == COL_RDO: rdos[d[0]] = False
+                    elif tkn == COL_WRITE: rdos[d[0]] = d[1]
+                    elif tkn == COL_FRAME: self._processframe(sid,rdos,ts,ts1,d)
                 except Exception as e:
                     # blanket exception, catch all and notify collator
                     msg = "{0} {1}\n{2}".format(type(e).__name__,e,tb())
-                    self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None,None)))
+                    self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None)))
 
         # notify collector we're down
         if self._curs: self._curs.close()
         if self._conn: self._conn.close()
-        self._icomms.put((self.cs,ts2iso(time()),THRESH_THRESH,None))
-
-    def stop(self,signum=None,stack=None): self._stop = True
+        self._icomms.put((self.cs,isots(),THRESH_THRESH,None))
 
     def _setup(self,dbstr):
         """
@@ -148,24 +132,25 @@ class Thresher(mp.Process):
          :param ts1: timestamp of data read
          :param d:  data
         """
-        # (1) pull frame out of buffer & notify Collator
+        # (1) pull frame off the buffer & notify Collator
         src = idx = b = None
         try:
-            # shouldn't be any errors associated with this
-            src,idx,b = d[0],d[1],d[2] # hwaddr,index,nBytes
-            f = rdos[src]['buffer'][(idx*DIM_N):(idx*DIM_N)+b].tobytes()
+            src,idx,b = d # hwaddr,index,nBytes
+            f = self._buff[(idx*DIM_N):(idx*DIM_N)+b].tobytes()
+            self._icomms.put((self.cs,isots(),THRESH_DQ,(None,idx)))
+        except ValueError:
+            self._icomms.put((self.cs,isots(),THRESH_ERR,'Bad Data'))
+            return
         except Exception as e:
             tr = tb()
             te = type(e).__name__
-            ets = ts2iso(time())
-            if src is None:
+            if not src:
                 msg = "Failed extracting data: {0}->{1}\n{2}".format(te,e,tr)
-                self._icomms.put(self.cs,ets,THRESH_ERR,(msg,None,None))
+                self._icomms.put((self.cs,isots(),THRESH_ERR,(msg,None)))
             else:
                 msg = "Failed extracting frame: {0}->{1}\n{2}".format(te,e,tr)
-                self._icomms.put(self.cs,ets,THRESH_ERR,(msg,src,idx))
-        else:
-            self._icomms.put((self.cs,ts2iso(time()),THRESH_DQ,(None,src,idx)))
+                self._icomms.put((self.cs,isots(),THRESH_ERR,(msg,idx)))
+            return
 
         # (2) parse the frame
         fid = None       # set an invalid frame id
@@ -181,17 +166,18 @@ class Thresher(mp.Process):
         except rtap.RadiotapException as e:
             # parsing failed @ radiotap, set empty vals & alert Collator
             msg = "Parsing failed at radiotap: {0} in buffer[{1}]".format(e,idx)
-            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None,None)))
+            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None)))
             vs = (sid,ts,lF,0,0,[0,lF],0,0,0)
+            dR['err'] = e
         except mpdu.MPDUException as e:
             # mpdu failed - initialize empty mpdu vals & alert Collator
             msg = "Parsing failed at mpdu: {0} in buffer[{1}]".format(e,idx)
-            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None,None)))
+            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None)))
             vs = (sid,ts,lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
                   int('a-mpdu' in dR['present']),rtap.flags_get(dR['flags'],'fcs'))
         except Exception as e: # blanket error
             msg = "Parsing Error. {0} {1}\n{2}".format(type(e).__name__,e,tb())
-            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,src,idx)))
+            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,idx)))
             return
 
         # (3) store the frame
@@ -210,13 +196,24 @@ class Thresher(mp.Process):
             self._conn.commit()
 
             # write raw bytes if specified
-            if rdos[src]['record']:
+            if rdos[src]:
                 self._next = 'frame_raw'
                 sql = "insert into frame_raw (fid,raw) values (%s,%s);"
                 self._curs.execute(sql,(fid,psql.Binary(f)))
                 self._conn.commit()
 
-            # insert malformed if we had any issues
+            # insert radiotap and/or malformed if we had any issues
+            self._next = 'radiotap'
+            if not 'err' in dR: self._insertrtap(fid,src,dR)
+            else:
+                sql = """
+                       insert into malformed (fid,location,reason)
+                       values (%s,%s,%s);
+                      """
+                self._curs.execute(sql,(fid,'radiotap',dR['err']))
+                self._conn.commit()
+
+            # insert mpdu and malfored (if it exists)
             for err in dM.error:
                 sql = """
                        insert into malformed (fid,location,reason)
@@ -228,16 +225,12 @@ class Thresher(mp.Process):
                 # notify collator, but we want to continue attempting to store
                 # as much as possible so set src and index to None
                 msg = "Frame {0}. Bad MPDU {1}".format(fid,err)
-                self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None,None)))
-
-            # NOTE: the next two "parts" storing and extracting are mutually
-            # exlusive & are not required to occur sequentially, thus could be
-            # handled by threads/processes in future iterations
+                self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None)))
 
             # (a) store frame details in db
-            self._next = 'store'
-            self._insertrtap(fid,src,dR)
+
             if not dM.isempty:
+                self._next = 'mpdu'
                 self._insertmpdu(fid,dM)
 
                 # (b) extract
@@ -270,24 +263,25 @@ class Thresher(mp.Process):
                     self._processmgmt(fid,sid,ts,addrs,dM)
 
             # notify collator, we're done
-            self._icomms.put((self.cs,ts2iso(time()),THRESH_DONE,(None,src,idx)))
+            self._icomms.put((self.cs,isots(),THRESH_DONE,(None,idx)))
         except psql.OperationalError as e: # unrecoverable
             # NOTE: for now we do not exit on unrecoverable error but allow
             # collator to send the poison pill
+            self._conn.rollback()
             args = (fid,self._next,e.pgcode,e.pgerror)
             msg = "<PSQL> Frame {0} failed at {1}. {2}->{3}.".format(*args)
-            self._icomms.put((self.cs,ts1,THRESH_ERR,(msg,src,idx)))
+            self._icomms.put((self.cs,ts1,THRESH_ERR,(msg,idx)))
         except psql.Error as e:
             # rollback to avoid db errors
             self._conn.rollback()
             args = (fid,self._next,e.pgcode,e.pgerror)
             msg = "<PSQL> Frame {0} failed at {1}. {2}->{3}.".format(*args)
-            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,src,idx)))
+            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,idx)))
         except Exception as e:
             self._conn.commit() # commit anything that may be pending
             args = (fid,self._next,type(e).__name__,e,tb())
             msg = "<UNK> Frame {0} failed at {1}. {2}->{3}\n{4}.".format(*args)
-            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,src,idx)))
+            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,idx)))
 
     #### All below _insert functions will allow db exceptions to pass through to caller
 
@@ -399,35 +393,37 @@ class Thresher(mp.Process):
             self._conn.commit()
 
         # encryption
-        if dM.crypt:
-            self._next = 'crypt'
-            if dM.crypt['type'] == 'wep':
-                sql = "insert into wepcrypt (fid,iv,key_id,icv) values (%s,%s,%s,%s);"
-                self._curs.execute(sql,(fid,psql.Binary(dM.crypt['iv']),
-                                            dM.crypt['key-id'],
-                                            dM.crypt['icv']))
-            elif dM.crypt['type'] == 'tkip':
-                sql = """
-                       insert into tkipcrypt (fid,tsc1,wepseed,tsc0,key_id,
-                                              tsc2,tsc3,tsc4,tsc5,mic,icv)
-                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
-                      """
-                self._curs.execute(sql,(fid,psql.Binary(dM.crypt['iv']['tsc1']),
-                                            psql.Binary(dM.crypt['iv']['wep-seed']),
-                                            psql.Binary(dM.crypt['iv']['tsc0']),
-                                            dM.crypt['iv']['key-id']['key-id'],
-                                            psql.Binary(dM.crypt['ext-iv']['tsc2']),
-                                            psql.Binary(dM.crypt['ext-iv']['tsc3']),
-                                            psql.Binary(dM.crypt['ext-iv']['tsc4']),
-                                            psql.Binary(dM.crypt['ext-iv']['tsc5']),
-                                            psql.Binary(dM.crypt['mic']),
-                                            psql.Binary(dM.crypt['icv'])))
-            elif dM.crypt['type'] == 'ccmp':
-                sql = """
-                       insert into ccmpcrypt (fid,pn0,pn1,key_id,pn2,pn3,pn4,pn5,mic)
-                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
-                      """
-                self._curs.execute(sql,(fid,psql.Binary(dM.crypt['pn0']),
+        if not dM.crypt: return
+        if dM.crypt['type'] == 'wep':
+            self._next = 'wepcrypt'
+            sql = "insert into wepcrypt (fid,iv,key_id,icv) values (%s,%s,%s,%s);"
+            self._curs.execute(sql,(fid,psql.Binary(dM.crypt['iv']),
+                                        dM.crypt['key-id'],
+                                        psql.Binary(dM.crypt['icv'])))
+        elif dM.crypt['type'] == 'tkip':
+            self._next = 'tkipcrypt'
+            sql = """
+                   insert into tkipcrypt (fid,tsc1,wepseed,tsc0,key_id,
+                                          tsc2,tsc3,tsc4,tsc5,mic,icv)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                  """
+            self._curs.execute(sql,(fid,psql.Binary(dM.crypt['iv']['tsc1']),
+                                        psql.Binary(dM.crypt['iv']['wep-seed']),
+                                        psql.Binary(dM.crypt['iv']['tsc0']),
+                                        dM.crypt['iv']['key-id']['key-id'],
+                                        psql.Binary(dM.crypt['ext-iv']['tsc2']),
+                                        psql.Binary(dM.crypt['ext-iv']['tsc3']),
+                                        psql.Binary(dM.crypt['ext-iv']['tsc4']),
+                                        psql.Binary(dM.crypt['ext-iv']['tsc5']),
+                                        psql.Binary(dM.crypt['mic']),
+                                        psql.Binary(dM.crypt['icv'])))
+        elif dM.crypt['type'] == 'ccmp':
+            self._next = 'ccmpcrypt'
+            sql = """
+                   insert into ccmpcrypt (fid,pn0,pn1,key_id,pn2,pn3,pn4,pn5,mic)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
+                  """
+            self._curs.execute(sql,(fid,psql.Binary(dM.crypt['pn0']),
                                             psql.Binary(dM.crypt['pn1']),
                                             dM.crypt['key-id']['key-id'],
                                             psql.Binary(dM.crypt['pn2']),
@@ -435,7 +431,7 @@ class Thresher(mp.Process):
                                             psql.Binary(dM.crypt['pn4']),
                                             psql.Binary(dM.crypt['pn5']),
                                             psql.Binary(dM.crypt['mic'])))
-            self._conn.commit()
+        self._conn.commit()
 
     def _insertsta(self,fid,sid,ts,addrs):
         """
@@ -628,7 +624,7 @@ class Thresher(mp.Process):
                insert into assocreq (fid,client,ap,ess,ibss,cf_pollable,
                                      cf_poll_req,privacy,short_pre,pbcc,
                                      ch_agility,spec_mgmt,qos,short_slot,
-                                     apsd,rdo_meas,dsss_ofdm,del_ba,imm_ba,
+                                     apsd,sw_meas,dsss_ofdm,del_ba,imm_ba,
                                      listen_int,sup_rates,ext_rates,vendors)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);
@@ -660,7 +656,7 @@ class Thresher(mp.Process):
         self._conn.commit()
 
         # now the ssids
-        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        sql = "insert into ssid (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
         for ssid in ssids:
             try:
                 if mpdu.validssid(ssid):
@@ -725,7 +721,7 @@ class Thresher(mp.Process):
         self._conn.commit()
 
         # now the ssids
-        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        sql = "insert into ssid (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
         for ssid in ssids:
             try:
                 if mpdu.validssid(ssid):
@@ -810,7 +806,7 @@ class Thresher(mp.Process):
         self._conn.commit()
 
         # now the ssids
-        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        sql = "insert into ssid (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
         for ssid in ssids:
             try:
                 if mpdu.validssid(ssid):
@@ -850,7 +846,7 @@ class Thresher(mp.Process):
         self._conn.commit()
 
         # now the ssids
-        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        sql = "insert into ssid (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
         for ssid in ssids:
             try:
                 if mpdu.validssid(ssid):
@@ -912,7 +908,7 @@ class Thresher(mp.Process):
         self._conn.commit()
 
         # now the ssids
-        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        sql = "insert into ssid (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
         for ssid in ssids:
             try:
                 if mpdu.validssid(ssid):
@@ -974,7 +970,7 @@ class Thresher(mp.Process):
 
         # now the ssids
         self._next = 'ssids'
-        sql = "insert into ssids (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
+        sql = "insert into ssid (fid,valid,invalid,isvalid) values (%s,%s,%s,%s);"
         for ssid in ssids:
             try:
                 if mpdu.validssid(ssid):
@@ -1088,7 +1084,7 @@ class Thresher(mp.Process):
         else: fromap = 2
         noack = int(noack)
         sql = """
-               insert into action (fid,rx,tx,ap,fromap,noack,category,action,has_el)
+               insert into act (fid,rx,tx,ap,fromap,noack,category,act_code,has_el)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s);
               """
         self._curs.execute(sql,(fid,rx,tx,ap,fromap,noack,

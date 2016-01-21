@@ -1,8 +1,7 @@
 Overall:
-  1) How to handle db constraint errors? i.e. invalid packets
-   o log as alert? and write invalid packet?
-   o modify constraint(s) to allow invalid packets
-   o modify mpdu to log as error/warning?
+  2) add program to extract saved frames from db and write to a pcap file
+   o initially write in bulk but add filters etc to all allow user to specify
+    what frames they want to write
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -40,24 +39,20 @@ Iyri:
  56) test c2c after switch to single platform
  61) document different comm protocols used internally
  63) format tracebacks to logging better
- 64) threshers and the buffer
-  o add/remove is too sporadic (FIXED)
-  o do we sanity check the constants? postgre will allow only a certain # of
-    connections
-    show max_connections; -> on my system 100
-    select count(*) from pg_stat_activity; -> number of current connections?
-  o handle situations where MAX_THRESH is reached tested w/ one radio, the buffer
-    eventually gets full and overwritten so, when two radios are used this problem
-    will occur much more rapidly, the problem is the collator can only identify
-    overwritten frames after the fact
-    - should we create a secondary buffer in collator (for each radio)? we
-      can copy the contents from the primary buffer to the secondary easily with
-      secondary[idx:l] = primary[idx:l]. This way, the collator can drop packets
-      if/when the secondary buffer reaches fullness
-    - should we just increase the size of the buffers to say 10000 or some other
-      large number. Using this approach, at what point does it become less efficient?
  65) look into using a priority queue for the internal comms (to Collator)
- 67) should we have one Collator per radio or continue with one and only one
+ 68) look into threading the Thresher
+  o a feeder thread to push frames onto an internal buffer (pulling frames of
+    the collators buffer thereby reducing it's capacity)
+  o a deframer thread that will process the frames and store
+  o the main process can then wait on the connection for any tokens
+  o question is, is it worth it or will it add too much complexity and/or slow
+    the program down http://www.dabeaz.com/python/GIL.pdf
+ 69) need to work thresher creation/destruction better
+  o need to give newly created threshers time to reduce the capacity
+  o still not sure that this will be able to handle the workload of one radio
+   not to mention when used with the shama radio as well
+ 70) handle IOError/EOFError in Collator better - if there is an error in the
+   Pipe we need to be able to kill the correpsonding Thresher through a signal
 Wifi:
   1) Should we add support for AVS, Prism headers ?
   2) radiotap: ensure data pad is handled for atheros cards (any others?)
@@ -72,7 +67,5 @@ Wifi:
   6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
   8) in iw and iwtools switch to netlink rather than parsing iw/iwconfig/ifconfig
      output
-  9) handle multiple ssids in mgmt frames
- 10) add ability to track multipe errors if frame can be processed further
 Nidus(.sql):
   1) create different users (w/ varying roles/authorities)

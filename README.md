@@ -48,12 +48,15 @@ in the database. Any geolocational data is also stored (if a gps device is prese
 
 NOTE:
 In earlier versions < 0.1.x, Iyri did not handle database writes/updates. Rather
-this was handled by a an additional module colocated with the database that the
-sensor would pass data to. It was with great relunctance that I removed this
-'mediator', and moved database functionality directly to the sensor, primarily as
-it would restrict wraith to a single platform i.e. expanding to a central database
-and multiple sensors will be very difficult. However, there were two primary
-reasons for doing so:
+this was handled by an additional module colocated on the same system as database
+that the sensor would pass data to. It was with great relunctance that I removed
+this 'mediator', and moved database functionality directly to the sensor, primarily
+for two reasons:
+ * it would restrict wraith to a single platform i.e. expanding to a central
+  database and multiple sensors will be very difficult.
+ * sensors could be used on 'minimal' systems i.e. routers and other embedded
+  systems
+However, there were two primary reasons for doing so:
  * I wanted to push more autonomy and intelligence into the sensor which would
    require the sensor to parse out radiotap and mpdu (no point in doing this twice)
  * frames (as strings) were being passed through multiple connection, queues and
@@ -127,7 +130,8 @@ Provides the Postgresql database schema, nidus.sql.
      - iyri.py          primary module
      - constants.py     defines several constants used by iryi
      - gpsctl.py        GPS device handler
-     - rdoctl.py        radio controler with tuner, sniffer
+     - rdoctl.py        radio controler
+     - tuner.py         radio scanner
      - collate.py       data collation and forwarding
      - thresh.py        Thresher process for parsing/writing frames
      - iyrid            iyri daemon

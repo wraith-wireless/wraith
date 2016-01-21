@@ -90,7 +90,10 @@ class MPDU(dict):
     @property
     def error(self):
         """ returns error message(s) """
-        return self['err']
+        try:
+            return self['err']
+        except:
+            return []
 
     @property
     def offset(self):

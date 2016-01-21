@@ -6,20 +6,19 @@ Processes and forwards GPS device and locational data
 """
 __name__ = 'gpsctl'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 __date__ = 'January 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-from time import time                      # for timestamps
 import socket                              # connection to gps device
 import signal                              # handling signals
 import mgrs                                # lat/lon to mgrs conversion
 import gps                                 # gps device access
 import multiprocessing as mp               # multiprocessing
-from wraith.utils.timestamps import ts2iso # ts conversion
+from wraith.utils.timestamps import isots  # converted timestamp
 from wraith.iyri.constants import *        # token constants
 
 class GPSController(mp.Process):
@@ -59,26 +58,29 @@ class GPSController(mp.Process):
 
         # get and transmit device details
         ret = self._devicedetails()
-        if ret: self._icomms.put(('gpsd',ts2iso(time()),GPS_GPSD,self._dd))
+        if ret: self._icomms.put(('gpsd',isots(),GPS_GPSD,self._dd))
 
-        # if fixed location, send one frontline trace & tell iyri we're quitting
+        # if fixed location, send one frontline trace otherwise poll over device
         if self._fixed:
-            self._icomms.put(('gpsd',ts2iso(time()),GPS_FLT,self._defFLT))
-            self._cI.send((IYRI_DONE,'gpsd','done','static'))
+            self._icomms.put(('gpsd',isots(),GPS_FLT,self._defFLT))
+        else:
+            while True:
+                # block on our poll time (this will cause serial device to fill up
+                if self._cI.poll(self._poll) and self._cI.recv() == POISON: break
+                while self._gpsd.waiting():
+                    # at each iteration make sure we did not get a poison pill
+                    if self._cI.poll() and self._cI.recv() == POISON: break
 
-        # 2 Location loop (only if dynamic))
-        while ret and not self._fixed:
-            if self._cI.poll(self._poll) and self._cI.recv() == POISON: break
-            while self._gpsd.waiting():
-                # recheck if we need to stop so we don't get stuck in here
-                if self._cI.poll() and self._cI.recv() == POISON: break
-                rpt = self._gpsd.next()
-                if rpt['class'] != 'TPV': continue
-                try:
-                    if rpt['epx'] > self._qpx or rpt['epy'] > self._qpy: continue
-                    else:
-                        ts = ts2iso(time())
-                        flt = {'fix':rpt['mode'],
+                    # get the next input from the device
+                    rpt = self._gpsd.next()
+                    if rpt['class'] != 'TPV': continue
+
+                    # try to read in all data
+                    try:
+                        if rpt['epx'] > self._qpx or rpt['epy'] > self._qpy:
+                            continue
+                        else:
+                            flt = {'fix':rpt['mode'],
                                'coord':self._m.toMGRS(rpt['lat'],rpt['lon']),
                                'epy':rpt['epy'],
                                'epx':rpt['epx'],
@@ -88,19 +90,20 @@ class GPSController(mp.Process):
                                'dop':{'xdop':'{0:.3}'.format(self._gpsd.xdop),
                                       'ydop':'{0:.3}'.format(self._gpsd.ydop),
                                       'pdop':'{0:.3}'.format(self._gpsd.pdop)}}
-                        self._icomms.put(('gpsd',ts,GPS_FLT,flt))
+                            self._icomms.put(('gpsd',isots(),GPS_FLT,flt))
+                            break
+                    except (KeyError,AttributeError):
+                        # a KeyError means not all values are present, an
+                        # AttributeError means not all dop values are present
+                        pass
+                    except: # blanket exception quit device read loop
                         break
-                except (KeyError,AttributeError):
-                    # a KeyError means not all values are present, an
-                    # AttributeError means not all dop values are present
-                    pass
-                except: # blanket exception
-                    break
 
-        # send stop & close out connections
-        if ret: self._icomms.put(('gpsd',ts2iso(time()),GPS_GPSD,None))
-        if self._gpsd: self._gpsd.close()
+        # tell collator we're down, notify Iyri
+        if ret: self._icomms.put(('gpsd',isots(),GPS_GPSD,None))
+        self._cI.send((IYRI_DONE,'gpsd','',''))
         self._cI.close()
+        if self._gpsd: self._gpsd.close()
 
     def _devicedetails(self):
         """ Device Details Loop - get complete details or quit on done """

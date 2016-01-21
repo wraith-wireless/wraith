@@ -1,5 +1,5 @@
 -- using postgresql 9.3.4
--- version 0.0.14
+-- version 0.0.15
 
 -- create nidus user and nidus database
 --postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
@@ -101,7 +101,7 @@ CREATE INDEX using_gpsd_period_idx ON using_gpsd USING GIST (period);
 -- *dop values:
 -- 1	 Ideal	    highest possible confidence level
 -- 1-2	 Excellent	positional measurements are considered accurate enough for most apps
--- 2-5	 Good	    minimum appropriate for business decisions, could be used to make reliable in-route navigation suggestions
+-- 2-5	 Good	    min. appropriate for business decisions, could be used to make reliable in-route navigation suggestions
 -- 5-10	 Moderate	can be used for calculations, but fix quality could be improved, more open view of sky is recommended.
 -- 10-20 Fair	    low confidence level discard or used only to indicate rough estimate of current loc
 -- >20	 Poor	    measurements are inaccurate and should be discard
@@ -275,8 +275,8 @@ CREATE TABLE ampdu(
    refnum bigint NOT NULL,   -- reference number
    flags integer NOT NULL,   -- flags
    CONSTRAINT ch_fid CHECK (fid > 0),
-   CONSTRAINT ch_refnum CHECK (refnum > 0),
-   CONSTRAINT ch_flags CHECK (flags > 0),
+   CONSTRAINT ch_refnum CHECK (refnum >= 0),
+   CONSTRAINT ch_flags CHECK (flags >= 0),
    FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE
 );
 
@@ -322,9 +322,9 @@ CREATE TABLE signal(
    mcs_stbc smallint,          -- # stbc streams if present
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_rate CHECK (rate >= 0),
-   CONSTRAINT ch_channel CHECK (channel > 0 and channel < 200),
+   CONSTRAINT ch_channel CHECK (channel >= 0 and channel < 200),
    CONSTRAINT ch_chflags CHECK (chflags >= 0),
-   CONSTRAINT ch_rf CHECK (rf > 0),
+   CONSTRAINT ch_rf CHECK (rf >= 0),
    CONSTRAINT ch_ht CHECK (ht >=0 and ht <= 1),
    CONSTRAINT ch_mcs_gi CHECK (mcs_gi >= 0 and mcs_gi <= 1),
    CONSTRAINT ch_mcs_ht CHECK (mcs_ht >= 0 and mcs_ht <= 1),
@@ -543,14 +543,14 @@ CREATE TABLE sta_activity(
 
 -- Management Frames
 
--- ssids table
+-- ssid table
 -- one row for each ssid broadcast in a mgmt frame (probereq,beacon,assocreq,
 -- assocresp,reassocreq). provides bytea row for invalid ssids i.e. longer than
 -- 32 char or not utf-8.
 -- NOTE: any of above frames types with no row in this table implies a cloaked
 -- ssid
-DROP TABLE IF EXISTS ssids;
-CREATE TABLE ssids(
+DROP TABLE IF EXISTS ssid;
+CREATE TABLE ssid(
   fid bigint NOT NULL,          -- fk to frame
   valid VARCHAR(32),            -- valid ssid (=< 32 chars & utf-8)
   invalid bytea,                -- invalid ssid (> 32 chars or not utf-8)
@@ -927,8 +927,9 @@ CREATE TABLE deauth(
   FOREIGN KEY (ap) REFERENCES sta(sta_id) ON DELETE CASCADE
 );
 
-DROP TABLE IF EXISTS action;
-CREATE TABLE action(
+-- action table
+DROP TABLE IF EXISTS act;
+CREATE TABLE act(
   fid bigint NOT NULL,        -- fk to frame
   rx integer,                 -- fk to receiving STA if present
   tx integer,                 -- fk to transmitting STA if present
@@ -936,7 +937,7 @@ CREATE TABLE action(
   fromap smallint NOT NULL,   -- {0:client initiated|1:ap initiated|2:intrasta}
   noack smallint NOT NULL,    -- {0:False|1:True}
   category smallint NOT NULL, -- category code
-  action smallint NOT NULL,   -- action code
+  act_code smallint NOT NULL, -- action code
   has_el smallint NOT NULL,   -- {0:no action elements present|1:action elements present}
   CONSTRAINT ch_fid CHECK (fid > 0),
   CONSTRAINT ch_rx CHECK (rx >= 0),
@@ -945,7 +946,7 @@ CREATE TABLE action(
   CONSTRAINT ch_fromap CHECK (fromap >= 0 and fromap <=2),
   CONSTRAINT ch_noack CHECK (noack >= 0 and noack <=1),
   CONSTRAINT ch_category CHECK (category >= 0),
-  CONSTRAINT ch_action CHECK (action >= 0),
+  CONSTRAINT ch_action CHECK (act_code >= 0),
   CONSTRAINT ch_has_el CHECK (has_el >= 0 and has_el <= 1),
   FOREIGN KEY (fid) REFERENCES frame(frame_id) ON DELETE CASCADE,
   FOREIGN KEY (rx) REFERENCES sta(sta_id) ON DELETE CASCADE,
@@ -1083,9 +1084,10 @@ DELETE FROM disassoc;
 DELETE FROM deauth;
 DELETE FROM beacon;
 DELETE FROM auth;
-DELETE FROM action;
+DELETE FROM act;
 DELETE FROM sta_activity;
 DELETE FROM sta;
+DELETE FROM ssid;
 ALTER SEQUENCE sta_sta_id_seq restart;
 DELETE FROM malformed;
 ALTER SEQUENCE malformed_mal_id_seq RESTART;
@@ -1126,6 +1128,7 @@ DROP TABLE auth;
 DROP TABLE action;
 DROP TABLE sta_activity;
 DROP TABLE sta;
+DROP TABLE ssids;
 DROP TABLE malformed;
 DROP TABLE frame_raw;
 DROP TABLE frame;

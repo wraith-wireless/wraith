@@ -30,32 +30,29 @@ Note: Iryi only allows one client connection at a time
 
 #__name__ = 'iyri'
 __license__ = 'GPL v3.0'
-__version__ = '0.1.0'
-__date__ = 'September 2015'
+__version__ = '0.1.1'
+__date__ = 'January 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                                       # for path validations
-import signal                                   # signal processing
-from time import sleep                          # for sleep
-import logging                                  # log
-import logging.config                           # log configuration
-import logging.handlers                         # handlers for log
-import multiprocessing as mp                    # multiprocessing process, events etc
-import ConfigParser                             # reading configuration files
-import socket,threading                         # for the c2c server
-import select                                   # c2c & main loop
-from wraith.iyri import __version__ as ivers    # for iyri version
-from wraith.iyri.collate import Collator        # the collator
-from wraith.iyri.rdoctl import RadioController  # Radio object etc
-from wraith.iyri.gpsctl import GPSController    # gps device
-from wraith.wifi import iw                      # regset/get & channels
-from wraith.wifi.iwtools import wifaces         # check for interface presents
-from wraith.utils.cmdline import runningprocess # check for psql running
-from wraith.utils import valrep                 # validation functionality
-from wraith.iyri.constants import *             # buffer dims
+import os                                        # for path validations
+import signal                                    # signal processing
+import logging, logging.config, logging.handlers # logging
+import multiprocessing as mp                     # multiprocessing process, events
+import ConfigParser                              # reading configuration files
+import socket,threading                          # for the c2c server
+import select                                    # c2c & main loop
+from wraith.iyri import __version__ as ivers     # for iyri version
+from wraith.iyri.collate import Collator         # the collator
+from wraith.iyri.rdoctl import RadioController   # Radio object etc
+from wraith.iyri.gpsctl import GPSController     # gps device
+from wraith.wifi import iw                       # regset/get & channels
+from wraith.wifi.iwtools import wifaces          # check for interface presents
+from wraith.utils.cmdline import runningprocess  # check for psql running
+from wraith.utils import valrep                  # validation functionality
+from wraith.iyri.constants import *              # buffer dims
 
 #### set up log -> have to configure absolute path
 GPATH = os.path.dirname(os.path.abspath(__file__))
@@ -79,7 +76,7 @@ class C2C(threading.Thread):
           :param port: port to listen for connections on
         """
         threading.Thread.__init__(self)
-        self._cD = conn     # connection to/from Iryi
+        self._cI = conn     # connection to/from Iryi
         self._lp = port     # port to listen on
         self._sock = None   # the listen socket
         self._caddr = None  # the client addr
@@ -97,24 +94,45 @@ class C2C(threading.Thread):
                         self._send("Iyri v{0}".format(ivers))
 
                 # prepare inputs
-                ins = [self._cD,self._csock] if self._csock else [self._cD]
+                ins = [self._cI,self._csock] if self._csock else [self._cI]
 
                 # block on inputs & process if present
-                rs,_,_ = select.select(ins,[],[],0.25)
-                if self._cD in rs: # token from Iryi
-                    tkn = self._cD.recv()
+                try:
+                    (rs,_,_ ) = select.select(ins,[],[],0.25)
+                except select.error as e: # hide (4,'Interupted system call')
+                    if e[0] == 4: continue
+                    raise
+
+                if self._cI in rs: # token from Iryi
+                    tkn = self._cI.recv()
                     if tkn == POISON: break
                     else: self._send(tkn)
                 if self._csock in rs: # cmd from client
                     cmd = self._recv()
-                    if cmd: self._cD.send((CMD_CMD,'c2c','msg',cmd))
-            except (select.error,socket.error): # hide any select errors
-                self._shutdown() # reset everything
-            except C2CClientExit:
-                # used to signal an exiting client
+                    if cmd: self._cI.send((CMD_CMD,'c2c','msg',cmd))
+            except C2CClientExit: # used to signal an exiting client
                 logging.info("Client exited")
-                self._shutdown()
-        self._shutdown() # cleanup
+                self._caddr = None
+                self._csock = None
+            except Exception as e: # blanket exception, catch all and notify collator
+                self._cI.send((IYRI_ERR,'c2c',type(e).__name__,e))
+
+        # cleanup. 1) client connection, 2) listening socket, 3) notify iyri
+        if self._csock:
+            try:
+                self._csock.shutdown(socket.SHUT_RDWR)
+                self._csock.close()
+                self._csock = self._caddr = None
+            except: pass
+
+        if self._sock:
+            try:
+                self._sock.shutdown(socket.SHUT_RDWR)
+                self._sock.close()
+                self._sock = None
+            except: pass
+
+        self._cI.send((IYRI_DONE,'c2c',None,None))
 
     def _listen(self):
         """ open socket for listening """
@@ -157,25 +175,6 @@ class C2C(threading.Thread):
         """
         if self._csock: self._csock.send(msg)
 
-    def _shutdown(self,how=socket.SHUT_RDWR):
-        """ close connection (if present) and listening socket """
-        # start with client connection
-        try:
-            if self._csock:
-                self._csock.shutdown(how)
-                self._csock.close()
-        except: pass
-        finally:
-            self._csock = self._caddr = None
-
-        # then listening socket
-        try:
-            if self._sock: self._sock.shutdown(how)
-            self._sock.close()
-        except: pass
-        finally:
-            self._sock = None
-
     @property
     def clientstr(self):
         try:
@@ -216,57 +215,73 @@ class Iryi(object):
     def state(self): return self._state
 
     def run(self):
-        """ start execution """
+        """
+         start execution. Iyri creates several workers Collator, RadioController(s),
+         GPSController and C2C (threaded). If a worker fails, it notifies Iyri
+         and the Iyri will tell it to quit.
+        """
         # setup signal handlers for stop
         signal.signal(signal.SIGINT,self.stop)   # CTRL-C and kill -INT stop
         signal.signal(signal.SIGTERM,self.stop)  # kill -TERM stop
 
         # initialize, quit on failure
-        logging.info("**** Starting Iryi %s ****",ivers)
         self._create()
         if self.state == IYRI_INVALID:
             # make sure we do not leave system in corrupt state (i.e. w/o nics)
-            self._destroy()
-            raise IryiRuntimeException("Iryi failed to initialize, shutting down")
-
-        # set state to running
-        self._state = IYRI_RUNNING
+            logging.error("Iryi failed to initialize, shutting down")
+            #self._halt.set()
+            self.stop()
+        else:
+            logging.info("**** Starting Iryi %s ****",ivers)
+            self._state = IYRI_RUNNING
 
         # execution loop
-        while not self._halt.is_set():
+        while mp.active_children(): # side effect joins children
+            # are we exiting?
+            #if self._halt.is_set() and self._state < IYRI_EXITING:
+            #    # send out poison pills
+            #    self._state = IYRI_EXITING
+            #    for wrkr in self._pConns:
+            #        try:
+            #            self._pConns[wrkr].send(POISON)
+            #        except (EOFError,IOError): # ignore broken pipes
+            #            pass
+
+            # get & process messages
             try:
-                rs,_,_ = select.select(self._pConns.values(),[],[],0.5)
+                (rs,_,_) = select.select(self._pConns.values(),[],[],0.5)
             except select.error as e: # hide (4,'Interupted system call') errors
-                if e[0] == 4: continue
-                rs = []
+                if e[0] != 4: logging.error("Iryi failed. %s->%s", type(e),e)
+                else: continue
 
             for r in rs:
                 try:
                     # get message(s) a tuple: (level,originator,type,message)
-                    l,o,t,m = r.recv()
+                    (l,o,t,m) = r.recv()
                     if l == IYRI_ERR:
-                        # only care about errors we get while running
-                        if IYRI_CREATED < self.state < IYRI_EXITING:
-                            if o == 'shama': # continue w/out shama if it fails
-                                logging.warning("Shama dropped: %s",m)
-                                self._pConns['shama'].send(POISON)
-                                self._pConns['shama'].close()
-                                del self._pConns['shama']
-                                mp.active_children() # join without blocking
-                                self._sr = None
-                            else:
-                                logging.error("%s failed (%s) %s",o,t,m)
-                                self.stop()
+                        # we can continue w/o collator, gpsd or c2c
+                        if o == 'shama' or o == 'gpsd' or o == 'c2c':
+                            logging.warning("%s failed %s. Continuing without",o,m)
+                            self._pConns[o].send(POISON)
+                        else:
+                            logging.error("%s failed: %s->%s. Exiting...",o,t,m)
+                            self.stop()
                     elif l == IYRI_WARN: logging.warning("%s: (%s) %s",o,t,m)
                     elif l == IYRI_INFO: logging.info("%s: (%s) %s",o,t,m)
                     elif l == IYRI_DONE:
-                        # the GPSController will send one FLT and quit if the
-                        # location is static - handle this case here
-                        if o == 'gpsd':
-                            self._pConns['gpsd'].close()
-                            del self._pConns['gpsd']
-                            self._gpsd = None
-                            mp.active_children()
+                        # close out the pipe and remove from internals
+                        logging.info("%s has quit, cleaning up...",o)
+                        self._pConns[o].close()
+                        del self._pConns[o]
+                        if o == 'gpsd': self._gpsd = None
+                        elif o == 'abad': self._ar = None
+                        elif o == 'shama': self._sr = None
+                        elif o == 'collator':
+                            logging.info("Collator reports: {0}".format(m))
+                            self._collator = None
+                        elif o == 'c2c':
+                            self._c2c.join()
+                            self._c2c = None
                     elif l == CMD_CMD:
                         cid,cmd,rdos,ps = self._processcmd(m)
                         if cid is None: continue
@@ -282,9 +297,26 @@ class Iryi(object):
                         resp = "OK %d \001%s\001\n".format(t,m)
                         self._pConns['c2c'].send(resp)
                         logging.info('Command %d succeeded',t)
-                except Exception as e:
+                except Exception as e: # catch everything and quit
                     logging.error("Iryi failed. %s->%s", type(e),e)
                     self.stop()
+
+        # clean up
+        if self._c2c and self._c2c.is_alive():
+            try:
+                self._c2c.join()
+                logging.info("C2C stopped")
+            except Exception as e:
+                pass
+
+        if self._rd:
+            try:
+                logging.info("Resetting regulatory domain...")
+                iw.regset(self._rd)
+                if iw.regget() != self._rd: raise RuntimeError
+                logging.info("Regulatory domain reset")
+            except:
+                logging.warning("Failed to reset regulatory domain")
 
     # noinspection PyUnusedLocal
     def stop(self,signum=None,stack=None):
@@ -295,7 +327,13 @@ class Iryi(object):
         """
         if IYRI_RUNNING <= self.state < IYRI_EXITING:
             logging.info("**** Stopping Iryi ****")
-            self._destroy()
+            self._state = IYRI_EXITING
+            for w in self._pConns:
+                try:
+                    self._pConns[w].send(POISON)
+                except Exception as e:
+                    msg = "Error stopping {0}: {1}-{2}s".format(w,type(e).__name__,e)
+                    logging.info(msg)
 
     #### PRIVATE HELPERS
 
@@ -411,40 +449,6 @@ class Iryi(object):
             if self._c2c:
                 logging.info("C2C listening on port %d",self._conf['local']['c2c'])
 
-    def _destroy(self):
-        """ destroy Iryi cleanly """
-        # change our state & halt main execution loop
-        self._state = IYRI_EXITING
-        self._halt.set()
-
-        # stop c2c server
-        logging.info("Stopping C2C")
-        if self._c2c and self._c2c.is_alive(): self._c2c.join()
-        logging.info("C2C stopped")
-
-        # ssend out poison pills to stop workds
-        logging.info("Stopping Sub-processes...")
-        for key in self._pConns:
-            try:
-                self._pConns[key].send(POISON)
-                self._pConns[key].close()
-            except (EOFError,IOError): pass # ignore any broken pipe errors
-        while mp.active_children(): sleep(0.5)
-        logging.info("Sub-processes stopped")
-
-        # reset regulatory domain if necessary
-        if self._rd:
-            try:
-                logging.info("Resetting regulatory domain...")
-                iw.regset(self._rd)
-                if iw.regget() != self._rd: raise RuntimeError
-                logging.info("Regulatory domain reset")
-            except:
-                logging.warning("Failed to reset regulatory domain")
-
-        # change our state
-        self._state = IYRI_DESTROYED
-
     def _readconf(self):
         """ read in config file at cpath """
         logging.info("Reading configuration file...")
@@ -497,9 +501,7 @@ class Iryi(object):
                                    'opath':None,
                                    'region':None,
                                    'c2c':2526}
-            self._conf['local']['thresher']['min'] = cp.getint('Local','mint')
             self._conf['local']['thresher']['max'] = cp.getint('Local','maxt')
-            self._conf['local']['thresher']['wrk'] = cp.getint('Local','wrkt')
 
             # get optional
             if cp.has_option('Local','OUI'):
@@ -535,7 +537,7 @@ class Iryi(object):
         """
         nic = cp.get(rtype,'nic')
         if not nic in wifaces():
-            err = "Radio %s not present/not wireless".format(nic)
+            err = "Radio {0} not present/not wireless".format(nic)
             raise RuntimeError(err)
 
         # get nic & set role, also setting defaults
@@ -565,7 +567,7 @@ class Iryi(object):
 
         # process antennas - get the number first
         try:
-            nA = cp.getint(rtype,'antennas') if cp.has_option(rtype,'antennas') else 0
+            nA = cp.getint(rtype,'antennas')
         except ValueError:
             nA = 0
 

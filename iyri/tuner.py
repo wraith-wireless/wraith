@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-""" rdoctl.py: Radio Controller
+""" tuner.py: Radio scanner
 
-An interface to an underlying radio (wireless nic). Tunes and sniffs a radio,
-forwarding data to the Collator.
+Handles switching channels on the radio as specified by parameters in the
+config file. Will additionally process any user-specified commands.
 """
 __name__ = 'tuner'
 __license__ = 'GPL v3.0'
@@ -14,12 +14,12 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-from time import time                      # timestamps
-import signal                              # handling signals
-import multiprocessing as mp               # for Process
-from wraith.wifi import iw                 # iw command line interface
-from wraith.utils.timestamps import ts2iso # time stamp conversion
-from wraith.iyri.constants import *        # tuner states & buffer dims
+from time import time                             # timestamps/timing metrics
+import signal                                     # handling signals
+import multiprocessing as mp                      # for Process
+from wraith.wifi import iw                        # iw command line interface
+from wraith.utils.timestamps import isots, ts2iso # time stamp conversion
+from wraith.iyri.constants import *               # tuner states & buffer dims
 
 class Tuner(mp.Process):
     """ tune' the radio's channel and width """
@@ -55,9 +55,8 @@ class Tuner(mp.Process):
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
         # starting paused or scanning?
-        ts = ts2iso(time())
-        if self._state == TUNE_PAUSE: self._qR.put((RDO_PAUSE,ts,[-1,' ']))
-        else: self._qR.put((RDO_SCAN,ts,[-1,self._chs]))
+        if self._state == TUNE_PAUSE: self._qR.put((RDO_PAUSE,isots(),[-1,' ']))
+        else: self._qR.put((RDO_SCAN,isots(),[-1,self._chs]))
 
         # execution loop - wait on the internal connection for each channels
         # dwell time. IOT avoid a state where we would continue to scan the same
@@ -147,7 +146,7 @@ class Tuner(mp.Process):
                     iw.chset(self._vnic,self._chs[self._i][0],self._chs[self._i][1])
                     remaining = 0 # reset remaining timeout
                 except iw.IWException as e:
-                    self._qR.put((RDO_FAIL,ts2iso(time()),[-1,e]))
+                    self._qR.put((RDO_FAIL,isots(),[-1,e]))
                 except Exception as e: # blanket exception
-                    self._qR.put((RDO_FAIL,ts2iso(time()),[-1,e]))
+                    self._qR.put((RDO_FAIL,isots(),[-1,e]))
 

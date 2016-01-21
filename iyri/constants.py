@@ -37,7 +37,7 @@ POISON        =  0 # poison pill
 IYRI_INFO     =  1 # info message
 IYRI_WARN     =  2 # warning message
 IYRI_ERR      =  3 # error message
-IYRI_DONE     =  4 # done message (currently only used by gpsd)
+IYRI_DONE     =  4 # done message - child is exiting
 # C2C
 CMD_CMD       =  5 # command from user
 CMD_ERR       =  6 # command failed
@@ -49,7 +49,7 @@ THRESH_THRESH = 10 # thresher up/down
 THRESH_WARN   = 11 # thresher warning
 THRESH_ERR    = 12 # thresher failed
 THRESH_DQ     = 13 # thresher popped frame from buffer
-THRESH_DONE   = 14 # thresher has finiahed a frame
+THRESH_DONE   = 14 # thresher has finished a frame
 RDO_RADIO     = 15 # radio up/down
 RDO_FAIL      = 16 # radio failed
 RDO_SCAN      = 17 # radio is scanning
@@ -62,7 +62,7 @@ RDO_STATE     = 23 # radio state requested
 RDO_FRAME     = 24 # radio sent frame
 # commands to threshers
 COL_SID       = 25 # pass the sid
-COL_RDO       = 26 # pass radio info
+COL_RDO       = 26 # pass radio
 COL_WRITE     = 27 # pass write/don't write
 COL_FRAME     = 28 # pass frame
 

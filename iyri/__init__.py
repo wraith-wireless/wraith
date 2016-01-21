@@ -4,8 +4,9 @@
 
 Iyri is a 802.11 sensor consisting of a mandatory radio (Abad) and an optional
 radio (Shama). While Abad can receive/collect and transmit, Shama only receives.
-Iyri relays collected data to the backend database nidus, collects/stores data
-from raw 802.11 packets and any geolocational data (if a gps device is present).
+Iyri relays collected data to the backend database nidus, storing data data
+from raw 802.11 packets and any geolocational data (if a gps device is present)
+as well as data on the radios, gps device and platform.
 
 REVISIONS:
  0.0.x
@@ -36,29 +37,35 @@ REVISIONS:
     o removed seperate 'writer' process, writes handled by thresher
     o removed writing raw frames to file, stored in db (have to use psycopg2 Binary
  0.2.1
-  desc: Adds some "intelligent". Collator will add threshers IOT to avoid race
+  desc: Adds some "intelligence". Collator will add threshers IOT to avoid race
    condition introduced by circular buffer where frames are being overwritten
    before they are processed and remove threshers when possible to remove
-   overhead of unecessary processes.
-  includes: iyri 0.1.0 collate 0.1.2 constants 0.0.1 gpsctl 0.0.2 rdoctl 0.1.1
-   thresh 0.0.4 iyrid iyri.conf iyri.log.conf iyrid
+   overhead of unecessary processes. The collator also maintains an internal
+   buffer 'pulling' frames of the radio's buffers as soon as it is notified
+  includes: iyri 0.1.1 constants 0.0.1 collate 0.1.4 gpsctl 0.0.3 rdoctl 0.1.1
+   tuner 0.0.1 thresh 0.0.5 iyrid iyri.conf iyri.log.conf iyrid
   changes:
-   - Threshers created when workload exceeds specified threshhold and killed when
-    workloads fall below specified threshhold
-    o based on constants MIN_TRESH, MAX_THRESH and WRK_THRESH
+   - Threshers created when buffer exceeds a certain capacity (25% full) and
+     killed when it fall below a certain capacity (10% full)
+   - added internal buffer to collator
+     o collator copies frames from radio(s) buffers to internal buffers
    - removed artifacts hanging around from previous revisions
-   - moved constants to conf file (after testing)
+   - moved some constants to conf file (after testing)
    - made the Tuner a process
    - fixed exiting errors with RadioController
-   - stopping writing frames to buffer when radio is paused
-   - fixed GPSController, it was quitting without iyri tracking on static location
+   - stopping storing frames in buffer when radio is paused
+   - fixed GPSController, on static location, it was quitting without iyri tracking
    - found & fixed several bugs such as iyri not shutting down on sub-process errors
-
+   - reworked iyri execution loop and children exection loops:
+     o iyri can process messages from children during shutdown phase
+     o all children will notify iyri when they are finished
+     o collator will delay poison pill to threshers until all outstanding frames
+      have been processed
 """
 __name__ = 'iyri'
 __license__ = 'GPL v3.0'
 __version__ = '0.2.1'
-__date__ = 'October 2015'
+__date__ = 'January 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
