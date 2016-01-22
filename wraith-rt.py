@@ -51,33 +51,12 @@ def stoppsql(pwd):
     else:
         return True
 
-def startnidus(pwd):
-    """ start nidus server. pwd: the sudo password """
-    try:
-        cmdline.service('nidusd',pwd)
-        time.sleep(0.5)
-        if not cmdline.runningservice(wraith.NIDUSPID): raise RuntimeError
-    except RuntimeError:
-        return False
-    else:
-        return True
-
-def stopnidus(pwd):
-    """ stop nidus storage manager. pwd: Sudo password """
-    try:
-        cmdline.service('nidusd',pwd,False)
-        while cmdline.runningservice(wraith.NIDUSPID): time.sleep(1.0)
-    except RuntimeError as e:
-        return False
-    else:
-        return True
-
 def startiyri(pwd):
     """ start Iyri sensor. pwd: the sudo password """
     try:
         cmdline.service('Iyrid',pwd)
         time.sleep(1.0)
-        if not cmdline.runningservice(wraith.LYRIPID): raise RuntimeError
+        if not cmdline.runningservice(wraith.IYRIPID): raise RuntimeError
     except RuntimeError:
         return False
     else:
@@ -87,7 +66,7 @@ def stopIyri(pwd):
     """ stop Iyri sensor. pwd: Sudo password """
     try:
         cmdline.service('Iyrid',pwd,False)
-        while cmdline.runningservice(wraith.LYRIPID): time.sleep(1.0)
+        while cmdline.runningservice(wraith.IYRIPID): time.sleep(1.0)
     except RuntimeError as e:
         return False
     else:
@@ -126,16 +105,14 @@ def readconf():
 _STATE_INIT_   = 0
 _STATE_STORE_  = 1
 _STATE_CONN_   = 2
-_STATE_NIDUS_  = 3
-_STATE_LYRI_  = 4
-_STATE_EXIT_   = 5
-_STATE_FLAGS_NAME_ = ['init','store','conn','nidus','Iyri','exit']
-_STATE_FLAGS_ = {'init':(1 << 0),   # initialized properly
-                 'store':(1 << 1),  # storage instance is running (i.e. postgresql)
-                 'conn':(1 << 2),   # connected to storage instance
-                 'nidus':(1 << 3),  # nidus storage manager running
-                 'Iyri':(1 << 4),  # at least one sensor is collecting data
-                 'exit':(1 << 5)}   # exiting/shutting down
+_STATE_IYRI_   = 3
+_STATE_EXIT_   = 4
+_STATE_FLAGS_NAME_ = ['init','store','conn','Iyri','exit']
+_STATE_FLAGS_ = {'init':(1 << _STATE_INIT_),   # initialized properly
+                 'store':(1 << _STATE_STORE_), # storage instance is running (i.e. postgresql)
+                 'conn':(1 << _STATE_CONN_),   # connected to storage instance
+                 'iyri':(1 << _STATE_IYRI_),    # at least one sensor is collecting data
+                 'exit':(1 << _STATE_EXIT_)}   # exiting/shutting down
 
 class WraithPanel(gui.MasterPanel):
     """ WraithPanel - master panel for wraith gui """
@@ -168,9 +145,6 @@ class WraithPanel(gui.MasterPanel):
 
     @property # return {True: connected to backend|False: Not connected to backend}
     def isconnected(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['conn']
-
-    @property # return {True: Nidus is running|False: Nidus is not running}
-    def nidusisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['nidus']
 
     @property # return {True: Iyri is running|False: Iyri is not running|
     def Iyriisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['Iyri']
@@ -236,17 +210,10 @@ class WraithPanel(gui.MasterPanel):
                          "Not connected to DB",
                          gui.LOG_WARN))
 
-        # nidus running?
-        if cmdline.runningservice(wraith.NIDUSPID):
-            msgs.append((time.strftime('%H:%M:%S'),"Nidus running",gui.LOG_NOERR))
-            self._setstate(_STATE_NIDUS_)
-        else:
-            msgs.append((time.strftime('%H:%M:%S'),"Nidus not running",gui.LOG_WARN))
-
         # Iyri running?
         if cmdline.runningservice(wraith.IYRIPID):
             msgs.append((time.strftime('%H:%M:%S'),"Iyri running",gui.LOG_NOERR))
-            self._setstate(_STATE_LYRI_)
+            self._setstate(_STATE_IYRI_)
         else:
             msgs.append((time.strftime('%H:%M:%S'),"Iyri not running",gui.LOG_WARN))
 
@@ -326,17 +293,6 @@ class WraithPanel(gui.MasterPanel):
         self._mnuStoragePSQL.add_command(label='Fix',command=self.psqlfix)           # 6
         self._mnuStoragePSQL.add_command(label='Delete All',command=self.psqldelall) # 7
         self._mnuStorage.add_cascade(label='PostgreSQL',menu=self._mnuStoragePSQL)  # 3
-        self._mnuStorageNidus = tk.Menu(self._mnuStorage,tearoff=0)
-        self._mnuStorageNidus.add_command(label='Start',command=self.nidusstart)     # 0
-        self._mnuStorageNidus.add_command(label='Stop',command=self.nidusstop)       # 1
-        self._mnuStorageNidus.add_separator()                                        # 2
-        self._mnuNidusLog = tk.Menu(self._mnuStorageNidus,tearoff=0)
-        self._mnuNidusLog.add_command(label='View',command=self.viewniduslog)         # 0
-        self._mnuNidusLog.add_command(label='Clear',command=self.clearniduslog)       # 1
-        self._mnuStorageNidus.add_cascade(label='Log',menu=self._mnuNidusLog)         # 3
-        self._mnuStorageNidus.add_separator()                                        # 4
-        self._mnuStorageNidus.add_command(label='Config',command=self.confignidus)   # 5
-        self._mnuStorage.add_cascade(label='Nidus',menu=self._mnuStorageNidus)      # 4
 
         # Iyri Menu
         self._mnuIyri = tk.Menu(self._menubar,tearoff=0)
@@ -372,8 +328,6 @@ class WraithPanel(gui.MasterPanel):
         elif desc == 'interfaces': self.viewinterfaces()
         elif desc == 'sessions': self.viewsessions()
         elif desc == 'preferences': self.configwraith()
-        elif desc == 'niduslog': self.viewniduslog()
-        elif desc == 'nidusprefs': self.confignidus()
         elif desc == 'Iyrilog': self.viewIyrilog()
         elif desc == 'Iyriprefs': self.configIyri()
         elif desc == 'about': self.about()
@@ -582,83 +536,6 @@ class WraithPanel(gui.MasterPanel):
             finally:
                 if curs: curs.close()
 
-    def nidusstart(self):
-        """ starts nidus storage manager """
-        # NOTE: should not be enabled if postgresql is not running but check anyway
-        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if not flags['nidus']:
-            # do we have a password
-            if not self._pwd:
-                pwd = self._getpwd()
-                if pwd is None:
-                    self.logwrite("Password entry canceled. Cannot continue",
-                                  gui.LOG_WARN)
-                    return
-                self._pwd = pwd
-            self.logwrite('Starting Nidus...',gui.LOG_NOTE)
-            if startnidus(self._pwd):
-                self._updatestate()
-                self._menuenable()
-                self.logwrite('Nidus Started')
-            else:
-                self.logwrite("Failed to start Nidus",gui.LOG_ERR)
-
-    def nidusstop(self):
-        """ stops nidus storage manager """
-        # should not be enabled if nidus is not running, but check anyway
-        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['nidus']:
-            # do we have a password
-            if not self._pwd:
-                pwd = self._getpwd()
-                if pwd is None:
-                    self.logwrite("Password entry canceled. Cannot continue",
-                                  gui.LOG_WARN)
-                    return
-                self._pwd = pwd
-
-            self.logwrite("Stopping Nidus...",gui.LOG_NOTE)
-            if stopnidus(self._pwd):
-                self._updatestate()
-                self._menuenable()
-                self.logwrite("Nidus Stopped")
-            else:
-                self.logwrite("Failed to stop Nidus",gui.LOG_ERR)
-
-    def viewniduslog(self):
-        """ display Nidus log """
-        panel = self.getpanels('niduslog',False)
-        if not panel:
-            t = tk.Toplevel()
-            pnl = gui.TailLogPanel(t,self,"Nidus Log",200,wraith.NIDUSLOG,50)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'niduslog'))
-        else:
-            panel[0].tk.deiconify()
-            panel[0].tk.lift()
-
-    def clearniduslog(self):
-        """ clear nidus log """
-        # prompt first
-        finfo = os.stat(wraith.NIDUSLOG)
-        if finfo.st_size > 0:
-            ans = self.ask("Clear Log","Clear contents of Nidus log?")
-            self.update()
-            if ans == 'no': return
-            lv = self.getpanel('niduslog')
-            with open(wraith.NIDUSLOG,'w'): os.utime(wraith.NIDUSLOG,None)
-            if lv: lv.reset()
-
-    def confignidus(self):
-        """ display nidus config file preference editor """
-        panel = self.getpanels('nidusprefs',False)
-        if not panel:
-            t = tk.Toplevel()
-            pnl = subgui.NidusConfigPanel(t,self)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'nidusprefs'))
-        else:
-            panel[0].tk.deiconify()
-            panel[0].tk.lift()
-
 #### Iyri Menu
 
     def Iyristart(self):
@@ -682,7 +559,7 @@ class WraithPanel(gui.MasterPanel):
         panel = self.getpanels('Iyrilog',False)
         if not panel:
             t = tk.Toplevel()
-            pnl = gui.TailLogPanel(t,self,"Iyri Log",200,wraith.LYRILOG,50)
+            pnl = gui.TailLogPanel(t,self,"Iyri Log",200,wraith.IYRILOG,50)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'Iyrilog'))
         else:
             panel[0].tk.deiconify()
@@ -691,12 +568,12 @@ class WraithPanel(gui.MasterPanel):
     def clearIyrilog(self):
         """ clears the Iyri log """
         # prompt first
-        finfo = os.stat(wraith.LYRILOG)
+        finfo = os.stat(wraith.IYRILOG)
         if finfo.st_size > 0:
             ans = self.ask("Clear Log","Clear contents of Iyri log?")
             self.update()
             if ans == 'no': return
-            with open(wraith.LYRILOG,'w'): pass
+            with open(wraith.IYRILOG,'w'): pass
             lv = self.getpanel('Iyrilog')
             if lv: lv.reset()
 
@@ -740,13 +617,9 @@ class WraithPanel(gui.MasterPanel):
 
     def _updatestate(self):
         """ reevaluates internal state """
-        # state of nidus
-        if cmdline.runningservice(wraith.NIDUSPID): self._setstate(_STATE_NIDUS_)
-        else: self._setstate(_STATE_NIDUS_,False)
-
         # state of Iyri
-        if cmdline.runningservice(wraith.LYRIPID): self._setstate(_STATE_LYRI_)
-        else:  self._setstate(_STATE_LYRI_,False)
+        if cmdline.runningservice(wraith.IYRIPID): self._setstate(_STATE_IYRI_)
+        else:  self._setstate(_STATE_IYRI_,False)
 
         # state of postgres i.e. store
         if cmdline.runningprocess('postgres'): self._setstate(_STATE_STORE_)
@@ -778,12 +651,12 @@ class WraithPanel(gui.MasterPanel):
         else: self._mnuData.entryconfig(4,state=tk.DISABLED)
 
         # start all
-        if flags['store'] and flags['nidus'] and flags['Iyri']:
+        if flags['store'] and flags['iyri']:
             self._mnuData.entryconfig(4,state=tk.DISABLED)
         else: self._mnuData.entryconfig(4,state=tk.NORMAL)
 
         # stop all
-        if not flags['store'] and not flags['nidus'] and not flags['Iyri']:
+        if not flags['store'] and not flags['iyri']:
             self._mnuStorage.entryconfig(1,state=tk.DISABLED)
         else: self._mnuStorage.entryconfig(1,state=tk.NORMAL)
 
@@ -819,23 +692,9 @@ class WraithPanel(gui.MasterPanel):
             self._mnuStoragePSQL.entryconfig(6,state=tk.DISABLED)
             self._mnuStoragePSQL.entryconfig(7,state=tk.DISABLED)
 
-        # nidus start/stop & clear log NOTE: unlike psql, we allow nidus to stop
-        # even in cases where Iyri may be running as Iyri will handle nidus
-        # closing the comms socket)
-        if flags['nidus']:
-            # disable start and clear log and enable stop
-            self._mnuStorageNidus.entryconfig(0,state=tk.DISABLED)
-            self._mnuNidusLog.entryconfig(1,state=tk.DISABLED)
-            self._mnuStorageNidus.entryconfig(1,state=tk.NORMAL)
-        else:
-            # enable start clear log and disable stop
-            self._mnuStorageNidus.entryconfig(0,state=tk.NORMAL)
-            self._mnuNidusLog.entryconfig(1,state=tk.NORMAL)
-            self._mnuStorageNidus.entryconfig(1,state=tk.DISABLED)
-
         # Iyri
-        if not flags['store'] and not flags['nidus']:
-            # cannot start/stop/control Iyri unless nidus & postgres is running
+        if not flags['store']:
+            # cannot start/stop/control Iyri unless postgres is running
             self._mnuIyri.entryconfig(0,state=tk.DISABLED)  # start
             self._mnuIyri.entryconfig(1,state=tk.DISABLED)  # stop
             self._mnuIyri.entryconfig(3,state=tk.DISABLED)  # ctrl panel
@@ -877,16 +736,6 @@ class WraithPanel(gui.MasterPanel):
             else:
                 self.logwrite("PostgreSQL started")
 
-        # start nidus
-        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if not flags['nidus'] and flags['store']:
-            self.logwrite("Starting Nidus...",gui.LOG_NOTE)
-            if not startnidus(self._pwd):
-                self.logwrite("Failed to start Nidus",gui.LOG_ERR)
-                return
-            else:
-                self.logwrite("Nidus started")
-
         # connect to db
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if not flags['conn'] and flags['store']:
@@ -911,29 +760,13 @@ class WraithPanel(gui.MasterPanel):
             if ans == 'no': return
 
         # return if no storage component is running
-        if not (flags['store'] or flags['conn'] or flags['nidus']): return
+        if not (flags['store'] or flags['conn']): return
 
         # disconnect from db
         if flags['conn']: self._psqldisconnect()
 
-        # before shutting down nidus & postgresql, confirm auto shutdown is enabled
+        # before shutting downpostgresql, confirm auto shutdown is enabled
         if not self._conf['policy']['shutdown']: return
-
-        # shutdown nidus
-        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['nidus']:
-            # do we have a password
-            if not self._pwd:
-                pwd = self._getpwd()
-                if pwd is None:
-                    self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
-                    return
-                self._pwd = pwd
-
-            self.logwrite("Stopping Nidus...",gui.LOG_NOTE)
-            if not stopnidus(self._pwd):
-                self.logwrite("Failed to stop Nidus",gui.LOG_WARN)
-            else: self.logwrite("Nidus stopped")
 
         # shutdown postgresql (check first if polite)
         if self._conf['policy']['polite'] and self._bSQL: return
@@ -966,7 +799,7 @@ class WraithPanel(gui.MasterPanel):
     def _startsensor(self):
         """ starts the Iyri sensor """
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store'] and flags['nidus'] and not flags['Iyri']:
+        if flags['store'] and not flags['Iyri']:
             # do we have a password
             if not self._pwd:
                 pwd = self._getpwd()
@@ -979,14 +812,14 @@ class WraithPanel(gui.MasterPanel):
             # start the sensor
             try:
                 self.logwrite("Starting Iyri...",gui.LOG_NOTE)
-                cmdline.service('Iyrid',self._pwd)
+                cmdline.service('iyrid',self._pwd)
                 time.sleep(0.5)
-                if not cmdline.runningservice(wraith.LYRIPID): raise RuntimeError('unknown')
+                if not cmdline.runningservice(wraith.IYRIPID): raise RuntimeError('unknown')
             except RuntimeError as e:
                 self.logwrite("Error starting Iyri: {0}".format(e),gui.LOG_ERR)
             else:
                 self.logwrite("Iyri Started")
-                self._setstate(_STATE_LYRI_)
+                self._setstate(_STATE_IYRI_)
 
     def _stopsensor(self):
         """ stops the Iyri sensor """
@@ -1008,7 +841,7 @@ class WraithPanel(gui.MasterPanel):
             except RuntimeError as e:
                 self.logwrite("Error shutting down Iyri: {0}".format(e),gui.LOG_ERR)
             else:
-                self._setstate(_STATE_LYRI_,False)
+                self._setstate(_STATE_IYRI_,False)
                 self.logwrite("Iyri shut down")
 
     def _getpwd(self):
@@ -1066,7 +899,6 @@ class WraithSplash(object):
         # start 'polling'
         self._bconfig = False
         self._bpsql = False
-        self._bnidus = False
         self._bfinished = False
         self._tl.after(1000,self._busy)
 
@@ -1079,7 +911,6 @@ class WraithSplash(object):
         else:
             if not self._bconfig: self._chkconfig()
             elif not self._bpsql: self._chkpsql()
-            elif not self._bnidus: self._chknidus()
             else: self._chkIyri()
             self._tl.after(1000,self._busy)
 
@@ -1105,32 +936,20 @@ class WraithSplash(object):
         self._bpsql = True
         self._pb.step(2.0)
 
-    def _chknidus(self):
-        self._sv.set("Checking Nidus...")
-        self._pb.step(0.5)
-        if not cmdline.runningservice(wraith.NIDUSPID):
-            self._sv.set("Starting Nidus")
-            if startnidus(pwd): self._sv.set("Nidus started")
-            else: self._sv.set("Failed to start Nidus")
-        else:
-            self._sv.set("Nidus already running")
-        self._bnidus = True
-        self._pb.step(2.0)
-
     def _chkIyri(self):
         self._sv.set("Checking Iyri...")
         self._pb.step(2.0)
-        if not cmdline.runningservice(wraith.LYRIPID):
+        if not cmdline.runningservice(wraith.IYRIPID):
             self._sv.set("Starting Iyri")
-            if not startIyri(pwd):
+            if not startiyri(pwd):
                 # because Iyri can sometimes take a while, we will run
                 # this several times
                 i = 5
-                while not cmdline.runningservice(wraith.LYRIPID):
+                while not cmdline.runningservice(wraith.IYRIPID):
                     i -= 1
                     if i == 0: break
                     time.sleep(0.5)
-            if cmdline.runningservice(wraith.LYRIPID): self._sv.set("Iyri started")
+            if cmdline.runningservice(wraith.IYRIPID): self._sv.set("Iyri started")
             else: self._sv.set("Failed to start Iyri")
         else:
             self._sv.set("Iyri already running")
@@ -1166,14 +985,10 @@ if __name__ == '__main__':
 
         # stop Iyri, then Nidus, then PostgreSQL
         sd = sn = sp = True
-        if cmdline.runningservice(wraith.LYRIPID):
+        if cmdline.runningservice(wraith.IYRIPID):
             ret = 'ok' if stopIyri(pwd) else 'fail'
             print "Stopping Iyri\t\t\t\t[{0}]".format(ret)
         else: print "Iyri not running"
-        if cmdline.runningservice(wraith.NIDUSPID):
-            ret = 'ok' if stopnidus(pwd) else 'fail'
-            print "Stopping Nidus\t\t\t\t[{0}]".format(ret)
-        else: print "Nidus not running"
         if cmdline.runningprocess('postgres') and not exclude:
             ret = 'ok' if stoppsql(pwd) else 'fail'
             print "Stopping PostgreSQL\t\t\t[{0}]".format(ret)
@@ -1197,13 +1012,8 @@ if __name__ == '__main__':
             print "Starting PostgreSQL\t\t\t[{0}]".format(ret)
         else:
             print "PostgreSQL already running"
-        if not cmdline.runningservice(wraith.NIDUSPID):
-            ret = 'ok' if startnidus(pwd) else 'fail'
-            print "Starting Nidus\t\t\t\t[{0}]".format(ret)
-        else:
-            print "Nidus already running"
-        if not cmdline.runningservice(wraith.LYRIPID):
-            ret = 'ok' if startIyri(pwd) else 'fail'
+        if not cmdline.runningservice(wraith.IYRIPID):
+            ret = 'ok' if startiyri(pwd) else 'fail'
             print "Starting Iyri\t\t\t\t[{0}]".format(ret)
         else:
             print "Iyri already Running"

@@ -10,27 +10,26 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                                  # file info etc
-import re                                  # reg. exp.
-import Tkinter as tk                       # gui constructs
-import tkFileDialog as tkFD                # import file gui dialogs
-import ttk                                 # ttk widgets
-import mgrs                                # for mgrs2latlon conversions etc
-import math                                # for conversions, calculations
-import time                                # for timestamps
-from PIL import Image,ImageTk              # image input & support
-import psycopg2 as psql                    # postgresql api
-import psycopg2.extras as pextras          # cursors and such
-import ConfigParser                        # config file parsing
-import wraith                              # version info & constants
-import wraith.widgets.panel as gui         # graphics suite
-from wraith.wifi import iw                 # wireless interface details
-from wraith.wifi import iwtools as iwt     # interface details
-from wraith.wifi import mpdu               # for 802.11 types/subtypes
-from wraith.iyri.iyri import parsechlist   # channelist validity check
-from wraith.utils import timestamps        # valid data/time
-from wraith.utils import landnav           # lang nav utilities
-from wraith.utils import cmdline           # cmdline functionality
+import Tkinter as tk                   # gui constructs
+import tkFileDialog as tkFD            # import file gui dialogs
+import ttk                             # ttk widgets
+import mgrs                            # for mgrs2latlon conversions etc
+import math                            # for conversions, calculations
+import time                            # for timestamps
+from PIL import Image,ImageTk          # image input & support
+import psycopg2 as psql                # postgresql api
+import psycopg2.extras as pextras      # cursors and such
+import ConfigParser                    # config file parsing
+import wraith                          # version info & constants
+import wraith.widgets.panel as gui     # graphics suite
+from wraith.wifi import iw             # wireless interface details
+from wraith.wifi import iwtools as iwt # interface details
+from wraith.wifi import mpdu           # for 802.11 types/subtypes
+from wraith.utils import timestamps    # valid data/time
+from wraith.utils import landnav       # lang nav utilities
+from wraith.utils import cmdline       # cmdline functionality
+from wraith.utils import valrep        # validity checks
+
 
 # Some constants
 COPY = u"\N{COPYRIGHT SIGN}"
@@ -120,9 +119,7 @@ class WraithConfigPanel(gui.ConfigPanel):
     def _validate(self):
         """ validate entries """
         host = self._entHost.get()
-        if re.match(IPADDR,host) is None and host != 'localhost':
-            self.err("Invalid Input","Host {0} is not valid".format(host))
-            return False
+        if not valrep.validaddr(host): return False
         port = self._entPort.get()
         try:
             port = int(port)
@@ -1025,11 +1022,11 @@ class QueryPanel(gui.SlavePanel):
         if self._vfilteron[0]:
             # allow all in host, nic, driver
             mac = self._entSensorMac.get().upper()
-            if mac and re.match(MACADDR,mac) is None:
+            if mac and not valrep.validhwaddr(mac):
                 self.err("Invalid Input","MAC addr {0} is not valid".format(mac))
                 return False
             mac = self._entSensorSpoof.get().upper()
-            if mac and re.match(MACADDR,mac) is None:
+            if mac and not valrep.validhwaddr(mac):
                 self.err("Invalid Input","Spoof addr {0} is not valid".format(mac))
                 return False
             stds = self._entSensorStd.get().split(',')
@@ -1060,7 +1057,7 @@ class QueryPanel(gui.SlavePanel):
                 except ValueError:
                     self.err("Invalid Input","Rate(s) must be numeric")
                     return False
-            if not parsechlist(self._entSignalCh.get(),'scan'):
+            if not valrep.channellist(self._entSignalCh.get(),'scan'):
                 self.err("Invalid Input","Invalid channel(s0 specification")
                 return False
             mis = self._entIndex.get().split(',')
@@ -1079,7 +1076,7 @@ class QueryPanel(gui.SlavePanel):
         # only validate traffic entries if 'enabled'
         if self._vfilteron[2]:
             mac = self._entHWAddr.get().upper()
-            if mac and re.match(MACADDR,mac) is None:
+            if mac and not valrep.validhwaddr(mac):
                 self.err("Invalid Input","HW Addr {0} is not valid".format(mac))
                 return False
             # check file path and file
@@ -1090,7 +1087,7 @@ class QueryPanel(gui.SlavePanel):
                 fin = open(fpath,'r')
                 ss = fin.read().split(',')
                 for s in ss:
-                    if re.match(MACADDR,s.strip()) is None:
+                    if not valrep.validhwaddr(s.strip()):
                         self.err("Invalid Input",
                                  "File {0} has invalid data {1}".format(fpath,s))
                         return False
@@ -1272,242 +1269,6 @@ class SessionsPanel(gui.DBPollingTabularPanel):
                 self.err("Query Error",e)
         else:
             self.err("Connect Error",err)
-
-# Storage->Nidus-->Config
-class NidusConfigPanel(gui.ConfigPanel):
-    """ Display Nidus Configuration Panel """
-    def __init__(self,tl,chief):
-        gui.ConfigPanel.__init__(self,tl,chief,"Configure Nidus")
-
-    def _makegui(self,frm):
-        """ set up entry widgets """
-        # Storage Configuration
-        frmSS = ttk.LabelFrame(frm,text='Storage')
-        frmSS.grid(row=0,column=0,sticky='nwse')
-        ttk.Label(frmSS,text='Host: ').grid(row=0,column=0,sticky='w')
-        self._entHost = ttk.Entry(frmSS,width=15)
-        self._entHost.grid(row=0,column=1,sticky='e')
-        ttk.Label(frmSS,text=' ').grid(row=0,column=2) # separator
-        ttk.Label(frmSS,text='Port: ').grid(row=0,column=3,sticky='w')
-        self._entPort = ttk.Entry(frmSS,width=5)
-        self._entPort.grid(row=0,column=4,sticky='w')
-        ttk.Label(frmSS,text='DB: ').grid(row=1,column=0,sticky='w')
-        self._entDB = ttk.Entry(frmSS,width=10)
-        self._entDB.grid(row=1,column=1,sticky='w')
-        ttk.Label(frmSS,text='User: ').grid(row=1,column=3,sticky='w')
-        self._entUser = ttk.Entry(frmSS,width=10)
-        self._entUser.grid(row=1,column=4,sticky='e')
-        ttk.Label(frmSS,text=' ').grid(row=1,column=5) # separator
-        ttk.Label(frmSS,text='PWD: ').grid(row=1,column=6,sticky='w')
-        self._entPWD = ttk.Entry(frmSS,width=10)
-        self._entPWD.grid(row=1,column=7,sticky='w')
-
-        # SSE Configuration
-        frmS = ttk.LabelFrame(frm,text='SSE')
-        frmS.grid(row=1,column=0,sticky='nwse')
-        ttk.Label(frmS,text='Packets: ').grid(row=0,column=0,sticky='w')
-        self._vsave = tk.IntVar()
-        ttk.Checkbutton(frmS,text="Save",variable=self._vsave,command=self.cb).grid(row=0,column=1,sticky='w')
-        self._vpriv = tk.IntVar()
-        self._chkPriv = ttk.Checkbutton(frmS,text="Private",variable=self._vpriv)
-        self._chkPriv.grid(row=0,column=2,sticky='e')
-        ttk.Label(frmS,text='Path: ').grid(row=0,column=3,sticky='w')
-        self._entPCAPPath = ttk.Entry(frmS,width=25)
-        self._entPCAPPath.grid(row=0,column=4)
-        ttk.Label(frmS,text="Max Size: ").grid(row=1,column=1,sticky='w')
-        self._entMaxSz = ttk.Entry(frmS,width=4)
-        self._entMaxSz.grid(row=1,column=2,sticky='w')
-        ttk.Label(frmS,text="Max Files: ").grid(row=1,column=3,sticky='w')
-        self._entMaxFiles = ttk.Entry(frmS,width=4)
-        self._entMaxFiles.grid(row=1,column=4,columnspan=2,sticky='w')
-        ttk.Label(frmS,text='Threads: ').grid(row=2,column=0,sticky='w')
-        ttk.Label(frmS,text='Store: ').grid(row=2,column=1,sticky='w')
-        self._entNumStore = ttk.Entry(frmS,width=2)
-        self._entNumStore.grid(row=2,column=2,sticky='w')
-        ttk.Label(frmS,text='Extract: ').grid(row=2,column=3,sticky='w')
-        self._entNumExtract = ttk.Entry(frmS,width=2)
-        self._entNumExtract.grid(row=2,column=4,sticky='w')
-
-        # OUI Configuration
-        frmO = ttk.Frame(frm)
-        frmO.grid(row=2,column=0,sticky='nwse')
-        ttk.Label(frmO,text='OUI Path: ').grid(row=0,column=0,sticky='w')
-        self._entOUIPath = ttk.Entry(frmO,width=50)
-        self._entOUIPath.grid(row=0,column=1,sticky='e')
-
-    def cb(self):
-        """ Save Checkbutton callback: disable/enable Save options as necessary """
-        if self._vsave.get(): state = tk.NORMAL
-        else: state = tk.DISABLED
-        self._chkPriv.configure(state=state)
-        self._entPCAPPath.configure(state=state)
-        self._entMaxSz.configure(state=state)
-        self._entMaxFiles.configure(state=state)
-
-    def _initialize(self):
-        """ insert values from config file into entry boxes """
-        conf = ConfigParser.RawConfigParser()
-        if not conf.read(wraith.NIDUSCONF):
-            self.err("File Not Found","nidus.conf was not found")
-            return
-
-        # in case the conf file is invalid, set to empty if not present
-        # storage server
-        self._entHost.delete(0,tk.END)
-        if conf.has_option('Storage','host'):
-            self._entHost.insert(0,conf.get('Storage','host'))
-
-        self._entPort.delete(0,tk.END)
-        if conf.has_option('Storage','port'):
-            self._entPort.insert(0,conf.get('Storage','port'))
-
-        self._entDB.delete(0,tk.END)
-        if conf.has_option('Storage','db'):
-            self._entDB.insert(0,conf.get('Storage','db'))
-
-        self._entUser.delete(0,tk.END)
-        if conf.has_option('Storage','user'):
-            self._entUser.insert(0,conf.get('Storage','user'))
-
-        self._entPWD.delete(0,tk.END)
-        if conf.has_option('Storage','pwd'):
-            self._entPWD.insert(0,conf.get('Storage','pwd'))
-
-        # SSE section
-        try:
-            save = int(conf.getboolean('SSE','save'))
-            private = int(conf.getboolean('SSE','save_private'))
-        except:
-            save = 0
-            private = 0
-        self._entPCAPPath.delete(0,tk.END)
-        if conf.has_option('SSE','save_path'):
-            self._entPCAPPath.insert(0,conf.get('SSE','save_path'))
-        self._entMaxSz.delete(0,tk.END)
-        if conf.has_option('SSE','save_maxsize'):
-            self._entMaxSz.insert(0,conf.get('SSE','save_maxsize'))
-        self._entMaxFiles.delete(0,tk.END)
-        if conf.has_option('SSE','save_maxfiles'):
-            self._entMaxFiles.insert(0,conf.get('SSE','save_maxfiles'))
-        self._entNumStore.delete(0,tk.END)
-        if conf.has_option('SSE','store_threads'):
-            self._entNumStore.insert(0,conf.get('SSE','store_threads'))
-        else: self._entNumStore.insert(0,'2')
-        self._entNumExtract.delete(0,tk.END)
-        if conf.has_option('SSE','extract_threads'):
-            self._entNumExtract.insert(0,conf.get('SSE','extract_threads'))
-        else: self._entNumExtract.insert(0,'2')
-
-        # disable/enable as needed
-        if save: state = tk.NORMAL
-        else: state = tk.DISABLED
-        self._chkPriv.configure(state=state)
-        self._entPCAPPath.configure(state=state)
-        self._entMaxSz.configure(state=state)
-        self._entMaxFiles.configure(state=state)
-
-        # OUI section
-        self._entOUIPath.delete(0,tk.END)
-        if conf.has_option('OUI','path'):
-            self._entOUIPath.insert(0,conf.get('OUI','Path'))
-        else: self._entOUIPath.insert(0,'/etc/aircrack-ng/airodump-ng-oui.txt')
-
-    def _validate(self):
-        """ validate entries """
-        # storage server
-        host = self._entHost.get()
-        if re.match(IPADDR,host) is None and host != 'localhost':
-            self.err("Invalid Input","Host {0} is not valid".format(host))
-            return False
-        port = self._entPort.get()
-        try:
-            port = int(port)
-            if port < 1024 or port > 65535: raise RuntimeError("")
-        except:
-            self.err("Invalid Input","Port must be a number between 1024 and 65535")
-            return False
-        if len(self._entDB.get()) < 1 or len(self._entDB.get()) > 15:
-            self.err("Invalid Input","DB name must be between 1 and 15 characters")
-            return False
-        if len(self._entUser.get()) < 1 or len(self._entUser.get()) > 15:
-            self.err("Invalid Input","User name must be between 1 and 15 characters")
-            return False
-        if len(self._entPWD.get()) < 1 or len(self._entPWD.get()) > 15:
-            self.err("Invalid Input","Password must be between 1 and 15 characters")
-            return False
-
-        # if not saving pcaps, we ignore pcap options
-        if self._vsave.get():
-            # for the pcap directory, convert to absolute path before checking existence
-            pPCAP = self._entPCAPPath.get()
-            if not os.path.isabs(pPCAP):
-                pPCAP = os.path.abspath(os.path.join('nidus',pPCAP))
-            if not os.path.exists(pPCAP):
-                self.err("Invalid Input",
-                         "PCAP directory {0} does not exist".format(pPCAP))
-                return False
-            try:
-                if int(self._entMaxSz.get()) < 1:
-                    self.err("Invalid Input","Max Size must be >= 1")
-                    return False
-            except ValueError:
-                self.err("Invalid Input","Max Size must be an integer")
-                return False
-            try:
-                if int(self._entMaxFiles.get()) < 1:
-                    self.err("Invalid Input","Max Files must be >= 1")
-                    return False
-            except ValueError:
-                self.err("Invalid Input","Max files must be an integer")
-                return False
-        try:
-            st = int(self._entNumStore.get())
-            if st < 1 or st > 10:
-                self.err("Invalid Input","Number of store threads must be between 1 and 10")
-                return False
-        except ValueError:
-            self.err("Invalid Input","Number of store threads must be an integer")
-            return False
-        try:
-            et = int(self._entNumExtract.get())
-            if et < 1 or et > 10:
-                self.err("Invalid Input","Number of extract threads must be between 1 and 10")
-                return False
-        except ValueError:
-            self.err("Invalid Input","Number of extract threads must be an integer")
-            return False
-        if not os.path.isfile(self._entOUIPath.get()):
-            self.err("Invalid Input",
-                     "OUI file {0} is invalid".format(self._entOUIPath.get()))
-            return False
-        return True
-
-    def _write(self):
-        """ write entry inputs to config file """
-        fout = None
-        try:
-            cp = ConfigParser.ConfigParser()
-            cp.add_section('SSE')
-            cp.set('SSE','save','yes' if self._vsave.get() else 'no')
-            cp.set('SSE','save_private','yes' if self._vpriv.get() else 'no')
-            cp.set('SSE','save_path',self._entPCAPPath.get())
-            cp.set('SSE','save_maxsize',self._entMaxSz.get())
-            cp.set('SSE','save_maxfiles',self._entMaxFiles.get())
-            cp.set('SSE','store_threads',self._entNumStore.get())
-            cp.set('SSE','extract_threads',self._entNumExtract.get())
-            cp.add_section('OUI')
-            cp.set('OUI','path',self._entOUIPath.get())
-            fout = open(wraith.NIDUSCONF,'w')
-            cp.write(fout)
-        except IOError as e:
-            self.err("File Error","Error <{0}> writing to config file".format(e))
-        except ConfigParser.Error as e:
-            self.err("Configuration Error",
-                     "Error <{0}> writing to config file".format(e))
-        else:
-            self.info('Success',"Changes will take effect on next start")
-        finally:
-            if fout: fout.close()
 
 # Iyri->Config
 class IyriConfigException(Exception): pass
@@ -1826,7 +1587,7 @@ class IyriConfigPanel(gui.ConfigPanel):
         elif not nic in iwt.wifaces():
             self.warn("Not Found","Recon radio may not be wireless")
         spoof = self._entReconSpoof.get().upper()
-        if spoof and re.match(MACADDR,spoof) is None:
+        if spoof and not valrep.validhwaddr(spoof):
             self.err("Invalid Recon Input","Spoofed MAC addr %s is not valid")
             return False
 
@@ -1888,8 +1649,8 @@ class IyriConfigPanel(gui.ConfigPanel):
             self.err("Invalid Recon Input",e)
             return False
         try:
-            parsechlist(self._entReconScanScan.get(),'scan')
-            parsechlist(self._entReconScanPass.get(),'pass')
+            valrep.channellist(self._entReconScanScan.get(),'scan')
+            valrep.channellist(self._entReconScanPass.get(),'pass')
         except ValueError as e:
             self.err("Invalid Recon Input",e)
             return False
@@ -1899,7 +1660,7 @@ class IyriConfigPanel(gui.ConfigPanel):
         if nic:
             if not nic in iwt.wifaces(): self.warn("Not Found","Radio may not be wireless")
             spoof = self._entSurveilSpoof.get().upper()
-            if spoof and re.match(MACADDR,spoof) is None:
+            if spoof and not valrep.validhwaddr(spoof):
                 self.err("Invalid Surveillance Input","Spoofed MAC address is not valid")
                 return False
 
@@ -1962,8 +1723,8 @@ class IyriConfigPanel(gui.ConfigPanel):
                 self.err("Invalid Surveillance Input",e)
                 return False
             try:
-                parsechlist(self._entSurveilScanScan.get(),'scan')
-                parsechlist(self._entSurveilScanPass.get(),'pass')
+                valrep.channellist(self._entSurveilScanScan.get(),'scan')
+                valrep.channellist(self._entSurveilScanPass.get(),'pass')
             except ValueError as e:
                 self.err("Invalid Surveillance Input",e)
                 return False
@@ -1998,7 +1759,7 @@ class IyriConfigPanel(gui.ConfigPanel):
             except:
                 self.err("Invalid GPS Input","Device port must be a number between 1024 and 65535")
                 return False
-            if re.match(GPSDID,self._entDevID.get().upper()) is None:
+            if not valrep.validgpsdid(self._entDevID.get().upper()):
                 self.err("Invalid GPS Input","GPS Dev ID is invalid")
                 return False
             try:
@@ -2015,7 +1776,7 @@ class IyriConfigPanel(gui.ConfigPanel):
 
         # misc entries
         host = self._entStoreHost.get()
-        if re.match(IPADDR,host) is None and host != 'localhost':
+        if not valrep.validaddr(host):
             self.err("Invalid Storage Input","Host is not a valid address")
         port = self._entStorePort.get()
         try:

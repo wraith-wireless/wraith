@@ -2,6 +2,7 @@ Overall:
   2) add program to extract saved frames from db and write to a pcap file
    o initially write in bulk but add filters etc to all allow user to specify
     what frames they want to write
+  3) add relevant __all__ to init files
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
@@ -53,6 +54,11 @@ Iyri:
    not to mention when used with the shama radio as well
  70) handle IOError/EOFError in Collator better - if there is an error in the
    Pipe we need to be able to kill the correpsonding Thresher through a signal
+ 80) iyrid needs to handle stop better
+  o iyrid removes pid and reports status as 'is not running' while it is still
+   processing outstanding frames
+  o when run as service, logging is also stopped shortly after calling 'stop'
+   - artifact of calling as a service?
 Wifi:
   1) Should we add support for AVS, Prism headers ?
   2) radiotap: ensure data pad is handled for atheros cards (any others?)

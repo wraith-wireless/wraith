@@ -23,7 +23,7 @@ do_start() {
     log_daemon_msg "Starting $DAEMON_NAME"
     start-stop-daemon --start --background --pidfile $PIDFILE --make-pid --startas $DAEMON
     # sleep, giving time for iyri to succeed/fail
-    sleep 2
+    sleep 3
     log_end_msg $?
 }
 
