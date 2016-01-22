@@ -28,7 +28,6 @@ def runningprocess(process):
 def runningservice(pidfile):
     """
      determines if the service referenced by pidfile is running.
-      NOTE: only checks if pidfile exists
      :param pidfile: path of pid in file
      :returns: process is running
     """

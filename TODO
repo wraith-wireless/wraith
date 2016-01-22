@@ -3,6 +3,8 @@ Overall:
    o initially write in bulk but add filters etc to all allow user to specify
     what frames they want to write
   3) add relevant __all__ to init files
+  4) add a program that will kill all iyri related processes (in the event of
+   unresponsive children)
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work
