@@ -34,6 +34,9 @@ GUI:
      something
  36) add wildcards to some fields in query i.e. mac address allow search on vendor
      with 00:01:02.*
+ 37) move wraith.log to /var/log/wraith
+ 38) Poll periodically to check if external process/user started/stopped postgresql
+   and iyri
 Iyri:
  26) how to identify gps device failure, removal?
  53) implement spoof, txpwr commands

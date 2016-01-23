@@ -20,7 +20,7 @@ def parseoui(path=None):
     """
      parse oui.txt file
      :param path: path of oui text file
-     :returns: oui dict {oui:manuf} for each oui in path
+     :returns: oui dict {oui:manuf} for each oui in path or empty dict
     """
     fin = None
     ouis = {}

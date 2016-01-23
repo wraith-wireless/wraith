@@ -695,6 +695,7 @@ if __name__ == '__main__':
     try:
         sensor = Iryi()
         sensor.run()
+        logging.info("Iyri exited")
     except IryiConfException as e:
         logging.error("Configuration Error: %s",e)
     except IryiParamException as e:

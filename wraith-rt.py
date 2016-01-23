@@ -15,7 +15,6 @@ import os                                  # file info etc
 import sys                                 # for exit
 import time                                # sleeping, timestamps
 import psycopg2 as psql                    # postgresql api
-#import psycopg2.extras as pextras          # cursors and such
 import Tkinter as tk                       # gui constructs
 import ttk                                 # ttk widgets
 from PIL import Image,ImageTk              # image input & support
@@ -31,7 +30,11 @@ from wraith.utils import cmdline           # command line stuff
 # server/services functions shared by splash and main panel
 
 def startpsql(pwd):
-    """ start postgresl server. pwd: the sudo password """
+    """
+     start postgresl server. pwd: the sudo password
+     :param pwd: sudo password
+     :returns: whether postgresql started or not
+    """
     try:
         cmdline.service('postgresql',pwd)
         time.sleep(0.5)
@@ -42,7 +45,11 @@ def startpsql(pwd):
         return True
 
 def stoppsql(pwd):
-    """ shut down posgresql. pwd: the sudo password """
+    """
+     shut down posgresql. pwd: the sudo password
+     :param pwd: sudo password
+     :returns: whether postgresql stopped or not
+    """
     try:
         cmdline.service('postgresql',pwd,False)
         while cmdline.runningprocess('postgres'): time.sleep(0.5)
@@ -52,9 +59,13 @@ def stoppsql(pwd):
         return True
 
 def startiyri(pwd):
-    """ start Iyri sensor. pwd: the sudo password """
+    """
+     start Iyri sensor.
+     :param pwd: sudo password
+     :returns: whether iyri started or not
+    """
     try:
-        cmdline.service('Iyrid',pwd)
+        cmdline.service('iyrid',pwd)
         time.sleep(1.0)
         if not cmdline.runningservice(wraith.IYRIPID): raise RuntimeError
     except RuntimeError:
@@ -62,10 +73,14 @@ def startiyri(pwd):
     else:
         return True
 
-def stopIyri(pwd):
-    """ stop Iyri sensor. pwd: Sudo password """
+def stopiyri(pwd):
+    """
+     stop Iyri sensor. pwd: Sudo password
+     :param pwd: sudo password
+     :returns: whether iyri stopped or not
+    """
     try:
-        cmdline.service('Iyrid',pwd,False)
+        cmdline.service('iyrid',pwd,False)
         while cmdline.runningservice(wraith.IYRIPID): time.sleep(1.0)
     except RuntimeError as e:
         return False
@@ -107,7 +122,7 @@ _STATE_STORE_  = 1
 _STATE_CONN_   = 2
 _STATE_IYRI_   = 3
 _STATE_EXIT_   = 4
-_STATE_FLAGS_NAME_ = ['init','store','conn','Iyri','exit']
+_STATE_FLAGS_NAME_ = ['init','store','conn','iyri','exit']
 _STATE_FLAGS_ = {'init':(1 << _STATE_INIT_),   # initialized properly
                  'store':(1 << _STATE_STORE_), # storage instance is running (i.e. postgresql)
                  'conn':(1 << _STATE_CONN_),   # connected to storage instance
@@ -147,7 +162,7 @@ class WraithPanel(gui.MasterPanel):
     def isconnected(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['conn']
 
     @property # return {True: Iyri is running|False: Iyri is not running|
-    def Iyriisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['Iyri']
+    def iyriisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['iyri']
 
     @property # return {True: Wraith is exiting|False: Wraith is not exiting}
     def isexiting(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['exit']
@@ -280,33 +295,28 @@ class WraithPanel(gui.MasterPanel):
 
         # Storage Menu
         self._mnuStorage = tk.Menu(self._menubar,tearoff=0)
-        self._mnuStorage.add_command(label="Start All",command=self.storagestart)  # 0
-        self._mnuStorage.add_command(label="Stop All",command=self.storagestop)    # 1
-        self._mnuStorage.add_separator()                                           # 2
-        self._mnuStoragePSQL = tk.Menu(self._mnuStorage,tearoff=0)
-        self._mnuStoragePSQL.add_command(label='Start',command=self.psqlstart)       # 0
-        self._mnuStoragePSQL.add_command(label='Stop',command=self.psqlstop)         # 1
-        self._mnuStoragePSQL.add_separator()                                         # 2
-        self._mnuStoragePSQL.add_command(label='Connect',command=self.connect)       # 3
-        self._mnuStoragePSQL.add_command(label='Disconnect',command=self.disconnect) # 4
-        self._mnuStoragePSQL.add_separator()                                         # 5
-        self._mnuStoragePSQL.add_command(label='Fix',command=self.psqlfix)           # 6
-        self._mnuStoragePSQL.add_command(label='Delete All',command=self.psqldelall) # 7
-        self._mnuStorage.add_cascade(label='PostgreSQL',menu=self._mnuStoragePSQL)  # 3
+        self._mnuStorage.add_command(label='Start',command=self.psqlstart)       # 0
+        self._mnuStorage.add_command(label='Stop',command=self.psqlstop)         # 1
+        self._mnuStorage.add_separator()                                         # 2
+        self._mnuStorage.add_command(label='Connect',command=self.connect)       # 3
+        self._mnuStorage.add_command(label='Disconnect',command=self.disconnect) # 4
+        self._mnuStorage.add_separator()                                         # 5
+        self._mnuStorage.add_command(label='Fix',command=self.psqlfix)           # 6
+        self._mnuStorage.add_command(label='Delete All',command=self.psqldelall) # 7
 
         # Iyri Menu
         self._mnuIyri = tk.Menu(self._menubar,tearoff=0)
-        self._mnuIyri.add_command(label='Start',command=self.Iyristart)   # 0
-        self._mnuIyri.add_command(label='Stop',command=self.Iyristop)     # 1
+        self._mnuIyri.add_command(label='Start',command=self.iyristart)   # 0
+        self._mnuIyri.add_command(label='Stop',command=self.iyristop)     # 1
         self._mnuIyri.add_separator()                                      # 2
-        self._mnuIyri.add_command(label='Control',command=self.Iyrictrl)  # 3
+        self._mnuIyri.add_command(label='Control',command=self.iyrictrl)  # 3
         self._mnuIyri.add_separator()                                      # 4
         self._mnuIyriLog = tk.Menu(self._mnuIyri,tearoff=0)
-        self._mnuIyriLog.add_command(label='View',command=self.viewIyrilog)   # 0
-        self._mnuIyriLog.add_command(label='Clear',command=self.clearIyrilog) # 1
+        self._mnuIyriLog.add_command(label='View',command=self.viewiyrilog)   # 0
+        self._mnuIyriLog.add_command(label='Clear',command=self.cleariyrilog) # 1
         self._mnuIyri.add_cascade(label='Log',menu=self._mnuIyriLog)       # 5
         self._mnuIyri.add_separator()                                      # 6
-        self._mnuIyri.add_command(label='Config',command=self.configIyri) # 7
+        self._mnuIyri.add_command(label='Config',command=self.configiyri) # 7
 
         # Help Menu
         self._mnuHelp = tk.Menu(self._menubar,tearoff=0)
@@ -322,14 +332,17 @@ class WraithPanel(gui.MasterPanel):
         self._menubar.add_cascade(label='Help',menu=self._mnuHelp)
 
     def showpanel(self,desc):
-        """ opens a panel of type desc """
+        """
+         opens a panel of type desc
+         :param desc: string name of panel to open
+        """
         if desc == 'log': self.viewlog()
         elif desc == 'databin': self.viewdatabins()
         elif desc == 'interfaces': self.viewinterfaces()
         elif desc == 'sessions': self.viewsessions()
         elif desc == 'preferences': self.configwraith()
-        elif desc == 'Iyrilog': self.viewIyrilog()
-        elif desc == 'Iyriprefs': self.configIyri()
+        elif desc == 'iyrilog': self.viewiyrilog()
+        elif desc == 'iyriprefs': self.configiyri()
         elif desc == 'about': self.about()
         else: raise RuntimeError, "WTF Cannot open {0}".format(desc)
 
@@ -362,7 +375,10 @@ class WraithPanel(gui.MasterPanel):
             panel[0].tk.lift()
 
     def calc(self,key):
-        """ calculate the function defined by key in the _CALCS_ dict"""
+        """
+         calculate the function defined by key in the CALCS dict
+         :param key: key of the function to display
+        """
         panel = self.getpanels('{0}calc'.format(key))
         if not panel:
             t = tk.Toplevel()
@@ -472,7 +488,7 @@ class WraithPanel(gui.MasterPanel):
         """ starts postgresql """
         # should not be enabled if postgresql is not running, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store'] and not flags['Iyri']:
+        if flags['store'] and not flags['iyri']:
             # do we have a password
             if not self._pwd:
                 pwd = self._getpwd()
@@ -496,7 +512,7 @@ class WraithPanel(gui.MasterPanel):
         # should not be enabled unless postgres is running, we are connected
         # and no sensors are running
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store'] and flags['conn'] and not flags['Iyri']:
+        if flags['store'] and flags['conn'] and not flags['iyri']:
             curs = None
             try:
                 self.logwrite("Fixing null-ended records in database...",gui.LOG_NOTE)
@@ -517,7 +533,7 @@ class WraithPanel(gui.MasterPanel):
         # should not be enabled unless postgres is running, we are connected
         # and a sensor is not running, but check anyway
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store'] and flags['conn'] and not flags['Iyri']:
+        if flags['store'] and flags['conn'] and not flags['iyri']:
             ans = self.ask('Delete Records','Delete all DB records?')
             self.update()
             if ans == 'no': return
@@ -538,34 +554,34 @@ class WraithPanel(gui.MasterPanel):
 
 #### Iyri Menu
 
-    def Iyristart(self):
+    def iyristart(self):
         """ starts Iyri sensor """
         self._startsensor()
         self._updatestate()
         self._menuenable()
 
-    def Iyristop(self):
+    def iyristop(self):
         """ stops Iyri sensor """
         self._stopsensor()
         self._updatestate()
         self._menuenable()
 
-    def Iyrictrl(self):
+    def iyrictrl(self):
         """ displays Iyri Control Panel """
         self.unimplemented()
 
-    def viewIyrilog(self):
+    def viewiyrilog(self):
         """ display Iyri log """
-        panel = self.getpanels('Iyrilog',False)
+        panel = self.getpanels('iyrilog',False)
         if not panel:
             t = tk.Toplevel()
             pnl = gui.TailLogPanel(t,self,"Iyri Log",200,wraith.IYRILOG,50)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'Iyrilog'))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'iyrilog'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
 
-    def clearIyrilog(self):
+    def cleariyrilog(self):
         """ clears the Iyri log """
         # prompt first
         finfo = os.stat(wraith.IYRILOG)
@@ -574,16 +590,16 @@ class WraithPanel(gui.MasterPanel):
             self.update()
             if ans == 'no': return
             with open(wraith.IYRILOG,'w'): pass
-            lv = self.getpanel('Iyrilog')
+            lv = self.getpanel('iyrilog')
             if lv: lv.reset()
 
-    def configIyri(self):
+    def configiyri(self):
         """ display Iyri config file preference editor """
-        panel = self.getpanels('Iyriprefs',False)
+        panel = self.getpanels('iyriprefs',False)
         if not panel:
             t = tk.Toplevel()
             pnl = subgui.IyriConfigPanel(t,self)
-            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'Iyriprefs'))
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'iyriprefs'))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()
@@ -642,7 +658,7 @@ class WraithPanel(gui.MasterPanel):
                                              _STATE_FLAGS_NAME_[f])
 
     def _menuenable(self):
-        """ enable/disable menus as necessary """
+        """ enable/disable menus as determined by the current state """
         # get all flags
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
 
@@ -650,47 +666,37 @@ class WraithPanel(gui.MasterPanel):
         if flags['conn']: self._mnuData.entryconfig(4,state=tk.NORMAL)
         else: self._mnuData.entryconfig(4,state=tk.DISABLED)
 
-        # start all
-        if flags['store'] and flags['iyri']:
-            self._mnuData.entryconfig(4,state=tk.DISABLED)
-        else: self._mnuData.entryconfig(4,state=tk.NORMAL)
-
-        # stop all
-        if not flags['store'] and not flags['iyri']:
-            self._mnuStorage.entryconfig(1,state=tk.DISABLED)
-        else: self._mnuStorage.entryconfig(1,state=tk.NORMAL)
-
         # start/stop postgres
         if flags['store']:
             # disable start, enable stop (if Iyri is not running)
-            self._mnuStoragePSQL.entryconfig(0,state=tk.DISABLED)
-            if not flags['Iyri']: self._mnuStoragePSQL.entryconfig(1,state=tk.NORMAL)
+            self._mnuStorage.entryconfig(0,state=tk.DISABLED)
+            if not flags['iyri']: self._mnuStorage.entryconfig(1,state=tk.NORMAL)
         else:
             # enable start and disable stop
-            self._mnuStoragePSQL.entryconfig(0,state=tk.NORMAL)
-            self._mnuStoragePSQL.entryconfig(1,state=tk.DISABLED)
+            self._mnuStorage.entryconfig(0,state=tk.NORMAL)
+            self._mnuStorage.entryconfig(1,state=tk.DISABLED)
 
         # connect/disconnect 2 postgres
         if flags['conn']:
             # disable connect and enable disconnect
-            self._mnuStoragePSQL.entryconfig(3,state=tk.DISABLED)
-            self._mnuStoragePSQL.entryconfig(4,state=tk.NORMAL)
+            self._mnuStorage.entryconfig(3,state=tk.DISABLED)
+            self._mnuStorage.entryconfig(4,state=tk.NORMAL)
         else:
             # enable connect and disable disconnect
-            self._mnuStoragePSQL.entryconfig(3,state=tk.NORMAL)
-            self._mnuStoragePSQL.entryconfig(4,state=tk.DISABLED)
+            self._mnuStorage.entryconfig(3,state=tk.NORMAL)
+            self._mnuStorage.entryconfig(4,state=tk.DISABLED)
 
         # fix db and delete all (only allowed if connected and Iyri is not running)
         if flags['conn']:
-            if flags['Iyri']:
-                self._mnuStoragePSQL.entryconfig(6,state=tk.DISABLED)
-                self._mnuStoragePSQL.entryconfig(7,state=tk.DISABLED)
+            if flags['iyri']:
+                self._mnuStorage.entryconfig(6,state=tk.DISABLED)
+                self._mnuStorage.entryconfig(7,state=tk.DISABLED)
             else:
-                self._mnuStoragePSQL.entryconfig(6,state=tk.NORMAL)
-                self._mnuStoragePSQL.entryconfig(7,state=tk.NORMAL)
+                self._mnuStorage.entryconfig(6,state=tk.NORMAL)
+                self._mnuStorage.entryconfig(7,state=tk.NORMAL)
         else:
-            self._mnuStoragePSQL.entryconfig(6,state=tk.DISABLED)
-            self._mnuStoragePSQL.entryconfig(7,state=tk.DISABLED)
+            self._mnuStorage.entryconfig(6,state=tk.DISABLED)
+            self._mnuStorage.entryconfig(7,state=tk.DISABLED)
 
         # Iyri
         if not flags['store']:
@@ -701,7 +707,7 @@ class WraithPanel(gui.MasterPanel):
             self._mnuIyriLog.entryconfig(1,state=tk.NORMAL) # clear log
             self._mnuIyri.entryconfig(7,state=tk.NORMAL)    # configure
         else:
-            if flags['Iyri']:
+            if flags['iyri']:
                 # Iyri sensor is running
                 self._mnuIyri.entryconfig(0,state=tk.DISABLED)    # start
                 self._mnuIyri.entryconfig(1,state=tk.NORMAL)      # stop
@@ -754,7 +760,7 @@ class WraithPanel(gui.MasterPanel):
         """ stop posgresql db, nidus storage manager & disconnect """
         # if Iyri is running, prompt for clearance
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['Iyri']:
+        if flags['iyri']:
             ans = self.ask('Iyri Running','Quit and lose queued data?')
             self.update()
             if ans == 'no': return
@@ -799,7 +805,7 @@ class WraithPanel(gui.MasterPanel):
     def _startsensor(self):
         """ starts the Iyri sensor """
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store'] and not flags['Iyri']:
+        if flags['store'] and not flags['iyri']:
             # do we have a password
             if not self._pwd:
                 pwd = self._getpwd()
@@ -824,7 +830,7 @@ class WraithPanel(gui.MasterPanel):
     def _stopsensor(self):
         """ stops the Iyri sensor """
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['Iyri']:
+        if flags['iyri']:
             # do we have a password
             if not self._pwd:
                 pwd = self._getpwd()
@@ -837,7 +843,7 @@ class WraithPanel(gui.MasterPanel):
             # stop the sensor
             try:
                 self.logwrite("Shutting down Iyri...",gui.LOG_NOTE)
-                cmdline.service('Iyrid',self._pwd,False)
+                cmdline.service('iyrid',self._pwd,False)
             except RuntimeError as e:
                 self.logwrite("Error shutting down Iyri: {0}".format(e),gui.LOG_ERR)
             else:
@@ -911,7 +917,7 @@ class WraithSplash(object):
         else:
             if not self._bconfig: self._chkconfig()
             elif not self._bpsql: self._chkpsql()
-            else: self._chkIyri()
+            else: self._chkiyri()
             self._tl.after(1000,self._busy)
 
     def _chkconfig(self):
@@ -936,7 +942,7 @@ class WraithSplash(object):
         self._bpsql = True
         self._pb.step(2.0)
 
-    def _chkIyri(self):
+    def _chkiyri(self):
         self._sv.set("Checking Iyri...")
         self._pb.step(2.0)
         if not cmdline.runningservice(wraith.IYRIPID):
@@ -986,7 +992,7 @@ if __name__ == '__main__':
         # stop Iyri, then Nidus, then PostgreSQL
         sd = sn = sp = True
         if cmdline.runningservice(wraith.IYRIPID):
-            ret = 'ok' if stopIyri(pwd) else 'fail'
+            ret = 'ok' if stopiyri(pwd) else 'fail'
             print "Stopping Iyri\t\t\t\t[{0}]".format(ret)
         else: print "Iyri not running"
         if cmdline.runningprocess('postgres') and not exclude:

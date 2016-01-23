@@ -3,8 +3,8 @@
 
 __name__ = 'subpanels'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.3'
-__revdate__ = 'May 2015'
+__version__ = '0.0.5'
+__revdate__ = 'January 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -29,7 +29,6 @@ from wraith.utils import timestamps    # valid data/time
 from wraith.utils import landnav       # lang nav utilities
 from wraith.utils import cmdline       # cmdline functionality
 from wraith.utils import valrep        # validity checks
-
 
 # Some constants
 COPY = u"\N{COPYRIGHT SIGN}"
@@ -366,15 +365,22 @@ class CalculatePanel(gui.SimplePanel):
         formula = self._formula
         # make sure no entries are empty substituting the value of the entry as
         # we go
-        # TODO use enumerate here
-        for i in xrange(len(self._entries)):
-            if self._entries[i].get():
+        for i,entry in enumerate(self._entries):
+            if entry.get():
                 formula = formula.replace('${0}'.format(i),
                                           "{0}('{1}')".format((self._inputs[i][2],
-                                                               self._entries[i].get())))
+                                                               entry.get())))
             else:
                 self.err('Error',"All entries must be filled in")
                 return
+        #for i in xrange(len(self._entries)):
+        #    if self._entries[i].get():
+        #        formula = formula.replace('${0}'.format(i),
+        #                                  "{0}('{1}')".format((self._inputs[i][2],
+        #                                                       self._entries[i].get())))
+        #    else:
+        #        self.err('Error',"All entries must be filled in")
+        #        return
 
         # attempt to calculate
         try:
@@ -391,7 +397,9 @@ class CalculatePanel(gui.SimplePanel):
         self._ans.set('')
 
 class InterfacePanel(gui.PollingTabularPanel):
-    """ a singular panel which display information pertaining to the "program" """
+    """
+     a singular panel which display information pertaining to available wireless nics
+    """
     def __init__(self,tl,chief):
         gui.PollingTabularPanel.__init__(self,tl,chief,"Interfaces",5,
                                          [('PHY',gui.lenpix(6),str),
@@ -480,12 +488,18 @@ class DatabinPanel(gui.SimplePanel):
         self._bins[b]['btn'].bind('<Button-3>',self.binrc)
 
     def notifyclose(self,name):
-        """ close the associated bin's cursor """
+        """
+         close the associated bin's cursor
+         :param name: name of bin to close
+        """
         self._curs[name].close()
         gui.SimplePanel.notifyclose(self,name)
 
     def viewquery(self,b):
-        """ shows query panel for bin b """
+        """
+         shows query panel for bin b
+         :param b: the data bin
+        """
         # notify user if not connected to database
         if not self._chief.isconnected:
             self.warn("Disconnected","Connect and try again")
@@ -501,7 +515,10 @@ class DatabinPanel(gui.SimplePanel):
             panel[0].tk.lift()
 
     def binrc(self,event):
-        """ on right click, show context menu for this button """
+        """
+         on right click, show context menu for this button
+         :param event: required parameter from tk/ttk
+        """
         # determine which bin
         #bin = None
         #for b in self._bins:
@@ -602,10 +619,9 @@ class QueryPanel(gui.SlavePanel):
         hdrs = ['ID','Host','Start','Frames']
         hdrlens = [gui.lenpix(3),gui.lenpix(4),gui.lenpix(13),gui.lenpix(6)]
         self._trSess['columns'] = hdrs
-        # TODO use enumerate here
-        for i in xrange(len(hdrs)):
+        for i,hdr in enumerate(hdrs):
             self._trSess.column(i,width=hdrlens[i],anchor=tk.CENTER)
-            self._trSess.heading(i,text=hdrs[i])
+            self._trSess.heading(i,text=hdr)
         self._getsessions()
         # enable ctrl-a (select all) on the tree
         self._trSess.bind('<Control-a>',self.trsessca)
@@ -633,10 +649,9 @@ class QueryPanel(gui.SlavePanel):
         frmFO.grid(row=1,column=0,sticky='nwse')
         filters = ['Sensor','Signal','Traffic']
         self._vfilteron = []
-        # TODO: use enumerate here
-        for i in xrange(3):
+        for i,f in enumerate(filters):
             self._vfilteron.append(tk.IntVar())
-            ttk.Checkbutton(frmFO,text=filters[i],variable=self._vfilteron[i]).grid(row=0,column=i,sticky='w')
+            ttk.Checkbutton(frmFO,text=f,variable=self._vfilteron[i]).grid(row=0,column=i,sticky='w')
 
         # progress frame
         frmP = ttk.Frame(frmR)
@@ -698,9 +713,9 @@ class QueryPanel(gui.SlavePanel):
         self._vnotdriver = tk.IntVar()
         ttk.Checkbutton(frmSL,variable=self._vnotdriver).grid(row=6,column=2,sticky='w')
         self._vrecon = tk.IntVar()
-        ttk.Checkbutton(frmSL,text='Recon',variable=self._vrecon).grid(row=1,column=3,sticky='w')
+        ttk.Checkbutton(frmSL,text='Abad',variable=self._vrecon).grid(row=1,column=3,sticky='w')
         self._vcoll = tk.IntVar()
-        ttk.Checkbutton(frmSL,text='Surveillance',variable=self._vcoll).grid(row=2,column=3,sticky='w')
+        ttk.Checkbutton(frmSL,text='Shama',variable=self._vcoll).grid(row=2,column=3,sticky='w')
         frmSRL = ttk.LabelFrame(frmSR,text='Location')
         frmSRL.grid(row=0,column=1,sticky='nwse')
         ttk.Label(frmSRL,text='Center PT: ').grid(row=1,column=5,sticky='w')
@@ -739,10 +754,9 @@ class QueryPanel(gui.SlavePanel):
         frmSigFlags = ttk.LabelFrame(frmSig,text='Flags')
         frmSigFlags.grid(row=1,column=0,sticky='nwse')
         self._vrtflags = []
-        # TODO use enumerate here
-        for i in xrange(len(RT_FLAGS)):
+        for i,RT_FLAG in enumerate(RT_FLAGS):
             self._vrtflags.append(tk.IntVar())
-            chk = ttk.Checkbutton(frmSigFlags,text=RT_FLAGS[i],variable=self._vrtflags[i])
+            chk = ttk.Checkbutton(frmSigFlags,text=RT_FLAG,variable=self._vrtflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
         ttk.Separator(frmSigFlags,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=2,sticky='ns')
         self._vandorrtflags = tk.IntVar()
@@ -751,10 +765,9 @@ class QueryPanel(gui.SlavePanel):
         frmSigChFlags = ttk.LabelFrame(frmSig,text="Channel Flags")
         frmSigChFlags.grid(row=2,column=0,sticky='nwse')
         self._vchflags = []
-        # TODO use enumerate here
-        for i in xrange(len(CH_FLAGS)):
+        for i,CH_FLAG in enumerate(CH_FLAGS):
             self._vchflags.append(tk.IntVar())
-            chk = ttk.Checkbutton(frmSigChFlags,text=CH_FLAGS[i],variable=self._vchflags[i])
+            chk = ttk.Checkbutton(frmSigChFlags,text=CH_FLAG,variable=self._vchflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
         ttk.Separator(frmSigChFlags,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=2,sticky='ns')
         self.vandorchflags = tk.IntVar()
@@ -773,7 +786,6 @@ class QueryPanel(gui.SlavePanel):
         frmSigHTBW.grid(row=1,column=0,sticky='nwse')
         ttk.Label(frmSigHTBW,text='BW: ').grid(row=0,column=0,sticky='nwse')
         self._vbws = []
-        # TODO use enumerate here
         for i in xrange(len(BW_FLAGS)):
             self._vbws.append(tk.IntVar())
             chk = ttk.Checkbutton(frmSigHTBW,text=BW_FLAGS[i],variable=self._vbws[i])
@@ -833,10 +845,9 @@ class QueryPanel(gui.SlavePanel):
         frmRFC = ttk.LabelFrame(frmR,text="Frame Control Frames")
         frmRFC.grid(row=0,column=0,sticky='nwse')
         self._vfcflags = []
-        # TODO use enumerate here
-        for i in xrange(len(FC_FLAGS)):
+        for i,FC_FLAG in enumerate(FC_FLAGS):
             self._vfcflags.append(tk.IntVar())
-            chk = ttk.Checkbutton(frmRFC,text=FC_FLAGS[i],variable=self._vfcflags[i])
+            chk = ttk.Checkbutton(frmRFC,text=FC_FLAG,variable=self._vfcflags[i])
             chk.grid(row=(i / 4),column=(i % 4),sticky='w')
         ttk.Separator(frmRFC,orient=tk.VERTICAL).grid(row=0,column=4,rowspan=2,sticky='ns')
         self.vandorfcflags = tk.IntVar()
@@ -857,7 +868,6 @@ class QueryPanel(gui.SlavePanel):
         frmRAL = ttk.Frame(frmRA,border=0)
         frmRAL.grid(row=2,column=1,columnspan=3)
         self._vlimitto = []
-        # TODO should we use enumerate here
         for i in xrange(4):
             self._vlimitto.append(tk.IntVar())
             chk = ttk.Checkbutton(frmRAL,
@@ -886,7 +896,10 @@ class QueryPanel(gui.SlavePanel):
 
     # bindings
     def trsessca(self,event):
-        """ sessions tree ctrl-a -> selects all """
+        """
+         sessions tree ctrl-a -> selects all
+         :param event: required param of tk/ttk
+        """
         self._trSess.selection_set(self._trSess.get_children(''))
 
     # virtual implementations
@@ -1148,8 +1161,8 @@ class SessionsPanel(gui.DBPollingTabularPanel):
                                           ('Start',gui.lenpix(13),str),
                                           ('Stop',gui.lenpix(13),str),
                                           ('GPSD',gui.lenpix(8),str),
-                                          ('Recon',gui.lenpix(12),str),
-                                          ('Surveillance',gui.lenpix(12),str),
+                                          ('Abad',gui.lenpix(12),str),
+                                          ('Shama',gui.lenpix(12),str),
                                           ('Frames',gui.lenpix(6),int)],
                                          "widgets/icons/sessions.png",False)
 
@@ -1167,8 +1180,7 @@ class SessionsPanel(gui.DBPollingTabularPanel):
             self.logwrite("Sessions failed: {0}".format(e),gui.LOG_NOERR)
             return
 
-        # TODO: could this get extremely large?
-        #       use difference (ls,sids) to remove items no longer in the table
+        # use difference (ls,sids) to remove items no longer in the table
         ss = self._curs.fetchall()            # get all rows
         ls = self._tree.get_children()        # & all ids from tree
 
@@ -1185,8 +1197,8 @@ class SessionsPanel(gui.DBPollingTabularPanel):
             stop = s['stop'].strftime("%d/%m/%y %H:%M:%S") if s['stop'] else ''
             kern = s['kernel'].replace('-generic','') # save some space
             devid = s['devid']
-            recon = s['recon']
-            surveil = s['surveillance']
+            abad = s['abad']
+            shama = s['shama']
             nF = s['fcnt']
             if sid in ls: # session is present
                 # check for changes (id and start are not checked0
@@ -1195,15 +1207,18 @@ class SessionsPanel(gui.DBPollingTabularPanel):
                 if cur['Kernel'] != kern: self._tree.set(sid,'Kernel',kern)
                 if cur['Stop'] != stop: self._tree.set(sid,'Stop',stop)
                 if cur['GPSD'] != devid: self._tree.set(sid,'GPSD',devid)
-                if cur['Recon'] != recon: self._tree.set(sid,'Recon',recon)
-                if cur['Surveillance'] != surveil: self._tree.set(sid,'Surveillance',surveil)
+                if cur['Abad'] != abad: self._tree.set(sid,'Abad',abad)
+                if cur['Shama'] != shama: self._tree.set(sid,'Shama',shama)
                 if cur['Frames'] != nF: self._tree.set(sid,'Frames',nF)
             else:         # session not present
                 self._tree.insert('','end',iid=sid,values=(sid,host,kern,start,stop,
-                                                           devid,recon,surveil,nF))
+                                                           devid,abad,shama,nF))
 
     def treerc(self,event):
-        """ show delete context menu for the specified item """
+        """
+         show delete context menu for the specified item
+         :param event: require param from tk/ttk
+        """
         # get selected item(s) and item where right click occurred
         # if right click occurred outside selected items, select it
         sids = self._tree.selection()
@@ -1228,8 +1243,12 @@ class SessionsPanel(gui.DBPollingTabularPanel):
         self.setbusy()
         self.dkp(sids)
         self.setbusy(False)
+
     def dkp(self,sids=None):
-        """ delete specified entry(s) """
+        """
+         delete specified entry(s)
+         :param sids: list of sids to delete
+        """
         sql = "delete from sensor where session_id = %s;"
         if sids is None: sids = self._tree.selection()
 
@@ -1282,115 +1301,119 @@ class IyriConfigPanel(gui.ConfigPanel):
         nb = ttk.Notebook(frm)
         nb.grid(row=0,column=0,sticky='nwse')
 
-        # Recon Tab Configuration
-        frmR = ttk.Frame(nb)
-        ttk.Label(frmR,text='NIC: ').grid(row=0,column=0,sticky='nw')
-        self._entReconNic = ttk.Entry(frmR,width=5)
-        self._entReconNic.grid(row=0,column=1,sticky='nw')
-        ttk.Label(frmR,text=' ').grid(row=0,column=2,sticky='w')
-        ttk.Label(frmR,text='Spoof: ').grid(row=0,column=3,sticky='nw')
-        self._entReconSpoof = ttk.Entry(frmR,width=17)
-        self._entReconSpoof.grid(row=0,column=4,sticky='nw')
-        ttk.Label(frmR,text='Desc: ').grid(row=1,column=0,sticky='nw')
-        self._entReconDesc = tk.Text(frmR,width=42,height=3)
-        self._entReconDesc.grid(row=1,column=1,columnspan=4,sticky='e')
+        # Abad Tab Configuration
+        frmA = ttk.Frame(nb)
+        ttk.Label(frmA,text='NIC: ').grid(row=0,column=0,sticky='nw')
+        self._entAbadNic = ttk.Entry(frmA,width=5)
+        self._entAbadNic.grid(row=0,column=1,sticky='nw')
+        ttk.Label(frmA,text=' ').grid(row=0,column=2,sticky='w')
+        ttk.Label(frmA,text='Spoof: ').grid(row=0,column=3,sticky='nw')
+        self._entAbadSpoof = ttk.Entry(frmA,width=17)
+        self._entAbadSpoof.grid(row=0,column=4,sticky='nw')
+        ttk.Label(frmA,text='Desc: ').grid(row=1,column=0,sticky='nw')
+        self._entAbadDesc = tk.Text(frmA,width=42,height=3)
+        self._entAbadDesc.grid(row=1,column=1,columnspan=4,sticky='e')
 
         # ANTENNA SUB SECTION
-        frmRA = ttk.LabelFrame(frmR,text='Antennas')
-        frmRA.grid(row=2,column=0,columnspan=5,sticky='nwse')
+        frmAA = ttk.LabelFrame(frmA,text='Antennas')
+        frmAA.grid(row=2,column=0,columnspan=5,sticky='nwse')
         # ANTENNA SUBSECTION
-        ttk.Label(frmRA,text="Number: ").grid(row=0,column=0,sticky='w')
-        self._entReconAntNum = ttk.Entry(frmRA,width=2)
-        self._entReconAntNum.grid(row=0,column=1,sticky='w')
-        ttk.Label(frmRA,text='Gain: ').grid(row=1,column=0,sticky='w')
-        self._entReconAntGain = ttk.Entry(frmRA,width=7)
-        self._entReconAntGain.grid(row=1,column=1,sticky='w')
-        ttk.Label(frmRA,text=" ").grid(row=1,column=2)
-        ttk.Label(frmRA,text="Type: ").grid(row=1,column=3,sticky='e')
-        self._entReconAntType = ttk.Entry(frmRA,width=15)
-        self._entReconAntType.grid(row=1,column=4,sticky='e')
-        ttk.Label(frmRA,text='Loss: ').grid(row=2,column=0,sticky='w')
-        self._entReconAntLoss = ttk.Entry(frmRA,width=7)
-        self._entReconAntLoss.grid(row=2,column=1,sticky='w')
-        ttk.Label(frmRA,text=" ").grid(row=2,column=2)
-        ttk.Label(frmRA,text="XYZ: ").grid(row=2,column=3,sticky='e')
-        self._entReconAntXYZ = ttk.Entry(frmRA,width=15)
-        self._entReconAntXYZ.grid(row=2,column=4,sticky='e')
+        ttk.Label(frmAA,text="Number: ").grid(row=0,column=0,sticky='w')
+        self._entAbadAntNum = ttk.Entry(frmAA,width=2)
+        self._entAbadAntNum.grid(row=0,column=1,sticky='w')
+        ttk.Label(frmAA,text='Gain: ').grid(row=1,column=0,sticky='w')
+        self._entAbadAntGain = ttk.Entry(frmAA,width=7)
+        self._entAbadAntGain.grid(row=1,column=1,sticky='w')
+        ttk.Label(frmAA,text=" ").grid(row=1,column=2)
+        ttk.Label(frmAA,text="Type: ").grid(row=1,column=3,sticky='e')
+        self._entAbadAntType = ttk.Entry(frmAA,width=15)
+        self._entAbadAntType.grid(row=1,column=4,sticky='e')
+        ttk.Label(frmAA,text='Loss: ').grid(row=2,column=0,sticky='w')
+        self._entAbadAntLoss = ttk.Entry(frmAA,width=7)
+        self._entAbadAntLoss.grid(row=2,column=1,sticky='w')
+        ttk.Label(frmAA,text=" ").grid(row=2,column=2)
+        ttk.Label(frmAA,text="XYZ: ").grid(row=2,column=3,sticky='e')
+        self._entAbadAntXYZ = ttk.Entry(frmAA,width=15)
+        self._entAbadAntXYZ.grid(row=2,column=4,sticky='e')
         # SCAN PATTERN SUB SECTION
-        frmRS = ttk.LabelFrame(frmR,text='Scan')
-        frmRS.grid(row=3,column=0,columnspan=5,sticky='nwse')
-        ttk.Label(frmRS,text="Dwell: ").grid(row=0,column=0,sticky='w')
-        self._entReconScanDwell = ttk.Entry(frmRS,width=5)
-        self._entReconScanDwell.grid(row=0,column=2,sticky='w')
-        ttk.Label(frmRS,text=" ").grid(row=0,column=3)
-        ttk.Label(frmRS,text="Start: ").grid(row=0,column=4,sticky='e')
-        self._entReconScanStart = ttk.Entry(frmRS,width=3)
-        self._entReconScanStart.grid(row=0,column=5,sticky='w')
-        ttk.Label(frmRS,text="Scan: ").grid(row=1,column=0,sticky='w')
-        self._entReconScanScan = ttk.Entry(frmRS,width=12)
-        self._entReconScanScan.grid(row=1,column=2,sticky='w')
-        ttk.Label(frmRS,text=" ").grid(row=1,column=3)
-        ttk.Label(frmRS,text="Pass: ").grid(row=1,column=4,sticky='w')
-        self._entReconScanPass = ttk.Entry(frmRS,width=12)
-        self._entReconScanPass.grid(row=1,column=5,sticky='e')
-        self._vrpause = tk.IntVar()
-        ttk.Checkbutton(frmRS,text="Paused",variable=self._vrpause).grid(row=2,column=0,columnspan=2)
-        nb.add(frmR,text='Recon')
+        frmAS = ttk.LabelFrame(frmA,text='Scan')
+        frmAS.grid(row=3,column=0,columnspan=5,sticky='nwse')
+        ttk.Label(frmAS,text="Dwell: ").grid(row=0,column=0,sticky='w')
+        self._entAbadScanDwell = ttk.Entry(frmAS,width=5)
+        self._entAbadScanDwell.grid(row=0,column=2,sticky='w')
+        ttk.Label(frmAS,text=" ").grid(row=0,column=3)
+        ttk.Label(frmAS,text="Start: ").grid(row=0,column=4,sticky='e')
+        self._entAbadScanStart = ttk.Entry(frmAS,width=3)
+        self._entAbadScanStart.grid(row=0,column=5,sticky='w')
+        ttk.Label(frmAS,text="Scan: ").grid(row=1,column=0,sticky='w')
+        self._entAbadScanScan = ttk.Entry(frmAS,width=12)
+        self._entAbadScanScan.grid(row=1,column=2,sticky='w')
+        ttk.Label(frmAS,text=" ").grid(row=1,column=3)
+        ttk.Label(frmAS,text="Pass: ").grid(row=1,column=4,sticky='w')
+        self._entAbadScanPass = ttk.Entry(frmAS,width=12)
+        self._entAbadScanPass.grid(row=1,column=5,sticky='e')
+        self._vapause = tk.IntVar()
+        ttk.Checkbutton(frmAS,text="Paused",variable=self._vapause).grid(row=2,column=0)
+        self._varecord = tk.IntVar()
+        ttk.Checkbutton(frmAS,text="Record",variable=self._varecord).grid(row=2,column=2,sticky='w')
+        nb.add(frmA,text='Abad')
 
-        # Surveillance Tab Configuration
+        # Shama Tab Configuration
         frmC = ttk.Frame(nb)
         ttk.Label(frmC,text='NIC: ').grid(row=0,column=0,sticky='nw')
-        self._entSurveilNic = ttk.Entry(frmC,width=5)
-        self._entSurveilNic.grid(row=0,column=1,sticky='nw')
+        self._entShamaNic = ttk.Entry(frmC,width=5)
+        self._entShamaNic.grid(row=0,column=1,sticky='nw')
         ttk.Label(frmC,text=' ').grid(row=0,column=2,sticky='w')
         ttk.Label(frmC,text='Spoof: ').grid(row=0,column=3,sticky='wn')
-        self._entSurveilSpoof = ttk.Entry(frmC,width=17)
-        self._entSurveilSpoof.grid(row=0,column=4,sticky='nw')
+        self._entShamaSpoof = ttk.Entry(frmC,width=17)
+        self._entShamaSpoof.grid(row=0,column=4,sticky='nw')
         ttk.Label(frmC,text='Desc: ').grid(row=1,column=0,sticky='nw')
-        self._entSurveilDesc = tk.Text(frmC,width=42,height=3)
-        self._entSurveilDesc.grid(row=1,column=1,columnspan=4,sticky='e')
+        self._entShamaDesc = tk.Text(frmC,width=42,height=3)
+        self._entShamaDesc.grid(row=1,column=1,columnspan=4,sticky='e')
 
         # ANTENNA SUB SECTION
         frmCA = ttk.LabelFrame(frmC,text='Antennas')
         frmCA.grid(row=2,column=0,columnspan=5,sticky='nwse')
         # ANTENNA SUBSECTION
         ttk.Label(frmCA,text="Number: ").grid(row=0,column=0,sticky='w')
-        self._entSurveilAntNum = ttk.Entry(frmCA,width=2)
-        self._entSurveilAntNum.grid(row=0,column=1,sticky='w')
+        self._entShamaAntNum = ttk.Entry(frmCA,width=2)
+        self._entShamaAntNum.grid(row=0,column=1,sticky='w')
         ttk.Label(frmCA,text='Gain: ').grid(row=1,column=0,sticky='w')
-        self._entSurveilAntGain = ttk.Entry(frmCA,width=7)
-        self._entSurveilAntGain.grid(row=1,column=1,sticky='w')
+        self._entShamaAntGain = ttk.Entry(frmCA,width=7)
+        self._entShamaAntGain.grid(row=1,column=1,sticky='w')
         ttk.Label(frmCA,text=" ").grid(row=1,column=2)
         ttk.Label(frmCA,text="Type: ").grid(row=1,column=3,sticky='e')
-        self._entSurveilAntType = ttk.Entry(frmCA,width=15)
-        self._entSurveilAntType.grid(row=1,column=4,sticky='e')
+        self._entShamaAntType = ttk.Entry(frmCA,width=15)
+        self._entShamaAntType.grid(row=1,column=4,sticky='e')
         ttk.Label(frmCA,text='Loss: ').grid(row=2,column=0,sticky='w')
-        self._entSurveilAntLoss = ttk.Entry(frmCA,width=7)
-        self._entSurveilAntLoss.grid(row=2,column=1,sticky='w')
+        self._entShamaAntLoss = ttk.Entry(frmCA,width=7)
+        self._entShamaAntLoss.grid(row=2,column=1,sticky='w')
         ttk.Label(frmCA,text=" ").grid(row=2,column=2)
         ttk.Label(frmCA,text="XYZ: ").grid(row=2,column=3,sticky='e')
-        self._entSurveilAntXYZ = ttk.Entry(frmCA,width=15)
-        self._entSurveilAntXYZ.grid(row=2,column=4,sticky='e')
+        self._entShamaAntXYZ = ttk.Entry(frmCA,width=15)
+        self._entShamaAntXYZ.grid(row=2,column=4,sticky='e')
         # SCAN PATTERN SUB SECTION
         frmCS = ttk.LabelFrame(frmC,text='Scan Pattern')
         frmCS.grid(row=3,column=0,columnspan=5,sticky='nwse')
         ttk.Label(frmCS,text="Dwell: ").grid(row=0,column=0,sticky='w')
-        self._entSurveilScanDwell = ttk.Entry(frmCS,width=5)
-        self._entSurveilScanDwell.grid(row=0,column=2,sticky='w')
+        self._entShamaScanDwell = ttk.Entry(frmCS,width=5)
+        self._entShamaScanDwell.grid(row=0,column=2,sticky='w')
         ttk.Label(frmCS,text=" ").grid(row=0,column=3)
         ttk.Label(frmCS,text="Start: ").grid(row=0,column=4,sticky='e')
-        self._entSurveilScanStart = ttk.Entry(frmCS,width=3)
-        self._entSurveilScanStart.grid(row=0,column=5,sticky='w')
+        self._entShamaScanStart = ttk.Entry(frmCS,width=3)
+        self._entShamaScanStart.grid(row=0,column=5,sticky='w')
         ttk.Label(frmCS,text="Scan: ").grid(row=1,column=0,sticky='w')
-        self._entSurveilScanScan = ttk.Entry(frmCS,width=12)
-        self._entSurveilScanScan.grid(row=1,column=2,sticky='w')
+        self._entShamaScanScan = ttk.Entry(frmCS,width=12)
+        self._entShamaScanScan.grid(row=1,column=2,sticky='w')
         ttk.Label(frmCS,text=" ").grid(row=1,column=3)
         ttk.Label(frmCS,text="Pass: ").grid(row=1,column=4,sticky='w')
-        self._entSurveilScanPass = ttk.Entry(frmCS,width=12)
-        self._entSurveilScanPass.grid(row=1,column=5,sticky='e')
-        self._vcpause = tk.IntVar()
-        ttk.Checkbutton(frmCS,text="Paused",variable=self._vcpause).grid(row=2,column=0,columnspan=2)
-        nb.add(frmC,text='Surveillance')
+        self._entShamaScanPass = ttk.Entry(frmCS,width=12)
+        self._entShamaScanPass.grid(row=1,column=5,sticky='e')
+        self._vspause = tk.IntVar()
+        ttk.Checkbutton(frmCS,text="Paused",variable=self._vspause).grid(row=2,column=0)
+        self._vsrecord = tk.IntVar()
+        ttk.Checkbutton(frmCS,text="Record",variable=self._vsrecord).grid(row=2,column=2,sticky='w')
+        nb.add(frmC,text='Shama')
 
         # GPS Tab Configuration
         # use a checkbutton & two subframes to differentiate betw/ fixed & dyanmic
@@ -1436,12 +1459,22 @@ class IyriConfigPanel(gui.ConfigPanel):
         frmM = ttk.Frame(nb)
         frmMS = ttk.LabelFrame(frmM,text='Storage')
         frmMS.grid(row=0,column=0,sticky='w')
-        ttk.Label(frmMS,text=' Host: ').grid(row=0,column=0)
+        ttk.Label(frmMS,text='Host: ').grid(row=0,column=0)
         self._entStoreHost = ttk.Entry(frmMS,width=15)
         self._entStoreHost.grid(row=0,column=1)
         ttk.Label(frmMS,text=' Port: ').grid(row=0,column=2)
         self._entStorePort = ttk.Entry(frmMS,width=5)
         self._entStorePort.grid(row=0,column=3)
+        ttk.Label(frmMS,text='DB: ').grid(row=1,column=0,sticky='w')
+        self._entStoreDB = ttk.Entry(frmMS,width=10)
+        self._entStoreDB.grid(row=1,column=1,sticky='w')
+        ttk.Label(frmMS,text='User: ').grid(row=2,column=0,sticky='w')
+        self._entStoreUSR = ttk.Entry(frmMS,width=10)
+        self._entStoreUSR.grid(row=2,column=1,sticky='w')
+        ttk.Label(frmMS,text='PWD: ').grid(row=3,column=0,sticky='w')
+        self._entStorePWD = ttk.Entry(frmMS,width=10)
+        self._entStorePWD.grid(row=3,column=1,sticky='w')
+
         frmML = ttk.LabelFrame(frmM,text='Local')
         frmML.grid(row=1,column=0,sticky='w')
         ttk.Label(frmML,text="Region: ").grid(row=0,column=0,sticky='w')
@@ -1450,6 +1483,9 @@ class IyriConfigPanel(gui.ConfigPanel):
         ttk.Label(frmML,text=" C2C: ").grid(row=0,column=2,sticky='w')
         self._entC2CPort = ttk.Entry(frmML,width=5)
         self._entC2CPort.grid(row=0,column=3,sticky='w')
+        ttk.Label(frmML,text=" Max Threshers: ").grid(row=0,column=4,sticky='w')
+        self._entMaxT = ttk.Entry(frmML,width=5)
+        self._entMaxT.grid(row=0,column=5,sticky='w')
         nb.add(frmM,text='Misc.')
 
     def _initialize(self):
@@ -1460,86 +1496,92 @@ class IyriConfigPanel(gui.ConfigPanel):
             return
 
         # start by reading the recon radio details
-        self._entReconNic.delete(0,tk.END)
-        if cp.has_option('Recon','nic'):
-            self._entReconNic.insert(0,cp.get('Recon','nic'))
-        self._entReconSpoof.delete(0,tk.END)
-        if cp.has_option('Recon','spoof'):
-            self._entReconSpoof.insert(0,cp.get('Recon','spoof'))
-        self._entReconDesc.delete(1.0,tk.END)
-        if cp.has_option('Recon','desc'):
-            self._entReconDesc.insert(tk.END,cp.get('Recon','desc'))
-        self._entReconAntNum.delete(0,tk.END)
-        if cp.has_option('Recon','antennas'):
-            self._entReconAntNum.insert(0,cp.get('Recon','antennas'))
-        self._entReconAntGain.delete(0,tk.END)
-        if cp.has_option('Recon','antenna_gain'):
-            self._entReconAntGain.insert(0,cp.get('Recon','antenna_gain'))
-        self._entReconAntType.delete(0,tk.END)
-        if cp.has_option('Recon','antenna_type'):
-            self._entReconAntType.insert(0,cp.get('Recon','antenna_type'))
-        self._entReconAntLoss.delete(0,tk.END)
-        if cp.has_option('Recon','antenna_loss'):
-            self._entReconAntLoss.insert(0,cp.get('Recon','antenna_loss'))
-        self._entReconAntXYZ.delete(0,tk.END)
-        if cp.has_option('Recon','antenna_xyz'):
-            self._entReconAntXYZ.insert(0,cp.get('Recon','antenna_xyz'))
-        self._entReconScanDwell.delete(0,tk.END)
-        if cp.has_option('Recon','dwell'):
-            self._entReconScanDwell.insert(0,cp.get('Recon','dwell'))
-        self._entReconScanStart.delete(0,tk.END)
-        if cp.has_option('Recon','scan_start'):
-            self._entReconScanStart.insert(0,cp.get('Recon','scan_start'))
-        self._entReconScanScan.delete(0,tk.END)
-        if cp.has_option('Recon','scan'):
-            self._entReconScanScan.insert(0,cp.get('Recon','scan'))
-        self._entReconScanPass.delete(0,tk.END)
-        if cp.has_option('Recon','pass'):
-            self._entReconScanPass.insert(0,cp.get('Recon','pass'))
-        self._vrpause.set(0)
-        if cp.has_option('Recon','paused'):
-            if cp.getboolean('Recon','paused'): self._vrpause.set(1)
+        self._entAbadNic.delete(0,tk.END)
+        if cp.has_option('Abad','nic'):
+            self._entAbadNic.insert(0,cp.get('Abad','nic'))
+        self._entAbadSpoof.delete(0,tk.END)
+        if cp.has_option('Abad','spoof'):
+            self._entAbadSpoof.insert(0,cp.get('Abad','spoof'))
+        self._entAbadDesc.delete(1.0,tk.END)
+        if cp.has_option('Abad','desc'):
+            self._entAbadDesc.insert(tk.END,cp.get('Abad','desc'))
+        self._entAbadAntNum.delete(0,tk.END)
+        if cp.has_option('Abad','antennas'):
+            self._entAbadAntNum.insert(0,cp.get('Abad','antennas'))
+        self._entAbadAntGain.delete(0,tk.END)
+        if cp.has_option('Abad','antenna_gain'):
+            self._entAbadAntGain.insert(0,cp.get('Abad','antenna_gain'))
+        self._entAbadAntType.delete(0,tk.END)
+        if cp.has_option('Abad','antenna_type'):
+            self._entAbadAntType.insert(0,cp.get('Abad','antenna_type'))
+        self._entAbadAntLoss.delete(0,tk.END)
+        if cp.has_option('Abad','antenna_loss'):
+            self._entAbadAntLoss.insert(0,cp.get('Abad','antenna_loss'))
+        self._entAbadAntXYZ.delete(0,tk.END)
+        if cp.has_option('Abad','antenna_xyz'):
+            self._entAbadAntXYZ.insert(0,cp.get('Abad','antenna_xyz'))
+        self._entAbadScanDwell.delete(0,tk.END)
+        if cp.has_option('Abad','dwell'):
+            self._entAbadScanDwell.insert(0,cp.get('Abad','dwell'))
+        self._entAbadScanStart.delete(0,tk.END)
+        if cp.has_option('Abad','scan_start'):
+            self._entAbadScanStart.insert(0,cp.get('Abad','scan_start'))
+        self._entAbadScanScan.delete(0,tk.END)
+        if cp.has_option('Abad','scan'):
+            self._entAbadScanScan.insert(0,cp.get('Abad','scan'))
+        self._entAbadScanPass.delete(0,tk.END)
+        if cp.has_option('Abad','pass'):
+            self._entAbadScanPass.insert(0,cp.get('Abad','pass'))
+        self._vapause.set(0)
+        if cp.has_option('Abad','paused'):
+            if cp.getboolean('Abad','paused'): self._vapause.set(1)
+        self._varecord.set(1)
+        if cp.has_option('Abad','record'):
+            if not cp.getboolean('Abad','record'): self._varecord.set(0)
 
-        # then the surveillance radio details
-        self._entSurveilNic.delete(0,tk.END)
-        if cp.has_option('Surveillance','nic'):
-            self._entSurveilNic.insert(0,cp.get('Surveillance','nic'))
-        self._entSurveilSpoof.delete(0,tk.END)
-        if cp.has_option('Surveillance','spoof'):
-            self._entSurveilSpoof.insert(0,cp.get('Surveillance','spoof'))
-        self._entSurveilDesc.delete(1.0,tk.END)
-        if cp.has_option('Surveillance','desc'):
-            self._entSurveilDesc.insert(tk.END,cp.get('Surveillance','desc'))
-        self._entSurveilAntNum.delete(0,tk.END)
-        if cp.has_option('Surveillance','antennas'):
-            self._entSurveilAntNum.insert(0,cp.get('Surveillance','antennas'))
-        self._entSurveilAntGain.delete(0,tk.END)
-        if cp.has_option('Surveillance','antenna_gain'):
-            self._entSurveilAntGain.insert(0,cp.get('Surveillance','antenna_gain'))
-        self._entSurveilAntType.delete(0,tk.END)
-        if cp.has_option('Surveillance','antenna_type'):
-            self._entSurveilAntType.insert(0,cp.get('Surveillance','antenna_type'))
-        self._entSurveilAntLoss.delete(0,tk.END)
-        if cp.has_option('Surveillance','antenna_loss'):
-            self._entSurveilAntLoss.insert(0,cp.get('Surveillance','antenna_loss'))
-        self._entSurveilAntXYZ.delete(0,tk.END)
-        if cp.has_option('Surveillance','antenna_xyz'):
-            self._entSurveilAntXYZ.insert(0,cp.get('Surveillance','antenna_xyz'))
-        self._entSurveilScanDwell.delete(0,tk.END)
-        if cp.has_option('Surveillance','dwell'):
-            self._entSurveilScanDwell.insert(0,cp.get('Surveillance','dwell'))
-        self._entSurveilScanStart.delete(0,tk.END)
-        if cp.has_option('Surveillance','scan_start'):
-            self._entSurveilScanStart.insert(0,cp.get('Surveillance','scan_start'))
-        self._entSurveilScanScan.delete(0,tk.END)
-        if cp.has_option('Surveillance','scan'):
-            self._entSurveilScanScan.insert(0,cp.get('Surveillance','scan'))
-        self._entSurveilScanPass.delete(0,tk.END)
-        if cp.has_option('Surveillance','pass'):
-            self._entSurveilScanPass.insert(0,cp.get('Surveillance','pass'))
-        self._vcpause.set(0)
-        if cp.has_option('Surveillance','paused'):
-            if cp.getboolean('Surveillance','paused'): self._vcpause.set(1)
+        # then the shama radio details
+        self._entShamaNic.delete(0,tk.END)
+        if cp.has_option('Shama','nic'):
+            self._entShamaNic.insert(0,cp.get('Shama','nic'))
+        self._entShamaSpoof.delete(0,tk.END)
+        if cp.has_option('Shama','spoof'):
+            self._entShamaSpoof.insert(0,cp.get('Shama','spoof'))
+        self._entShamaDesc.delete(1.0,tk.END)
+        if cp.has_option('Shama','desc'):
+            self._entShamaDesc.insert(tk.END,cp.get('Shama','desc'))
+        self._entShamaAntNum.delete(0,tk.END)
+        if cp.has_option('Shama','antennas'):
+            self._entShamaAntNum.insert(0,cp.get('Shama','antennas'))
+        self._entShamaAntGain.delete(0,tk.END)
+        if cp.has_option('Shama','antenna_gain'):
+            self._entShamaAntGain.insert(0,cp.get('Shama','antenna_gain'))
+        self._entShamaAntType.delete(0,tk.END)
+        if cp.has_option('Shama','antenna_type'):
+            self._entShamaAntType.insert(0,cp.get('Shama','antenna_type'))
+        self._entShamaAntLoss.delete(0,tk.END)
+        if cp.has_option('Shama','antenna_loss'):
+            self._entShamaAntLoss.insert(0,cp.get('Shama','antenna_loss'))
+        self._entShamaAntXYZ.delete(0,tk.END)
+        if cp.has_option('Shama','antenna_xyz'):
+            self._entShamaAntXYZ.insert(0,cp.get('Shama','antenna_xyz'))
+        self._entShamaScanDwell.delete(0,tk.END)
+        if cp.has_option('Shama','dwell'):
+            self._entShamaScanDwell.insert(0,cp.get('Shama','dwell'))
+        self._entShamaScanStart.delete(0,tk.END)
+        if cp.has_option('Shama','scan_start'):
+            self._entShamaScanStart.insert(0,cp.get('Shama','scan_start'))
+        self._entShamaScanScan.delete(0,tk.END)
+        if cp.has_option('Shama','scan'):
+            self._entShamaScanScan.insert(0,cp.get('Shama','scan'))
+        self._entShamaScanPass.delete(0,tk.END)
+        if cp.has_option('Shama','pass'):
+            self._entShamaScanPass.insert(0,cp.get('Shama','pass'))
+        self._vspause.set(0)
+        if cp.has_option('Shama','paused'):
+            if cp.getboolean('Shama','paused'): self._vspause.set(1)
+        self._vsrecord.set(1)
+        if cp.has_option('Shama','record'):
+            if not cp.getboolean('Shama','record'): self._vsrecord.set(0)
 
         # gps entries
         try:
@@ -1580,36 +1622,36 @@ class IyriConfigPanel(gui.ConfigPanel):
     def _validate(self):
         """ validate entries """
         # start with the recon radio details
-        nic = self._entReconNic.get()
+        nic = self._entAbadNic.get()
         if not nic:
-            self.err("Invalid Recon Input","Radio nic must be specified")
+            self.err("Invalid Abad Input","Radio nic must be specified")
             return False
         elif not nic in iwt.wifaces():
-            self.warn("Not Found","Recon radio may not be wireless")
-        spoof = self._entReconSpoof.get().upper()
+            self.warn("Not Found","Abad radio may not be wireless")
+        spoof = self._entAbadSpoof.get().upper()
         if spoof and not valrep.validhwaddr(spoof):
-            self.err("Invalid Recon Input","Spoofed MAC addr %s is not valid")
+            self.err("Invalid Abad Input","Spoofed MAC addr %s is not valid")
             return False
 
         # process antennas, if # > 0 then force validation of all antenna widgets
-        if self._entReconAntNum.get():
+        if self._entAbadAntNum.get():
             try:
-                nA = int(self._entReconAntNum.get())
+                nA = int(self._entAbadAntNum.get())
                 if nA:
                     try:
-                        if len(map(float,self._entReconAntGain.get().split(','))) != nA:
+                        if len(map(float,self._entAbadAntGain.get().split(','))) != nA:
                             raise IyriConfigException("Number of gain is invalid")
                     except ValueError:
                         raise IyriConfigException("Gain must be float or list of floats")
-                    if len(self._entReconAntType.get().split(',')) != nA:
+                    if len(self._entAbadAntType.get().split(',')) != nA:
                         raise IyriConfigException("Number of types is invalid")
                     try:
-                        if len(map(float,self._entReconAntLoss.get().split(','))) != nA:
+                        if len(map(float,self._entAbadAntLoss.get().split(','))) != nA:
                             raise IyriConfigException("Number of loss is invalid")
                     except:
                         raise IyriConfigException("Loss must be float or list of floats")
                     try:
-                        xyzs = self._entReconAntXYZ.get().split(',')
+                        xyzs = self._entAbadAntXYZ.get().split(',')
                         if len(xyzs) != nA:
                             raise IyriConfigException("Number of xyz is invalid")
                         for xyz in xyzs:
@@ -1620,19 +1662,19 @@ class IyriConfigPanel(gui.ConfigPanel):
                     except ValueError:
                         raise IyriConfigException('XYZ must be integer')
             except ValueError:
-                self.err("Invalid Recon Input","Number of antennas must be numeric")
+                self.err("Invalid Abad Input","Number of antennas must be numeric")
                 return False
             except IyriConfigException as e:
-                self.err("Invalid Recon Input",e)
+                self.err("Invalid Abad Input",e)
                 return False
 
         # process scan patterns
         try:
-            float(self._entReconScanDwell.get())
+            float(self._entAbadScanDwell.get())
         except:
-            self.err("Invalid Recon Input","Scan dwell must be float")
+            self.err("Invalid Abad Input","Scan dwell must be float")
             return False
-        start = self._entReconScanStart.get()
+        start = self._entAbadScanStart.get()
         try:
             if start:
                 if ':' in start: ch,chw = start.split(':')
@@ -1643,47 +1685,47 @@ class IyriConfigPanel(gui.ConfigPanel):
                 if chw and not chw in iw.IW_CHWS:
                     raise RuntimeError("Specified channel width is not valid")
         except ValueError:
-            self.err("Invalid Recon Input","Scan start must be integer")
+            self.err("Invalid Abad Input","Scan start must be integer")
             return False
         except Exception as e:
-            self.err("Invalid Recon Input",e)
+            self.err("Invalid Abad Input",e)
             return False
         try:
-            valrep.channellist(self._entReconScanScan.get(),'scan')
-            valrep.channellist(self._entReconScanPass.get(),'pass')
+            valrep.channellist(self._entAbadScanScan.get(),'scan')
+            valrep.channellist(self._entAbadScanPass.get(),'pass')
         except ValueError as e:
-            self.err("Invalid Recon Input",e)
+            self.err("Invalid Abad Input",e)
             return False
 
-        # then surveillance radio details
-        nic = self._entSurveilNic.get()
+        # then shama radio details
+        nic = self._entShamaNic.get()
         if nic:
             if not nic in iwt.wifaces(): self.warn("Not Found","Radio may not be wireless")
-            spoof = self._entSurveilSpoof.get().upper()
+            spoof = self._entShamaSpoof.get().upper()
             if spoof and not valrep.validhwaddr(spoof):
-                self.err("Invalid Surveillance Input","Spoofed MAC address is not valid")
+                self.err("Invalid Shama Input","Spoofed MAC address is not valid")
                 return False
 
             # process the antennas - if antenna number is > 0 then force validation of
             # all antenna widgets
-            if self._entSurveilAntNum.get():
+            if self._entShamaAntNum.get():
                 try:
-                    nA = int(self._entSurveilAntNum.get())
+                    nA = int(self._entShamaAntNum.get())
                     if nA:
                         try:
-                            if len(map(float,self._entSurveilAntGain.get().split(','))) != nA:
+                            if len(map(float,self._entShamaAntGain.get().split(','))) != nA:
                                 raise IyriConfigException("Number of gain is invalid")
                         except ValueError:
                             raise IyriConfigException("Gain must be float or list of floats")
-                        if len(self._entSurveilAntType.get().split(',')) != nA:
+                        if len(self._entShamaAntType.get().split(',')) != nA:
                             raise IyriConfigException("Number of types is invalid")
                         try:
-                            if len(map(float,self._entSurveilAntLoss.get().split(','))) != nA:
+                            if len(map(float,self._entShamaAntLoss.get().split(','))) != nA:
                                 raise IyriConfigException("Number of loss is invalid")
                         except:
                             raise IyriConfigException("Loss must be float or list of floats")
                         try:
-                            xyzs = self._entSurveilAntXYZ.get().split(',')
+                            xyzs = self._entShamaAntXYZ.get().split(',')
                             if len(xyzs) != nA:
                                 raise IyriConfigException("Number of xyz is invalid")
                             for xyz in xyzs:
@@ -1694,19 +1736,19 @@ class IyriConfigPanel(gui.ConfigPanel):
                         except ValueError:
                             raise IyriConfigException("XYZ must be integer")
                 except ValueError:
-                    self.err("Invalid Surveillance Input","Number of antennas must be numeric")
+                    self.err("Invalid Shama Input","Number of antennas must be numeric")
                     return False
                 except IyriConfigException as e:
-                    self.err("Invalid Surveillance Input",e)
+                    self.err("Invalid Shama Input",e)
                     return False
 
             # process scan patterns
             try:
-                float(self._entSurveilScanDwell.get())
+                float(self._entShamaScanDwell.get())
             except:
-                self.err("Invalid Surveillance Input", "Scan dwell must be float")
+                self.err("Invalid Shama Input", "Scan dwell must be float")
                 return False
-            start = self._entSurveilScanStart.get()
+            start = self._entShamaScanStart.get()
             try:
                 if start:
                     if ':' in start: ch,chw = start.split(':')
@@ -1717,16 +1759,16 @@ class IyriConfigPanel(gui.ConfigPanel):
                     if chw and not chw in iw.IW_CHWS:
                         raise RuntimeError("Specified channel width is not valid")
             except ValueError:
-                self.err("Invalid Surveillance Input", "Scan start must be integer")
+                self.err("Invalid Shama Input", "Scan start must be integer")
                 return False
             except Exception as e:
-                self.err("Invalid Surveillance Input",e)
+                self.err("Invalid Shama Input",e)
                 return False
             try:
-                valrep.channellist(self._entSurveilScanScan.get(),'scan')
-                valrep.channellist(self._entSurveilScanPass.get(),'pass')
+                valrep.channellist(self._entShamaScanScan.get(),'scan')
+                valrep.channellist(self._entShamaScanPass.get(),'pass')
             except ValueError as e:
-                self.err("Invalid Surveillance Input",e)
+                self.err("Invalid Shama Input",e)
                 return False
 
         # gps - only process enabled widgets
@@ -1804,43 +1846,45 @@ class IyriConfigPanel(gui.ConfigPanel):
         fout = None
         try:
             cp = ConfigParser.ConfigParser()
-            cp.add_section('Recon')
-            cp.set('Recon','nic',self._entReconNic.get())
-            cp.set('Recon','paused','on' if self._vrpause.get() else 'off')
-            if self._entReconSpoof.get(): cp.set('Recon','spoof',self._entReconSpoof.get())
+            cp.add_section('Abad')
+            cp.set('Abad','nic',self._entAbadNic.get())
+            cp.set('Abad','paused','on' if self._vapause.get() else 'off')
+            cp.set('Abad','record','on' if self._varecord.get() else 'off')
+            if self._entAbadSpoof.get(): cp.set('Abad','spoof',self._entAbadSpoof.get())
 
-            nA = self._entReconAntNum.get()
+            nA = self._entAbadAntNum.get()
             if nA:
-                cp.set('Recon','antennas',self._entReconAntNum.get())
-                cp.set('Recon','antenna_gain',self._entReconAntGain.get())
-                cp.set('Recon','antenna_loss',self._entReconAntLoss.get())
-                cp.set('Recon','antenna_type',self._entReconAntType.get())
-                cp.set('Recon','antenna_xyz',self._entReconAntXYZ.get())
-            desc = self._entReconDesc.get(1.0,tk.END).strip()
-            if desc: cp.set('Recon','desc',desc)
-            cp.set('Recon','dwell',self._entReconScanDwell.get())
-            cp.set('Recon','scan',self._entReconScanScan.get())
-            cp.set('Recon','pass',self._entReconScanPass.get())
-            cp.set('Recon','scan_start',self._entReconScanStart.get())
-            if self._entSurveilNic.get():
-                cp.add_section('Surveillance')
-                cp.set('Surveillance','nic',self._entSurveilNic.get())
-                cp.set('Surveillance','paused','on' if self._vcpause.get() else 'off')
-                if self._entSurveilSpoof.get():
-                    cp.set('Surveillance','spoof',self._entSurveilSpoof.get())
-                nA = self._entSurveilAntNum.get()
+                cp.set('Abad','antennas',self._entAbadAntNum.get())
+                cp.set('Abad','antenna_gain',self._entAbadAntGain.get())
+                cp.set('Abad','antenna_loss',self._entAbadAntLoss.get())
+                cp.set('Abad','antenna_type',self._entAbadAntType.get())
+                cp.set('Abad','antenna_xyz',self._entAbadAntXYZ.get())
+            desc = self._entAbadDesc.get(1.0,tk.END).strip()
+            if desc: cp.set('Abad','desc',desc)
+            cp.set('Abad','dwell',self._entAbadScanDwell.get())
+            cp.set('Abad','scan',self._entAbadScanScan.get())
+            cp.set('Abad','pass',self._entAbadScanPass.get())
+            cp.set('Abad','scan_start',self._entAbadScanStart.get())
+            if self._entShamaNic.get():
+                cp.add_section('Shama')
+                cp.set('Shama','nic',self._entShamaNic.get())
+                cp.set('Shama','paused','on' if self._vspause.get() else 'off')
+                cp.set('Shama','record','on' if self._vsrecord.get() else 'off')
+                if self._entShamaSpoof.get():
+                    cp.set('Shama','spoof',self._entShamaSpoof.get())
+                nA = self._entShamaAntNum.get()
                 if nA:
-                    cp.set('Surveillance','antennas',self._entSurveilAntNum.get())
-                    cp.set('Surveillance','antenna_gain',self._entSurveilAntGain.get())
-                    cp.set('Surveillance','antenna_loss',self._entSurveilAntLoss.get())
-                    cp.set('Surveillance','antenna_type',self._entSurveilAntType.get())
-                    cp.set('Surveillance','antenna_xyz',self._entSurveilAntXYZ.get())
-                desc = self._entSurveilDesc.get(1.0,tk.END).strip()
-                if desc: cp.set('Surveillance','desc',desc)
-                cp.set('Surveillance','dwell',self._entSurveilScanDwell.get())
-                cp.set('Surveillance','scan',self._entSurveilScanScan.get())
-                cp.set('Surveillance','pass',self._entSurveilScanPass.get())
-                cp.set('Surveillance','scan_start',self._entSurveilScanStart.get())
+                    cp.set('Shama','antennas',self._entShamaAntNum.get())
+                    cp.set('Shama','antenna_gain',self._entShamaAntGain.get())
+                    cp.set('Shama','antenna_loss',self._entShamaAntLoss.get())
+                    cp.set('Shama','antenna_type',self._entShamaAntType.get())
+                    cp.set('Shama','antenna_xyz',self._entShamaAntXYZ.get())
+                desc = self._entShamaDesc.get(1.0,tk.END).strip()
+                if desc: cp.set('Shama','desc',desc)
+                cp.set('Shama','dwell',self._entShamaScanDwell.get())
+                cp.set('Shama','scan',self._entShamaScanScan.get())
+                cp.set('Shama','pass',self._entShamaScanPass.get())
+                cp.set('Shama','scan_start',self._entShamaScanStart.get())
             cp.add_section('GPS')
             fixed = self.vfixed.get()
             cp.set('GPS','fixed','yes' if fixed else 'no')
