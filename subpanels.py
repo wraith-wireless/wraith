@@ -453,7 +453,7 @@ class DatabinPanel(gui.SimplePanel):
          conn: the db connection
         """
         self._bins = {}
-        self._curs = {}
+        #self._curs = {}
         self._conn = conn
         gui.SimplePanel.__init__(self,tl,chief,'Databin',"widgets/icons/db.png")
 
@@ -473,7 +473,8 @@ class DatabinPanel(gui.SimplePanel):
         # attempt to load the icon if it fails use text, save the name of this
         # button, then grid the button
         try:
-            self._bins[b] = {'img':ImageTk.PhotoImage(Image.open('widgets/icons/bin%s.png'%b))}
+            ipath = 'widgets/icons/bin{0}.png'.format(b)
+            self._bins[b] = {'img':ImageTk.PhotoImage(Image.open(ipath))}
         except:
             self._bins[b] = {'img':None}
             self._bins[b]['btn'] = ttk.Button(frm,text=b,
@@ -492,7 +493,6 @@ class DatabinPanel(gui.SimplePanel):
          close the associated bin's cursor
          :param name: name of bin to close
         """
-        self._curs[name].close()
         gui.SimplePanel.notifyclose(self,name)
 
     def viewquery(self,b):
@@ -510,6 +510,7 @@ class DatabinPanel(gui.SimplePanel):
             t = tk.Toplevel()
             pnl = QueryPanel(t,self,"Query [bin {0}]".format(b),b,
                              self._chief.connectstring)
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,"bin{0}".format(b)))
         else:
             panel[0].tk.deiconify()
             panel[0].tk.lift()

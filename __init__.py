@@ -64,6 +64,7 @@ wraith 0.0.4
   - moved db writes to iyri
   - tried commenting code (specifically functions) better
   - replaced deprecated '%' string operator with str.format()
+  - reworking gui to deal with new iyri and removal of nidus
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

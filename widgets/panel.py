@@ -80,10 +80,11 @@ class PanelException(Exception): pass # TopLevel generic error
 
 class PanelRecord(tuple):
     """
-     a record of a panel used as an item in a list of active "slave" panels
-      tk - the Toplevel
-      pnl - access this panel's methods
-      desc - string description of this panel
+     A record of a panel used as an item in a list of active "slave" panels.
+     A triple with the following items
+      tk: the Toplevel
+      pnl: access this panel's methods
+      desc: string description of this panel
     """
     # noinspection PyInitNewSignature
     def __new__(cls,tk,pnl,desc):
@@ -143,10 +144,11 @@ class Panel(ttk.Frame):
     # noinspection PyProtectedMember
     def __init__(self,tl,ipath=None,resize=False):
         """
-         tl - this is the Toplevel widget for this panel (managed directly
-          by the window manger)
-         ipath - path of icon (if one) to display the title bar
-         resize - allow resize of Panel ornot
+         initialization
+         :param tl: the Toplevel widget for this panel (managed directly by the
+          window manger)
+         :param ipath: path of icon (if one) to display the title bar
+         :param resize: resize of Panel or not
         """
         ttk.Frame.__init__(self,tl)
         self._appicon = ImageTk.PhotoImage(Image.open(ipath)) if ipath else None
@@ -162,39 +164,58 @@ class Panel(ttk.Frame):
 
     # virtual methods
     def delete(self): raise NotImplementedError("Panel::delete") # user initiated
-    def close(self): raise NotImplementedError("Panel::close") # self/master initiated
+    def close(self): raise NotImplementedError("Panel::close")   # self/master initiated
 
     ### busy/notbusy
 
     def setbusy(self,on=True):
-        """ set busy cursor on this panel if on is True, otherwise set normal """
+        """
+         set/unser busy cursor on this panel
+         :param on: if on set panel's cursor to busy otherwise set to normal
+        """
         if on: self.master.config(cursor='watch')
         else: self.master.config(cursor='')
 
     #### slave panel storage functions
 
     def notifyclose(self,name):
-        """ slave panel known by name is notifying of a pending close """
+        """
+         slave panel known by name is notifying of a pending close
+         :param name: id of the closing panel
+        """
         del self._panels[name]
 
     def addpanel(self,name,panelrec):
-        """ adds the panel record panelrec having with unique name to internal """
+        """
+         adds the panel record panelrec having with unique name to internal
+         :param name: id of the panel to add
+         :param panelrec: the panel record
+        """
         self._panels[name] = panelrec
 
     def killpanel(self,name):
-        """ force the panel identifed by name to quit - panel may not cleanup """
+        """
+         force the panel identifed by name to quit - panel may not cleanup
+         :param name: id of panel to kill
+        """
         if not name in self._panels: return
         self._panels[name].tk.destroy()
         del self._panels[name]
 
     def deletepanel(self,name):
-        """ delete the panel with name and remove it from the internal dict """
+        """
+         delete the panel with name and remove it from the internal dict
+         :param name: id of panel to delete
+        """
         if not name in self._panels: return
         self._panels[name].pnl.close()
         del self._panels[name]
 
     def deletepanels(self,desc):
-        """ deletes all panels with desc """
+        """
+         deletes all panels with desc
+         :param desc: type of panel
+        """
         for panel in self.getpanels(desc,False):
             panel.pnl.close()
             del self._panels[panel.pnl.name]
@@ -202,8 +223,8 @@ class Panel(ttk.Frame):
     def getpanel(self,desc,pnlOnly=True):
         """
          returns the first panel with desc or None
-         if pnlOnly is True returns the panel object otherwise returns the
-         PanelRecord
+         :param desc: type of panel
+         :param pnlOnly: True = return panel object, False = return panel record
         """
         for name in self._panels:
             if self._panels[name].desc == desc:
@@ -214,8 +235,8 @@ class Panel(ttk.Frame):
     def getpanels(self,desc,pnlOnly=True):
         """
          returns all panels with desc or [] if there are none open
-         if pnlOnly is True returns the panel object otherwise returns the
-         PanelRecord
+         :param desc: type of panel
+         :param pnlOnly: True = return panel object, False = return panel record
         """
         opened = []
         for name in self._panels:
@@ -225,13 +246,19 @@ class Panel(ttk.Frame):
         return opened
 
     def haspanel(self,desc):
-        """ returns True if there is at least one panel with desc """
+        """
+         returns True if there is at least one panel with desc
+         :param desc: type of panel
+        """
         for name in self._panels:
             if self._panels[name].desc == desc: return True
         return False
 
     def numpanels(self,desc):
-        """ returns a count of all panels with desc """
+        """
+         returns a count of all panels with desc
+         :param desc: type of panel
+        """
         n = 0
         for name in self._panels:
             if self._panels[name].desc == desc: n +=1
@@ -242,6 +269,7 @@ class Panel(ttk.Frame):
         for name in self._panels: self._panels[name].pnl.close()
 
     # message box methods
+    # below, t=title, m=message and opts = additional options
     def err(self,t,m): tkMB.showerror(t,m,parent=self)
     def warn(self,t,m): tkMB.showwarning(t,m,parent=self)
     def info(self,t,m): tkMB.showinfo(t,m,parent=self)
@@ -271,7 +299,14 @@ class SlavePanel(Panel):
       menu, main frame etc
     """
     def __init__(self,tl,chief,ttl,ipath=None,resize=False):
-        """ chief is the controlling (master) panel """
+        """
+         initialize
+         :param tl: the Toplevel
+         :param chief: the controlling (master) panel
+         :param ttl: title of panel
+         :param ipath: path to icon
+         :param resize: allow user to resize panel
+        """
         Panel.__init__(self,tl,ipath,resize)
         self._chief = chief
         self.master.title(ttl)
@@ -282,11 +317,17 @@ class SlavePanel(Panel):
     def pnlupdate(self): raise NotImplementedError("SlavePanel::pnlupdate")
 
     def logwrite(self,msg,mtype=LOG_NOERR):
-        """ write messages to primary log """
+        """
+         write messages to primary log. Note this is recursive, the master of
+         thie panel will call logwrite until and so on until it reaches the
+         Master
+         :param msg: message to write
+         :param mtype: message level
+        """
         self._chief.logwrite(msg,mtype)
 
     def delete(self):
-        """ user initiated - notify master of request to close """
+        """ user initiated, notify master of request to close """
         self._chief.notifyclose(self.name)
         self.close()
 
@@ -315,8 +356,16 @@ class SimplePanel(SlavePanel):
       pnlreset,pnlupdate if dynamic data is being displayed
       _shutdown if any cleanup needs to be performed prior to closing
     """
-    def __init__(self,tl,chief,ttl,iconpath=None,resize=False):
-        SlavePanel.__init__(self,tl,chief,ttl,iconpath,resize)
+    def __init__(self,tl,chief,ttl,ipath=None,resize=False):
+        """
+         initialize
+         :param tl: the Toplevel
+         :param chief: the controlling (master) panel
+         :param ttl: title of panel
+         :param ipath: path to icon
+         :param resize: allow user to resize panel
+        """
+        SlavePanel.__init__(self,tl,chief,ttl,ipath,resize)
         self.grid(row=0,column=0,sticky='nwse')
         self._body()
     def _body(self): raise NotImplementedError("SimplePanel::_body")
@@ -343,7 +392,13 @@ class ConfigPanel(SlavePanel):
       _write writes the values of the entries into the config file
     """
     def __init__(self,tl,chief,ttl,resize=False):
-        """ initialize configuration panel """
+        """
+         initialize
+         :param tl: the Toplevel
+         :param chief: the controlling (master) panel
+         :param ttl: title of panel
+         :param resize: allow user to resize panel
+        """
         SlavePanel.__init__(self,tl,chief,ttl,"widgets/icons/config.png",resize)
 
         # set up the input widget frame
@@ -418,16 +473,16 @@ class TabularPanel(SlavePanel):
     def __init__(self,tl,chief,ttl,h,cols=None,ipath=None,resize=False):
         """
          initialize
-         tl: the Toplevel of this panel
-         chief: the master/controlling panel
-         ttl: title to display
-         h: # of lines to configure the treeview's height
-         cols: a list of tuples col<i> =(l,w,t) where:
+         :param tl: the Toplevel of this panel
+         :param chief: the master/controlling panel
+         :param ttl: title to display
+         :param h: # of lines to configure the treeview's height
+         :param cols: a list of tuples col<i> =(l,w,t) where:
            l is the text to display in the header
            w is the desired width of the column in pixels
            t is the type of data in the column
-         ipath: path of appicon
-         resize: allow Panel to be resized by user
+         :param ipath: path of appicon
+         :param resize: allow user to resize Panel
         """
         SlavePanel.__init__(self,tl,chief,ttl,ipath,resize)
 
@@ -456,7 +511,6 @@ class TabularPanel(SlavePanel):
         # configure the headers
         self._ctypes = [] # the type in this column
         self._tree['columns'] = [t[0] for t in cols]
-        # TODO use enumerate here
         for i in xrange(len(cols)):
             # for each one set the column to the use specified width (or 0)
             # and set the text for each header if present as well as the sort
@@ -479,13 +533,19 @@ class TabularPanel(SlavePanel):
         if self.bottomframe(frmB): frmB.grid(row=2,column=0,sticky='nwse')
 
     def sortbycol(self,col,asc):
-        """ sorts the col in ascending order if asc or descending otherwise """
+        """
+         sorts the col
+         :param col: index of column to sort
+         :param asc: order to sort in
+        """
         vs = [(self._tree.set(k,col),k) for k in self._tree.get_children('')]
         vs.sort(key=lambda t: self._ctypes[col](t[0]),reverse=not asc)
         for i, (_,k) in enumerate(vs): self._tree.move(k,'',i)
         self._tree.heading(col,command=lambda:self.sortbycol(col,not asc))
 
+    # noinspection PyMethodMayBeStatic
     def str2key(self,s): return s
+    # noinspection PyMethodMayBeStatic
     def key2str(self,k): return str(k)
     def treerc(self,event): pass
     def treeca(self,event): self._tree.selection_set(self._tree.get_children(''))
@@ -496,7 +556,11 @@ class TabularPanel(SlavePanel):
     def bottomframe(self,frm): return None # override to add widgets to bottomframe
 
     def _makesort(self,col,text):
-        """ add column header with label text at col index col (w/ sort fct) """
+        """
+         add column header with label text at col index col (w/ sort fct)
+         :param col: index of column to sort
+         :param text: text to add to column header
+        """
         self._tree.heading(col,text=text,command=lambda: self.sortbycol(col,True))
 
 class PollingTabularPanel(TabularPanel):
@@ -509,17 +573,17 @@ class PollingTabularPanel(TabularPanel):
     def __init__(self,tl,chief,ttl,h,cols=None,ipath=None,resize=False,polltime=500):
         """
          initialize the PollingTabularPanel
-         tl: the Toplevel of this panel
-         chief: the master/controlling panel
-         ttl: title to display
-         h: # of lines to configure the treeview's height
-         cols: a list of tuples col<i> =(l,w,t) where:
+         :param tl: the Toplevel of this panel
+         :param chief: the master/controlling panel
+         :param ttl: title to display
+         :param h: # of lines to configure the treeview's height
+         :param cols: a list of tuples col<i> =(l,w,t) where:
            l is the text to display in the header
            w is the desired width of the column in pixels
            t is the type of data in the column
-         ipath: path of appicon
-         resize: allow Panel to be resized by user
-         polltime: time in microseconds betw/ after calls
+         :param ipath: path of appicon
+         :param resize: allow Panel to be resized by user
+         :param polltime: time in microseconds betw/ after calls
         """
         TabularPanel.__init__(self,tl,chief,ttl,h,cols,ipath,resize)
         self._polltime = polltime
@@ -548,18 +612,18 @@ class DBPollingTabularPanel(PollingTabularPanel):
     def __init__(self,tl,chief,connect,ttl,h,cols=None,ipath=None,resize=False,polltime=500):
         """
          initialize the PollingTabularPanel
-         tl: the Toplevel of this panel
-         chief: the master/controlling panel
-         connect: connect string to get a db connection
-         ttl: title to display
-         h: # of lines to configure the treeview's height
-         cols: a list of tuples col<i> =(l,w,t) where:
+         :param tl: the Toplevel of this panel
+         :param chief: the master/controlling panel
+         :param connect: connect string to get a db connection
+         :param ttl: title to display
+         :param h: # of lines to configure the treeview's height
+         :param cols: a list of tuples col<i> =(l,w,t) where:
            l is the text to display in the header
            w is the desired width of the column in pixels
            t is the type of data in the column
-         ipath: path of appicon
-         resize: allow Panel to be resized by user
-         polltime: time in microseconds betw/ after calls
+         :param ipath: path of appicon
+         :param resize: allow Panel to be resized by user
+         :param polltime: time in microseconds betw/ after calls
         """
         self._l = threading.Lock()
         self._conn = self._curs = None
@@ -575,7 +639,11 @@ class DBPollingTabularPanel(PollingTabularPanel):
             self._l.release()
     def _update_(self): raise NotImplementedError("DBPolling::_connect")
     def sortbycol(self,col,asc):
-        """wrap parent sortbycol with thread safety"""
+        """
+         wrap parent sortbycol with thread safety
+         :param col: col to sort
+         :param asc: sort ascending or descending
+        """
         self._l.acquire()
         try:
             PollingTabularPanel.sortbycol(self,col,asc)
@@ -589,14 +657,14 @@ class DBPollingTabularPanel(PollingTabularPanel):
 
 class LogPanel(TabularPanel):
     """
-     LogPanel -  a singular panel which displays information pertaining to the
+     LogPanel:  a singular panel which displays information pertaining to the
      "program", cannot be closed by the user only by the MasterPanel
     """
     def __init__(self,tl,chief):
         """
          initialzie LogPanel
-         tl: the Toplevel
-         chief: the master panel
+         :param tl: the Toplevel
+         :param chief: the Master panel
         """
         TabularPanel.__init__(self,tl,chief,"Log",5,
                               [('',lenpix('[+] '),str),
@@ -628,11 +696,17 @@ class LogPanel(TabularPanel):
     def pnlupdate(self): pass    # nothing needs to be updated
     def _shutdown(self): pass # nothing needs to be cleaned up
     def logwrite(self,msg,mtype=LOG_NOERR):
-        """ writes message msg of type mtype to the log """
+        """
+         writes message msg of type mtype to the log
+         :param msg: the message to write
+         :param mtype: the level of the message
+        """
         self._l.acquire()
         try:
             self._tree.insert('','end',iid=str(self._n),
-                             values=(self._symbol[mtype],time.strftime('%H:%M:%S'),msg),
+                             values=(self._symbol[mtype],
+                                     time.strftime('%H:%M:%S'),
+                                     msg),
                              tags=(mtype,))
             self._n += 1
             self._tree.yview('moveto',1.0)
@@ -642,10 +716,8 @@ class LogPanel(TabularPanel):
             self._l.release()
     def delayedwrite(self,ms):
         """
-         writes each msg in ms to the log where msg is a tuple (time,text,type)
-          time - time text occurred as a string
-          text - message text
-          type - type of message
+         writes a list of messages
+         :param ms: list of triples of the form (time,text,type)
         """
         self._l.acquire()
         try:
@@ -668,13 +740,12 @@ class TailLogPanel(TabularPanel):
     def __init__(self,tl,chief,ttl,polltime,logfile,w=20,resize=False):
         """
          initializes TailLogPanel to read from the file specified logfile
-         tl: the Toplevel
-         chief: the master panel
-         ttl: title to display
-         polltime: polltime in milliseconds to pause between file checks
-         logfile: the log file to tail
-         width: width of the display (in characters
-         resize: allow resize
+         :param tl: the Toplevel
+         :param chief: the master panel
+         :param ttl: title to display
+         :param polltime: polltime in milliseconds to pause between file checks
+         :param logfile: the log file to tail
+         :param resize: allow resize
         """
         TabularPanel.__init__(self,tl,chief,ttl,5,[('',lenpix(w),str)],
                               "widgets/icons/log.png",resize)
@@ -748,7 +819,10 @@ class TailLogPanel(TabularPanel):
 
     # PRIVATE HELPER
     def _newlines(self,lines):
-        """ writes new lines to panel """
+        """
+         writes new lines to panel
+         :param lines: list of lines to append to the end of the log
+        """
         for line in lines:
             self._tree.insert('','end',iid=str(self._n),values=(line.strip(),))
             self._n += 1
@@ -774,11 +848,11 @@ class MasterPanel(Panel):
     """
     def __init__(self,tl,ttl,datatypes=None,ipath=None,resize=False):
         """
-         ttl: title of the window/panel
-         tl: the toplevel of this panel
-         datatypes: list of strings for data bins, etc
-         logpanel: if True, will initiate a logpanel
-         ipath: path of image to show as icon for this panel
+         initialize
+         :param ttl: title of the window/panel
+         :param tl: the toplevel of this panel
+         :param datatypes: list of strings for data bins, etc
+         :param ipath: path of image to show as icon for this panel
         """
         Panel.__init__(self,tl,ipath,resize)
         self.tk = tl
@@ -839,6 +913,7 @@ class MasterPanel(Panel):
          override notifyclose, before allowing requesting panel to close,
          deregister it we need to remove all notification requests from
          the panel before deleting it
+         :param name: id of pane that is closing
         """
         if name in self._panels: self.audit_deregister(name)
         del self._panels[name]
@@ -884,7 +959,10 @@ class MasterPanel(Panel):
                 self.logwrite(e,LOG_ERR)
 
     def guiload(self,fpath=None):
-        """ loads a saved toolset configuration """
+        """
+         loads a saved toolset configuration
+         :param fpath: path to toolset file
+        """
         if not fpath:
             fpath = tkFD.askopenfilename(title='Open Toolset',
                                          filetypes=[('Toolset files','*.ts')],
@@ -911,7 +989,11 @@ class MasterPanel(Panel):
                         i += 1
 
     def logwrite(self,msg,mtype=LOG_NOERR):
-        """ writes msg to log or shows in error message """
+        """
+         writes msg to log or shows in error message
+         :param msg: message to write
+         :param mtype: level of message
+        """
         log = self.getpanel("log",True)
         if log:
             log.logwrite(msg,mtype)
@@ -926,12 +1008,17 @@ class MasterPanel(Panel):
     # Panel/data update functionality
 
     def audit_register(self,dtype,name):
-        """ register panel for dtype audits """
+        """
+         register panel for dtype audits
+         :param dtype: type of data
+         :param name: id of requesting panel
+        """
         self._audit_registered[dtype].append(name)
 
     def audit_deregister(self,name):
         """
          deregister panel from all audits
+         :param name: id of panel
         """
         for registered in self._audit_registered:
             if name in self._audit_registered[registered]:
@@ -941,6 +1028,9 @@ class MasterPanel(Panel):
         """
          notification that the panel name is hiding ids - will notify all audit 
          registered panels that these ids are hidden
+         :param dtype: type of data
+         :param name: id of panel
+         :param ids: ids of data being hidden
         """
         self._hidden[dtype].extend(ids)
         for panel in self._audit_registered[dtype]:
@@ -951,6 +1041,9 @@ class MasterPanel(Panel):
         """
          notification that the panel name has selected ids - will notify all audit
          registered panels that these ids are selected
+         :param dtype: type of data
+         :param name: id of panel
+         :param ids: ids of data selected by the panel
         """
         self._selected[dtype] = ids
         for panel in self._audit_registered[dtype]:
@@ -960,7 +1053,9 @@ class MasterPanel(Panel):
     def restorehidden(self,dtype,name):
         """
          notification that the panel name is restoring ids - will notify all audit
-        registered panels that all ids are being restored
+         registered panels that all ids are being restored
+         :param dtype: type of data
+         :param name: id of panel
         """
         h = self._hidden[dtype]
         self._hidden[dtype] = []
