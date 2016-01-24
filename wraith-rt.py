@@ -782,7 +782,7 @@ class WraithPanel(gui.MasterPanel):
             if not self._pwd:
                 pwd = self._getpwd()
                 if pwd is None:
-                    self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
+                    self.logwrite("Password entry canceled.",gui.LOG_WARN)
                     return
                 self._pwd = pwd
 
@@ -866,13 +866,12 @@ class WraithSplash(object):
     """ Splash Window """
     def __init__(self,tl,wp,pwd):
         """
-         tl: Toplevel
-         wp: WraithPanel
+         :param tl: Toplevel
+         :param wp: WraithPanel
         """
         self._tl = tl
         self._wp = wp
         self._pwd = pwd
-        self._finished = False
         self._tl.overrideredirect(True) # hide the title bar
 
         # create our splash image, progress bar and status label
@@ -1049,7 +1048,7 @@ if __name__ == '__main__':
 
         # WraithPanel will start everything if pwd is present otherwise just the gui
         try:
-            wp = WraithPanel(t,pwd)                     # create main program
+            wp = WraithPanel(t,pwd)                         # create main program
             if sopts == 'all':
                 t.withdraw()                                # hide main programe
                 splash = WraithSplash(tk.Toplevel(),wp,pwd) # show the splash
