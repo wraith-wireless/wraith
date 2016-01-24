@@ -988,7 +988,7 @@ if __name__ == '__main__':
             i -= 1
             if i == 0: ap.error("Three incorrect password attempts")
 
-        # stop Iyri, then Nidus, then PostgreSQL
+        # stop Iyri, then PostgreSQL
         sd = sn = sp = True
         if cmdline.runningservice(wraith.IYRIPID):
             ret = 'ok' if stopiyri(pwd) else 'fail'
