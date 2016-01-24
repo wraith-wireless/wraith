@@ -204,7 +204,6 @@ class ConvertPanel(gui.SimplePanel):
 
     def convertgeo(self):
         """convert geo from lat/lon to mgrs or vice versa """
-        # copied from LOBster
         m = self._entMGRS.get()
         ll = self._entLatLon.get()
         if m and ll: self.err('Error',"One field must be empty")
@@ -212,15 +211,13 @@ class ConvertPanel(gui.SimplePanel):
             if m:
                 try:
                     ll = self._mgrs.toLatLon(m)
-                    "{0:.3} {1:.3}".format(ll[0],ll[1])
-                    self._entLatLon.insert(0,"{0:.3} {1:.3}".format(ll[0],ll[1]))
+                    self._entLatLon.insert(0,"%.3f %.3f" % (ll[0],ll[1]))
                 except:
                     self.err('Error',"MGRS is not valid")
             elif ll:
                 try:
                     ll = ll.split()
-                    m = self._mgrs.toMGRS(ll[0],ll[1])
-                    self._entMGRS.insert(0,m)
+                    self._entMGRS.insert(0,self._mgrs.toMGRS(ll[0],ll[1]))
                 except:
                     self.err('Error',"Lat/Lon is not valid")
 
@@ -233,24 +230,24 @@ class ConvertPanel(gui.SimplePanel):
             try:
                 w = math.pow(10,(float(d)/10.0))
                 m = 100 * float(d)
-                self._entmW.insert(0,'{0.3}'.format(w))
-                self._entmBm.insert(0,'{0.3}'.format(m))
+                self._entmW.insert(0,'%.3f' % w)
+                self._entmBm.insert(0,'%.3f' % m)
             except:
                 self.err('Error',"dBm is not valid")
         elif w and not (m or d):
             try:
                 d = 10*math.log10(float(w))
                 m = 100 * d
-                self._entdBm.insert(0,'{0.3}'.format(d))
-                self._entmBm.insert(0,'{0.3}'.format(m))
+                self._entdBm.insert(0,'%.3f' % d)
+                self._entmBm.insert(0,'%.3f' % m)
             except:
                 self.err('Error',"dBm is not valid")
         elif m and not (d or m):
             try:
                 d = float(m) / 100
                 w = math.pow(10,(float(d)/10.0))
-                self._entdBm.insert(0,'{0.3}'.format(d))
-                self._entmW.insert(0,'{0.3}'.format(w))
+                self._entdBm.insert(0,'%.3f' % d)
+                self._entmW.insert(0,'%.3f' % w)
             except:
                 self.err('Error',"mBm is not valid")
         else: self.err('Error',"Two fields must be empty")
@@ -362,34 +359,24 @@ class CalculatePanel(gui.SimplePanel):
 
     def calc(self):
         """ apply formula with entries """
-        formula = self._formula
-        # make sure no entries are empty substituting the value of the entry as
-        # we go
+        f = self._formula
+        # make sure no entries are empty substituting the entry's  value as we go
         for i,entry in enumerate(self._entries):
-            if entry.get():
-                formula = formula.replace('${0}'.format(i),
-                                          "{0}('{1}')".format((self._inputs[i][2],
-                                                               entry.get())))
+            x = entry.get()
+            if x:
+                f = f.replace('$%d' % i,"%s('%s')" % (self._inputs[i][2],x))
             else:
                 self.err('Error',"All entries must be filled in")
                 return
-        #for i in xrange(len(self._entries)):
-        #    if self._entries[i].get():
-        #        formula = formula.replace('${0}'.format(i),
-        #                                  "{0}('{1}')".format((self._inputs[i][2],
-        #                                                       self._entries[i].get())))
-        #    else:
-        #        self.err('Error',"All entries must be filled in")
-        #        return
 
         # attempt to calculate
         try:
-            self._ans.set("{0} {1}".format(str(eval(formula)),self._meas))
+            self._ans.set("{0} {1}".format(str(eval(f)),self._meas))
         except ValueError as e:
             err = "{0} is not a valid input".format(e.message.split(':')[1].strip())
             self.err("Invalid Input",err)
-        except Exception as e:
-            self.err('Error',e)
+        #except Exception as e:
+        #    self.err('Error',e)
 
     def clear(self):
         """ clear all entries """
@@ -487,13 +474,6 @@ class DatabinPanel(gui.SimplePanel):
 
         # bind the right click to this button to show a context menu
         self._bins[b]['btn'].bind('<Button-3>',self.binrc)
-
-    def notifyclose(self,name):
-        """
-         close the associated bin's cursor
-         :param name: name of bin to close
-        """
-        gui.SimplePanel.notifyclose(self,name)
 
     def viewquery(self,b):
         """
@@ -1000,9 +980,10 @@ class QueryPanel(gui.SlavePanel):
                                      filetypes=[("Text Files","*.txt"),
                                                 ("Selector Files","*.sel")],
                                      parent=self)
-        self.update()
-        self.clearselfile()
-        self._entSelFile.insert(0,fpath)
+        if fpath:
+            self.update()
+            self.clearselfile()
+            self._entSelFile.insert(0,fpath)
 
     def clearselfile(self):
         """ clear the selection file """
@@ -1457,6 +1438,7 @@ class IyriConfigPanel(gui.ConfigPanel):
         nb.add(frmG,text='GPS')
 
         # misc tab
+        # storage
         frmM = ttk.Frame(nb)
         frmMS = ttk.LabelFrame(frmM,text='Storage')
         frmMS.grid(row=0,column=0,sticky='w')
@@ -1475,7 +1457,7 @@ class IyriConfigPanel(gui.ConfigPanel):
         ttk.Label(frmMS,text='PWD: ').grid(row=3,column=0,sticky='w')
         self._entStorePWD = ttk.Entry(frmMS,width=10)
         self._entStorePWD.grid(row=3,column=1,sticky='w')
-
+        # local
         frmML = ttk.LabelFrame(frmM,text='Local')
         frmML.grid(row=1,column=0,sticky='w')
         ttk.Label(frmML,text="Region: ").grid(row=0,column=0,sticky='w')
@@ -1487,6 +1469,13 @@ class IyriConfigPanel(gui.ConfigPanel):
         ttk.Label(frmML,text=" Max Threshers: ").grid(row=0,column=4,sticky='w')
         self._entMaxT = ttk.Entry(frmML,width=5)
         self._entMaxT.grid(row=0,column=5,sticky='w')
+        frmMLO = ttk.Frame(frmML)                # frame the oui widgets
+        frmMLO.grid(row=1,column=0,columnspan=6,sticky='w')
+        ttk.Label(frmMLO,text='Oui File: ').grid(row=1,column=0,sticky='w')
+        self._entOUIFile = ttk.Entry(frmMLO,width=17)
+        self._entOUIFile.grid(row=1,column=1)
+        ttk.Button(frmMLO,text='Browse',width=6,command=self.browse).grid(row=1,column=2,sticky='nw')
+        ttk.Button(frmMLO,text='Clear',width=6,command=self.clearouifile).grid(row=1,column=3,sticky='nw')
         nb.add(frmM,text='Misc.')
 
     def _initialize(self):
@@ -1619,6 +1608,13 @@ class IyriConfigPanel(gui.ConfigPanel):
         if cp.has_option('Local','region'): self._entRegion.insert(0,cp.get('Local','region'))
         self._entC2CPort.delete(0,tk.END)
         if cp.has_option('Local','C2C'): self._entC2CPort.insert(0,cp.get('Local','C2C'))
+        self._entMaxT.delete(0,tk.END)
+        if cp.has_option('Local','maxt'):
+            try:
+                self._entMaxT.insert(0,cp.getint('Local','maxt'))
+            except:
+                pass
+        if cp.has_option('Local','OUI'): self._entOUIFile.insert(0,cp.get('Local','OUI'))
 
     def _validate(self):
         """ validate entries """
@@ -1818,26 +1814,43 @@ class IyriConfigPanel(gui.ConfigPanel):
                 return False
 
         # misc entries
-        host = self._entStoreHost.get()
-        if not valrep.validaddr(host):
+        # begin with storage related
+        if not valrep.validaddr(self._entStoreHost.get()):
             self.err("Invalid Storage Input","Host is not a valid address")
-        port = self._entStorePort.get()
         try:
-            port = int(port)
-            if port < 1024 or port > 65535: raise RuntimeError("")
+            port = int(self._entStorePort.get())
+            if port < 1024 or port > 65535: raise ValueError("see below")
         except ValueError:
             self.err("Invalid Storage Input","Host Port must be a number between 1024 and 65535")
             return False
+        if not self._entStoreDB.get():
+            self.err("Invalid Storage Input","DB must be entered")
+            return False
+        if not self._entStoreUSR.get():
+            self.err("Invalid Storage Input","User must be entered")
+            return False
+        if not self._entStorePWD.get():
+            self.err("Invalid Storage Input","Passwored must be entered")
+            return False
+        # then local related
         region = self._entRegion.get()
         if region and len(region) != 2:
             self.err("Invalid Local Input","Region must be 2 characters")
             return False
-        port = self._entC2CPort.get()
         try:
-            port = int(port)
-            if port < 1024 or port > 65535: raise RuntimeError("")
-        except:
+            port = self._entC2CPort.get()
+            if port:
+                port = int(port)
+                if port < 1024 or port > 65535: raise ValueError("see below")
+        except ValueError:
             self.err("Invalid Local Input","C2C Port must be a number between 1024 and 65535")
+            return False
+        # NOTE: no validating done on oui path
+        try:
+            mx = self._entMaxT.get()
+            if mx: mx = int()
+        except ValueError:
+            self.err("Invalid Local Input","If present, MaxT must be an integer")
             return False
 
         return True
@@ -1903,24 +1916,45 @@ class IyriConfigPanel(gui.ConfigPanel):
             cp.add_section('Storage')
             cp.set('Storage','host',self._entStoreHost.get())
             cp.set('Storage','port',self._entStorePort.get())
+            cp.set('Storage','db',self._entStoreDB.get())
+            cp.set('Storage','user',self._entStoreUSR.get())
+            cp.set('Storage','pwd',self._entStorePWD.get())
             region = self._entRegion.get()
             c2cport = self._entC2CPort.get()
-            if region or c2cport:
+            opath = self._entOUIFile.get()
+            maxt = self._entMaxT.get()
+            if region or c2cport or opath or maxt:
                 cp.add_section('Local')
                 if region: cp.set('Local','region',region)
                 if c2cport: cp.set('Local','C2C',c2cport)
+                if opath: cp.set('Local','OUI',opath)
+                if maxt: cp.set('Local','maxt',maxt)
             fout = open(wraith.IYRICONF,'w')
             cp.write(fout)
         except IOError as e:
-            self.err("File Error",
-                     "Error <{0}> writing to config file".format(e))
+            self.err("File Error","Error <{0}> writing to config file".format(e))
         except ConfigParser.Error as e:
-            self.err("Configuration Error",
-                     "Error <{0}> writing to config file".format(e))
+            self.err("Configuration Error","Error <{0}> writing to config file".format(e))
         else:
-            self.info('Success',"Restart for changes to take effect")
+            self.info('Success',"Restart Iyri if running for changes to take effect")
         finally:
             if fout: fout.close()
+
+#### callbacks
+
+    def browse(self):
+        """ open a file browsing dialog for selector file """
+        fpath = tkFD.askopenfilename(title="Select OUI File",
+                                     filetypes=[("Text Files","*.txt")],
+                                     parent=self)
+        if fpath:
+            self.update()
+            self.clearouifile()
+            self._entOUIFile.insert(0,fpath)
+
+    def clearouifile(self):
+        """ delete contents of oui entry """
+        self._entOUIFile.delete(0,tk.END)
 
     def gpscb(self):
         """ enable/disable gps entries as necessary """
