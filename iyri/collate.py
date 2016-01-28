@@ -271,7 +271,7 @@ class Collator(mp.Process):
                             continue
 
                         # move to our buffer, put on threshers queue & update index
-                        cb[(_ix*n):(_ix*n)+l] = smap[hw]['cb'][(i*DIM_N):(i*DIM_N)+l]
+                        cb[(_ix*n):(_ix*n)+l] = smap[hw]['cb'][(i*n):(i*n)+l]
                         fmap[_ix] = 1
                         qT.put((COL_FRAME,ts,(hw,_ix,l)))
                         _ix = (_ix+1) % m
