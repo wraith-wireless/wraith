@@ -236,6 +236,7 @@ class Iryi(object):
             self._state = IYRI_RUNNING
 
         # execution loop
+
         while mp.active_children(): # side effect joins children
             # get & process messages
             try:

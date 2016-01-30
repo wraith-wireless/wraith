@@ -130,6 +130,7 @@ class Thresher(mp.Process):
          :param ts: timestamp of frame
          :param d:  data
         """
+
         # (1) pull frame off the buffer & notify Collator
         src = idx = b = None
         try:
