@@ -398,7 +398,6 @@ class Collator(mp.Process):
         :param m: smap dict
         :returns tuple t = (thresher process id,send connection):
         """
-
         # NOTE: send the sid last so the thresher will not attempt to process
         # any frames until it has all radio(s) data
         r,s = mp.Pipe(False)
