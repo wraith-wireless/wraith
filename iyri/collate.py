@@ -1,20 +1,17 @@
 #!/usr/bin/env python
 
 """ collator.py: coordinates collection and transfer of wraith sensor & gps data
-
 Processes and stores
  1) frames from the radio(s)
  2) frontline traces collected by GPSController
  3) messages from tuner(s) and sniffer(s)
  4) device details to include 802.11 radios, gps device and system
-
 Additionally, an internal dict with the form fmap[ix] = state where ix is the
 index of the frame in the buffer and state is oneof {0|1} such that 0 denotes
 that the frame at ix has been "pulled" of the buffer but is still being processed
 and 1 denotes that frame at ix is still on the buffer (and no entry denotes that
 no frame is at ix. Use the number of frames (regardless of state) to determine if
 we need to increase/decrease the size of the local buffer.
-
 NOTE: this assumes that the Collator can pull frames off the radio(s) buffer prior
 to their being overwritten by the RadioCollator
 """
@@ -88,6 +85,7 @@ class Collator(mp.Process):
         fmap = {}                          # maps src (hwaddr) to frames
         smap = {}                          # maps src (hwaddr) to sensor params
         threshers = {}                     # pid->connection
+        tst = 0                            # timestamp of last thresher creation
         stop = False                       # poison pill has been received
         poisoned = False                   # poison pill has been sent (to threshers)
         df = rf = 0                        # number dropped frames & read frames
@@ -107,6 +105,7 @@ class Collator(mp.Process):
                     threshers[pid] = send
                 except RuntimeError as e:
                     self._cI.send((IYRI_WARN,'collator','Thresher',e))
+            tst = time()
             self._submitplatform()
         except psql.Error as e:
             if e.pgcode == '23P01': err = "Last session closed incorrectly"
@@ -121,8 +120,8 @@ class Collator(mp.Process):
 
         # execution loop - NOTE: if submitsensor failed, there will be no
         # threshers and we will immediately fall through the exection loop
-        tmUpdate = 0
-        tmUpdate1 = 0
+        tmUpdate = 0   # timestamps for tracking when last exiting update
+        tmUpdate1 = 0  # was sent
         ins = [self._cI,self._icomms._reader]
         while mp.active_children():
             if stop: # is it time to quit?
@@ -271,7 +270,7 @@ class Collator(mp.Process):
                             continue
 
                         # move to our buffer, put on threshers queue & update index
-                        cb[(_ix*n):(_ix*n)+l] = smap[hw]['cb'][(i*DIM_N):(i*DIM_N)+l]
+                        cb[(_ix*n):(_ix*n)+l] = smap[hw]['cb'][(i*n):(i*n)+l]
                         fmap[_ix] = 1
                         qT.put((COL_FRAME,ts,(hw,_ix,l)))
                         _ix = (_ix+1) % m
@@ -283,17 +282,20 @@ class Collator(mp.Process):
                         # processed)
                         if len(fmap) / (m*1.0) > 0.25 and len(threshers) < maxt:
                             # create at most mint new threshers w/out adding
-                            # more than allowed
+                            # more than allowed. Give time for previously
+                            # created threshers to start wokr
+                            tsnow = time()
+                            if tsnow - tst < 3: continue
                             x = min(mint,maxt-len(threshers))
                             msg = "Buffer at 25%, adding {0} threshers".format(x)
                             self._cI.send((IYRI_INFO,'collator','load',msg))
                             for _ in xrange(x):
                                 try:
-                                    (pid,send) = self._newthresher(qT,lSta,cb,
-                                                                   ouis,smap)
+                                    (pid,send) = self._newthresher(qT,lSta,cb,ouis,smap)
                                     threshers[pid] = send
                                 except RuntimeError as e:
                                     self._cI.send((IYRI_WARN,'Collator',Thresher,e))
+                            tst = time()
                     else: # unidentified event type, notify iyri
                         msg = "unknown event. {0}->{1}".format(ev,cs)
                         self._cI.send((IYRI_WARN,'collator','icomms',msg))

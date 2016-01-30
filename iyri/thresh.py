@@ -81,7 +81,6 @@ class Thresher(mp.Process):
 
             # get each message
             for r in rs:
-                ts1 = isots() # get data read time
                 try:
                     # get & process data
                     if r == self._cC: (tkn,ts,d) = self._cC.recv()
@@ -90,11 +89,11 @@ class Thresher(mp.Process):
                     elif tkn == COL_SID: sid = d[0]
                     elif tkn == COL_RDO: rdos[d[0]] = False
                     elif tkn == COL_WRITE: rdos[d[0]] = d[1]
-                    elif tkn == COL_FRAME: self._processframe(sid,rdos,ts,ts1,d)
+                    elif tkn == COL_FRAME: self._processframe(sid,rdos,ts,d)
                 except Exception as e:
                     # blanket exception, catch all and notify collator
                     msg = "{0} {1}\n{2}".format(type(e).__name__,e,tb())
-                    self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None)))
+                    self._icomms.put((self.cs,isots(),THRESH_WARN,(msg,None)))
 
         # notify collector we're down
         if self._curs: self._curs.close()
@@ -123,13 +122,12 @@ class Thresher(mp.Process):
             if self._conn: self._conn.close()
             raise RuntimeError(e)
 
-    def _processframe(self,sid,rdos,ts,ts1,d):
+    def _processframe(self,sid,rdos,ts,d):
         """
          inserts frame into db
          :param sid: session id
          :param rdos: radio dict
          :param ts: timestamp of frame
-         :param ts1: timestamp of data read
          :param d:  data
         """
         # (1) pull frame off the buffer & notify Collator
@@ -166,18 +164,18 @@ class Thresher(mp.Process):
         except rtap.RadiotapException as e:
             # parsing failed @ radiotap, set empty vals & alert Collator
             msg = "Parsing failed at radiotap: {0} in buffer[{1}]".format(e,idx)
-            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None)))
+            self._icomms.put((self.cs,isots(),THRESH_WARN,(msg,None)))
             vs = (sid,ts,lF,0,0,[0,lF],0,0,0)
             dR['err'] = e
         except mpdu.MPDUException as e:
             # mpdu failed - initialize empty mpdu vals & alert Collator
             msg = "Parsing failed at mpdu: {0} in buffer[{1}]".format(e,idx)
-            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None)))
+            self._icomms.put((self.cs,isots(),THRESH_WARN,(msg,None)))
             vs = (sid,ts,lF,dR['sz'],0,[dR['sz'],lF],dR['flags'],
                   int('a-mpdu' in dR['present']),rtap.flags_get(dR['flags'],'fcs'))
         except Exception as e: # blanket error
             msg = "Parsing Error. {0} {1}\n{2}".format(type(e).__name__,e,tb())
-            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,idx)))
+            self._icomms.put((self.cs,isots(),THRESH_WARN,(msg,idx)))
             return
 
         # (3) store the frame
@@ -225,7 +223,7 @@ class Thresher(mp.Process):
                 # notify collator, but we want to continue attempting to store
                 # as much as possible so set src and index to None
                 msg = "Frame {0}. Bad MPDU {1}".format(fid,err)
-                self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,None)))
+                self._icomms.put((self.cs,isots(),THRESH_WARN,(msg,None)))
 
             # (a) store frame details in db
 
@@ -270,18 +268,18 @@ class Thresher(mp.Process):
             self._conn.rollback()
             args = (fid,self._next,e.pgcode,e.pgerror)
             msg = "<PSQL> Frame {0} failed at {1}. {2}->{3}.".format(*args)
-            self._icomms.put((self.cs,ts1,THRESH_ERR,(msg,idx)))
+            self._icomms.put((self.cs,isots(),THRESH_ERR,(msg,idx)))
         except psql.Error as e:
             # rollback to avoid db errors
             self._conn.rollback()
             args = (fid,self._next,e.pgcode,e.pgerror)
             msg = "<PSQL> Frame {0} failed at {1}. {2}->{3}.".format(*args)
-            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,idx)))
+            self._icomms.put((self.cs,isots(),THRESH_WARN,(msg,idx)))
         except Exception as e:
             self._conn.commit() # commit anything that may be pending
             args = (fid,self._next,type(e).__name__,e,tb())
             msg = "<UNK> Frame {0} failed at {1}. {2}->{3}\n{4}.".format(*args)
-            self._icomms.put((self.cs,ts1,THRESH_WARN,(msg,idx)))
+            self._icomms.put((self.cs,isots(),THRESH_WARN,(msg,idx)))
 
     #### All below _insert functions will allow db exceptions to pass through to caller
 

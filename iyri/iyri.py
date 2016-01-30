@@ -237,16 +237,6 @@ class Iryi(object):
 
         # execution loop
         while mp.active_children(): # side effect joins children
-            # are we exiting?
-            #if self._halt.is_set() and self._state < IYRI_EXITING:
-            #    # send out poison pills
-            #    self._state = IYRI_EXITING
-            #    for wrkr in self._pConns:
-            #        try:
-            #            self._pConns[wrkr].send(POISON)
-            #        except (EOFError,IOError): # ignore broken pipes
-            #            pass
-
             # get & process messages
             try:
                 (rs,_,_) = select.select(self._pConns.values(),[],[],0.5)
