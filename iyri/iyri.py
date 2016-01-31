@@ -202,7 +202,6 @@ class Iryi(object):
         # internal variables
         self._state = IYRI_INVALID  # current state
         self._conf = {}             # iyri configuration dict
-        self._halt = None           # the stop event
         self._pConns = None         # token pipes for children (& c2c)
         self._ic = None             # internal comms queue
         self._collator = None       # data collation/forwarding
@@ -230,7 +229,6 @@ class Iryi(object):
         if self.state == IYRI_INVALID:
             # make sure we do not leave system in corrupt state (i.e. w/o nics)
             logging.error("Iryi failed to initialize, shutting down")
-            #self._halt.set()
             self.stop()
         else:
             logging.info("**** Starting Iryi %s ****",ivers)
@@ -281,12 +279,10 @@ class Iryi(object):
                             rmsg = '{0}:{1}:{2}'.format(cmd,cid,'-'.join(ps))
                             self._pConns[rdo].send(rmsg)
                     elif l == CMD_ERR:
-                        resp = "ERR %d \001%s\001\n".format(t,m)
-                        self._pConns['c2c'].send(resp)
+                        self._pConns['c2c'].send("ERR {0} \001{1}\001\n".format(t,m))
                         logging.info('Command %d failed: %s',t,m)
                     elif l == CMD_ACK:
-                        resp = "OK %d \001%s\001\n".format(t,m)
-                        self._pConns['c2c'].send(resp)
+                        self._pConns['c2c'].send("OK {0} \001{1}\001\n".format(t,m))
                         logging.info('Command %d succeeded',t)
                 except Exception as e: # catch everything and quit
                     logging.error("Iryi failed. %s->%s", type(e),e)
@@ -334,7 +330,6 @@ class Iryi(object):
         self._readconf()
 
         # intialize shared objects
-        self._halt = mp.Event() # our stop event
         self._ic = mp.Queue()   # comms for children
         self._pConns = {}       # dict of connections to children
 
@@ -439,6 +434,7 @@ class Iryi(object):
                 logging.info("Shama-%d started in %s mode",self._sr.pid,smode)
             if self._c2c:
                 logging.info("C2C listening on port %d",self._conf['local']['c2c'])
+                self._c2c.start()
 
     def _readconf(self):
         """ read in config file at cpath """
@@ -661,6 +657,7 @@ class Iryi(object):
             return None,None,None,None
 
         # ensure any params are valid
+        ps = []
         if cmd in ['listen','txpwr','spoof']:
             try:
                 ps = tkns[3].strip().split(':')

@@ -42,7 +42,6 @@ Iyri:
  53) implement spoof, txpwr commands
  55) start gpsd if it does not start automatically (assuming gps device is
      plugged in)
- 56) test c2c after switch to single platform
  61) document different comm protocols used internally
  63) format tracebacks to logging better
  65) look into using a priority queue for the internal comms (to Collator)

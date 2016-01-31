@@ -95,11 +95,9 @@ class Tuner(mp.Process):
 
                 # parse the requested command
                 cmd,cid,ps = tkn.split(':') # force into 3 components
-                print "cmd id of type", type(cid)
-                cid = int(cid) # necessary:
+                cid = int(cid)              # & convert id to int
                 if cmd == 'state':
-                    state = TUNE_DESC[self._state]
-                    self._qR.put((RDO_STATE,ts2iso(ts),[cid,state]))
+                    self._qR.put((RDO_STATE,ts2iso(ts),[cid,self.meta]))
                 elif cmd == 'scan':
                     if self._state != TUNE_SCAN:
                         self._state = TUNE_SCAN

@@ -61,6 +61,7 @@ REVISIONS:
      o all children will notify iyri when they are finished
      o collator will delay poison pill to threshers until all outstanding frames
       have been processed
+     o fixed c2c
 """
 __name__ = 'iyri'
 __license__ = 'GPL v3.0'
