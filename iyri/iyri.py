@@ -4,28 +4,8 @@
 
 802.11-2012 sensor that collects raw 802.11 frames, gps data and processes the
 data, storing it in a local postgres database. Provides c2c functionality via a
-socket on port 2526 unless otherwise specified in the config file.
-
-The protocol used is similar to kismet (see below)
-messages from client will be in the following format
- !<id> <cmd> <radio> [param]\n
- where:
-  id is an integer (unique)
-  cmd is oneof {state|scan|hold|listen|pause|txpwr|spoof}
-  radio is oneof {both|all|abad|shama} where both enforces abad and
-   shama radio and all enforces shama only if present
-  param is:
-   o of the format channel:width if cmd is listen where width is oneof
-     {'None','HT20','HT40+','HT40-'}
-   o of the format pwr:option where pwr is in dBm and option is oneof
-     {fixed|auto|limit}
-   o a macaddr if cmd is spoof
-Iryi will notify the client if the cmd specified by id is invalid or valid with
- OK <id> [\001output\001]or
- ERR <id> \001Reason for Failure\001
-If the command was invalid and no command id could be read it will be set to ?
-
-Note: Iryi only allows one client connection at a time
+socket on port 2526 unless otherwise specified in the config file. The protocol
+used is similar to kismet (see below)
 """
 
 #__name__ = 'iyri'
@@ -59,6 +39,27 @@ GPATH = os.path.dirname(os.path.abspath(__file__))
 logpath = os.path.join(GPATH,'iyri.log.conf')
 logging.config.fileConfig(logpath)
 
+"""
+  Messages from client must be in the following format
+   !<id> <cmd> <radio> [params]\n
+  where:
+   id is an integer (unique)
+   cmd is oneof {state|scan|hold|listen|pause|txpwr|spoof}
+   radio is oneof {both|all|abad|shama} where both enforces abad and
+    shama radio and all enforces shama only if present
+   param is:
+    o of the format channel:width if cmd is listen where width is oneof
+      {'None','HT20','HT40+','HT40-'}
+    o of the format pwr:option where pwr is in dBm and option is oneof
+      {fixed|auto|limit}
+    o a macaddr if cmd is spoof
+ Iryi will notify the client if the cmd specified by id is invalid or valid with
+  OK <id> [\001output\001]or
+  ERR <id> \001Reason for Failure\001
+If the command was invalid and no command id could be read it will be set to ?
+
+Note: Iryi only allows one client connection at a time
+"""
 class C2CClientExit(Exception): pass
 class C2C(threading.Thread):
     """
@@ -611,6 +612,8 @@ class Iryi(object):
         """
          parse and process command from c2c socket
          :param msg: the commnd from user
+         :returns: a tuple t = (cmdid,cmd,radios,ps) or (None,None,None,None)
+          if the cmd is bad. Note: ps will be a list of params
         """
         # get tokens & ensure there are at least 3 tokens
         try:
@@ -671,8 +674,8 @@ class Iryi(object):
                     if ps[1] not in ['fixed','auto','limit']: raise RuntimeError
                 elif cmd == 'spoof': # spoof will be macaddr
                     if len(ps) != 6: raise RuntimeError
-                    ps = ':'.join(ps).upper() # rejoin the mac
-                    if not valrep.validhwaddr(ps): raise RuntimeError
+                    if not valrep.validhwaddr(':'.join(ps).upper()):
+                        raise RuntimeError
             except:
                 resp = "ERR {0} \001invalid params\001\n".format(cmdid)
                 self._pConns['c2c'].send(resp)

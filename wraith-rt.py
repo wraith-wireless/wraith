@@ -316,7 +316,7 @@ class WraithPanel(gui.MasterPanel):
         self._mnuIyriLog.add_command(label='Clear',command=self.cleariyrilog) # 1
         self._mnuIyri.add_cascade(label='Log',menu=self._mnuIyriLog)       # 5
         self._mnuIyri.add_separator()                                      # 6
-        self._mnuIyri.add_command(label='Config',command=self.configiyri) # 7
+        self._mnuIyri.add_command(label='Config',command=self.iyriconfig) # 7
 
         # Help Menu
         self._mnuHelp = tk.Menu(self._menubar,tearoff=0)
@@ -342,7 +342,8 @@ class WraithPanel(gui.MasterPanel):
         elif desc == 'sessions': self.viewsessions()
         elif desc == 'preferences': self.configwraith()
         elif desc == 'iyrilog': self.viewiyrilog()
-        elif desc == 'iyriprefs': self.configiyri()
+        elif desc == 'iyrictrl': self.iyrictrl()
+        elif desc == 'iyriprefs': self.iyriconfig()
         elif desc == 'about': self.about()
         else: raise RuntimeError, "WTF Cannot open {0}".format(desc)
 
@@ -568,7 +569,14 @@ class WraithPanel(gui.MasterPanel):
 
     def iyrictrl(self):
         """ displays Iyri Control Panel """
-        self.unimplemented()
+        panel = self.getpanel('iyrictrl',False)
+        if not panel:
+            t = tk.Toplevel()
+            pnl = subgui.IyriCtrlPanel(t,self)
+            self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'iyrictrl'))
+        else:
+            panel[0].tk.deiconify()
+            panel[0].tk.lift()
 
     def viewiyrilog(self):
         """ display Iyri log """
@@ -593,7 +601,7 @@ class WraithPanel(gui.MasterPanel):
             lv = self.getpanel('iyrilog')
             if lv: lv.reset()
 
-    def configiyri(self):
+    def iyriconfig(self):
         """ display Iyri config file preference editor """
         panel = self.getpanels('iyriprefs',False)
         if not panel:
@@ -718,7 +726,8 @@ class WraithPanel(gui.MasterPanel):
                 # Iyri sensor is not running
                 self._mnuIyri.entryconfig(0,state=tk.NORMAL)    # start
                 self._mnuIyri.entryconfig(1,state=tk.DISABLED)  # stop
-                self._mnuIyri.entryconfig(3,state=tk.DISABLED)  # ctrl panel
+                #### TODO: uncomment below after test ctrl panel
+                #self._mnuIyri.entryconfig(3,state=tk.DISABLED)  # ctrl panel
                 self._mnuIyriLog.entryconfig(1,state=tk.NORMAL) # clear log
                 self._mnuIyri.entryconfig(7,state=tk.NORMAL)    # configure
 

@@ -70,12 +70,8 @@ class RadioController(mp.Process):
         self._chi = 0             # initial channel index
         self._s = None            # the raw socket
         self._antenna = {'num':0, # antenna details
-                         'gain':None,
-                         'type':None,
-                         'loss':None,
-                         'x':None,
-                         'y':None,
-                         'z':None}
+                         'gain':None,'type':None,'loss':None,
+                         'x':None,'y':None,'z':None}
         self._setup(conf)
 
     def terminate(self): pass
@@ -126,12 +122,12 @@ class RadioController(mp.Process):
                 elif ev == RDO_HOLD:
                     stuner = TUNE_HOLD
                     self._icomms.put((self._vnic,ts,RDO_HOLD,msg[1]))
-                    if msg[0] != -1:
+                    if msg[0] > -1:
                         self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
                 elif ev == RDO_SCAN:
                     stuner = TUNE_SCAN
                     self._icomms.put((self._vnic,ts,RDO_SCAN,msg[1]))
-                    if msg[0] != -1:
+                    if msg[0] > -1:
                         self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
                 elif ev == RDO_LISTEN:
                     stuner = TUNE_LISTEN
@@ -162,7 +158,7 @@ class RadioController(mp.Process):
                     self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
                     self._icomms.put((self._vnic,isots(),RDO_FAIL,e))
 
-        # ensure Tuner has finished
+        # wait on Tuner to finish
         while mp.active_children(): sleep(0.5)
 
         # notify Iyri and Collator we are down & shut down

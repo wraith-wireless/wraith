@@ -283,7 +283,7 @@ class Collator(mp.Process):
                         if len(fmap) / (m*1.0) > 0.25 and len(threshers) < maxt:
                             # create at most mint new threshers w/out adding
                             # more than allowed. Give time for previously
-                            # created threshers to start wokr
+                            # created threshers to start working
                             tsnow = time()
                             if tsnow - tst < 3: continue
                             x = min(mint,maxt-len(threshers))

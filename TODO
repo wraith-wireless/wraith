@@ -64,6 +64,13 @@ Iyri:
    processing outstanding frames
   o when run as service, logging is also stopped shortly after calling 'stop'
    - artifact of calling as a service?
+ 81) user command state needs to return more data such as current channel, txpwr etc
+ 82) have tuner interact directly with iyri?
+   o it could become an issue if a process was programmatically interacting
+    w/ iyri where the RadioController would be too occupied w/ fielding
+    comms from the Tuner rather than pulling off the "wire"
+   o However, radio must be able to forward radio events to the collator
+ 83) need to revamp the c2c cmd processing
 Wifi:
   1) Should we add support for AVS, Prism headers ?
   2) radiotap: ensure data pad is handled for atheros cards (any others?)

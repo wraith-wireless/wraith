@@ -373,6 +373,36 @@ class SimplePanel(SlavePanel):
     def pnlupdate(self): pass
     def _shutdown(self): pass
 
+class SimplePollingPanel(SimplePanel):
+    """
+     SimplePollingPanel - a simple panel that updates itself periodically
+     through the after function
+
+     Derived classes must implement:
+      o pnlupdate to configure the polling functionality
+      o _makegui to create the gui
+    """
+    def __init__(self,tl,chief,ttl,ipath=None,resize=False,polltime=500):
+        """
+         initialize
+         :param tl: the Toplevel
+         :param chief: the controlling (master) panel
+         :param ttl: title of panel
+         :param ipath: path to icon
+         :param resize: allow user to resize panel
+         :param polltime: time in ms betw/ polls
+        """
+        SimplePanel.__init__(self,tl,chief,ttl,ipath,resize)
+        self._polltime = polltime
+        self._makegui()
+        self.pnlupdate()
+        self.after(self._polltime,self.poll)
+    def poll(self):
+        self.pnlupdate()
+        self.after(self._polltime,self.poll)
+    def _makegui(self): raise NotImplementedError("SimplePollingPanel::_body")
+
+
 class ConfigPanel(SlavePanel):
     """
      Configuration file view/edit panel. Provides a frame for input widgets and

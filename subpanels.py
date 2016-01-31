@@ -1271,6 +1271,15 @@ class SessionsPanel(gui.DBPollingTabularPanel):
         else:
             self.err("Connect Error",err)
 
+# Iyri->Control
+class IyriCtrlPanel(gui.SimplePollingPanel):
+    """ Display Iyri Control Panel """
+    def __init__(self,tl,chief):
+        gui.SimplePollingPanel.__init__(self,tl,chief,"Iyri Control","widgets/icons/sensor.png")
+
+    def pnlupdate(self): pass
+    def _makegui(self): pass
+
 # Iyri->Config
 class IyriConfigException(Exception): pass
 class IyriConfigPanel(gui.ConfigPanel):
@@ -1283,7 +1292,7 @@ class IyriConfigPanel(gui.ConfigPanel):
         nb = ttk.Notebook(frm)
         nb.grid(row=0,column=0,sticky='nwse')
 
-        # Abad Tab Configuration
+        # Abad Tab Configurationsssssssssssssssssss ,mde5555555555555555[p
         frmA = ttk.Frame(nb)
         ttk.Label(frmA,text='NIC: ').grid(row=0,column=0,sticky='nw')
         self._entAbadNic = ttk.Entry(frmA,width=5)
