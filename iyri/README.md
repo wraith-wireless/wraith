@@ -106,3 +106,5 @@ Iyri will notify the client if the cmd specified by id is valid or invalid with:
 OK \<id\> [\001output\001]
 
 ERR \<id> \001Reason for Failure\001
+
+## 4. Architecture
