@@ -50,7 +50,7 @@ logging.config.fileConfig(logpath)
    param is:
     o of the format channel:width if cmd is listen where width is oneof
       {'None','HT20','HT40+','HT40-'}
-    o of the format pwr:option where pwr is in dBm and option is oneof
+    o of the format pwr:option if cmd is txpwr where pwr is in dBm and option is oneof
       {fixed|auto|limit}
     o a macaddr if cmd is spoof
  Iryi will notify the client if the cmd specified by id is invalid or valid with
