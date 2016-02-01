@@ -54,7 +54,7 @@ this 'mediator', and moved database functionality directly to the sensor, primar
 for two reasons:
  * it would restrict wraith to a single platform i.e. expanding to a central
   database and multiple sensors will be very difficult.
- * sensors could be used on 'minimal' systems i.e. routers and other embedded
+ * sensors could no longer be used on 'minimal' systems i.e. routers and other embedded
   systems
 However, there were two primary reasons for doing so:
  * I wanted to push more autonomy and intelligence into the sensor which would
