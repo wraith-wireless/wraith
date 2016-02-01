@@ -34,7 +34,7 @@ Radios are definied in the Abad (required) section and Shama (optional) section.
  * nic: the wireless nic to use i.e. wlan0, ath0 etc
  * paused: (optional) start in paused mode or scan (default) mode
  * spoof: (optional) spoofed mac address to use
- * record (optional) writes raw frames (default) to database or only writes parsed data
+ * record: (optional) writes raw frames (default) to database or only writes parsed data
  * Antenna Definition (optional) information currently stored in the database with the hope that in future versions it can be used to aid geolocation among other things but at present is only used to highlight different radio/antenna configurations and their collection results.
    - antennas: number of antennas
    - gain: gain in dBi
@@ -44,8 +44,10 @@ Radios are definied in the Abad (required) section and Shama (optional) section.
  * desc: brief desc of the radio
  * Scan routine defines the initial scan routine to follow
   - dwell: time to stay on each channel. At present the radio will stay on each channel for the same time but I hope to add adaptive dwells to future versions where the dwell times for each channel will change according to the amount of traffic on the channel.
-  - scan: channels to scan
-  - pass: channels not to scan. Any channels specified in pass will override scan specifications
-  - scan_start: the first channel
+  - scan: channels to scan. See below for channel list specifications
+  - pass: channels not to scan. Any channels specified in pass will override scan specifications. See below for channel list specifications
+  - scan_start (optional): the first channel. defined as 'ch:width' where channel is numeric and width is oneof {None,HT20,HT40-,HT40+}
+
+##### a. Channel List Definition:
 
 ### c. Control
