@@ -56,7 +56,7 @@ logging.config.fileConfig(logpath)
  Iryi will notify the client if the cmd specified by id is invalid or valid with
   OK <id> [\001output\001]or
   ERR <id> \001Reason for Failure\001
-If the command was invalid and no command id could be read it will be set to ?
+If the command was invalid and no command id could be read it will be set to '?'
 
 Note: Iryi only allows one client connection at a time
 """
