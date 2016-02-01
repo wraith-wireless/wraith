@@ -43,7 +43,7 @@ Radios are definied in the Abad (required) section and Shama (optional) section.
    - xyz: currently still in testing mode, defines the rotation of the antenna along three axis (see iyri.conf for descriptions of each axis).
  * desc: brief desc of the radio
  * Scan routine defines the initial scan routine to follow
-  - dwell: time to stay on each channel. At present the radio will stay on each channel for the same time but I hope to add adaptive dwells to future versions where the dwell times for each channel will change according to the amount of traffic on the channel.
+  - dwell: time to stay on each channel in seconds. At present the radio will stay on each channel for the same time but I hope to add adaptive dwells to future versions where the dwell times for each channel will change according to the amount of traffic on the channel.
   - scan: channels to scan. See below for channel list specifications
   - pass: channels not to scan. Any channels specified in pass will override scan specifications. See below for channel list specifications
   - scan_start (optional): the first channel. defined as 'ch:width' where channel is numeric and width is oneof {None,HT20,HT40-,HT40+}
@@ -58,5 +58,33 @@ and widths can be HT, NOHT, ALL (or empty for all). Examples:
  * scan = --> scan all channels and all widths
  * scan = 1,6,11:NOHT --> scan channels 1, 6 and 11 at width = 20
  * scan = B2.4:ALL --> scan ISM channels at all widths
+
+#### ii. Defining GPS
+GPS can be defined as a device with polling fixed = no or a static location fixed = yes. 
+ * fixed: use a hardcoded lat/lon or use a device and poll
+ * port: port the gps device is listening to
+ * devid: the device id of the gps (of the form XXXX:XXXX)
+ * poll: poll time in seconds
+ * epx: minimum ellipitical error to accept. inf specifies that everything is accepted
+ * epy: minimum ellipitical error to accept. inf specifies that everything is accepted
+ * lat: (if fixed = yes) hardcoded latitude
+ * lon: (if fixed = yes) hardcoded longitude
+ * alt: (if fixed = yes) hardcoded elevation
+ * heading: (if fixed = yes) hardcoded direction
+
+#### iii. Defining Storage
+Determines DB location and DB parameters.
+ * host: address of DB
+ * port: port DB is listening to
+ * db: name of DB
+ * user: user account Iyri will use
+ * pwd: password for user account
+
+#### iv. Defining Local Parameters
+Miscellaneous parameters
+ * region: two-alphanumeric sequence specifying regulatory domain to use
+ * C2C; port for c2c service to listen on
+ * OUI: path of oui file
+ * maxt: maximum number of threshers to allow. A suggested value. 
 
 ### c. Control
