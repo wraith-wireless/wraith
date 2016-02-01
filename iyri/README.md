@@ -92,3 +92,6 @@ Iyri defines a simplistic command and control service where users can use a sock
 
 !\<id\> \<cmd\> \<radio\> [params]\\n
  
+where:
+ * id is an unique (for the current session) integer
+ * cmd is oneof {state|scan|hold|listen|pause|txpwr|spoof}
