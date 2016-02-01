@@ -87,11 +87,22 @@ Miscellaneous parameters
  * OUI: path of oui file (soon to be removed)
  * maxt: maximum number of threshers to allow. A suggested value. 
 
-### c. Control
-Iyri defines a simplistic command and control service where users can use a socket via netcat or telnet to send basic commands to the sensor. Messages to the sensor must be in the following format:
+### c. Control (C2C)
+Iyri defines a simplistic command and control service where users can use a socket via netcat or telnet to send basic commands to the sensor. Iyri will only allow one connection to the C2C at a time. No authentication is present, just connect to the address and port. Messages to the sensor must be in the following format:
 
 !\<id\> \<cmd\> \<radio\> [params]\\n
  
 where:
  * id is an unique (for the current session) integer
  * cmd is oneof {state|scan|hold|listen|pause|txpwr|spoof}
+ * radio is oneof {both|all|abad|shama} where both enforces abad and shama radios and all only enforces shama if present
+ * params are:
+  - of the format channel:width if cmd is listen
+  - of the format pwr:option if cmd is txpwr where pwr is dBm and option is oneof {fixed|auto|limit}
+  - a mac address if cmd is spoof
+
+Iyri will notify the client if the cmd specified by id is valid or invalid with:
+
+OK \<id\> [\001output\001]
+
+ERR \<id> \001Reason for Failure\001
