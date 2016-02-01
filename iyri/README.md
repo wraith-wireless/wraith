@@ -88,3 +88,6 @@ Miscellaneous parameters
  * maxt: maximum number of threshers to allow. A suggested value. 
 
 ### c. Control
+Iyri defines a simplistic command and control service where users can use a socket via netcat or telnet to send basic commands to the sensor. Messages to the sensor must be in the following format:
+  !<id> <cmd> <radio> [params]\n
+ 
