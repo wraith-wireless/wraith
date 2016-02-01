@@ -49,5 +49,14 @@ Radios are definied in the Abad (required) section and Shama (optional) section.
   - scan_start (optional): the first channel. defined as 'ch:width' where channel is numeric and width is oneof {None,HT20,HT40-,HT40+}
 
 ##### a. Channel List Definition:
+Scan and pass configurations are specified by channel lists. Channel lists are defined as channels:widths where channels can be defined:
+ * A single channel or empty. Empty specifies all channels in scan and no channels in pass
+ * a list of ',' seperated channels i.e 1,6,11
+ * a range defined lower-upper i.e. 1-14
+ * a band preceded by a 'B' i.e. B.24 or B5
+and widths can be HT, NOHT, ALL (or empty for all). Examples:
+ * scan = --> scan all channels and all widths
+ * scan = 1,6,11:NOHT --> scan channels 1, 6 and 11 at width = 20
+ * scan = B2.4:ALL --> scan ISM channels at all widths
 
 ### c. Control
