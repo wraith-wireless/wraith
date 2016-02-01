@@ -84,7 +84,7 @@ Determines DB location and DB parameters.
 Miscellaneous parameters
  * region: two-alphanumeric sequence specifying regulatory domain to use
  * C2C; port for c2c service to listen on
- * OUI: path of oui file
+ * OUI: path of oui file (soon to be removed)
  * maxt: maximum number of threshers to allow. A suggested value. 
 
 ### c. Control
