@@ -43,5 +43,9 @@ Radios are definied in the Abad (required) section and Shama (optional) section.
    - xyz: currently still in testing mode, defines the rotation of the antenna along three axis (see iyri.conf for descriptions of each axis).
  * desc: brief desc of the radio
  * Scan routine defines the initial scan routine to follow
+  - dwell: time to stay on each channel. At present the radio will stay on each channel for the same time but I hope to add adaptive dwells to future versions where the dwell times for each channel will change according to the amount of traffic on the channel.
+  - scan: channels to scan
+  - pass: channels not to scan. Any channels specified in pass will override scan specifications
+  - scan_start: the first channel
 
 ### c. Control
