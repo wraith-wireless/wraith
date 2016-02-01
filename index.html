@@ -31,17 +31,17 @@
     <!-- MAIN CONTENT -->
     <div id="main_content_wrap" class="outer">
       <section id="main_content" class="inner">
-        <p><img src="https://github.com/wraith-wireless/wraith/blob/master/widgets/icons/splash.png?raw=true" alt=""></p>
+        <p><img src="widgets/icons/wraith-banner.png?raw=true" alt=""></p>
 
 <h1>
-<a id="wraith-wireless-assault-reconnaissance-collection-and-exploitation-toolkit" class="anchor" href="#wraith-wireless-assault-reconnaissance-collection-and-exploitation-toolkit" aria-hidden="true"><span class="octicon octicon-link"></span></a>WRAITH: Wireless assault, reconnaissance, collection and exploitation toolkit.</h1>
+<a id="wraith-wireless-reconnaissance-and-intelligent-target-harvesting" class="anchor" href="#wraith-wireless-reconnaissance-and-intelligent-target-harvesting" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>WRAITH: Wireless Reconnaissance And Intelligent Target Harvesting.</h1>
 
 <blockquote>
 <p>"You knew that I reap where I have not sown and gather where I scattered no seed."</p>
 </blockquote>
 
 <h2>
-<a id="1-description" class="anchor" href="#1-description" aria-hidden="true"><span class="octicon octicon-link"></span></a>1 DESCRIPTION:</h2>
+<a id="1-description" class="anchor" href="#1-description" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>1 DESCRIPTION:</h2>
 
 <p>Attack vectors, rogue devices, interfering networks are best visualized and identified
 over time. Current tools i.e. Kismet, Aircrack-ng and Wireshark are excellent tools
@@ -56,40 +56,37 @@ administrators with the ability to view their network(s) from a bird's eye view 
 drill down as necessary to a single device. Wraith allows the user to decide what
 data to view, how to view it and 'when' to view it.</p>
 
-<p>Once the reconnaissance and collection development is stable, assault plug-ins will
-be developed to aid WLAN administrators in the security testing of their networks.</p>
-
 <h2>
-<a id="2-requirements" class="anchor" href="#2-requirements" aria-hidden="true"><span class="octicon octicon-link"></span></a>2. REQUIREMENTS:</h2>
+<a id="2-requirements" class="anchor" href="#2-requirements" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>2. REQUIREMENTS:</h2>
 
 <ul>
-<li>linux (preferred 3.x kernel, tested on 3.13.0-43)
+<li>linux (tested on 3.13.x kernel)
 
 <ul>
 <li>NOTE: some cards i.e. rosewill usb nics were not fully supported through iw
-on earlier kernels</li>
+on earlier 3.13.x kernels</li>
 </ul>
 </li>
 <li>Python 2.7</li>
 <li>iw 3.17</li>
 <li>postgresql 9.x (tested on 9.3.5)</li>
-<li>pyscopg 2.6</li>
+<li>pyscopg &gt; 2.6</li>
 <li>mgrs 1.1</li>
 <li>macchanger 1.7.0</li>
-<li>lxml 3.4.4</li>
 </ul>
 
 <h2>
-<a id="3-modules-currently-consists-of-four-componentsmodules" class="anchor" href="#3-modules-currently-consists-of-four-componentsmodules" aria-hidden="true"><span class="octicon octicon-link"></span></a>3. MODULES: Currently consists of four components/modules</h2>
+<a id="3-modules-currently-consists-of-three-main-componentsmodules-wifi-iyri-and" class="anchor" href="#3-modules-currently-consists-of-three-main-componentsmodules-wifi-iyri-and" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>3. MODULES: Currently consists of three main components/modules: Wifi, Iyri and</h2>
+
+<p>the GUI and three secondary modules: utils, widgets, and nidus.</p>
 
 <h3>
-<a id="a-radio-v-004-80211-network-interface-objects-and-functions" class="anchor" href="#a-radio-v-004-80211-network-interface-objects-and-functions" aria-hidden="true"><span class="octicon octicon-link"></span></a>a. Radio (v 0.0.4): 802.11 network interface objects and functions</h3>
+<a id="a-wifi-v-005-80211-network-interface-objects-and-functions" class="anchor" href="#a-wifi-v-005-80211-network-interface-objects-and-functions" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>a. wifi (v 0.0.5): 802.11 network interface objects and functions</h3>
 
-<p>Objects/functions to manipulate wireless nics and parse 802.11 captures.
-Partial support of 802.11-2012</p>
+<p>Objects/functions to manipulate wireless nics and parse 802.11 captures.</p>
 
 <h4>
-<a id="standards" class="anchor" href="#standards" aria-hidden="true"><span class="octicon octicon-link"></span></a>Standards</h4>
+<a id="standards" class="anchor" href="#standards" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Standards</h4>
 
 <ul>
 <li>Currently Supported: 802.11a\b\g</li>
@@ -98,30 +95,59 @@ Partial support of 802.11-2012</p>
 </ul>
 
 <h3>
-<a id="b-dyskt-v-015--dynamic-small-kill-team-wraith-sensor" class="anchor" href="#b-dyskt-v-015--dynamic-small-kill-team-wraith-sensor" aria-hidden="true"><span class="octicon octicon-link"></span></a>b. DySKT (v 0.1.5) : Dynamic Small Kill Team (Wraith Sensor)</h3>
+<a id="b-iryi-v-021-wraith-sensor" class="anchor" href="#b-iryi-v-021-wraith-sensor" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>b. iryi (v 0.2.1): Wraith Sensor</h3>
 
-<p>An 802.11 sensor consisting of an optional collection radio (i.e. spotter), a
-mandatory reconnaissance radio (i.e. shooter) and an RTO which relays collected
-data to Nidus, the data storage system (i.e. HQ). DySKT collects data in the form
-of raw 802.11 packets with the reconnaissance (and collection if present) radios,
-forwarding that data along with any geolocational data (if a gps device is present)
-to higher.</p>
+<p>Iryi is a 802.11 sensor consisting of an optional radio (shama), and a mandatory
+radio (abad). 802.11 packets are stored in a circular buffer, parsed and inserted
+in the database. Any geolocational data is also stored (if a gps device is present).</p>
+
+<p>NOTE:
+In earlier versions &lt; 0.1.x, Iyri did not handle database writes/updates. Rather
+this was handled by an additional module colocated on the same system as database
+that the sensor would pass data to. It was with great relunctance that I removed
+this 'mediator', and moved database functionality directly to the sensor, primarily
+for two reasons:</p>
+
+<ul>
+<li>it would restrict wraith to a single platform i.e. expanding to a central
+database and multiple sensors will be very difficult.</li>
+<li>sensors could no longer be used on 'minimal' systems i.e. routers and other embedded
+systems
+However, there were two primary reasons for doing so:</li>
+<li>I wanted to push more autonomy and intelligence into the sensor which would
+require the sensor to parse out radiotap and mpdu (no point in doing this twice)</li>
+<li>frames (as strings) were being passed through multiple connection, queues and
+sockets before they eventually made their way to the mediator causing a major
+delay in processing</li>
+</ul>
 
 <h3>
-<a id="c-nidus-v-006-data-storage-manager" class="anchor" href="#c-nidus-v-006-data-storage-manager" aria-hidden="true"><span class="octicon octicon-link"></span></a>c. Nidus (v 0.0.6): Data Storage Manager</h3>
-
-<p>Nidus is the Data Storage manager processing data received from DySKT. Nidus is the
-interface to the backend Postgresql database, processing data in terms of raw 802.11
-frames, gps location, and 'device' details/status. </p>
-
-<h3>
-<a id="d-wraith-rt-gui" class="anchor" href="#d-wraith-rt-gui" aria-hidden="true"><span class="octicon octicon-link"></span></a>d. wraith-rt: GUI</h3>
+<a id="d-wraith-rt-gui" class="anchor" href="#d-wraith-rt-gui" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>d. wraith-rt: GUI</h3>
 
 <p>In progress gui. Currently configured to provide start/stop of services, display
 and editing of configuration files, some manipulation of backened storage.</p>
 
+<h3>
+<a id="e-utils-utility-functionality" class="anchor" href="#e-utils-utility-functionality" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>e. utils: utility functionality</h3>
+
+<p>Provides various functions used throughout wraith. See Architecture section for
+further information.</p>
+
+<h3>
+<a id="f-widgets-gui-super-classes" class="anchor" href="#f-widgets-gui-super-classes" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>f. widgets: gui super classes</h3>
+
+<p>Defines a graphic suite based on Tkinter/ttk where a set of non-modal panels operate
+under the control of a master panel and execute tasks, display information
+independently of or in conjuction with this panel and other panels. (Think undocked
+windows).</p>
+
+<h3>
+<a id="g-nidus-database" class="anchor" href="#g-nidus-database" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>g. nidus: database</h3>
+
+<p>Provides the Postgresql database schema, nidus.sql.</p>
+
 <h2>
-<a id="4-architectureheirarchy-brief-overview-of-the-project-file-structure" class="anchor" href="#4-architectureheirarchy-brief-overview-of-the-project-file-structure" aria-hidden="true"><span class="octicon octicon-link"></span></a>4. ARCHITECTURE/HEIRARCHY: Brief Overview of the project file structure</h2>
+<a id="4-architectureheirarchy-brief-overview-of-the-project-file-structure" class="anchor" href="#4-architectureheirarchy-brief-overview-of-the-project-file-structure" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>4. ARCHITECTURE/HEIRARCHY: Brief Overview of the project file structure</h2>
 
 <ul>
 <li>wraith/               Top-level package
@@ -152,9 +178,17 @@ and editing of configuration files, some manipulation of backened storage.</p>
 <li>landnav.py        land navigation utilities</li>
 <li>cmdline.py        various cmdline utilities for testing processes</li>
 <li>simplepcap.py     pcap writer</li>
+<li>brine.py          support for pickling connection objects</li>
+<li>valrep.py         validation and reporting functionality</li>
 </ul>
 </li>
-<li> radio               subpackage for radio/radiotap
+<li> data                data folder
+
+<ul>
+<li>oui.txt           tab seperated oui manufacturer file</li>
+</ul>
+</li>
+<li> wifi                subpackage for wifi related
 
 <ul>
 <li>__init__.py  initialize radio subpackage</li>
@@ -168,30 +202,27 @@ and editing of configuration files, some manipulation of backened storage.</p>
 <li>oui.py           oui/manuf related functions</li>
 </ul>
 </li>
-<li> dyskt               subpackage for wraith sensor
+<li>nidus                database schema
 
 <ul>
-<li>__init__.py  initialize dyskt package</li>
-<li>dyskt.conf       configuration file for dyskt</li>
-<li>dyskt.log.conf   configuration file for dyskt logging</li>
-<li>dyskt.py         primary module</li>
-<li>rdoctl.py        radio controler with tuner, sniffer</li>
-<li>rto.py           data collation and forwarding</li>
-<li>dysktd           dyskt daemon</li>
+<li>__init__.py  initialize nidus subpackage</li>
+<li>nidus.sql        database definition</li>
 </ul>
 </li>
-<li> nidus               subpackage for datamanager
+<li> iyri                subpackage for wraith sensor
 
 <ul>
-<li>__init__.py  initialize nidus package</li>
-<li>nidus.conf       nidus configuration</li>
-<li>nidus.log.conf   nidus logging configuration</li>
-<li>nidus.py         nidus server</li>
-<li>nmp.py           nidus protocol definition</li>
-<li>nidusdb.py       interface to storage system</li>
-<li>sse.py           frame/metaframe processing</li>
-<li>nidus.sql        sql tables definition</li>
-<li>nidusd           nidus daemon</li>
+<li>__init__.py  initialize iyri package</li>
+<li>iyri.conf        configuration file for iyri</li>
+<li>iyri.log.conf    configuration file for iyri logging</li>
+<li>iyri.py          primary module</li>
+<li>constants.py     defines several constants used by iryi</li>
+<li>gpsctl.py        GPS device handler</li>
+<li>rdoctl.py        radio controler</li>
+<li>tuner.py         radio scanner</li>
+<li>collate.py       data collation and forwarding</li>
+<li>thresh.py        Thresher process for parsing/writing frames</li>
+<li>iyrid            iyri daemon</li>
 </ul>
 </li>
 </ul>
