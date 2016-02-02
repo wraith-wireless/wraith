@@ -10,7 +10,9 @@ Iyri is a 802.11 sensor and processor. It can be configured to work with one or 
 
 NOTE: It is recommended to only use the Shama radio for collection during times Abad is transmitting as using both radios at the same time to scan can result in dropped packets. If traffic is spare though, both radios can be used. 
 
-## 2. REQUIREMENTS: 
+## 3. Setup, Configuration and Control
+
+### a. REQUIREMENTS: 
  * linux (tested on 3.13.x kernel)
  * Python 2.7
  * iw 3.17 located at /usr/sbin/iw
@@ -20,12 +22,10 @@ NOTE: It is recommended to only use the Shama radio for collection during times 
  * macchanger 1.7.0
  * dateutil 2.3
 
-## 3. Setup, Configuration and Control
-
-### a. Setup
+### b. Setup
 At present, Iyri, like Wraith, must be manually installed. See Configuration.txt in the Wraith directory to setup nidus, the Postgresql database and dependencies for Iyri.
 
-### b. Configuration
+### c. Configuration
 Using iyri.conf, there are several configurations that can be made prior to running Iyri. Any changes to iyri.conf will not be reflected until Iyri is restarted.
 
 #### i. Defining Source(s)
@@ -87,7 +87,7 @@ Miscellaneous parameters
  * OUI: path of oui file (soon to be removed)
  * maxt: maximum number of threshers to allow. A suggested value. 
 
-### c. Control (C2C)
+### d. Control (C2C)
 Iyri defines a simplistic command and control service where users can use a socket via netcat or telnet to send basic commands to the sensor. Iyri will only allow one connection to the C2C at a time. No authentication is present, just connect to the address and port. Messages to the sensor must be in the following format:
 
 !\<id\> \<cmd\> \<radio\> [params]\\n
