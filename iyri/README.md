@@ -6,11 +6,15 @@ Iyri is a 802.11 sensor and processor. It can be configured to work with one or 
  * Iyri can be configured at startup using iyri.conf and allows for control during operation over netcat, telnet etc or programmatically over a socket. 
  * Iyri can be started as service with iyrid (sudo service iyrid start) or via python (sudo python iyri.py)
  * Iyri logs informational messages and warnings/errors to /var/log/wraith/iyri.log
- * Each radio can be configured/controlled to run in scan, listen, hold, pause modes
+ * Each radio can run in scan, listen, hold, pause modes
+  - Scan: scans preconfigured channel list dwelling on each channel for a specified amount of time
+  - Listen: stays on a specified channel
+  - Hold: stays on the current channel
+  - Pause: does not record any data
 
 NOTE: It is recommended to only use the Shama radio for collection during times Abad is transmitting as using both radios at the same time to scan can result in dropped packets. If traffic is spare though, both radios can be used. 
 
-## 3. Setup, Configuration and Control
+## 2. Setup, Configuration and Control
 
 ### a. Dependencies: 
  * linux (tested on 3.13.x kernel)
@@ -139,4 +143,4 @@ OK \<id\> [\001output\001]
 
 ERR \<id> \001Reason for Failure\001
 
-## 4. Architecture
+## 3. Architecture
