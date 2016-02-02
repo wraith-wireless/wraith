@@ -23,7 +23,7 @@ NOTE: It is recommended to only use the Shama radio for collection during times 
  * dateutil 2.3
 
 ### b. Setup
-At present, Iyri, like Wraith, must be manually installed. See Configuration.txt in the Wraith directory to setup nidus, the Postgresql database. To setup Iyri: 
+At present, Iyri, like Wraith, must be manually installed. See CONFIGURE.txt in the wraith directory to setup nidus, the Postgresql database. To setup Iyri: 
 
 ### i. Install the following dependencies:
  * Timestamp conversion: dateutil v2.3 at https://pypi.python.org/pypi/python-dateutil
@@ -45,7 +45,7 @@ cd /etc/init.d
 sudo chown root:root iyrid
 sudo chmod 755 iyrid
 ```
-You should use sys-rc-conf or chkconfig and verfiy that iyrid is not configured to run on boot
+You should use sys-rc-conf or chkconfig and verfiy that iyrid is not configured to run on boot. Additionally you will have modify iyrid to point to your iyri.py. Edit iyrid and change line 11.
 * Configure Logging
 ```shell
 cd /var/logs
@@ -55,10 +55,10 @@ chmod 750 wraith
 cd wraith
 touch iyri.log
 ```
-It is recommended to run iyri as a service
+It is recommended to run iyri as a service as root. However, it is possible to run iyrid as a normal user but will require some workarounds with respect to iw, iwconfig, ifconfig and macchanger and giving python temporary set raw capabilities in order to bind the raw socket(s). For more information, see CONFIGURE.txt in the wraith directory.
 
 ### c. Configuration
-Using iyri.conf, there are several configurations that can be made prior to running Iyri. Any changes to iyri.conf will not be reflected until Iyri is restarted.
+Using iyri.conf, there are several configurations that can be made prior to running Iyri. Any changes to iyri.conf will not be reflected until Iyri is restarted. Note that at present iyri.conf needs to be in the same directory as iyri.py
 
 #### i. Defining Source(s)
 Radios are definied in the Abad (required) section and Shama (optional) section. Each radio will have the following configuration options. 
