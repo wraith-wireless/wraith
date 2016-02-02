@@ -38,9 +38,24 @@ Iyri requires all files in the iyri directory as well as those in the utils and 
 
 ### iii. Configure System
 Before first use, the logging and service need to be set up. 
+* Configure iyrid
 ```shell
-cp ...pathtowraith.../iyri/iyrid /etc/init.d/iyri
+sudo cp ...pathtowraith.../iyri/iyrid /etc/init.d/iyri
+cd /etc/init.d
+sudo chown root:root iyrid
+sudo chmod 755 iyrid
 ```
+You should use sys-rc-conf or chkconfig and verfiy that iyrid is not configured to run on boot
+* Configure Logging
+```shell
+cd /var/logs
+mkdir wraith
+sudo chown <user>:adm wraith
+chmod 750 wraith
+cd wraith
+touch iyri.log
+```
+It is recommended to run iyri as a service
 
 ### c. Configuration
 Using iyri.conf, there are several configurations that can be made prior to running Iyri. Any changes to iyri.conf will not be reflected until Iyri is restarted.
