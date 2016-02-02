@@ -12,7 +12,7 @@ NOTE: It is recommended to only use the Shama radio for collection during times 
 
 ## 3. Setup, Configuration and Control
 
-### a. REQUIREMENTS: 
+### a. Dependencies: 
  * linux (tested on 3.13.x kernel)
  * Python 2.7
  * iw 3.17 located at /usr/sbin/iw
@@ -23,7 +23,17 @@ NOTE: It is recommended to only use the Shama radio for collection during times 
  * dateutil 2.3
 
 ### b. Setup
-At present, Iyri, like Wraith, must be manually installed. See Configuration.txt in the Wraith directory to setup nidus, the Postgresql database and dependencies for Iyri.
+At present, Iyri, like Wraith, must be manually installed. See Configuration.txt in the Wraith directory to setup nidus, the Postgresql database. To setup Iyri: 
+
+### i. Install the following dependencies:
+ * Timestamp conversion: dateutil v2.3 at https://pypi.python.org/pypi/python-dateutil
+ * Postgresql DB API: psycopg2 v2.5.4 at https://pypi.python.org/pypi/psycopg2
+ * Lat/Lon conversion: mgrs v1.1 https://pypi.python.org/packages/source/m/mgrs/mgrs-1.1.0.tar.gz
+   - may require python-setuptools
+ * Spoofed Mac Addresses macchanger v1.7.0  http://www.gnu.org/software/macchanger
+ * iw: parses the output as produced by v3.17 https://www.kernel.org/pub/software/network/iw/iw-3.17.tar.xz
+
+### ii.
 
 ### c. Configuration
 Using iyri.conf, there are several configurations that can be made prior to running Iyri. Any changes to iyri.conf will not be reflected until Iyri is restarted.
