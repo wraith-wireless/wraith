@@ -33,7 +33,14 @@ At present, Iyri, like Wraith, must be manually installed. See Configuration.txt
  * Spoofed Mac Addresses macchanger v1.7.0  http://www.gnu.org/software/macchanger
  * iw: parses the output as produced by v3.17 https://www.kernel.org/pub/software/network/iw/iw-3.17.tar.xz
 
-### ii.
+### ii. Python Files
+Iyri requires all files in the iyri directory as well as those in the utils and wifi directories. Iyri currently uses a oui text file stored in data directory - this can be configured (see below) to utilze any directory you choose
+
+### iii. Configure System
+Before first use, the logging and service need to be set up. 
+```shell
+cp ...pathtowraith.../iyri/iyrid /etc/init.d/iyri
+```
 
 ### c. Configuration
 Using iyri.conf, there are several configurations that can be made prior to running Iyri. Any changes to iyri.conf will not be reflected until Iyri is restarted.
