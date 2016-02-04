@@ -247,7 +247,7 @@ class RadioController(mp.Process):
         # determine virtual interface name
         ns = []
         for wiface in iwt.wifaces():
-            cs = wiface.split(self._role)
+            cs = wiface.split('iyri')
             try:
                 if len(cs) > 1: ns.append(int(cs[1]))
             except ValueError: pass
