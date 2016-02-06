@@ -137,4 +137,3 @@ Provides the Postgresql database schema, nidus.sql.
      - collate.py       data collation and forwarding
      - thresh.py        Thresher process for parsing/writing frames
      - iyrid            iyri daemon
-
