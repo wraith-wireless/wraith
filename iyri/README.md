@@ -1,3 +1,4 @@
+![](widgets/icons/watcher.png?raw=true)
 # Iyri v 0.2.1: 802.11 Sensor
 
 ## 1 DESCRIPTION:
