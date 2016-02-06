@@ -50,13 +50,13 @@ logging.config.fileConfig(logpath)
    param is:
     o of the format channel:width if cmd is listen where width is oneof
       {'None','HT20','HT40+','HT40-'}
-    o of the format pwr:option where pwr is in dBm and option is oneof
+    o of the format pwr:option if cmd is txpwr where pwr is in dBm and option is oneof
       {fixed|auto|limit}
     o a macaddr if cmd is spoof
  Iryi will notify the client if the cmd specified by id is invalid or valid with
   OK <id> [\001output\001]or
   ERR <id> \001Reason for Failure\001
-If the command was invalid and no command id could be read it will be set to ?
+If the command was invalid and no command id could be read it will be set to '?'
 
 Note: Iryi only allows one client connection at a time
 """
@@ -198,7 +198,7 @@ class Iryi(object):
         """
         # get parameters
         self._cpath = conf if conf else os.path.join(GPATH,'iyri.conf')
-        
+
         # internal variables
         self._state = IYRI_INVALID  # current state
         self._conf = {}             # iyri configuration dict

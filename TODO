@@ -5,6 +5,10 @@ Overall:
   3) add relevant __all__ to init files
   4) add a program that will kill all iyri related processes (in the event of
    unresponsive children)
+  5) manufacturer for nics
+    o remove manuf column from sta Table
+    o add a manufacturer Table w/ oui, name columns
+    o modify fetchoui to write to database rather than file
 GUI:
  10) get log panel/tail log panels to scroll automatically
      o yview('moveto') does not work

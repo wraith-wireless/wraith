@@ -60,8 +60,8 @@ class WraithConfigPanel(gui.ConfigPanel):
         self._entUser = ttk.Entry(frmS,width=10)
         self._entUser.grid(row=1,column=4,sticky='e')
         ttk.Label(frmS,text='PWD: ').grid(row=4,column=0,sticky='w')
-        self._entPWD = ttk.Entry(frmS,width=10)
-        self._entPWD.grid(row=4,column=1,sticky='w')
+        self._entPWD = ttk.Entry(frmS,width=20)
+        self._entPWD.grid(row=4,column=1,columnspan=4,sticky='w')
 
         # Policy Configuration
         frmP = ttk.LabelFrame(frm,text='Policy')
@@ -1278,7 +1278,19 @@ class IyriCtrlPanel(gui.SimplePollingPanel):
         gui.SimplePollingPanel.__init__(self,tl,chief,"Iyri Control","widgets/icons/sensor.png")
 
     def pnlupdate(self): pass
-    def _makegui(self): pass
+
+    def _makegui(self):
+        """ make the gui """
+        # main frame
+        frmMain = ttk.Frame(self,borderwidth=0)
+        frmMain.grid(row=0,column=0,sticky='w')
+
+        frmA = ttk.LabelFrame(frmMain,text="Abad")
+        frmA.grid(row=1,column=0,sticky='nwse')
+
+
+        frmS = ttk.LabelFrame(frmMain,text='Shama')
+        frmS.grid(row=2,column=0,sticky='nwse')
 
 # Iyri->Config
 class IyriConfigException(Exception): pass
@@ -1292,7 +1304,7 @@ class IyriConfigPanel(gui.ConfigPanel):
         nb = ttk.Notebook(frm)
         nb.grid(row=0,column=0,sticky='nwse')
 
-        # Abad Tab Configurationsssssssssssssssssss ,mde5555555555555555[p
+        # Abad Tab Configuration
         frmA = ttk.Frame(nb)
         ttk.Label(frmA,text='NIC: ').grid(row=0,column=0,sticky='nw')
         self._entAbadNic = ttk.Entry(frmA,width=5)

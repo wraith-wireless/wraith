@@ -82,7 +82,7 @@ class RadioController(mp.Process):
         signal.signal(signal.SIGINT,signal.SIG_IGN)
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
-        # start tuner thread
+        # start tuner
         stuner = TUNE_PAUSE if self._paused else TUNE_SCAN
         try:
             qT = mp.Queue()
@@ -247,7 +247,7 @@ class RadioController(mp.Process):
         # determine virtual interface name
         ns = []
         for wiface in iwt.wifaces():
-            cs = wiface.split(self._role)
+            cs = wiface.split('iyri')
             try:
                 if len(cs) > 1: ns.append(int(cs[1]))
             except ValueError: pass

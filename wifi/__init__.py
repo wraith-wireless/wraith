@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" radio: 802.11 network interface objects and functions
+""" wifi: 802.11 network interface and standards
 
 Objects/functions to manipulate wireless nics and parse 802.11 captures.
 Partial support of 802.11-2012
@@ -14,21 +14,11 @@ Not Supported
 802.11s\y\ac\ad\af
 
 REVISIONS:
-radio 0.0.5
+wifi 0.0.5
  desc: provides tools to manipulate wireless nics and parse raw wireless traffic
- includes: bits 0.0.4 channels 0.0.1, mcs 0.0.1, iw 0.1.0 iwtools 0.0.12,
- radiotap 0.0.4, mpdu 0.1.2, oui 0.0.1
- changes:
-  - cleaned up some of the code in mpdu
-    o moved parse function to top, 'sectioned' code together based on field,
-      type of frame
-    o defined a 'wrapper' class around the mpdu dict
-    o added wep, tkip and ccmp parsing
-    o decided to pass on parsing msb of qosctrl to 'clients'
-  - modified regget in iw to allow partial parsing of regulatory domain
-  - added error property to mpdu object
+ includes: interface and standards directories
 """
-__name__ = 'radio'
+__name__ = 'wifi'
 __license__ = 'GPL v3.0'
 __version__ = '0.0.5'
 __date__ = 'December 2015'

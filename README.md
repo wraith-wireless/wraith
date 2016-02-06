@@ -54,7 +54,7 @@ this 'mediator', and moved database functionality directly to the sensor, primar
 for two reasons:
  * it would restrict wraith to a single platform i.e. expanding to a central
   database and multiple sensors will be very difficult.
- * sensors could be used on 'minimal' systems i.e. routers and other embedded
+ * sensors could no longer be used on 'minimal' systems i.e. routers and other embedded
   systems
 However, there were two primary reasons for doing so:
  * I wanted to push more autonomy and intelligence into the sensor which would
@@ -112,14 +112,16 @@ Provides the Postgresql database schema, nidus.sql.
     - oui.txt           tab seperated oui manufacturer file
  *  wifi                subpackage for wifi related
      - \_\_init\_\_.py  initialize radio subpackage
-     - iwtools.py       iwconfig, ifconfig interface and nic utilities
-     - iw.py            iw 3.17 interface
-     - radiotap.py      radiotap parsing
-     - mpdu.py          IEEE 802.11 MAC (MPDU) parsing
-     - dott1u.py        contstants for 802.11u (not currently used)
-     - channels.py      802.11 channel, freq utilities
-     - mcs.py           mcs index functions
-     - oui.py           oui/manuf related functions
+     - interface        initialize interface subpackage
+        + iwtools.py    iwconfig, ifconfig interface and nic utilities
+        + iw.py         iw 3.17 interface
+        + oui.py        oui/manuf related functions
+     - standards        initialize standards subpackage
+        + radiotap.py   radiotap parsing
+        + mpdu.py       IEEE 802.11 MAC (MPDU) parsing
+        + dott1u.py     contstants for 802.11u (not currently used)
+        + channels.py   802.11 channel, freq utilities
+        + mcs.py        mcs index functions
  * nidus                database schema
      - \_\_init\_\_.py  initialize nidus subpackage
      - nidus.sql        database definition
