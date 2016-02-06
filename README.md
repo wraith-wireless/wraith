@@ -17,7 +17,7 @@ administrators with the ability to view their network(s) from a bird's eye view 
 drill down as necessary to a single device. Wraith allows the user to decide what
 data to view, how to view it and 'when' to view it.
 
-## 2. REQUIREMENTS: 
+## 2. REQUIREMENTS:
  * linux (tested on 3.13.x kernel)
    - NOTE: some cards i.e. rosewill usb nics were not fully supported through iw
      on earlier 3.13.x kernels
@@ -137,3 +137,4 @@ Provides the Postgresql database schema, nidus.sql.
      - collate.py       data collation and forwarding
      - thresh.py        Thresher process for parsing/writing frames
      - iyrid            iyri daemon
+
