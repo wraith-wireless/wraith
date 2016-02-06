@@ -1,0 +1,83 @@
+A. CONFIGURATION
+
+1) Postgresql (posgresql 9.3.X (tested on 9.3.4) with btree_gist (see http://www.postgresql.org/docs/devel/static/rangetypes.html)
+# configure postgresql with adminpack and btree_gist, then create user nidus
+# and nidus db
+sudo su - postgres psql (and from prompt)
+postgres=# CREATE EXTENSION adminpack;
+postgres=# CREATE EXTENSION btree_gist;
+postgres=# createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
+postgres=# createdb --owner=nidus nidus
+postgres=# exit
+psql -h localhost -U nidus -d nidus # at prompt, enter password, past nidus.sql
+
+# create nidus user and nidus database
+
+2) Dependencies
+ - dateutil 2.3 https://pypi.python.org/pypi/python-dateutil
+
+ - iw 3.17 https://www.kernel.org/pub/software/network/iw/iw-3.17.tar.xz
+   o install to /usr/sbin/iw
+   o iw.py depends upon this version
+
+ - psycopg2 2.5.4 https://pypi.python.org/pypi/psycopg2
+ 
+ - mgrs 1.1 https://pypi.python.org/packages/source/m/mgrs/mgrs-1.1.0.tar.gz
+   o may need python-setuptools
+   
+ - macchanger 1.7.0 http://www.gnu.org/software/macchanger
+   
+ - gui support
+   o python-tk
+   o tix
+
+3) Configure system for use
+ - Set up sensor daemon
+   o iyrid
+     1) copy <pathtowraith>/iyri/iyrid to /etc/init.d
+     2) change ownership to root/root (if necessary)
+     3) make iyri.py executable (change permissions of iyri.py to 755)
+     4) verify iyri does not start on boot (unless desired)
+ 
+  - Set up logs
+     cd /var/logs
+     mkdir wraith
+     sudo chown <user>:adm wraith
+     chmod 750 wraith
+     cd wraith
+     touch iyri.log
+
+  - Configure Iyri. Iyri requires root privleges to a) bind to the raw socket
+    and b) set nic properities i.e. execute macchanger, iw, iwconfig and ifconfig.
+    There are two options:
+     o run iyri as root (use current iyrid)
+     o If you're not comfortable running iyri as root, it can be run as a user
+       which requires the following:
+      * configure iw, iwconfig, ifconfig and macchanger in /etc/sudoers
+        # Cmnd alias specification
+        Cmnd_Alias	IWCONFIG = /sbin/iwconfig
+        Cmnd_Alias	IFCONFIG = /sbin/ifconfig
+        Cmnd_Alias	IW = /usr/sbin/iw #--> iw 3.17
+        Cmnd_Alias   MACCHANGER = /usr/bin/macchanger
+       
+        # Allow user to execute iw* commands
+        <user> ALL=NOPASSWD:IWCONFIG
+        <user> ALL=NOPASSWD:IFCONFIG
+        <user> ALL=NOPASSWD:IW
+        <user> ALL=NOPASSWD:MACCHANGER
+  
+       Then run 'sudo service sudo restart'
+     * You also need to give the python interpreter set raw capability in order to
+       bind the raw socket. Configure the iyri daemon, to set raw capabilities
+       temporarily and then remove the permission after iyri has bound to the
+       raw socket by setting do_start to the following:
+
+       do_start() {
+           log_daemon_msg "Setting capability cap_net_raw"
+           setcap cap_net_raw=+ep /usr/bin/python2.7
+           log_daemon_msg "Starting $DAEMON_NAME"
+           start-stop-daemon --start --background --pidfile $PIDFILE --make-pid --user $DAEMON_USER --chuid $DAEMON_USER --startas $DAEMON
+           log_daemon_msg "Removing capability cap_net_raw"
+           setcap cap_net_raw=-ep /usr/bin/python2.7
+           log_end_msg $?
+       }
