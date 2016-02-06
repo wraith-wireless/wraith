@@ -1,5 +1,4 @@
-![](../widgets/icons/watcher.png?raw=true)
-# Iyri v 0.2.1: 802.11 Sensor
+# ![](../widgets/icons/watcher.png?raw=true) Iyri v 0.2.1: 802.11 Sensor
 
 ## 1 DESCRIPTION:
 Iyri is a 802.11 sensor and processor. It can be configured to work with one or two wireless network interface cards (hereafter referred to as radios). It consists of a mandatory radio (Abad) which can receive or transmit and an optional radio (Shama) for receiving only. Additionally, Iyri allows for an optional GPS device. Iryi will parse data from the radio(s) (in the form of raw frames) as well as GPS data (locational and device), wireless nic information and system/platform information and store this data in a Postgresql database (nidus).
