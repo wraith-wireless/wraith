@@ -12,10 +12,11 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Production'
 
-import re                           # reg exp matching
-from socket import gethostbyname    # hostname resolution
-from wraith.wifi import iw,channels # channel list specification
-import sys,traceback                # traceback/error reporting
+import re                                  # reg exp matching
+from socket import gethostbyname           # hostname resolution
+from wraith.wifi.interface import iw       # iw
+from wraith.wifi.standards import channels # channel list specification
+import sys,traceback                       # traceback/error reporting
 
 # validation expressions
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr

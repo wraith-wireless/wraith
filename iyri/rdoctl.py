@@ -21,16 +21,16 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-from time import time,sleep                # current time, waiting
-import signal                              # handling signals
-import socket                              # reading frames
-from Queue import Empty                    # queue empty exception
-import multiprocessing as mp               # for Process
-from wraith.wifi import iw                 # iw command line interface
-import wraith.wifi.iwtools as iwt          # nic command line interaces
-from wraith.utils.timestamps import isots  # converted timestamp
-from wraith.iyri.tuner import Tuner        # our tuner
-from wraith.iyri.constants import *        # tuner states & buffer dims
+from time import time,sleep                 # current time, waiting
+import signal                               # handling signals
+import socket                               # reading frames
+from Queue import Empty                     # queue empty exception
+import multiprocessing as mp                # for Process
+from wraith.wifi.interface import iw        # iw command line interface
+import wraith.wifi.interface.iwtools as iwt # nic command line interaces
+from wraith.utils.timestamps import isots   # converted timestamp
+from wraith.iyri.tuner import Tuner         # our tuner
+from wraith.iyri.constants import *         # tuner states & buffer dims
 
 class RadioController(mp.Process):
     """ RadioController - handles radio initialization and collection """

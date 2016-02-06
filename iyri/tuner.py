@@ -14,13 +14,13 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-from time import time                             # timestamps/timing metrics
-import signal                                     # handling signals
-import multiprocessing as mp                      # for Process
-from wraith.wifi import iw                        # iw command line interface
-from wraith.wifi.iwtools import iwconfig          # for txpwr
-from wraith.utils.timestamps import isots, ts2iso # time stamp conversion
-from wraith.iyri.constants import *               # tuner states & buffer dims
+from time import time                              # timestamps/timing metrics
+import signal                                      # handling signals
+import multiprocessing as mp                       # for Process
+from wraith.wifi.interface import iw               # iw command line interface
+from wraith.wifi.interface.iwtools import iwconfig # for txpwr
+from wraith.utils.timestamps import isots, ts2iso  # time stamp conversion
+from wraith.iyri.constants import *                # tuner states & buffer dims
 
 class Tuner(mp.Process):
     """ tune' the radio's channel and width """

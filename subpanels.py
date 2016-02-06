@@ -10,25 +10,25 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import Tkinter as tk                   # gui constructs
-import tkFileDialog as tkFD            # import file gui dialogs
-import ttk                             # ttk widgets
-import mgrs                            # for mgrs2latlon conversions etc
-import math                            # for conversions, calculations
-import time                            # for timestamps
-from PIL import Image,ImageTk          # image input & support
-import psycopg2 as psql                # postgresql api
-import psycopg2.extras as pextras      # cursors and such
-import ConfigParser                    # config file parsing
-import wraith                          # version info & constants
-import wraith.widgets.panel as gui     # graphics suite
-from wraith.wifi import iw             # wireless interface details
-from wraith.wifi import iwtools as iwt # interface details
-from wraith.wifi import mpdu           # for 802.11 types/subtypes
-from wraith.utils import timestamps    # valid data/time
-from wraith.utils import landnav       # lang nav utilities
-from wraith.utils import cmdline       # cmdline functionality
-from wraith.utils import valrep        # validity checks
+import Tkinter as tk                             # gui constructs
+import tkFileDialog as tkFD                      # import file gui dialogs
+import ttk                                       # ttk widgets
+import mgrs                                      # for mgrs2latlon conversions etc
+import math                                      # for conversions, calculations
+import time                                      # for timestamps
+from PIL import Image,ImageTk                    # image input & support
+import psycopg2 as psql                          # postgresql api
+import psycopg2.extras as pextras                # cursors and such
+import ConfigParser                              # config file parsing
+import wraith                                    # version info & constants
+import wraith.widgets.panel as gui               # graphics suite
+from wraith.wifi.interface import iw             # wireless interface details
+from wraith.wifi.interface import iwtools as iwt # interface details
+from wraith.wifi.standards import mpdu           # for 802.11 types/subtypes
+from wraith.utils import timestamps              # valid data/time
+from wraith.utils import landnav                 # lang nav utilities
+from wraith.utils import cmdline                 # cmdline functionality
+from wraith.utils import valrep                  # validity checks
 
 # Some constants
 COPY = u"\N{COPYRIGHT SIGN}"

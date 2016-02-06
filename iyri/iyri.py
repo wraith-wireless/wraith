@@ -17,22 +17,22 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                                        # for path validations
-import signal                                    # signal processing
-import logging, logging.config, logging.handlers # logging
-import multiprocessing as mp                     # multiprocessing process, events
-import ConfigParser                              # reading configuration files
-import socket,threading                          # for the c2c server
-import select                                    # c2c & main loop
-from wraith.iyri import __version__ as ivers     # for iyri version
-from wraith.iyri.collate import Collator         # the collator
-from wraith.iyri.rdoctl import RadioController   # Radio object etc
-from wraith.iyri.gpsctl import GPSController     # gps device
-from wraith.wifi import iw                       # regset/get & channels
-from wraith.wifi.iwtools import wifaces          # check for interface presents
-from wraith.utils.cmdline import runningprocess  # check for psql running
-from wraith.utils import valrep                  # validation functionality
-from wraith.iyri.constants import *              # buffer dims
+import os                                         # for path validations
+import signal                                     # signal processing
+import logging, logging.config, logging.handlers  # logging
+import multiprocessing as mp                      # multiprocessing process, events
+import ConfigParser                               # reading configuration files
+import socket,threading                           # for the c2c server
+import select                                     # c2c & main loop
+from wraith.iyri import __version__ as ivers      # for iyri version
+from wraith.iyri.collate import Collator          # the collator
+from wraith.iyri.rdoctl import RadioController    # Radio object etc
+from wraith.iyri.gpsctl import GPSController      # gps device
+from wraith.wifi.interface import iw              # regset/get & channels
+from wraith.wifi.interface.iwtools import wifaces # check for interface presents
+from wraith.utils.cmdline import runningprocess   # check for psql running
+from wraith.utils import valrep                   # validation functionality
+from wraith.iyri.constants import *               # buffer dims
 
 #### set up log -> have to configure absolute path
 GPATH = os.path.dirname(os.path.abspath(__file__))
