@@ -65,6 +65,8 @@ wraith 0.0.4
   - tried commenting code (specifically functions) better
   - replaced deprecated '%' string operator with str.format()
   - reworking gui to deal with new iyri and removal of nidus
+  - added a Radio class
+   o first step in moving away from parsing command line output from iw etc
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

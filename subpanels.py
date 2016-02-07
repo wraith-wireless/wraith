@@ -22,8 +22,7 @@ import psycopg2.extras as pextras                # cursors and such
 import ConfigParser                              # config file parsing
 import wraith                                    # version info & constants
 import wraith.widgets.panel as gui               # graphics suite
-from wraith.wifi.interface import iw             # wireless interface details
-from wraith.wifi.interface import iwtools as iwt # interface details
+from wraith.wifi.interface import radio           # wireless interface details
 from wraith.wifi.standards import mpdu           # for 802.11 types/subtypes
 from wraith.utils import timestamps              # valid data/time
 from wraith.utils import landnav                 # lang nav utilities
@@ -404,30 +403,28 @@ class InterfacePanel(gui.PollingTabularPanel):
     def pnlupdate(self):
         """ lists interfaces """
         # get list of current wifaces on system & list of wifaces in tree
-        nics = iwt.wifaces()
+        nics = radio.winterfaces()
         ls = self._tree.get_children()
 
         # remove nics that are no longer present
-        for nic in ls:
-            if not nic in nics: self._tree.delete(nic)
+        for l in ls:
+            if not l in nics: self._tree.delete(l)
 
         # add new system nics
+        r = radio.Radio()
         for nic in nics:
-            (phy,w) = iw.dev(nic)
-            a = w[0]['addr']
-            m = w[0]['type']
-            d = iwt.getdriver(nic)
-            c = iwt.getchipset(d)
-            if nic in ls: # nic is already listed
+            r.setnic(nic)
+            if nic in ls:
                 # check if data has changed -
                 cur = self._tree.set(nic)
-                if cur['PHY'] != phy: self._tree.set(nic,'PHY',phy)
-                if cur['MAC'] != a: self._tree.set(nic,'MAC',a)
-                if cur['Mode'] != m: self._tree.set(nic,'Mode',m)
-                if cur['Driver'] != d: self._tree.set(nic,'Driver',d)
-                if cur['Chipset'] != c: self._tree.set(nic,'Chipset',c)
-            else:         # nic is new
-                self._tree.insert('','end',iid=nic,values=(phy,nic,a,m,d,c))
+                if cur['PHY'] != r.phy: self._tree.set(nic,'PHY',r.phy)
+                if cur['MAC'] != r.hwaddr: self._tree.set(nic,'MAC',r.hwaddr)
+                if cur['Mode'] != r.mode: self._tree.set(nic,'Mode',r.mode)
+                if cur['Driver'] != r.driver: self._tree.set(nic,'Driver',r.driver)
+                if cur['Chipset'] != r.chipset: self._tree.set(nic,'Chipset',r.chipset)
+            else:
+                self._tree.insert('','end',iid=nic,values=(r.phy,nic,r.hwaddr,
+                                                           r.mode,r.driver,r.chipset))
 
 # View->DataBin
 class DatabinPanel(gui.SimplePanel):
@@ -1644,7 +1641,7 @@ class IyriConfigPanel(gui.ConfigPanel):
         if not nic:
             self.err("Invalid Abad Input","Radio nic must be specified")
             return False
-        elif not nic in iwt.wifaces():
+        elif not nic in radio.winterfaces():
             self.warn("Not Found","Abad radio may not be wireless")
         spoof = self._entAbadSpoof.get().upper()
         if spoof and not valrep.validhwaddr(spoof):
@@ -1700,7 +1697,7 @@ class IyriConfigPanel(gui.ConfigPanel):
                     ch = start
                     chw = None
                 ch = int(ch)
-                if chw and not chw in iw.IW_CHWS:
+                if chw and not chw in radio.IW_CHWS:
                     raise RuntimeError("Specified channel width is not valid")
         except ValueError:
             self.err("Invalid Abad Input","Scan start must be integer")
@@ -1718,7 +1715,8 @@ class IyriConfigPanel(gui.ConfigPanel):
         # then shama radio details
         nic = self._entShamaNic.get()
         if nic:
-            if not nic in iwt.wifaces(): self.warn("Not Found","Radio may not be wireless")
+            if not nic in radio.winterfaces():
+                self.warn("Not Found","Radio may not be wireless")
             spoof = self._entShamaSpoof.get().upper()
             if spoof and not valrep.validhwaddr(spoof):
                 self.err("Invalid Shama Input","Spoofed MAC address is not valid")
@@ -1774,7 +1772,7 @@ class IyriConfigPanel(gui.ConfigPanel):
                         ch = start
                         chw = None
                     ch = int(ch)
-                    if chw and not chw in iw.IW_CHWS:
+                    if chw and not chw in radio.IW_CHWS:
                         raise RuntimeError("Specified channel width is not valid")
             except ValueError:
                 self.err("Invalid Shama Input", "Scan start must be integer")

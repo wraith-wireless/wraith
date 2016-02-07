@@ -28,7 +28,7 @@ from wraith.iyri import __version__ as ivers      # for iyri version
 from wraith.iyri.collate import Collator          # the collator
 from wraith.iyri.rdoctl import RadioController    # Radio object etc
 from wraith.iyri.gpsctl import GPSController      # gps device
-from wraith.wifi.interface import iw              # regset/get & channels
+from wraith.wifi.interface import radio           # regset/get & channels
 from wraith.wifi.interface.iwtools import wifaces # check for interface presents
 from wraith.utils.cmdline import runningprocess   # check for psql running
 from wraith.utils import valrep                   # validation functionality
@@ -299,8 +299,8 @@ class Iryi(object):
         if self._rd:
             try:
                 logging.info("Resetting regulatory domain...")
-                iw.regset(self._rd)
-                if iw.regget() != self._rd: raise RuntimeError
+                radio.setrd(self._rd)
+                if radio.getrd() != self._rd: raise RuntimeError
                 logging.info("Regulatory domain reset")
             except:
                 logging.warning("Failed to reset regulatory domain")
@@ -375,8 +375,8 @@ class Iryi(object):
             rd = self._conf['local']['region']
             if rd:
                 logging.info("Setting regulatory domain to %s...",rd)
-                self._rd = iw.regget()
-                iw.regset(rd)
+                self._rd = radio.getrd()()
+                radio.setrd(rd)
 
             # abad radio is mandatory -> as with the Collator, we cannot continue
             # w/out this one, allow the outer block to catch any failures
@@ -595,7 +595,7 @@ class Iryi(object):
                     ch = scanspec
                     chw = None
                 ch = int(ch) if ch else r['scan'][0][0]
-                if not chw in iw.IW_CHWS: chw = r['scan'][0][1]
+                if not chw in radio.IW_CHWS: chw = r['scan'][0][1]
                 r['scan_start'] = (ch,chw) if (ch,chw) in r['scan'] else r['scan'][0]
             except ValueError:
                 r['scan_start'] = r['scan'][0]

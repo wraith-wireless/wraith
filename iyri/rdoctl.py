@@ -26,8 +26,7 @@ import signal                               # handling signals
 import socket                               # reading frames
 from Queue import Empty                     # queue empty exception
 import multiprocessing as mp                # for Process
-from wraith.wifi.interface import iw        # iw command line interface
-import wraith.wifi.interface.iwtools as iwt # nic command line interaces
+from wraith.wifi.interface import radio     # wireless nics & details
 from wraith.utils.timestamps import isots   # converted timestamp
 from wraith.iyri.tuner import Tuner         # our tuner
 from wraith.iyri.constants import *         # tuner states & buffer dims
@@ -50,20 +49,11 @@ class RadioController(mp.Process):
         self._buffer = buff       # buffer for frames
         self._qT = None           # queue for tuner messages
         self._role = None         # role this radio plays
-        self._nic = None          # radio network interface controller name
-        self._mac = None          # real mac address
-        self._phy = None          # the phy of the device
-        self._vnic = None         # virtual monitor name
-        self._std = None          # supported standards
+        self._rdo = None          # the radio
         self._scan = []           # scan list
         self._hop = None          # hop time
         self._interval = None     # interval time
-        self._chs = []            # supported channels
         self._ds = []             # dwell times list
-        self._txpwr = 0           # current tx power
-        self._driver = None       # the driver
-        self._chipset = None      # the chipset
-        self._spoofed = ""        # spoofed mac address
         self._record = False      # write frames to file?
         self._desc = None         # optional description
         self._paused = False      # initial state: pause on True, scan otherwise
@@ -86,12 +76,12 @@ class RadioController(mp.Process):
         stuner = TUNE_PAUSE if self._paused else TUNE_SCAN
         try:
             qT = mp.Queue()
-            tuner = Tuner(qT,self._cI,self._vnic,self._scan,self._ds,self._chi,stuner)
+            tuner = Tuner(qT,self._cI,self._rdo,self._scan,self._ds,self._chi,stuner)
             tuner.start()
-            self._icomms.put((self._vnic,isots(),RDO_RADIO,self.radio))
+            self._icomms.put((self._rdo.vnic,isots(),RDO_RADIO,self.radio))
         except Exception as e:
             self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
-            self._icomms.put((self._vnic,isots(),RDO_FAIL,e))
+            self._icomms.put((self._rdo.vnic,isots(),RDO_FAIL,e))
         else:
             msg = "tuner-{0} up".format(tuner.pid)
             self._cI.send((IYRI_INFO,self._role,'Tuner',msg))
@@ -116,27 +106,27 @@ class RadioController(mp.Process):
                     self._cI.send((CMD_ERR,self._role,msg[0],msg[1]))
                 elif ev == RDO_FAIL:
                     self._cI.send((IYRI_ERR,self._role,'Tuner',msg[1]))
-                    self._icomms.put((self._vnic,ts,RDO_FAIL,msg[1]))
+                    self._icomms.put((self._rdo.vnic,ts,RDO_FAIL,msg[1]))
                 elif ev == RDO_STATE:
                     self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
                 elif ev == RDO_HOLD:
                     stuner = TUNE_HOLD
-                    self._icomms.put((self._vnic,ts,RDO_HOLD,msg[1]))
+                    self._icomms.put((self._rdo.vnic,ts,RDO_HOLD,msg[1]))
                     if msg[0] > -1:
                         self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
                 elif ev == RDO_SCAN:
                     stuner = TUNE_SCAN
-                    self._icomms.put((self._vnic,ts,RDO_SCAN,msg[1]))
+                    self._icomms.put((self._rdo.vnic,ts,RDO_SCAN,msg[1]))
                     if msg[0] > -1:
                         self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
                 elif ev == RDO_LISTEN:
                     stuner = TUNE_LISTEN
-                    self._icomms.put((self._vnic,ts,RDO_LISTEN,msg[1]))
+                    self._icomms.put((self._rdo.vnic,ts,RDO_LISTEN,msg[1]))
                     if msg[0] > -1:
                         self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
                 elif ev == RDO_PAUSE:
                     stuner = TUNE_PAUSE
-                    self._icomms.put((self._vnic,ts,RDO_PAUSE,' '))
+                    self._icomms.put((self._rdo.vnic,ts,RDO_PAUSE,' '))
                     if msg[0] > -1:
                         self._cI.send((CMD_ACK,self._role,msg[0],msg[1]))
             except Empty: # no notices from Tuner
@@ -146,24 +136,24 @@ class RadioController(mp.Process):
                     if stuner == TUNE_PAUSE: _ = self._s.recv(n)
                     else:
                         l = self._s.recv_into(self._buffer[(ix*n):(ix*n)+n],n)
-                        self._icomms.put((self._vnic,isots(),RDO_FRAME,(ix,l)))
+                        self._icomms.put((self._rdo.vnic,isots(),RDO_FRAME,(ix,l)))
                         ix = (ix+1) % m
                 except socket.timeout: pass
                 except socket.error as e:
                     err = True
                     self._cI.send((IYRI_ERR,self._role,'Socket',e))
-                    self._icomms.put((self._vnic,isots(),RDO_FAIL,e))
+                    self._icomms.put((self._rdo.vnic,isots(),RDO_FAIL,e))
                 except Exception as e:
                     err = True
                     self._cI.send((IYRI_ERR,self._role,type(e).__name__,e))
-                    self._icomms.put((self._vnic,isots(),RDO_FAIL,e))
+                    self._icomms.put((self._rdo.vnic,isots(),RDO_FAIL,e))
 
         # wait on Tuner to finish
         while mp.active_children(): sleep(0.5)
 
         # notify Iyri and Collator we are down & shut down
         self._cI.send((IYRI_DONE,self._role,'done','done'))
-        self._icomms.put((self._vnic,isots(),RDO_RADIO,None))
+        self._icomms.put((self._rdo.vnic,isots(),RDO_RADIO,None))
         if not self._shutdown():
             try:
                 self._cI.send((IYRI_WARN,self._role,'Shutdown',"Incomplete reset"))
@@ -172,20 +162,20 @@ class RadioController(mp.Process):
     @property
     def radio(self):
         """ returns a dict describing this radio """
-        return {'nic':self._nic,
-                'vnic':self._vnic,
-                'phy':self._phy,
-                'mac':self._mac,
+        return {'nic':self._rdo.nic,
+                'vnic':self._rdo.vnic,
+                'phy':self._rdo.phy,
+                'mac':self._rdo.hwaddr,
                 'role':self._role,
-                'spoofed':self._spoofed,
+                'spoofed':self._rdo.spoofed,
                 'record':self._record,
-                'driver':self._driver,
-                'chipset':self._chipset,
-                'standards':self._std,
-                'channels':self._chs,
+                'driver':self._rdo.driver,
+                'chipset':self._rdo.chipset,
+                'standards':self._rdo.standards,
+                'channels':self._rdo.channels,
                 'hop':'{0:.3}'.format(self._hop),
                 'ival':'{0:.3}'.format(self._interval),
-                'txpwr':self._txpwr,
+                'txpwr':self._rdo.txpwr,
                 'desc':self._desc,
                 'nA':self._antenna['num'],
                 'type':self._antenna['type'],
@@ -206,101 +196,60 @@ class RadioController(mp.Process):
          :param conf: radio configuration
         """
         # 1) set radio properties as specified in conf
-        if conf['nic'] not in iwt.wifaces():
-            raise RuntimeError("{0}:iwtools.wifaces:not found".format(conf['role']))
-        self._nic = conf['nic']        # save nic name
-        self._role = conf['role']      # & role
+        if conf['nic'] not in radio.winterfaces():
+            raise RuntimeError("{0}:radio.nic:not found".format(conf['role']))
+        self._role = conf['role']      # save role
         self._paused = conf['paused']  # & initial state (paused|scan)
         self._record = conf['record']  # & write frames
 
-        # get the phy and associated interfaces
+        # determine virtual interface name
+        ns = []
+        for wiface in radio.winterfaces():
+            cs = wiface.split('iyri')
+            try:
+                if len(cs) == 2:
+                    ns.append(int(cs[1]))
+            except ValueError:
+                pass
+        n = 0 if not ns else max(ns)+1
+        vnic = "iyri{0}".format(n)
+
+        # initialize the radio & set a monitor interface
         try:
-            self._phy,ifaces = iw.dev(self._nic)
-            self._mac = ifaces[0]['addr']
+            spoofed = None if not conf['spoofed'] else conf['spoofed']
+            self._rdo = radio.Radio(conf['nic'],vnic,spoofed)
         except (KeyError, IndexError):
             err = "{0}:iw.dev:error getting interfaces".format(self._role)
             raise RuntimeError(err)
-        except iw.IWException as e:
-            err = "{0}:iw.dev:failed to get phy <{1}>".format(self._role,e)
+        except radio.RadioException as e:
+            err = "{0}:Radio:failed to initialize <{1}>".format(self._role,e)
             raise RuntimeError(err)
 
-        # get properties (the below will return None rather than throw exception)
-        self._chs = iw.chget(self._phy)
-        self._std = iwt.iwconfig(self._nic,'Standards')
-        self._txpwr = iwt.iwconfig(self._nic,'Tx-Power')
-        self._driver = iwt.getdriver(self._nic)
-        self._chipset = iwt.getchipset(self._driver)
-
-        # spoof the mac address ??
-        if conf['spoofed']:
-            mac = None if conf['spoofed'].lower() == 'random' else conf['spoofed']
-            try:
-                iwt.ifconfig(self._nic,'down')
-                self._spoofed = iwt.sethwaddr(self._nic,mac)
-            except iwt.IWToolsException as e:
-                raise RuntimeError("{0}:iwtools.sethwaddr:{1}".format(self._role,e))
-
-        # 2) prepare specified nic for monitoring and bind it
-        # delete all associated interfaces - we want full control
-        for iface in ifaces: iw.devdel(iface['nic'])
-
-        # determine virtual interface name
-        ns = []
-        for wiface in iwt.wifaces():
-            cs = wiface.split('iyri')
-            try:
-                if len(cs) > 1: ns.append(int(cs[1]))
-            except ValueError: pass
-        n = 0 if not 0 in ns else max(ns)+1
-        self._vnic = "iyri{0}".format(n)
-
-        # sniffing interface
-        try:
-            iw.phyadd(self._phy,self._vnic,'monitor') # create a monitor,
-            iwt.ifconfig(self._vnic,'up')             # and turn it on
-        except iw.IWException as e:
-            # never added virtual nic, restore nic
-            errMsg = "{0}:iw.phyadd:{1}".format(self._role,e)
-            try:
-                iwt.ifconfig(self._nic,'up')
-            except iwt.IWToolsException:
-                errMsg += " Failed to restore {0}".format(self._nic)
-            raise RuntimeError(errMsg)
-        except iwt.IWToolsException as e:
-            # failed to 'raise' virtual nic, remove vnic and add nic
-            errMsg = "{0}:iwtools.ifconfig:{1}".format(self._role,e)
-            try:
-                iw.phyadd(self._phy,self._nic,'managed')
-                iw.devdel(self._vnic)
-                iwt.ifconfig(self._nic,'up')
-            except (iw.IWException,iwt.IWToolsException):
-                errMsg += " Failed to restore {0}".format(self._nic)
-            raise RuntimeError(errMsg)
+        # read in antenna details and radio description
+        if conf['antennas']['num'] > 0:
+            self._antenna['num'] = conf['antennas']['num']
+            self._antenna['type'] = conf['antennas']['type']
+            self._antenna['gain'] = conf['antennas']['gain']
+            self._antenna['loss'] = conf['antennas']['loss']
+            self._antenna['x'] = [v[0] for v in conf['antennas']['xyz']]
+            self._antenna['y'] = [v[1] for v in conf['antennas']['xyz']]
+            self._antenna['z'] = [v[2] for v in conf['antennas']['xyz']]
+        self._desc = conf['desc']
 
         # wrap remaining in a try block, we must attempt to restore card and
-        # release the socket after any failures ATT
+        # release the socket after any failures
         self._s = None
         try:
             # bind socket w/ a timeout of 5 just in case there is no wireless traffic
-            self._s = socket.socket(socket.AF_PACKET,
-                                    socket.SOCK_RAW,
-                                    socket.htons(0x0003))
+            self._s = socket.socket(socket.AF_PACKET,socket.SOCK_RAW,socket.htons(0x0003))
             self._s.settimeout(5)
-            self._s.bind((self._vnic,0x0003))
-
-            # read in antenna details and radio description
-            if conf['antennas']['num'] > 0:
-                self._antenna['num'] = conf['antennas']['num']
-                self._antenna['type'] = conf['antennas']['type']
-                self._antenna['gain'] = conf['antennas']['gain']
-                self._antenna['loss'] = conf['antennas']['loss']
-                self._antenna['x'] = [v[0] for v in conf['antennas']['xyz']]
-                self._antenna['y'] = [v[1] for v in conf['antennas']['xyz']]
-                self._antenna['z'] = [v[2] for v in conf['antennas']['xyz']]
-            self._desc = conf['desc']
+            self._s.bind((vnic,0x0003))
 
             #3) creates a scan list and compile statistics
-            scan = [(str(t[0]),t[1]) for t in conf['scan'] if str(t[0]) in self._chs and not t in conf['pass']]
+            ss = conf['scan']
+            ps = conf['pass']
+            cs = self._rdo.channels
+            scan = [(str(c[0]),c[1]) for c in ss if str(c[0]) in cs and not c in ps]
 
             # sum hop times with side effect of removing any invalid channel tuples
             # i.e. Ch 14, Width HT40+ and any user specified channels the card
@@ -310,19 +259,17 @@ class RadioController(mp.Process):
             while scan:
                 try:
                     t = time()
-                    iw.chset(self._vnic,scan[i][0],scan[i][1])
+                    self._rdo.setch(scan[i][0],scan[i][1])
                     self._hop += (time() - t)
                     i += 1
-                except iw.IWException as e:
-                    # if invalid argument, drop the channel otherwise reraise error
-                    if iw.ecode(str(e)) == iw.IW_INVALIDARG:
-                        del scan[i]
-                    else:
-                        raise
+                except radio.RadioInvalidArg:
+                    del scan[i]
                 except IndexError:
                     break
-            if not scan: raise ValueError("Empty scan pattern")
-            else: self._scan = scan
+            if not scan:
+                raise ValueError("Empty scan pattern")
+            else:
+                self._scan = scan
 
             # calculate avg hop time, and interval time
             # NOTE: these are not currently used but may be useful later
@@ -334,15 +281,23 @@ class RadioController(mp.Process):
 
             # get start ch & set the initial channel
             try:
-                self._chi = scan.index(conf['scan_start'])
-            except ValueError: pass
-            iw.chset(self._vnic,scan[self._chi][0],scan[self._chi][1])
+                start = conf['scan_start'].split(':')
+                if start == ['']: self._chi = 0
+                else:
+                    if len(start) == 1: start = (start[0],None)
+                    else:
+                        if start[1] not in radio.IW_CHWS: start (start[0],None)
+                        else: start = (start[0],start[1])
+                    self._chi = scan.index(start)
+            except ValueError:
+                self._chi = 0
+            self._rdo.setch(scan[self._chi][0],scan[self._chi][1])
         except socket.error as e:
             self._shutdown()
             raise RuntimeError("{0}:Raw Socket:{1}".format(self._role,e))
-        except iw.IWException as e:
+        except radio.RadioException as e:
             self._shutdown()
-            err = "{0}:iw.chset:Failed to set channel: {1}".format(self._role,e)
+            err = "{0}:Radio.setch:Failed to set channel: {1}".format(self._role,e)
             raise RuntimeError(err)
         except (ValueError,TypeError) as e:
             self._shutdown()
@@ -356,15 +311,14 @@ class RadioController(mp.Process):
         # try shutting down & resetting radio (if it failed we may not be able to)
         clean = True
         try:
-            iw.devdel(self._vnic)
-            iw.phyadd(self._phy,self._nic)
-            if self._spoofed: iwt.resethwaddr(self._nic)
-            iwt.ifconfig(self._nic,'up')
+            if self._rdo:
+                if self._rdo.mode == 'monitor': self._rdo.unwatch()
+                if self._rdo.spoofed: self._rdo.uncloak()
             if self._s:
                 self._s.shutdown(socket.SHUT_RD)
                 self._s.close()
             self._cI.close()
-        except iw.IWException: clean = False
+        except radio.RadioException: clean = False
         except (EOFError,IOError): pass
         except: clean = False
         return clean

@@ -17,18 +17,17 @@ __status__ = 'Development'
 from time import time                              # timestamps/timing metrics
 import signal                                      # handling signals
 import multiprocessing as mp                       # for Process
-from wraith.wifi.interface import iw               # iw command line interface
-from wraith.wifi.interface.iwtools import iwconfig # for txpwr
-from wraith.utils.timestamps import isots, ts2iso  # time stamp conversion
-from wraith.iyri.constants import *                # tuner states & buffer dims
+from wraith.wifi.interface import radio           # radio
+from wraith.utils.timestamps import isots, ts2iso # time stamp conversion
+from wraith.iyri.constants import *               # tuner states & buffer dims
 
 class Tuner(mp.Process):
     """ tune' the radio's channel and width """
-    def __init__(self,q,conn,iface,scan,dwell,i,state=TUNE_SCAN):
+    def __init__(self,q,conn,rdo,scan,dwell,i,state=TUNE_SCAN):
         """
          :param q: msg queue from us to RadioController
          :param conn: token connnection from iyri
-         :param iface: interface name of card
+         :param rdo: the radio
          :param scan: scan list of channel tuples (ch,chw)
          :param dwell: dwell list. for each i stay on ch in scan[i] for dwell[i]
          :param i: initial channel index
@@ -38,7 +37,7 @@ class Tuner(mp.Process):
         self._state = state # initial state paused or scanning
         self._qR = q        # event queue to RadioController
         self._cI = conn     # connection from Iyri to tuner
-        self._vnic = iface  # this radio's vnic
+        self._rdo = rdo     # the radio
         self._chs = scan    # scan list
         self._ds = dwell    # corresponding dwell times
         self._i = i         # initial/current index into scan/dwell
@@ -54,7 +53,7 @@ class Tuner(mp.Process):
         # need channel, txpwr, current state
         return "{0} ch {1} txpwr {2}".format(TUNE_DESC[self._state],
                                              self.channel,
-                                             iwconfig(self._vnic,'Tx-Power'))
+                                             self._rdo.txpwr)
 
     def run(self):
         """ switch channels based on associted dwell times """
@@ -127,14 +126,14 @@ class Tuner(mp.Process):
                         try:
                             ch,chw = ps.split('-')
                             if chw == 'None': chw = None
-                            iw.chset(self._vnic,ch,chw)
+                            self._rdo.setch(ch,chw)
                             self._state = TUNE_LISTEN
                             details = "{0}:{1}".format(ch,chw)
                             self._qR.put((RDO_LISTEN,ts2iso(ts),[cid,details]))
                         except ValueError:
                             err = "invalid param format"
                             self._qR.put((CMD_ERR,ts2iso(ts),[cid,err]))
-                        except iw.IWException as e:
+                        except radio.RadioException as e:
                             self._qR.put((CMD_ERR,ts2iso(ts),[cid,str(e)]))
                     else:
                         self._qR.put((CMD_ERR,ts2iso(ts),[cid,"redundant cmd"]))
@@ -145,9 +144,9 @@ class Tuner(mp.Process):
                 try:
                     # no token, go to next channel, reset remaining
                     self._i = (self._i+1) % len(self._chs)
-                    iw.chset(self._vnic,self._chs[self._i][0],self._chs[self._i][1])
+                    self._rdo.setch(self._chs[self._i][0],self._chs[self._i][1])
                     remaining = 0 # reset remaining timeout
-                except iw.IWException as e:
+                except radio.RadioException as e:
                     self._qR.put((RDO_FAIL,isots(),[-1,e]))
                 except Exception as e: # blanket exception
                     self._qR.put((RDO_FAIL,isots(),[-1,e]))

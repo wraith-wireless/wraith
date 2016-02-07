@@ -30,9 +30,9 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                # getuid()
-import re                # regular expressions
-import subprocess as sp  # executing commands
+import os,re
+import subprocess as sp
+from wraith.wifi.standards.channels import f2c
 
 # constants error code
 IW_PERMISSION =  -1
@@ -41,6 +41,9 @@ IW_NONIC      = -19
 IW_INVALIDARG = -22
 IW_EXCEED     = -23
 IW_OPERATION  = -95
+
+# our iw path
+IW3_17 = '/usr/sbin/iw'
 
 # supported channel widths
 IW_CHWS = [None,'HT20','HT40+','HT40-']
@@ -72,12 +75,13 @@ def dev(nic=None):
      a sub of iw for getting phy info (iw dev) on wireless cards
 
      :param nic: name of nic
-     USES:
-      if nic is None returns a dict of phys corresponding to the iw dev command
-      otherwise returns a tuple dict (phy,interfaces) or None if it does not exist
+     :returns: if nic is set, returns a tuple t = (phy,interfaces) where phy is
+      the physical name and interfaces is a dict having keys: iface, ifindex, wdev,
+      addr, ntype,channel
+      if nic is None, returns a dict of phys corresponding to the iw dev command
     """
 
-    p = sp.Popen(['/usr/sbin/iw','dev'],stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
+    p = sp.Popen([IW3_17,'dev'],stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
 
     # phys is a dict of dicts with each phy the key
@@ -110,14 +114,15 @@ def dev(nic=None):
                                'rf':ch[_IFACE_CH_RF_],
                                'width':ch[_IFACE_CH_WIDTH_],
                                'cf':ch[_IFACE_CH_CF_]}
-                phys[phy].append({'nic':iface,'addr':addr,'ifindex':ifindex,
-                                  'wdev':wdev,'type':ntype,'channel':channel})               
+                phys[phy].append({'nic':iface.strip(),'addr':addr.strip(),
+                                  'ifindex':ifindex,'wdev':wdev.strip(),
+                                  'type':ntype.strip(),'channel':channel})
 
-        if not nic:return phys
+        if not nic: return phys
         for phy in phys:
             for i in phys[phy]:
                 if i['nic'] == nic: return phy,phys[phy]
-        return None
+        raise IWException("No such device (-19)")
     except Exception as e:
         raise IWException(e)
         
@@ -135,7 +140,7 @@ def devadd(nic,vnic,mode='monitor'):
      :param vnic: name to give virtual interface
      :param mode: what mode to set virtual interface to
     """
-    cmd = ['/usr/sbin/iw','dev',nic,'interface','add',vnic,'type',mode]
+    cmd = [IW3_17,'dev',nic,'interface','add',vnic,'type',mode]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -147,7 +152,7 @@ def devdel(vnic):
 
      :param vnic: virtual interface to delete
     """
-    cmd = ['/usr/sbin/iw','dev',vnic,'del']
+    cmd = [IW3_17,'dev',vnic,'del']
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -161,7 +166,7 @@ def phyadd(phy,vnic,mode='managed'):
      :param vnic: name to give virtual interface
      :param mode: what mode to set the
     """
-    cmd = ['/usr/sbin/iw',phy,'interface','add',vnic,'type',mode]
+    cmd = [IW3_17,phy,'interface','add',vnic,'type',mode]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -177,7 +182,7 @@ def chget(phy):
      :param phy: the phy to get chnnels for
      :returns: list of supported channels (as strings)
     """
-    cmd = ['/usr/sbin/iw','phy',phy,'info']
+    cmd = [IW3_17,'phy',phy,'info']
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
     
@@ -204,15 +209,33 @@ def chget(phy):
         pass
     return ch
 
-def chset(vnic,ch,chwidth=None):
+def curchget(nic):
+    """
+    :param nic: name of interface to query
+    :returns: the current channel (number only)
+    """
+    p = sp.Popen(['iwlist',nic,'channel'],stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
+    out,err = p.communicate()
+
+    try:
+        # split by newline, get rid of empties and pull out the last line
+        lines = [line.strip() for line in out.split('\n') if line]
+        rf = r'Current Frequency:([\d|\.]*)'
+        freq = int(float(re.search(rf,lines[-1]).group(1))*1000)
+        ch = f2c(freq)
+        return ch
+    except (AttributeError,IndexError,ValueError): return None
+    except Exception as e: raise IWException(e)
+
+def chset(phy,ch,chwidth=None):
     """
      sets the specified channel of vnic: sudo iw dev vnic set channel ch [chwidth]
 
-     :param vnic: name of virtual interface
+     :param phy: physical name of card
      :param ch: channel to set to
      :param chwidth: channel width (if any) to set to
     """
-    cmd = ['/usr/sbin/iw','dev',vnic,'set','channel',ch]
+    cmd = [IW3_17,'phy',phy,'set','channel',ch]
     if chwidth: cmd.append(chwidth)
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
@@ -224,11 +247,11 @@ def chset(vnic,ch,chwidth=None):
 
 """ txpower """
 
-def txpwrset(nic,pwr,option='fixed'):
+def txpwrset(phy,pwr,option='fixed'):
     """
      sets txpower of nic to pwr (dBm) with option = oneof {fixed|limit|auto}
 
-     :param nic: name of nic
+     :param phy: physical name of card
      :param pwr: power in dBm to set nic to
      :param option: power option oneof {'fixed'|'limit'|'auto'}
     """
@@ -237,7 +260,7 @@ def txpwrset(nic,pwr,option='fixed'):
     if not option in ['fixed','auto','limit']:
         raise IWException("option {0} must be one of {fixed|limit|auto}".format(option))
 
-    cmd = ['/usr/sbin/iw','dev',nic,'set','txpower',option,str(pwr*100)]
+    cmd = [IW3_17,'phy',phy,'set','txpower',option,str(pwr*100)]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -270,7 +293,7 @@ def regset(region):
 
      :param region: region to set regulatory domain to (two letter country code)
     """
-    cmd = ['/usr/sbin/iw','reg','set',region]
+    cmd = [IW3_17,'reg','set',region]
     if os.getuid() != 0: cmd.insert(0,'sudo')
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
@@ -285,7 +308,7 @@ def regget(regOnly=True):
      :param regOnly: return regultory domain only or full output
      :returns: see description
     """
-    cmd = ['/usr/sbin/iw','reg','get']
+    cmd = [IW3_17,'reg','get']
     p = sp.Popen(cmd,stdin=sp.PIPE,stdout=sp.PIPE,stderr=sp.PIPE)
     out,err = p.communicate()
     if err: raise IWException(err.split(':')[1].strip())

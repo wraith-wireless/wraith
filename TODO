@@ -76,17 +76,27 @@ Iyri:
  83) need to revamp the c2c cmd processing
 Wifi:
   1) Should we add support for AVS, Prism headers ?
-  2) radiotap: ensure data pad is handled for atheros cards (any others?)
-  3) in mpdu, fully parse
+  2) in standards.radiotap: ensure data pad is handled for atheros cards (any others?)
+  3) in standards.mpdu, fully parse
      o control wrapper
      o +htc
      o info-elements
       - RSN Std 8.4.2.27, #48
       - TIM Info-Element #5 from beacons could be useful
       - parse timing advance
-  5) how to support a-msdu etc
-  6) 802.1X parsing as well as additional mpdu i.e. 802.11u, 802.11s etc
-  8) in iw and iwtools switch to netlink rather than parsing iw/iwconfig/ifconfig
-     output
+  5) in standards.mpdu, how to support a-msdu etc
+  6) in standards, implement 802.1X parsing? other 802.11 standards i.e mesh
+  8) in standards.iw and .iwtools switch to netlink rather than parsing
+     iw/iwconfig/ifconfig/iwlist output
+  9) in interface.radio can we get a nic(s) from phy? currently saving nic/vnic
+     to pass to iw & iwtools
+ 10) in interfaces should we add support for rfill to handle devices that may
+     be locked
+ 11) what data can be found in /sys/class/net rather than through iw
+     o for exampele /sys/class/net/uevent contains interface name and ifindex
+     o will this data always be present on all linux versions?
+ 12) how to get the current channel and channel width?
+     o could use ifaces and retrieve the channel dict but this would be a slow
+      workaround
 Nidus(.sql):
   1) create different users (w/ varying roles/authorities)
