@@ -63,8 +63,7 @@ RDO_FRAME     = 24 # radio sent frame
 # commands to threshers
 COL_SID       = 25 # pass the sid
 COL_RDO       = 26 # pass radio
-COL_WRITE     = 27 # pass write/don't write
-COL_FRAME     = 28 # pass frame
+COL_FRAME     = 27 # pass frame
 
 # RADIO CONSTANTS string desc corresponds with nidus RADIOSTATE -> these are
 # set here to provide a string message for the states

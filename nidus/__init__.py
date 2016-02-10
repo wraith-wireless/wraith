@@ -10,6 +10,8 @@
   - added ssids table for multiple ssids in mgmt frames
   - changed beacon_ts from type bytea to numeric(19)
   - relaxed constraints to allow for invalid packets to be stored
+  - drop manuf column in sta table
+   o will add oui/manuf table at some point
 """
 __name__ = 'nidus'
 __license__ = 'GPL v3.0'

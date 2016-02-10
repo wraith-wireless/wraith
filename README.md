@@ -116,6 +116,7 @@ Provides the Postgresql database schema, nidus.sql.
         + iwtools.py    iwconfig, ifconfig interface and nic utilities
         + iw.py         iw 3.17 interface
         + oui.py        oui/manuf related functions
+        + radio.py      Radio consolidates iwtools.py, iw.py
      - standards        initialize standards subpackage
         + radiotap.py   radiotap parsing
         + mpdu.py       IEEE 802.11 MAC (MPDU) parsing

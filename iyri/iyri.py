@@ -300,7 +300,7 @@ class Iryi(object):
             try:
                 logging.info("Resetting regulatory domain...")
                 radio.setrd(self._rd)
-                if radio.getrd() != self._rd: raise RuntimeError
+                if radio.getrd != self._rd: raise RuntimeError
                 logging.info("Regulatory domain reset")
             except:
                 logging.warning("Failed to reset regulatory domain")
@@ -375,7 +375,7 @@ class Iryi(object):
             rd = self._conf['local']['region']
             if rd:
                 logging.info("Setting regulatory domain to %s...",rd)
-                self._rd = radio.getrd()()
+                self._rd = radio.getrd
                 radio.setrd(rd)
 
             # abad radio is mandatory -> as with the Collator, we cannot continue
@@ -482,21 +482,12 @@ class Iryi(object):
                 raise RuntimeError("Invalid IP address for storage host")
 
             # Local section
-            # thresher related are required, ouipath, c2c and region are optional
+            # thresher related are required, c2c and region are optional
             # get required
             self._conf['local'] = {'thresher':{},
-                                   'opath':None,
                                    'region':None,
                                    'c2c':2526}
             self._conf['local']['thresher']['max'] = cp.getint('Local','maxt')
-
-            # get optional
-            if cp.has_option('Local','OUI'):
-                path = os.path.join(GPATH,os.path.abspath(cp.get('Local','OUI')))
-                if os.path.isfile(path):
-                    self._conf['local']['opath'] = path
-                else:
-                    logging.warning("OUI file {0} is not a file".format(path))
 
             if cp.has_option('Local','C2C'):
                 try:
@@ -531,7 +522,6 @@ class Iryi(object):
         r = {'nic':nic,
              'paused':False,
              'spoofed':None,
-             'record':True,
              'desc':"unknown",
              'scan_start':None,
              'role':rtype.lower(),
@@ -550,7 +540,6 @@ class Iryi(object):
                 r['spoofed'] = spoof
         if cp.has_option(rtype,'desc'): r['desc'] = cp.get(rtype,'desc')
         if cp.has_option(rtype,'paused'): r['paused'] = cp.getboolean(rtype,'paused')
-        if cp.has_option(rtype,'record'): r['record'] = cp.getboolean(rtype,'record')
 
         # process antennas - get the number first
         try:

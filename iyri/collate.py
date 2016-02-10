@@ -34,7 +34,6 @@ import psycopg2 as psql                        # postgresql api
 from wraith.utils.timestamps import isots      # converted timestamp
 from wraith.wifi.interface.iw import regget    # regulatory domain
 from wraith.utils.cmdline import ipaddr        # returns ip address
-from wraith.wifi.interface.oui import parseoui # parse out oui dict
 from wraith.iyri.thresh import Thresher        # thresher process
 from wraith.iyri.constants import *            # constants
 
@@ -61,7 +60,7 @@ class Collator(mp.Process):
         self._sb = sb        # shama's buffer
         self._save = None    # save options
         self._dbstr = {}     # db connection string
-        self._ps = {}        # thresher & oui path parameters
+        self._ps = {}        # thresher max count param
         self._setup(conf)
 
     def terminate(self): pass
@@ -76,7 +75,6 @@ class Collator(mp.Process):
         signal.signal(signal.SIGTERM,signal.SIG_IGN)
 
         # function local variables
-        ouis = parseoui(self._ps['opath']) # oui dict
         mint = mp.cpu_count()              # min/initial # of threshers
         maxt = self._ps['max']             # maximum # of threshers
         lSta = mp.Lock()                   # sta lock
@@ -101,7 +99,7 @@ class Collator(mp.Process):
             self._submitsensor(isots(),True)
             for _ in xrange(mint):
                 try:
-                    (pid,send) = self._newthresher(qT,lSta,cb,ouis,smap)
+                    (pid,send) = self._newthresher(qT,lSta,cb,smap)
                     threshers[pid] = send
                 except RuntimeError as e:
                     self._cI.send((IYRI_WARN,'collator','Thresher',e))
@@ -120,22 +118,13 @@ class Collator(mp.Process):
 
         # execution loop - NOTE: if submitsensor failed, there will be no
         # threshers and we will immediately fall through the exection loop
-        tmUpdate = 0   # timestamps for tracking when last exiting update
-        tmUpdate1 = 0  # was sent
         ins = [self._cI,self._icomms._reader]
         while mp.active_children():
-            if stop: # is it time to quit?
-                # while frames are still queued, update iyri of status
-                if len(fmap) > 0 and not poisoned:
-                    tmUpdate1 = time()
-                    if tmUpdate1 - tmUpdate > 5.0:
-                        msg = "{0} outstanding frames".format(len(fmap))
-                        self._cI.send((IYRI_INFO,'collator','Frames',msg))
-                        tmUpdate = time()
-
-                # send out the poison pills once all frames have been
-                # processed (or at least pulled of the buffer)
+            # if we have stop, send out the poison pills once all frames have been
+            # processed (or at least pulled of the buffer)
+            if stop:
                 if not [i for i in fmap if fmap[i]] and not poisoned:
+                    msg = "{0} outstanding frames".format(len(fmap))
                     for pid in threshers:
                         try:
                             threshers[pid].send((POISON,None,None))
@@ -190,7 +179,7 @@ class Collator(mp.Process):
 
                             # make a new thresher (to replace this one)
                             try:
-                                (pid,send) = self._newthresher(qT,lSta,cb,ouis,smap)
+                                (pid,send) = self._newthresher(qT,lSta,cb,smap)
                                 threshers[pid] = send
                             except RuntimeError as e:
                                 self._cI.send((IYRI_WARN,'Collator',Thresher,e))
@@ -208,7 +197,7 @@ class Collator(mp.Process):
                     elif ev == GPS_FLT: self._submitflt(ts,d)
                     elif ev == RDO_RADIO: # up/down message from radio(s).
                         if d is not None: # radio up
-                            (mac,role,rec) = d['mac'],d['role'],d['record']
+                            (mac,role) = d['mac'],d['role']
 
                             # shouldn't happen but make sure:
                             assert(cs not in rmap)           # reinitialization
@@ -218,14 +207,13 @@ class Collator(mp.Process):
                             msg = "{0}:{1} initiated".format(role,cs)
                             self._cI.send((IYRI_INFO,'collator','Radio',msg))
                             rmap[cs] = mac
-                            smap[mac] = {'record':rec,'cb':None}
+                            smap[mac] = {'cb':None}
                             if role == 'abad': smap[mac]['cb'] = self._ab
                             else: smap[mac]['cb'] = self._sb
 
                             # update threshers
                             for pid in threshers:
                                 threshers[pid].send((COL_RDO,ts,[mac]))
-                                threshers[pid].send((COL_WRITE,ts,[mac,rec]))
 
                             # submit radio & antenna(s)
                             self._submitradio(ts,mac,d)
@@ -291,7 +279,7 @@ class Collator(mp.Process):
                             self._cI.send((IYRI_INFO,'collator','load',msg))
                             for _ in xrange(x):
                                 try:
-                                    (pid,send) = self._newthresher(qT,lSta,cb,ouis,smap)
+                                    (pid,send) = self._newthresher(qT,lSta,cb,smap)
                                     threshers[pid] = send
                                 except RuntimeError as e:
                                     self._cI.send((IYRI_WARN,'Collator',Thresher,e))
@@ -353,7 +341,6 @@ class Collator(mp.Process):
         try:
             self._dbstr = conf['store']
             self._ps = conf['local']['thresher']
-            self._ps['opath'] = conf['local']['opath']
             self._conn = psql.connect(host=self._dbstr['host'],
                                       port=self._dbstr['port'],
                                       dbname=self._dbstr['db'],
@@ -388,26 +375,23 @@ class Collator(mp.Process):
             self._conn.rollback()
             raise RuntimeError("Collator:Unknown:{0}->{1}".format(type(e).__name__,e))
 
-    def _newthresher(self,q,l,b,os,m):
+    def _newthresher(self,q,l,b,m):
         """
         creates a new thresher
         :param q: task queue for threshers
         :param l: STA lock
         :param b: buffer
-        :param os: oui dict
         :param m: smap dict
         :returns tuple t = (thresher process id,send connection):
         """
         # NOTE: send the sid last so the thresher will not attempt to process
         # any frames until it has all radio(s) data
         r,s = mp.Pipe(False)
-        t = Thresher(self._icomms,q,r,l,b,self._dbstr,os)
+        t = Thresher(self._icomms,q,r,l,b,self._dbstr)
         t.start()
         for mac in m:
             ts = isots()
-            rec = m[mac]['record']
             s.send((COL_RDO,ts,[mac]))
-            s.send((COL_WRITE,ts,[mac,rec]))
         if self._sid: s.send((COL_SID,isots(),[self._sid]))
         return t.pid,s
 

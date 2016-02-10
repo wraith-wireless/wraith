@@ -63,6 +63,11 @@ REVISIONS:
       have been processed
      o fixed c2c
    - moved to the Radio class
+   - removed 'record' option. ATT all frames are written (raw) to db
+     o this may be useful later if we move away from full processing in the Thresher
+     o deprecated dict rdos is still maintained in Thresher as is the COL_RDO
+      token
+   - removed oui related from conf file and functions
 """
 __name__ = 'iyri'
 __license__ = 'GPL v3.0'

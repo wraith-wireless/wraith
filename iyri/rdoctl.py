@@ -54,7 +54,6 @@ class RadioController(mp.Process):
         self._hop = None          # hop time
         self._interval = None     # interval time
         self._ds = []             # dwell times list
-        self._record = False      # write frames to file?
         self._desc = None         # optional description
         self._paused = False      # initial state: pause on True, scan otherwise
         self._chi = 0             # initial channel index
@@ -168,7 +167,6 @@ class RadioController(mp.Process):
                 'mac':self._rdo.hwaddr,
                 'role':self._role,
                 'spoofed':self._rdo.spoofed,
-                'record':self._record,
                 'driver':self._rdo.driver,
                 'chipset':self._rdo.chipset,
                 'standards':self._rdo.standards,
@@ -197,10 +195,11 @@ class RadioController(mp.Process):
         """
         # 1) set radio properties as specified in conf
         if conf['nic'] not in radio.winterfaces():
+            print conf['nic']
+            print radio.winterfaces()
             raise RuntimeError("{0}:radio.nic:not found".format(conf['role']))
         self._role = conf['role']      # save role
         self._paused = conf['paused']  # & initial state (paused|scan)
-        self._record = conf['record']  # & write frames
 
         # determine virtual interface name
         ns = []
@@ -281,14 +280,7 @@ class RadioController(mp.Process):
 
             # get start ch & set the initial channel
             try:
-                start = conf['scan_start'].split(':')
-                if start == ['']: self._chi = 0
-                else:
-                    if len(start) == 1: start = (start[0],None)
-                    else:
-                        if start[1] not in radio.IW_CHWS: start (start[0],None)
-                        else: start = (start[0],start[1])
-                    self._chi = scan.index(start)
+                self._chi = scan.index(conf['scan_start'])
             except ValueError:
                 self._chi = 0
             self._rdo.setch(scan[self._chi][0],scan[self._chi][1])

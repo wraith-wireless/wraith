@@ -374,8 +374,8 @@ class CalculatePanel(gui.SimplePanel):
         except ValueError as e:
             err = "{0} is not a valid input".format(e.message.split(':')[1].strip())
             self.err("Invalid Input",err)
-        #except Exception as e:
-        #    self.err('Error',e)
+        except Exception as e:
+            self.err('Error',e)
 
     def clear(self):
         """ clear all entries """

@@ -52,7 +52,9 @@ IW_CHWS = [None,'HT20','HT40+','HT40-']
 class IWException(Exception): pass
 
 """ Returns the error code for the IW error """
-def ecode(err): return int(err[err.find('(')+1:err.find(')')])
+def ecode(err):
+    e = err.__str__()
+    return int(e[e.find('(')+1:e.find(')')])
 
 """
  dev (iw dev)- list basic phy info on cards

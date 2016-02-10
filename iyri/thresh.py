@@ -23,13 +23,12 @@ import wraith.wifi.standards.radiotap as rtap      # 802.11 layer 1 parsing
 from wraith.wifi.standards import mpdu             # 802.11 layer 2 parsing
 from wraith.wifi.standards import mcs              # mcs functions
 from wraith.wifi.standards import channels         # 802.11 channels/RFs
-from wraith.wifi.interface.oui import manufacturer # oui functions
 from wraith.utils.valrep import tb                 # for traceback
 from wraith.iyri.constants import *                # constants
 
 class Thresher(mp.Process):
     """ Thresher process frames and inserts frame data in database """
-    def __init__(self,comms,q,conn,lSta,buff,dbstr,ouis):
+    def __init__(self,comms,q,conn,lSta,buff,dbstr):
         """
          :param comms: internal communication (to Collator)
          :param q: task queue from Collator
@@ -37,7 +36,6 @@ class Thresher(mp.Process):
          :param lSta: lock for sta and sta activity inserts/updates
          :param buff: buffer
          :param dbstr: db connection string
-         :param ouis: oui dict
         """
         mp.Process.__init__(self)
         self._icomms = comms  # communications queue
@@ -47,7 +45,6 @@ class Thresher(mp.Process):
         self._conn = None     # db connection
         self._l = lSta        # sta lock
         self._curs = None     # our cursor
-        self._ouis = ouis     # oui dict
         self._next = None     # next operation to execute
         self._setup(dbstr)
 
@@ -64,7 +61,7 @@ class Thresher(mp.Process):
 
         # local variables
         sid = None   # current session id
-        rdos = {}    # radio map hwaddr->write = oneof {True|False}
+        rdos = {}    # (deprecated) radio map hwaddr->True
         stop = False # stop flag
 
         # notify collator we're up
@@ -87,9 +84,8 @@ class Thresher(mp.Process):
                     else: (tkn,ts,d) = self._tasks.get(0.5)
                     if tkn == POISON: stop = True
                     elif tkn == COL_SID: sid = d[0]
-                    elif tkn == COL_RDO: rdos[d[0]] = False
-                    elif tkn == COL_WRITE: rdos[d[0]] = d[1]
-                    elif tkn == COL_FRAME: self._processframe(sid,rdos,ts,d)
+                    elif tkn == COL_RDO: rdos[d[0]] = True
+                    elif tkn == COL_FRAME: self._processframe(sid,ts,d)
                 except Exception as e:
                     # blanket exception, catch all and notify collator
                     msg = "{0} {1}\n{2}".format(type(e).__name__,e,tb())
@@ -122,11 +118,10 @@ class Thresher(mp.Process):
             if self._conn: self._conn.close()
             raise RuntimeError(e)
 
-    def _processframe(self,sid,rdos,ts,d):
+    def _processframe(self,sid,ts,d):
         """
          inserts frame into db
          :param sid: session id
-         :param rdos: radio dict
          :param ts: timestamp of frame
          :param d:  data
         """
@@ -193,12 +188,11 @@ class Thresher(mp.Process):
             fid = self._curs.fetchone()[0]
             self._conn.commit()
 
-            # write raw bytes if specified
-            if rdos[src]:
-                self._next = 'frame_raw'
-                sql = "insert into frame_raw (fid,raw) values (%s,%s);"
-                self._curs.execute(sql,(fid,psql.Binary(f)))
-                self._conn.commit()
+            # write raw bytes
+            self._next = 'frame_raw'
+            sql = "insert into frame_raw (fid,raw) values (%s,%s);"
+            self._curs.execute(sql,(fid,psql.Binary(f)))
+            self._conn.commit()
 
             # insert radiotap and/or malformed if we had any issues
             self._next = 'radiotap'
@@ -462,10 +456,10 @@ class Thresher(mp.Process):
                 if not addrs[addr]['id']:
                     # insert the new sta
                     sql = """
-                           insert into sta (sid,fid,spotted,mac,manuf)
-                           values (%s,%s,%s,%s,%s) RETURNING sta_id;
+                           insert into sta (sid,fid,spotted,mac)
+                           values (%s,%s,%s,%s) RETURNING sta_id;
                           """
-                    self._curs.execute(sql,(sid,fid,ts,addr,manufacturer(self._ouis,addr)))
+                    self._curs.execute(sql,(sid,fid,ts,addr))
                     addrs[addr]['id'] = self._curs.fetchone()[0]
                     self._conn.commit()
 
@@ -762,7 +756,7 @@ class Thresher(mp.Process):
                        insert into sta (sid,fid,spotted,mac,manuf)
                        values (%s,%s,%s,%s,%s) RETURNING id;
                       """
-                self._curs.execute(sql,(sid,fid,ts,curAP,manufacturer(self._ouis,curAP)))
+                self._curs.execute(sql,(sid,fid,ts,curAP))
                 curid = self._curs.fetchone()[0]
                 self._conn.commit()
 

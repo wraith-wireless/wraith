@@ -38,7 +38,7 @@ At present, Iyri, like Wraith, must be manually installed. See CONFIGURE.txt in 
  * iw: parses the output as produced by v3.17 https://www.kernel.org/pub/software/network/iw/iw-3.17.tar.xz
 
 ### ii. Python Files
-Iyri requires all files in the iyri directory as well as those in the utils and wifi directories. Iyri currently uses a oui text file stored in data directory - this can be configured (see below) to utilze any directory you choose
+Iyri requires all files in the iyri directory as well as those in the utils and wifi directories.
 
 ### iii. Configure System
 Before first use, the logging and service need to be set up.
@@ -70,7 +70,6 @@ Radios are definied in the Abad (required) section and Shama (optional) section.
  * nic: the wireless nic to use i.e. wlan0, ath0 etc
  * paused: (optional) start in paused mode or scan (default) mode
  * spoof: (optional) spoofed mac address to use
- * record: (optional) writes raw frames (default) to database or only writes parsed data
  * Antenna Definition (optional) information currently stored in the database with the hope that in future versions it can be used to aid geolocation among other things but at present is only used to highlight different radio/antenna configurations and their collection results.
    - antennas: number of antennas
    - gain: gain in dBi
@@ -119,8 +118,7 @@ Determines DB location and DB parameters.
 #### iv. Defining Local Parameters
 Miscellaneous parameters
  * region: two-alphanumeric sequence specifying regulatory domain to use
- * C2C; port for c2c service to listen on
- * OUI: path of oui file (soon to be removed)
+ * C2C: port for c2c service to listen on
  * maxt: maximum number of threshers to allow. A suggested value.
 
 ### d. Control (C2C)

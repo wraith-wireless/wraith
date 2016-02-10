@@ -506,7 +506,6 @@ CREATE TABLE sta(
    fid bigint NOT NULL,                  -- fk to frame sta was first seen
    spotted TIMESTAMPTZ NOT NULL,         -- ts sta was first seen/heard
    mac macaddr UNIQUE NOT NULL,          -- mac address of sta's radio
-   manuf VARCHAR(100) default 'unknown', -- manufacturer according to oui
    note TEXT,                            -- any notes on sta
    CONSTRAINT ch_fid CHECK (fid > 0),
    CONSTRAINT ch_sid CHECK (sid > 0),
