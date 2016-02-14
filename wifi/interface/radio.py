@@ -18,10 +18,14 @@ Exports
  getrd: get the regulatory domain
  driver: get driver for a network interface
  chipset: get chipset for a driver
+
+TODO:
+ - to set up and down, have to get flags (SIOCGIFFLAGS) and remove IFF_UP
+   or vice versa
 """
 __name__ = 'radio'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 __date__ = 'February 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -29,11 +33,28 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import os
+import fcntl
+import socket
+import struct
+from wraith.utils.bits import issetf,setf,unsetf
 from wraith.wifi.interface import iw
 from wraith.wifi.interface import iwtools as iwt
+from wraith.wifi.interface import sockios_h as sioc # sockios constants
+from wraith.wifi.interface import if_h as ifh
 
 # widths currently supported
-IW_CHWS = [None,'HT20','HT40+','HT40-']
+RDO_CHWS = [None,'HT20','HT40+','HT40-']
+
+# constants
+# constants error code
+RDO_PERMISSION =  1
+RDO_BUSY       = 16
+RDO_NONIC      = 19
+RDO_INVALIDARG = 22
+RDO_EXCEED     = 23
+RDO_OPERATION  = 95
+# max nic name length
+IFNAMSIZ = ifh.IFNAMSIZ - 1 # use in a range
 
 def interfaces():
     """ :returns: a list of names of current network interfaces cards """
@@ -164,7 +185,7 @@ class Radio(object):
         # those properties that can change i.e. txpwr, current channel etc
         # will be determined by 'querying' the card
         self._phy = None      # the <phy> of the card specified by nic
-        self._ifindex = None  # ifindex (do we need this)
+        self._ifindex = None  # ifindex
         self._hwaddr = None   # the real hw addr
         self._spoofed = None  # the current/spoofed hw addr
         self._standards = []  # list of supported standards i.e. ['b','g','n']
@@ -172,7 +193,9 @@ class Radio(object):
         self._driver = None   # driver if known
         self._chipset = None  # chipset if known
 
-        # these attributes are mutable be we store them for now as we need a nic
+        # these attributes are mutable but we use them to as semi-immutable
+        # NOTE: the Radio will be identified by either the nic, meaning it is
+        # not yet initialized or vnic meaning it is in monitor mode
         # name for calls to iw/iwtools
         self._nic = None
         self._nicmode = None
@@ -198,20 +221,20 @@ class Radio(object):
 
 #### attributes
 
-    @property
-    def phy(self):
-        """ :returns: physical name of Radio """
-        return self._phy
+    @property # :returns: physical name of Radio
+    def phy(self): return self._phy
 
-    @property
-    def nic(self):
-        """ :returns: the nic name (if any) """
-        return self._nic
+    @property # :returns: True if Radio is up
+    def up(self): return issetf(self._getflags(),ifh.IFF_UP)
 
-    @property
-    def vnic(self):
-        """ :returns: the nic name (if any) """
-        return self._vnic
+    @property # :returns: interface index
+    def ifindex(self):  return self._ifindex
+
+    @property # :returns: the nic name (if any)
+    def nic(self): return self._nic
+
+    @property # :returns: the nic name (if any)
+    def vnic(self): return self._vnic
 
     @property
     def ifaces(self):
@@ -225,12 +248,12 @@ class Radio(object):
             return iw.dev()[self._phy]
         except iw.IWException as e:
             ecode = iw.ecode(e)
-            if ecode == iw.IW_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == iw.IW_BUSY: raise RadioBusyDevice(e)
-            elif ecode == iw.IW_NONIC: raise RadioNicNotFound(e)
-            elif ecode == iw.IW_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == iw.IW_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == iw.IW_OPERATION: raise RadioOpNotPermitted(e)
+            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
+            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
+            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
             else: raise RadioException(e)
         except KeyError:
             raise RadioNicNotFound("No such device (-19)")
@@ -288,12 +311,12 @@ class Radio(object):
             return None
         except iw.IWException as e:
             ecode = iw.ecode(e)
-            if ecode == iw.IW_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == iw.IW_BUSY: raise RadioBusyDevice(e)
-            elif ecode == iw.IW_NONIC: raise RadioNicNotFound(e)
-            elif ecode == iw.IW_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == iw.IW_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == iw.IW_OPERATION: raise RadioOpNotPermitted(e)
+            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
+            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
+            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
             else: raise RadioException(e)
 
     @property
@@ -305,12 +328,12 @@ class Radio(object):
             return iw.txpwrget(nic)
         except iw.IWException as e:
             ecode = iw.ecode(e)
-            if ecode == iw.IW_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == iw.IW_BUSY: raise RadioBusyDevice(e)
-            elif ecode == iw.IW_NONIC: raise RadioNicNotFound(e)
-            elif ecode == iw.IW_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == iw.IW_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == iw.IW_OPERATION: raise RadioOpNotPermitted(e)
+            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
+            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
+            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
             else: raise RadioException(e)
 
     @property
@@ -329,6 +352,16 @@ class Radio(object):
 
 #### methods
 
+    def on(self):
+        """ turns Radio on """
+        flags = self._getflags()
+        if flags & ifh.IFF_UP: return
+
+    def off(self):
+        """ turns Radio off """
+        flags = self._getflags()
+        if not (flags & ifh.IFF_UP): return
+
     def watch(self,vnic):
         """
          creates a monitor interface name vnic on this Radio, deleting all other
@@ -345,12 +378,12 @@ class Radio(object):
         except iwt.IWToolsException as e: raise RadioException(e)
         except iw.IWException as e:
             ecode = iw.ecode(e)
-            if ecode == iw.IW_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == iw.IW_BUSY: raise RadioBusyDevice(e)
-            elif ecode == iw.IW_NONIC: raise RadioNicNotFound(e)
-            elif ecode == iw.IW_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == iw.IW_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == iw.IW_OPERATION: raise RadioOpNotPermitted(e)
+            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
+            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
+            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
             else: raise RadioException(e)
 
     def unwatch(self):
@@ -368,12 +401,12 @@ class Radio(object):
         except iwt.IWToolsException as e: raise RadioException(e)
         except iw.IWException as e:
             ecode = iw.ecode(e)
-            if ecode == iw.IW_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == iw.IW_BUSY: raise RadioBusyDevice(e)
-            elif ecode == iw.IW_NONIC: raise RadioNicNotFound(e)
-            elif ecode == iw.IW_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == iw.IW_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == iw.IW_OPERATION: raise RadioOpNotPermitted(e)
+            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
+            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
+            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
             else: raise RadioException(e)
 
     def cloak(self,hwaddr):
@@ -413,12 +446,12 @@ class Radio(object):
             iw.txpwrset(self._phy,pwr,option)
         except iw.IWException as e:
             ecode = iw.ecode(e)
-            if ecode == iw.IW_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == iw.IW_BUSY: raise RadioBusyDevice(e)
-            elif ecode == iw.IW_NONIC: raise RadioNicNotFound(e)
-            elif ecode == iw.IW_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == iw.IW_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == iw.IW_OPERATION: raise RadioOpNotPermitted(e)
+            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
+            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
+            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
             else: raise RadioException(e)
 
     def setch(self,ch,chw=None):
@@ -428,19 +461,19 @@ class Radio(object):
          :param chw: channel width to set to default is None
         """
         if not self._phy: raise RadioNotInitialized
-        if not chw in iw.IW_CHWS:
+        if not chw in RDO_CHWS:
             raise RadioInvalidArg("Channel width is invalid (-19)")
 
         try:
             iw.chset(self._phy,ch,chw)
         except iw.IWException as e:
             ecode = iw.ecode(e)
-            if ecode == iw.IW_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == iw.IW_BUSY: raise RadioBusyDevice(e)
-            elif ecode == iw.IW_NONIC: raise RadioNicNotFound(e)
-            elif ecode == iw.IW_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == iw.IW_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == iw.IW_OPERATION: raise RadioOpNotPermitted(e)
+            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
+            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
+            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
             else: raise RadioException(e)
 
 #### PRIVATE FUNCTIONS ####
@@ -459,8 +492,8 @@ class Radio(object):
                 if iface['nic'] == nic: interface = iface
             self._nic = nic
             self._nicmode = interface['type']
-            self._hwaddr = interface['addr']
-            self._ifindex = interface['ifindex'] # see /sys/class/net/<nic>/uevent
+            self._hwaddr = self._gethwaddr()
+            self._ifindex = self._getifindex() # see /sys/class/net/<nic>/ifindex
             self._channels = iw.chget(self._phy)
             self._standards = iwt.iwconfig(nic,'Standards') # iw
             self._txpwr = iwt.iwconfig(nic,'Tx-Power')
@@ -470,12 +503,12 @@ class Radio(object):
         except iwt.IWToolsException as e: raise RadioException(e)
         except iw.IWException as e:
             ecode = iw.ecode(e)
-            if ecode == iw.IW_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == iw.IW_BUSY: raise RadioBusyDevice(e)
-            elif ecode == iw.IW_NONIC: raise RadioNicNotFound(e)
-            elif ecode == iw.IW_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == iw.IW_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == iw.IW_OPERATION: raise RadioOpNotPermitted(e)
+            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
+            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
+            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
             else: raise RadioException(e)
 
         # create a spoofed address?
@@ -483,5 +516,81 @@ class Radio(object):
             mac = None if spoofed.lower() == 'random' else spoofed
             if mac: self.cloak(mac)
 
-        # create in montior mode?
+        # create in montor mode?
         if vnic: self.watch(vnic)
+
+#### our iw/ifconfig/iwconfig implementation
+
+    def _gethwaddr(self):
+        """ :returns: the hw addr of this Radio """
+        nic = self._vnic if self._vnic else self._nic
+        if nic is None: raise RadioNotInitialized
+
+        try:
+            s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            nic = struct.pack('256s',nic[:IFNAMSIZ])
+            ret = fcntl.ioctl(s.fileno(),sioc.SIOCGIFHWADDR,nic)
+            return ":".join(['{0:02x}'.format(ord(c)) for c in ret[18:24]])
+        except IOError as e:
+            ecode = e.errno
+            if ecode == RDO_PERMISSION: raise RadioNoPermission("gethwaddr")
+            elif ecode == RDO_BUSY: raise RadioBusyDevice("gethwaddr")
+            elif ecode == RDO_NONIC: raise RadioNicNotFound("gethwaddr")
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg("gethwaddr")
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles("gethwaddr")
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted("gethwaddr")
+            else: raise RadioException("gethwaddr")
+        except Exception as e:
+            raise RadioException("gethwaddr: unknown error {0}".format(e))
+        finally:
+            s.close()
+
+    def _getifindex(self):
+        """ :returns: the hw addr of this Radio """
+        nic = self._vnic if self._vnic else self._nic
+        if nic is None: raise RadioNotInitialized
+
+        try:
+            s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            nic = struct.pack('256s',nic[:IFNAMSIZ])
+            ret = fcntl.ioctl(s.fileno(),sioc.SIOCGIFINDEX,nic)
+            return ord(ret[16])
+        except IOError as e:
+            ecode = e.errno
+            if ecode == RDO_PERMISSION: raise RadioNoPermission("getifindex")
+            elif ecode == RDO_BUSY: raise RadioBusyDevice("getifindex")
+            elif ecode == RDO_NONIC: raise RadioNicNotFound("getifindex")
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg("getifindex")
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles("getifindex")
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted("getifindex")
+            else: raise RadioException("getifindex")
+        except Exception as e:
+            raise RadioException("getifindex: unknown error {0}".format(e))
+        finally:
+            s.close()
+
+    def _getflags(self):
+        """ :returns: the ifflags this Radio """
+        nic = self._vnic if self._vnic else self._nic
+        if nic is None: raise RadioNotInitialized
+
+        try:
+            s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            nic = struct.pack('256s',nic[:IFNAMSIZ])
+            ret = fcntl.ioctl(s.fileno(),sioc.SIOCGIFFLAGS,nic)
+            return struct.unpack('H',ret[16:18])[0]
+        except IOError as e:
+            ecode = e.errno
+            if ecode == RDO_PERMISSION: raise RadioNoPermission("getflags")
+            elif ecode == RDO_BUSY: raise RadioBusyDevice("getflags")
+            elif ecode == RDO_NONIC: raise RadioNicNotFound("getflags")
+            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg("getflags")
+            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles("getflags")
+            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted("getflags")
+            else: raise RadioException("getflags")
+        except (struct.error,IndexError):
+            raise RadioException("getflags: error unpacking")
+        except Exception as e:
+            raise RadioException("getflags: unknown error {0}".format(e))
+        finally:
+            s.close()

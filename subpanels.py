@@ -10,24 +10,28 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import Tkinter as tk                             # gui constructs
-import tkFileDialog as tkFD                      # import file gui dialogs
-import ttk                                       # ttk widgets
-import mgrs                                      # for mgrs2latlon conversions etc
-import math                                      # for conversions, calculations
-import time                                      # for timestamps
-from PIL import Image,ImageTk                    # image input & support
-import psycopg2 as psql                          # postgresql api
-import psycopg2.extras as pextras                # cursors and such
-import ConfigParser                              # config file parsing
-import wraith                                    # version info & constants
-import wraith.widgets.panel as gui               # graphics suite
-from wraith.wifi.interface import radio           # wireless interface details
-from wraith.wifi.standards import mpdu           # for 802.11 types/subtypes
-from wraith.utils import timestamps              # valid data/time
-from wraith.utils import landnav                 # lang nav utilities
-from wraith.utils import cmdline                 # cmdline functionality
-from wraith.utils import valrep                  # validity checks
+import Tkinter as tk                       # gui constructs
+import tkFileDialog as tkFD                # import file gui dialogs
+import tkSimpleDialog as tkSD              # input dialogs
+import tkMessageBox as tkMB                # simple info dialgos
+import ttk                                 # ttk widgets
+import mgrs                                # for mgrs2latlon conversions etc
+import math                                # for conversions, calculations
+import time                                # for timestamps
+from PIL.ImageTk import PhotoImage         # image loading
+from PIL.Image import open as imgopen      # image opening
+import psycopg2 as psql                    # postgresql api
+import psycopg2.extras as pextras          # cursors and such
+import ConfigParser                        # config file parsing
+import wraith                              # version info & constants
+import wraith.widgets.panel as gui         # graphics suite
+from wraith.wifi.interface import radio    # wireless interface details
+from wraith.wifi.standards import mpdu     # for 802.11 types/subtypes
+from wraith.wifi.standards import channels # available channels
+from wraith.utils import timestamps        # valid data/time
+from wraith.utils import landnav           # lang nav utilities
+from wraith.utils import cmdline           # cmdline functionality
+from wraith.utils import valrep            # validity checks
 
 # Some constants
 COPY = u"\N{COPYRIGHT SIGN}"
@@ -383,9 +387,7 @@ class CalculatePanel(gui.SimplePanel):
         self._ans.set('')
 
 class InterfacePanel(gui.PollingTabularPanel):
-    """
-     a singular panel which display information pertaining to available wireless nics
-    """
+    """ a singular panel displaying info on available wireless nics """
     def __init__(self,tl,chief):
         gui.PollingTabularPanel.__init__(self,tl,chief,"Interfaces",5,
                                          [('PHY',gui.lenpix(6),str),
@@ -398,8 +400,11 @@ class InterfacePanel(gui.PollingTabularPanel):
 
         # configure tree to show headings but not 0th column
         self._tree['show'] = 'headings'
+
     def pnlreset(self): pass
+
     def _shutdown(self): pass
+
     def pnlupdate(self):
         """ lists interfaces """
         # get list of current wifaces on system & list of wifaces in tree
@@ -425,7 +430,6 @@ class InterfacePanel(gui.PollingTabularPanel):
             else:
                 self._tree.insert('','end',iid=nic,values=(r.phy,nic,r.hwaddr,
                                                            r.mode,r.driver,r.chipset))
-
 # View->DataBin
 class DatabinPanel(gui.SimplePanel):
     """ DatabinPanel - displays a set of data bins for retrieved data storage """
@@ -440,8 +444,6 @@ class DatabinPanel(gui.SimplePanel):
         #self._curs = {}
         self._conn = conn
         gui.SimplePanel.__init__(self,tl,chief,'Databin',"widgets/icons/db.png")
-
-    def donothing(self): pass
 
     def _body(self):
         """ creates the body """
@@ -458,7 +460,7 @@ class DatabinPanel(gui.SimplePanel):
         # button, then grid the button
         try:
             ipath = 'widgets/icons/bin{0}.png'.format(b)
-            self._bins[b] = {'img':ImageTk.PhotoImage(Image.open(ipath))}
+            self._bins[b] = {'img':PhotoImage(imgopen(ipath))}
         except:
             self._bins[b] = {'img':None}
             self._bins[b]['btn'] = ttk.Button(frm,text=b,
@@ -957,8 +959,8 @@ class QueryPanel(gui.SlavePanel):
         """assign now() to the from entries """
         d,t = timestamps.ts2iso(time.time()).split('T') # split isoformat on 'T'
         t = t[:8]                                       # drop the microseconds
-        self._entFromDate.delete(0,tk.END)               # delete from entries
-        self._entFromDate.insert(0,d)                    # and add now
+        self._entFromDate.delete(0,tk.END)              # delete from entries
+        self._entFromDate.insert(0,d)                   # and add now
         self._entFromTime.delete(0,tk.END)
         self._entFromTime.insert(0,t)
 
@@ -966,8 +968,8 @@ class QueryPanel(gui.SlavePanel):
         """ assign now() to the to entries """
         d,t = timestamps.ts2iso(time.time()).split('T') # split isoformat on 'T'
         t = t[:8]                                       # drop the microseconds
-        self._entToDate.delete(0,tk.END)                 # delete from entries
-        self._entToDate.insert(0,d)                      # and add now
+        self._entToDate.delete(0,tk.END)                # delete from entries
+        self._entToDate.insert(0,d)                     # and add now
         self._entToTime.delete(0,tk.END)
         self._entToTime.insert(0,t)
 
@@ -1269,25 +1271,225 @@ class SessionsPanel(gui.DBPollingTabularPanel):
             self.err("Connect Error",err)
 
 # Iyri->Control
-class IyriCtrlPanel(gui.SimplePollingPanel):
+class _ParamDialog(tkSD.Dialog):
+    """ _ParamDialog - (Modal) prompts user for command parameters """
+    def __init__(self,parent,cmd):
+        """
+        :param parent: calling panel
+        :param cmd: the command
+        """
+        self._cmd = cmd
+        tkSD.Dialog.__init__(self,parent)
+    def body(self,master):
+        self.title('Enter Parameters')
+        cmdtext = ""
+        if self._cmd == 'listen': cmdtext = "ch:width "
+        elif self._cmd == 'txpwr': cmdtext = "pwr:option "
+        elif self._cmd == 'spoof': cmdtext = "HW Addr "
+        ttk.Label(master,text=cmdtext).grid(row=0,column=0)
+        # noinspection PyAttributeOutsideInit
+        self._entParam = ttk.Entry(master)
+        self._entParam.grid(row=0,column=1)
+        return self._entParam
+    def validate(self):
+        if self._entParam.get() == '': return 0
+        return 1
+    def apply(self):
+        param = self._entParam.get()
+        err = ""
+        if self._cmd == 'listen':
+            # must be ch:chw
+            try:
+                if ':' in param:
+                    (ch,chw) = param.split(':')
+                    if not chw: chw = 'None'
+                else:
+                    ch = param
+                    chw = 'None'
+                ch = int(ch)
+                if not (chw in radio.RDO_CHWS or chw == 'None'):
+                    err = "Invalid channel width"
+                elif not ch in channels.channels(): err = "Invalid channel"
+                else: params = "{0}:{1}".format(ch,chw)
+            except ValueError:
+                err = "Channel must be an integer"
+        elif self._cmd == 'txpwr':
+            # must be pwr:option
+            try:
+                if ':' in param:
+                    (pwr,opt) = param.split(':')
+                    if not opt: opt = 'fixed'
+                else:
+                    pwr = param
+                    opt = 'fixed'
+                pwr = int(pwr)
+                if not opt in ['fixed','auto','limit']: err = "Invalid power option"
+                else: params = "{0}:{1}".format(pwr,opt)
+            except ValueError:
+                err = "Power must be an integer"
+        elif self._cmd == 'spoof':
+            # valid mac address (or random)
+            if not (param == 'random' or valrep.validhwaddr(param)):
+                err = "Invalid HW Address"
+            else:
+                params = param
+
+        if err:
+            tkMB.showerror("Invalid Parameters",err,parent=self)
+        else:
+            # noinspection PyAttributeOutsideInit
+            self.params = params
+
+class IyriCtrlPanel(gui.SimplePanel):
     """ Display Iyri Control Panel """
     def __init__(self,tl,chief):
-        gui.SimplePollingPanel.__init__(self,tl,chief,"Iyri Control","widgets/icons/sensor.png")
+        self._cid = 1   # current command id
+        self._cmds = {} # dict of commands entered keyed of cid
+        self._imgs = {} # store opened image for the buttons
+        self._btns = {} # buttons
+        gui.SimplePanel.__init__(self,tl,chief,"Iyri Control","widgets/icons/radio.png")
 
-    def pnlupdate(self): pass
-
-    def _makegui(self):
+    def _body(self):
         """ make the gui """
-        # main frame
-        frmMain = ttk.Frame(self,borderwidth=0)
-        frmMain.grid(row=0,column=0,sticky='w')
+        # a simple notebook with two tabs
+        nb = ttk.Notebook(self)
+        nb.grid(row=0,column=0,sticky='nwse')
 
-        frmA = ttk.LabelFrame(frmMain,text="Abad")
-        frmA.grid(row=1,column=0,sticky='nwse')
+        # Single - one command at a time button initiated
+        frmV = ttk.Frame(nb)
+        frmA = ttk.LabelFrame(frmV,text='Abad')
+        frmA.grid(row=0,column=0,sticky='nwse')
+        frmS = ttk.LabelFrame(frmV,text='Shama')
+        frmS.grid(row=1,column=0,sticky='nwse')
+        frmO = ttk.Frame(frmV)
+        frmO.grid(row=2,column=0,sticky='n')
 
+        try:
+            # load button images
+            self._imgs['scan'] = PhotoImage(imgopen('widgets/icons/iscan.png'))
+            self._imgs['pause'] = PhotoImage(imgopen('widgets/icons/ipause.png'))
+            self._imgs['hold'] = PhotoImage(imgopen('widgets/icons/ihold.png'))
+            self._imgs['listen'] = PhotoImage(imgopen('widgets/icons/ilisten.png'))
+            self._imgs['txpwr'] = PhotoImage(imgopen('widgets/icons/itxpwr.png'))
+            self._imgs['spoof'] = PhotoImage(imgopen('widgets/icons/ispoof.png'))
+            self._imgs['state'] = PhotoImage(imgopen('widgets/icons/istate.png'))
 
-        frmS = ttk.LabelFrame(frmMain,text='Shama')
-        frmS.grid(row=2,column=0,sticky='nwse')
+            # create buttons first for abad then shama
+            self._btns['ascan'] = ttk.Button(frmA,image=self._imgs['scan'],
+                                             command=lambda:self.runsingle('scan','abad'))
+            self._btns['apause'] = ttk.Button(frmA,image=self._imgs['pause'],
+                                             command=lambda:self.runsingle('pause','abad'))
+            self._btns['ahold'] = ttk.Button(frmA,image=self._imgs['hold'],
+                                             command=lambda:self.runsingle('hold','abad'))
+            self._btns['alisten'] = ttk.Button(frmA,image=self._imgs['listen'],
+                                             command=lambda:self.runsingle('listen','abad'))
+            self._btns['atxpwr'] = ttk.Button(frmA,image=self._imgs['txpwr'],
+                                             command=lambda:self.runsingle('txpwr','abad'))
+            self._btns['aspoof'] = ttk.Button(frmA,image=self._imgs['spoof'],
+                                             command=lambda:self.runsingle('spoof','abad'))
+            self._btns['astate'] = ttk.Button(frmA,image=self._imgs['state'],
+                                             command=lambda:self.runsingle('state','abad'))
+            self._btns['sscan'] = ttk.Button(frmS,image=self._imgs['scan'],
+                                             command=lambda:self.runsingle('scan','shama'))
+            self._btns['spause'] = ttk.Button(frmS,image=self._imgs['pause'],
+                                             command=lambda:self.runsingle('pause','shama'))
+            self._btns['shold'] = ttk.Button(frmS,image=self._imgs['hold'],
+                                             command=lambda:self.runsingle('hold','shama'))
+            self._btns['slisten'] = ttk.Button(frmS,image=self._imgs['listen'],
+                                             command=lambda:self.runsingle('listen','shama'))
+            self._btns['stxpwr'] = ttk.Button(frmS,image=self._imgs['txpwr'],
+                                             command=lambda:self.runsingle('txpwr','shama'))
+            self._btns['sspoof'] = ttk.Button(frmS,image=self._imgs['spoof'],
+                                             command=lambda:self.runsingle('spoof','shama'))
+            self._btns['sstate'] = ttk.Button(frmS,image=self._imgs['state'],
+                                             command=lambda:self.runsingle('state','shama'))
+        except Exception as e:
+            # images failed to load
+            self._btns['ascan'] = ttk.Button(frmA,text='S',
+                                             command=lambda:self.runsingle('scan','abad'))
+            self._btns['apause'] = ttk.Button(frmA,text='P',
+                                             command=lambda:self.runsingle('pause','abad'))
+            self._btns['ahold'] = ttk.Button(frmA,text='H',
+                                             command=lambda:self.runsingle('hold','abad'))
+            self._btns['alisten'] = ttk.Button(frmA,text='L',
+                                             command=lambda:self.runsingle('listenn','abad'))
+            self._btns['atxpwr'] = ttk.Button(frmA,text='T',
+                                             command=lambda:self.runsingle('txpwr','abad'))
+            self._btns['aspoof'] = ttk.Button(frmA,text='Sp',
+                                             command=lambda:self.runsingle('spoof','abad'))
+            self._btns['astate'] = ttk.Button(frmA,text='St',
+                                             command=lambda:self.runsingle('state','abad'))
+            self._btns['sscan'] = ttk.Button(frmS,text='S',
+                                             command=lambda:self.runsingle('scan','shama'))
+            self._btns['spause'] = ttk.Button(frmS,text='P',
+                                             command=lambda:self.runsingle('pause','shama'))
+            self._btns['shold'] = ttk.Button(frmS,text='H',
+                                             command=lambda:self.runsingle('hold','shama'))
+            self._btns['slisten'] = ttk.Button(frmS,text='L',
+                                             command=lambda:self.runsingle('listen','shama'))
+            self._btns['stxpwr'] = ttk.Button(frmS,text='T',
+                                             command=lambda:self.runsingle('txpwr','shama'))
+            self._btns['sspoof'] = ttk.Button(frmS,text='Sp',
+                                             command=lambda:self.runsingle('spoof','shama'))
+            self._btns['sstate'] = ttk.Button(frmS,text='St',
+                                             command=lambda:self.runsingle('state','shama'))
+        finally:
+            # place the buttons and output
+            self._btns['ascan'].grid(row=0,column=0)
+            self._btns['apause'].grid(row=0,column=1)
+            self._btns['ahold'].grid(row=0,column=2)
+            self._btns['alisten'].grid(row=0,column=3)
+            self._btns['atxpwr'].grid(row=0,column=4)
+            self._btns['aspoof'].grid(row=0,column=5)
+            self._btns['astate'].grid(row=0,column=6)
+            self._btns['sscan'].grid(row=1,column=0)
+            self._btns['spause'].grid(row=1,column=1)
+            self._btns['shold'].grid(row=1,column=2)
+            self._btns['slisten'].grid(row=1,column=3)
+            self._btns['stxpwr'].grid(row=1,column=4)
+            self._btns['sspoof'].grid(row=1,column=5)
+            self._btns['sstate'].grid(row=1,column=6)
+            self._vout = tk.Text(frmO,width=33,height=1)
+            self._vout.grid(row=0,column=0,sticky='n')
+        nb.add(frmV,text="Single")
+
+        # Multiple - can enter multiple commands to be executed in order
+        frmC = ttk.Frame(nb)
+        self._cmdline = tk.Text(frmC,width=28,height=4)
+        self._cmdline.grid(row=0,column=0,sticky='nw')
+        try:
+            self._imgs['run'] = PhotoImage(imgopen('widgets/icons/irun.png'))
+            self._btnRun = ttk.Button(frmC,image=self._imgs['run'],command=self.runmultiple)
+        except:
+            self._btnRun = ttk.Button(frmC,width=1,text='!',command=self.runmultiple)
+        finally:
+            self._btnRun.grid(row=0,column=1,sticky='n')
+        self._cmdout = tk.Text(frmC,width=33,height=4)
+        self._cmdout.grid(row=1,column=0,columnspan=2,sticky='nwse')
+        nb.add(frmC,text="Multiple")
+
+    def runsingle(self,cmd,rdo,ps=None):
+        """
+         execute a single command
+         :param cmd: command to run
+         :param rdo: radio to run command on
+         :param ps: params (if any)
+        """
+        ps = ''
+        if cmd in ['listen','txpwr','spoof']:
+            dlg = _ParamDialog(self,cmd)
+            try:
+                ps = " " + dlg.params
+            except AttributeError:
+                return
+        msg = "!{0} {1} {2}{3}\n".format(self._cid,cmd,rdo,ps)
+        #print msg
+        self._cmds[self._cid] = msg
+        self._cid += 1
+
+    def runmultiple(self):
+        """ executes multiple commands (from command line widget) """
+        pass
 
 # Iyri->Config
 class IyriConfigException(Exception): pass
@@ -1354,8 +1556,6 @@ class IyriConfigPanel(gui.ConfigPanel):
         self._entAbadScanPass.grid(row=1,column=5,sticky='e')
         self._vapause = tk.IntVar()
         ttk.Checkbutton(frmAS,text="Paused",variable=self._vapause).grid(row=2,column=0)
-        self._varecord = tk.IntVar()
-        ttk.Checkbutton(frmAS,text="Record",variable=self._varecord).grid(row=2,column=2,sticky='w')
         nb.add(frmA,text='Abad')
 
         # Shama Tab Configuration
@@ -1411,8 +1611,6 @@ class IyriConfigPanel(gui.ConfigPanel):
         self._entShamaScanPass.grid(row=1,column=5,sticky='e')
         self._vspause = tk.IntVar()
         ttk.Checkbutton(frmCS,text="Paused",variable=self._vspause).grid(row=2,column=0)
-        self._vsrecord = tk.IntVar()
-        ttk.Checkbutton(frmCS,text="Record",variable=self._vsrecord).grid(row=2,column=2,sticky='w')
         nb.add(frmC,text='Shama')
 
         # GPS Tab Configuration
@@ -1487,13 +1685,6 @@ class IyriConfigPanel(gui.ConfigPanel):
         ttk.Label(frmML,text=" Max Threshers: ").grid(row=0,column=4,sticky='w')
         self._entMaxT = ttk.Entry(frmML,width=5)
         self._entMaxT.grid(row=0,column=5,sticky='w')
-        frmMLO = ttk.Frame(frmML)                # frame the oui widgets
-        frmMLO.grid(row=1,column=0,columnspan=6,sticky='w')
-        ttk.Label(frmMLO,text='Oui File: ').grid(row=1,column=0,sticky='w')
-        self._entOUIFile = ttk.Entry(frmMLO,width=17)
-        self._entOUIFile.grid(row=1,column=1)
-        ttk.Button(frmMLO,text='Browse',width=6,command=self.browse).grid(row=1,column=2,sticky='nw')
-        ttk.Button(frmMLO,text='Clear',width=6,command=self.clearouifile).grid(row=1,column=3,sticky='nw')
         nb.add(frmM,text='Misc.')
 
     def _initialize(self):
@@ -1543,9 +1734,6 @@ class IyriConfigPanel(gui.ConfigPanel):
         self._vapause.set(0)
         if cp.has_option('Abad','paused'):
             if cp.getboolean('Abad','paused'): self._vapause.set(1)
-        self._varecord.set(1)
-        if cp.has_option('Abad','record'):
-            if not cp.getboolean('Abad','record'): self._varecord.set(0)
 
         # then the shama radio details
         self._entShamaNic.delete(0,tk.END)
@@ -1587,9 +1775,6 @@ class IyriConfigPanel(gui.ConfigPanel):
         self._vspause.set(0)
         if cp.has_option('Shama','paused'):
             if cp.getboolean('Shama','paused'): self._vspause.set(1)
-        self._vsrecord.set(1)
-        if cp.has_option('Shama','record'):
-            if not cp.getboolean('Shama','record'): self._vsrecord.set(0)
 
         # gps entries
         try:
@@ -1632,7 +1817,6 @@ class IyriConfigPanel(gui.ConfigPanel):
                 self._entMaxT.insert(0,cp.getint('Local','maxt'))
             except:
                 pass
-        if cp.has_option('Local','OUI'): self._entOUIFile.insert(0,cp.get('Local','OUI'))
 
     def _validate(self):
         """ validate entries """
@@ -1697,7 +1881,7 @@ class IyriConfigPanel(gui.ConfigPanel):
                     ch = start
                     chw = None
                 ch = int(ch)
-                if chw and not chw in radio.IW_CHWS:
+                if chw and not chw in radio.RDO_CHWS:
                     raise RuntimeError("Specified channel width is not valid")
         except ValueError:
             self.err("Invalid Abad Input","Scan start must be integer")
@@ -1772,7 +1956,7 @@ class IyriConfigPanel(gui.ConfigPanel):
                         ch = start
                         chw = None
                     ch = int(ch)
-                    if chw and not chw in radio.IW_CHWS:
+                    if chw and not chw in radio.RDO_CHWS:
                         raise RuntimeError("Specified channel width is not valid")
             except ValueError:
                 self.err("Invalid Shama Input", "Scan start must be integer")
@@ -1882,7 +2066,6 @@ class IyriConfigPanel(gui.ConfigPanel):
             cp.add_section('Abad')
             cp.set('Abad','nic',self._entAbadNic.get())
             cp.set('Abad','paused','on' if self._vapause.get() else 'off')
-            cp.set('Abad','record','on' if self._varecord.get() else 'off')
             if self._entAbadSpoof.get(): cp.set('Abad','spoof',self._entAbadSpoof.get())
 
             nA = self._entAbadAntNum.get()
@@ -1902,7 +2085,6 @@ class IyriConfigPanel(gui.ConfigPanel):
                 cp.add_section('Shama')
                 cp.set('Shama','nic',self._entShamaNic.get())
                 cp.set('Shama','paused','on' if self._vspause.get() else 'off')
-                cp.set('Shama','record','on' if self._vsrecord.get() else 'off')
                 if self._entShamaSpoof.get():
                     cp.set('Shama','spoof',self._entShamaSpoof.get())
                 nA = self._entShamaAntNum.get()
@@ -1940,13 +2122,11 @@ class IyriConfigPanel(gui.ConfigPanel):
             cp.set('Storage','pwd',self._entStorePWD.get())
             region = self._entRegion.get()
             c2cport = self._entC2CPort.get()
-            opath = self._entOUIFile.get()
             maxt = self._entMaxT.get()
-            if region or c2cport or opath or maxt:
+            if region or c2cport or maxt:
                 cp.add_section('Local')
                 if region: cp.set('Local','region',region)
                 if c2cport: cp.set('Local','C2C',c2cport)
-                if opath: cp.set('Local','OUI',opath)
                 if maxt: cp.set('Local','maxt',maxt)
             fout = open(wraith.IYRICONF,'w')
             cp.write(fout)
@@ -1960,20 +2140,6 @@ class IyriConfigPanel(gui.ConfigPanel):
             if fout: fout.close()
 
 #### callbacks
-
-    def browse(self):
-        """ open a file browsing dialog for selector file """
-        fpath = tkFD.askopenfilename(title="Select OUI File",
-                                     filetypes=[("Text Files","*.txt")],
-                                     parent=self)
-        if fpath:
-            self.update()
-            self.clearouifile()
-            self._entOUIFile.insert(0,fpath)
-
-    def clearouifile(self):
-        """ delete contents of oui entry """
-        self._entOUIFile.delete(0,tk.END)
 
     def gpscb(self):
         """ enable/disable gps entries as necessary """
@@ -2007,7 +2173,7 @@ class AboutPanel(gui.SimplePanel):
         gui.SimplePanel.__init__(self,tl,chief,"About Wraith","widgets/icons/about.png")
 
     def _body(self):
-        self.logo = ImageTk.PhotoImage(Image.open("widgets/icons/splash.png"))
+        self.logo = PhotoImage(imgopen("widgets/icons/splash.png"))
         ttk.Label(self,image=self.logo).grid(row=0,column=0,sticky='n')
         ttk.Label(self,text="wraith-rt {0}".format(wraith.__version__),
                   font=("Roman",16,'bold')).grid(row=1,column=0,sticky='n')

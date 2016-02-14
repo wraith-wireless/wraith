@@ -35,12 +35,12 @@ import subprocess as sp
 from wraith.wifi.standards.channels import f2c
 
 # constants error code
-IW_PERMISSION =  -1
-IW_BUSY       = -16
-IW_NONIC      = -19
-IW_INVALIDARG = -22
-IW_EXCEED     = -23
-IW_OPERATION  = -95
+#IW_PERMISSION =  -1
+#IW_BUSY       = -16
+#IW_NONIC      = -19
+#IW_INVALIDARG = -22
+#IW_EXCEED     = -23
+#IW_OPERATION  = -95
 
 # our iw path
 IW3_17 = '/usr/sbin/iw'
@@ -54,7 +54,7 @@ class IWException(Exception): pass
 """ Returns the error code for the IW error """
 def ecode(err):
     e = err.__str__()
-    return int(e[e.find('(')+1:e.find(')')])
+    return abs(int(e[e.find('(')+1:e.find(')')]))
 
 """
  dev (iw dev)- list basic phy info on cards

@@ -12,11 +12,11 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Production'
 
-import re                                       # reg exp matching
-from socket import gethostbyname                # hostname resolution
-from wraith.wifi.interface.radio import IW_CHWS # allowed widths
-from wraith.wifi.standards import channels      # channel list specification
-import sys,traceback                            # traceback/error reporting
+import re                                        # reg exp matching
+from socket import gethostbyname                 # hostname resolution
+from wraith.wifi.interface.radio import RDO_CHWS # allowed widths
+from wraith.wifi.standards import channels       # channel list specification
+import sys,traceback                             # traceback/error reporting
 
 # validation expressions
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr
@@ -121,9 +121,9 @@ def channellist(pattern,ptype='scan'):
     # compile all possible combinations
     if (chs,ws) == ([],[]):
         if ptype == 'scan':
-            return [(ch,chw) for chw in IW_CHWS for ch in channels.channels()]
+            return [(ch,chw) for chw in RDO_CHWS for ch in channels.channels()]
     elif not chs: return [(ch,chw) for chw in ws for ch in channels.channels()]
-    elif not ws: return [(ch,chw) for chw in IW_CHWS for ch in chs]
+    elif not ws: return [(ch,chw) for chw in RDO_CHWS for ch in chs]
     else: return [(ch,chw) for chw in ws for ch in chs]
     return [],[]
 

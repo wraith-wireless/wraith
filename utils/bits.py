@@ -3,10 +3,11 @@
 """ bits: bit related functions
 
 defines
- bitmask related functions operating on bitmasks defined as dicts of the form
+ o bitmask related functions operating on bitmasks defined as dicts of the form
  name->mask where name (string) is represented by mask (integer) i.e
  {'flag1':(1 << 0),...,'flag2':(1 << 4)} or {'flag1':1,...,'flag2':16}
- bit extraction functions
+ o bit extraction functions on same
+ o set/unset numeric flags defined by constants
 """
 
 __name__ = 'bits'
@@ -17,6 +18,33 @@ __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Production'
+
+def issetf(flags,flag):
+    """
+     determines if flag is set
+    :param flags: current flag value
+    :param flag: flag to check
+    :return: True if flag is set
+    """
+    return (flags & flag) == flag
+
+def setf(flags,flag):
+    """
+     sets flag, adding to flags
+    :param flags: current flag value
+    :param flag: flag to set
+    :return: new flag value
+    """
+    return flags | flag
+
+def unsetf(flags,flag):
+    """
+     unsets flag, adding to flags
+    :param flags: current flag value
+    :param flag: flag to unset
+    :return: new flag value
+    """
+    return flags & ~flag
 
 def bitmask(bm,mn):
     """

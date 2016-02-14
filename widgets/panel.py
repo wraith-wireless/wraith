@@ -49,17 +49,18 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                         # files operations etc
-import time                       # dtg parsing etc
-import pickle                     # load and dump
-import threading                  # for threads
-import Tkinter as tk              # gui constructs
-import tkFont                     # gui fonts
-import ttk                        # ttk widgets
-import tkMessageBox as tkMB       # info dialogs
-import tkFileDialog as tkFD       # file gui dialogs
-import tkSimpleDialog as tkSD     # input dialogs
-from PIL import Image,ImageTk     # image input & support
+import os                             # files operations etc
+import time                           # dtg parsing etc
+import pickle                         # load and dump
+import threading                      # for threads
+import Tkinter as tk                  # gui constructs
+import tkFont                         # gui fonts
+import ttk                            # ttk widgets
+import tkMessageBox as tkMB           # info dialogs
+import tkFileDialog as tkFD           # file gui dialogs
+import tkSimpleDialog as tkSD         # input dialogs
+from PIL.ImageTk import PhotoImage    # image loading
+from PIL.Image import open as imgopen # image opening
 
 #### LOG MESSAGE TYPES ####
 LOG_NOERR = 0
@@ -103,10 +104,9 @@ class PasswordDialog(tkSD.Dialog):
     def __init__(self,parent):
         tkSD.Dialog.__init__(self,parent)
         self._entPWD = None
-        self._canceled = False
     def body(self,master):
         self.title('sudo Password')
-        ttk.Label(master,text='Password: ').grid(row=0,column=1)
+        ttk.Label(master,text='Password: ').grid(row=0,column=0)
         self._entPWD = ttk.Entry(master,show='*')
         self._entPWD.grid(row=0,column=1)
         return self._entPWD
@@ -151,7 +151,9 @@ class Panel(ttk.Frame):
          :param resize: resize of Panel or not
         """
         ttk.Frame.__init__(self,tl)
-        self._appicon = ImageTk.PhotoImage(Image.open(ipath)) if ipath else None
+        # NOTE: we have run into issues if the opened image is not stored as
+        # a member of the class
+        self._appicon = PhotoImage(imgopen(ipath)) if ipath else None
         if self._appicon: self.tk.call('wm','iconphoto',self.master._w,self._appicon)
         self.master.protocol("WM_DELETE_WINDOW",self.delete)
         self._panels = {}
@@ -346,14 +348,13 @@ class SimplePanel(SlavePanel):
      panels with minimal user interaction displaying static data. SimplePanels are
      not expected to have any slave panels. Additionally since they show singular
      static data, SimplePanels are not expected to display information that needs
-     to be updated or reset.
+     to be periodically updated or reset - use SimplePollingPanel for this.
 
      Derived class must implement:
       _body: define gui widgets
-      _shutdown, pnlreset, pnlupdate from SlavePanel
 
      Derived class should override:
-      pnlreset,pnlupdate if dynamic data is being displayed
+      pnlreset, pnlupdate if dynamic data is being displayed
       _shutdown if any cleanup needs to be performed prior to closing
     """
     def __init__(self,tl,chief,ttl,ipath=None,resize=False):

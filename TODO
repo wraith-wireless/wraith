@@ -26,7 +26,9 @@ GUI:
      o get rid of border around progressbar and progressbar.pbar
      o many statements are not even seen, remove them
  29) icons or status bar to show what state services are in??
- 30) What is the best way to handle child panels and db connections?
+ 30) What is the best way to handle child panels and db connections? Along with
+     the threshers, there may end up being too many connections, limiting system
+     performance
      o psycopg2 claims excellent threaded cursors - do we use the main connection
        in WraithPanel and pass created cursors to children? -> have to trust the
        children to rollback on any errors
@@ -98,5 +100,9 @@ Wifi:
  12) how to get the current channel and channel width?
      o could use ifaces and retrieve the channel dict but this would be a slow
       workaround
+ 13) maintain netlink an ioctl socket in Radio
+     o would this save enough time to be worth it?
+     o would need to implement the __del__ destructor to close the sockets
+      - not called until garbage collected
 Nidus(.sql):
   1) create different users (w/ varying roles/authorities)

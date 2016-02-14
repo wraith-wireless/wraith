@@ -50,7 +50,7 @@ logging.config.fileConfig(logpath)
    param is:
     o of the format channel:width if cmd is listen where width is oneof
       {'None','HT20','HT40+','HT40-'}
-    o of the format pwr:option if cmd is txpwr where pwr is in dBm and option is oneof
+    o of the format pwr:option if cmd is txpwr where pwr is dBm and option is oneof
       {fixed|auto|limit}
     o a macaddr if cmd is spoof
  Iryi will notify the client if the cmd specified by id is invalid or valid with
@@ -584,7 +584,7 @@ class Iryi(object):
                     ch = scanspec
                     chw = None
                 ch = int(ch) if ch else r['scan'][0][0]
-                if not chw in radio.IW_CHWS: chw = r['scan'][0][1]
+                if not chw in radio.RDO_CHWS: chw = r['scan'][0][1]
                 r['scan_start'] = (ch,chw) if (ch,chw) in r['scan'] else r['scan'][0]
             except ValueError:
                 r['scan_start'] = r['scan'][0]

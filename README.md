@@ -65,8 +65,12 @@ However, there were two primary reasons for doing so:
 
 ### d. wraith-rt: GUI
 
-In progress gui. Currently configured to provide start/stop of services, display
-and editing of configuration files, some manipulation of backened storage.
+Currently provides limited functionality. The gui can be used to:
+ * start/stop services: Postgresql, Iyri
+ * configure Wraith, Iyri
+ * view current sessions, current wirless nics and Iyri's log
+ * fix database errors, delete all entries in database
+ * RF math & land nav conversions, RF math calculations
 
 ### e. utils: utility functionality
 
@@ -117,6 +121,9 @@ Provides the Postgresql database schema, nidus.sql.
         + iw.py         iw 3.17 interface
         + oui.py        oui/manuf related functions
         + radio.py      Radio consolidates iwtools.py, iw.py
+        + sockios_h     definitions of the socket-level I/O control calls.
+        + nl80211_h     nl82011 constants
+        + if_h          inet definition
      - standards        initialize standards subpackage
         + radiotap.py   radiotap parsing
         + mpdu.py       IEEE 802.11 MAC (MPDU) parsing
