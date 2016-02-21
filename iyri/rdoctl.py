@@ -261,7 +261,7 @@ class RadioController(mp.Process):
                     self._rdo.setch(scan[i][0],scan[i][1])
                     self._hop += (time() - t)
                     i += 1
-                except radio.RadioInvalidArg:
+                except radio.RadioException:
                     del scan[i]
                 except IndexError:
                     break

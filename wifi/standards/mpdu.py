@@ -1422,6 +1422,10 @@ def _unpack_from_(fmt,b,o):
     """
      unpack data from the buffer b given the format specifier fmt starting at o &
      returns the unpacked data and the new offset
+     :param fmt: unpack format string
+     :param b: buffer
+     :param o: offset to unpack from
+     :returns: new offset after unpacking
     """
     vs = struct.unpack_from(FMT_BO+fmt,b,o)
     if len(vs) == 1: vs = vs[0]

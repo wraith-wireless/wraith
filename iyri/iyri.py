@@ -29,7 +29,6 @@ from wraith.iyri.collate import Collator          # the collator
 from wraith.iyri.rdoctl import RadioController    # Radio object etc
 from wraith.iyri.gpsctl import GPSController      # gps device
 from wraith.wifi.interface import radio           # regset/get & channels
-from wraith.wifi.interface.iwtools import wifaces # check for interface presents
 from wraith.utils.cmdline import runningprocess   # check for psql running
 from wraith.utils import valrep                   # validation functionality
 from wraith.iyri.constants import *               # buffer dims
@@ -514,7 +513,7 @@ class Iryi(object):
          :param rtype: radio type onoeof {'Abad'|'Shama'}
         """
         nic = cp.get(rtype,'nic')
-        if not nic in wifaces():
+        if not nic in radio.winterfaces():
             err = "Radio {0} not present/not wireless".format(nic)
             raise RuntimeError(err)
 
@@ -534,10 +533,13 @@ class Iryi(object):
         # get optional properties
         if cp.has_option(rtype,'spoof'):
             spoof = cp.get(rtype,'spoof').upper()
-            if not valrep.validhwaddr(spoof):
+            if not spoof == 'RANDOM' and not valrep.validhwaddr(spoof):
                 logging.warn("Invalid spoofed MAC addr %s specified",spoof)
             else:
-                r['spoofed'] = spoof
+                if spoof == 'RANDOM':
+                    logging.warn("Spoofing random mac is not yet supoorted")
+                else:
+                    r['spoofed'] = spoof
         if cp.has_option(rtype,'desc'): r['desc'] = cp.get(rtype,'desc')
         if cp.has_option(rtype,'paused'): r['paused'] = cp.getboolean(rtype,'paused')
 

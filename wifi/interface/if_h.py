@@ -2,7 +2,7 @@
 
 """ sockios_h.py: definitions for INET interface module
 
-A port of if.h to python
+A port of if.h (and iw_param from wireless.h) to python
 /*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
@@ -21,11 +21,16 @@ A port of if.h to python
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
+
+ Additionally
+  1) imports definitions from wireless_h to check if a nic is wireless and get
+     the tx-power
+  2) defines the sockaddr struct from netint/in.h
 """
 
 __name__ = 'if_h'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 __date__ = 'February 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -33,6 +38,7 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import struct
+from wraith.wifi.interface import sockios_h as sioc
 
 IFNAMSIZ = 16
 IFALIASZ = 256
@@ -127,6 +133,126 @@ IF_OPER_UP              = 6
 IF_LINK_MODE_DEFAULT = 0
 IF_LINK_MODE_DORMANT = 1 # limit upward transition to dormant
 
+#### Interface request structure used for socket
+# ioctl's.  All interface ioctl's must have parameter
+# definitions which begin with ifr_name.  The
+# remainder may be interface specific.
+#
+#struct ifreq {
+#
+#	union
+#	{
+#		char	ifrn_name[IFNAMSIZ];		# if name, e.g. "en0"
+#	} ifr_ifrn;
+#
+#	union {
+#		struct	sockaddr ifru_addr;
+#		struct	sockaddr ifru_dstaddr;
+#		struct	sockaddr ifru_broadaddr;
+#		struct	sockaddr ifru_netmask;
+#		struct  sockaddr ifru_hwaddr;
+#		short	ifru_flags;
+#		int	ifru_ivalue;
+#		int	ifru_mtu;
+#		struct  ifmap ifru_map;
+#		char	ifru_slave[IFNAMSIZ];	# Just fits the size
+#		char	ifru_newname[IFNAMSIZ];
+#		void *	ifru_data;
+#		struct	if_settings ifru_settings;
+#	} ifr_ifru;
+#};
+#
+# from wireless.h we build
+#struct	iw_param
+#{
+#  __s32		value;		/* The value of the parameter itself */
+#  __u8		fixed;		/* Hardware should not use auto select */
+#  __u8		disabled;	/* Disable the feature */
+#  __u16		flags;		/* Various specifc flags (if any) */
+# to get the txpower and verify the prescense of wireless extensions
+#};
+
+"""
+ As in mpdu/radiotap, we use packed strings to represent these stucts. The ifreq
+ struct is defined by the SOCKIOS_H constants, format strings, lengths and the
+ function ifreq. Together they can be used to get/set properties.
+"""
+# SOCKADDR DEFINITION
+ARPHRD_ETHER = 1  # from net/if_arp.h sa_family ethernet
+sa_addr = 'H6B'   # sockaddr is {unsigned short sa_family,char [14] address}
+def sockaddr(sa_family,sa_data):
+    """
+     create a sockaddr
+    :param sa_family: address family
+    :param sa_data: protocal address (up to 14 bytes)
+    :returns: packed sockaddr
+    """
+    # the address must be "prepended" with sa_family IOT follow the sockaddr struct
+    if sa_family == ARPHRD_ETHER:
+        vs = [sa_family]
+        vs.extend([int(x,16) for x in sa_data.split(':')])
+        return struct.pack(sa_addr,*vs)
+    else:
+        raise AttributeError("sa_family {0} not supported".format(sa_family))
+
+# IFREQ DEFINITION
+ifr_name = '{0}s'.format(IFNAMSIZ) # formats for ifreq struct
+ifr_flags = 'h'
+ifr_ifindex = 'i'
+ifr_iwname = '{0}s'.format(256-IFNAMSIZ)  # dirty hack to get an unknown string back
+ifr_iwtxpwr = 'iBBH'
+IFNAMELEN = struct.calcsize(ifr_name)       # lengths
+IFHWADDRLEN	= struct.calcsize(sa_addr)
+IFFLAGLEN = struct.calcsize(ifr_flags)
+IFIFINDEXLEN = struct.calcsize(ifr_ifindex)
+IWNAMELEN = struct.calcsize(ifr_iwname)
+IWPARAMLEN = struct.calcsize(ifr_iwtxpwr)
+def ifreq(ifrn,ifru=None,param=None):
+    """
+     creates a 'packed' struct cooresponding loosely to the ifreq struct. Padded
+     bytes are added on all 'gets' otherwise the ioctl will only return the
+     number of bytes sent
+     :param ifrn: name of interface/nic
+     :param ifru: from SOCKIOS_HDefines what type of ifreq struct to pack
+     :param param: list of params If None, pad byes are added having the size of
+      the appropriate param. If a hwaddr, must be a sockaddr family & string of
+      form "XX:XX:XX:XX:XX:XX", if flags must be an integer (c short) or (int)
+      respectively
+     :returns: packed ifreq
+
+     NOTE: ifreq does not attempt to catch any struct errors etc
+    """
+    # pack the nic
+    try:
+        # NOTE: don't need to keep the name to 16 chars as struct does it for us
+        ifr = struct.pack(ifr_name,ifrn)
+    except struct.error as e:
+        raise AttributeError("ifr_ifrn: {0}".format(e))
+
+    try:
+        if not ifru: pass # only pass the device name
+        elif ifru == sioc.SIOCGIFHWADDR: # get hwaddr
+            ifr += struct.pack('{0}x'.format(IFHWADDRLEN))
+        elif ifru == sioc.SIOCSIFHWADDR: # set hwaddr
+            ifr += sockaddr(param[0],param[1])
+        elif ifru == sioc.SIOCGIFFLAGS: # get flags
+            ifr += struct.pack('{0}x'.format(IFFLAGLEN))
+        elif ifru == sioc.SIOCSIFFLAGS: # set flags
+            ifr += struct.pack(ifr_flags,param[0])
+        elif ifru == sioc.SIOCGIFINDEX: # get if index
+            ifr += struct.pack('{0}x'.format(IFIFINDEXLEN))
+        elif ifru == sioc.SIOCGIWNAME: # get iw name
+            ifr += struct.pack('{0}x'.format(IWNAMELEN))
+        elif ifru == sioc.SIOCGIWTXPOW: # get tx pwr
+            ifr += struct.pack('{0}x'.format(IWPARAMLEN))
+        else:
+            raise AttributeError("ifru {0} not supported".format(ifru))
+    except (TypeError,IndexError):
+        raise AttributeError("param is invalid")
+
+    return ifr
+
+#### NOT IMPLEMENTED
 """
 /*
  *	Device mapping structure. I'd just gone off and designed a
@@ -166,104 +292,6 @@ struct if_settings {
 		te1_settings		*te1;
 	} ifs_ifsu;
 };
-"""
-
-"""
-/*
- * Interface request structure used for socket
- * ioctl's.  All interface ioctl's must have parameter
- * definitions which begin with ifr_name.  The
- * remainder may be interface specific.
-"""
-
-# IFREQ DEFINITION
-IFR_IFRU_HWADDR = 0
-IFR_IFRU_FLAGS = 1
-ifrn_name_fmt = '{0}s'.format(IFNAMSIZ)
-ifru_addr_fmt = '6B'
-ifru_flags_fmt = 'h'
-IFHWADDRLEN	= 6
-IFNAMELEN = struct.calcsize(ifrn_name_fmt)
-IFFLAGLEN = struct.calcsize(ifru_flags_fmt)
-def ifreq(ifrn,ifru,param=None):
-    """
-     creates a 'packed' struct cooresponding loosely to the ifreq struct
-     :param ifrn: name of interface/nic
-     :param ifru: ifr flag oneof {IFR_IFRU_HWADDR|IFR_IFRU_FLAG} defines
-      what type of ifreq struct to pack
-     :param param: either a hwaddr or flag depending on ifr_ifru, if None,
-      pad bytes will be added having the size of the appropriate param
-      if a hwaddr, must be string of form "XX:XX:XX:XX:XX:XX", if flags,
-      must be an integer
-     :returns: packed ifreq
-    """
-    # pack the nic
-    try:
-        ifr = struct.pack(ifrn_name_fmt,ifrn[:IFNAMSIZ-1])
-    except (struct.error,IndexError) as e:
-        raise AttributeError("ifr_ifrn: {0}".format(e))
-
-    # pack the parameter
-    if ifru == IFR_IFRU_HWADDR:
-        try:
-            if param is None: ifr += struct.pack('{0}x'.format(IFHWADDRLEN))
-            else:
-                ifr += struct.pack(ifru_addr_fmt,*[int(x,16) for x in param.split(':')])
-        except Exception as e:
-            raise AttributeError("ifr_ifru hwaddr {0} is invalid: {1}".format(param,e))
-    elif ifru == IFR_IFRU_FLAGS:
-        try:
-            if param is None: ifr += struct.pack('{0}x'.format(IFFLAGLEN))
-            else:
-                ifr += struct.pack(ifru_flags_fmt,param)
-        except Exception as e:
-            raise AttributeError("ifr_ifru flags {0} is invalid: {1}".format(param,e))
-    else:
-        raise AttributeError("ifr_ifru {0} not supported".format(ifru))
-
-    return ifr
-
-"""
-struct ifreq {
-
-	union
-	{
-		char	ifrn_name[IFNAMSIZ];		# if name, e.g. "en0"
-	} ifr_ifrn;
-
-	union {
-		struct	sockaddr ifru_addr;
-		struct	sockaddr ifru_dstaddr;
-		struct	sockaddr ifru_broadaddr;
-		struct	sockaddr ifru_netmask;
-		struct  sockaddr ifru_hwaddr;
-		short	ifru_flags;
-		int	ifru_ivalue;
-		int	ifru_mtu;
-		struct  ifmap ifru_map;
-		char	ifru_slave[IFNAMSIZ];	# Just fits the size
-		char	ifru_newname[IFNAMSIZ];
-		void *	ifru_data;
-		struct	if_settings ifru_settings;
-	} ifr_ifru;
-};
-ifr_name	ifr_ifrn.ifrn_name	# interface name
-ifr_hwaddr	ifr_ifru.ifru_hwaddr	# MAC address
-ifr_addr	ifr_ifru.ifru_addr	# address
-ifr_dstaddr	ifr_ifru.ifru_dstaddr	# other end of p-p lnk
-ifr_broadaddr	ifr_ifru.ifru_broadaddr	# broadcast address
-ifr_netmask	ifr_ifru.ifru_netmask	# interface net mask
-ifr_flags	ifr_ifru.ifru_flags	# flags
-ifr_metric	ifr_ifru.ifru_ivalue	# metric
-ifr_mtu		ifr_ifru.ifru_mtu	# mtu
-ifr_map		ifr_ifru.ifru_map	# device map
-ifr_slave	ifr_ifru.ifru_slave	# slave device
-ifr_data	ifr_ifru.ifru_data	# for use by interface
-ifr_ifindex	ifr_ifru.ifru_ivalue	# interface index
-ifr_bandwidth	ifr_ifru.ifru_ivalue    # link bandwidth
-ifr_qlen	ifr_ifru.ifru_ivalue	# Queue length
-ifr_newname	ifr_ifru.ifru_newname	# New name
-ifr_settings	ifr_ifru.ifru_settings	# Device/proto settings
 """
 
 """

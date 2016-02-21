@@ -2,7 +2,7 @@
 
 """ sockios_h.py: definitions of the socket-level I/O control calls.
 
-A port of sockios.h to python
+A port of sockios.h (and two constants from wireless.h) to python
 /*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
@@ -25,7 +25,7 @@ Most of these constants are not used but are left for possible future use
 
 __name__ = 'sockios_h'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 __date__ = 'February 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -40,6 +40,10 @@ __status__ = 'Production'
 SIOCADDRT = 0x890B # add routing table entry
 SIOCDELRT = 0x890C # delete routing table entry
 SIOCRTMSG = 0x890D # call to routing system
+
+# Socket configuration controls from wireless.h
+SIOCGIWNAME	        = 0x8B01 # get name (standards can be retrieved here)
+SIOCGIWTXPOW        = 0x8B27 # get transmit power
 
 # Socket configuration controls
 SIOCGIFNAME	        = 0x8910 # get iface name

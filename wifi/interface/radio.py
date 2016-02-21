@@ -6,9 +6,8 @@ Provides the Radio class, a network interface card, which consolidates network
 card manipulation and attribute functionality into a single object. Also
 provides several standalone functions w.r.t regulatory domain and system
 
-At present, is merely a wrapper around iw.py and iwtools.py functions which
-use the iw, iwlist, iwconfig and ifconfig command lines tools via popen.
-Will move to ioctl, netlink as appropriate commands are determined
+At present, is a wrapper around iw.py functions which use iw and iwlist but
+is now implemeting all iwconfig and ifconfig functionality through ioctl
 
 Exports
  Radio: wireless network card
@@ -19,42 +18,41 @@ Exports
  driver: get driver for a network interface
  chipset: get chipset for a driver
 
-TODO:
- - to set up and down, have to get flags (SIOCGIFFLAGS) and remove IFF_UP
-   or vice versa
 """
 __name__ = 'radio'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 __date__ = 'February 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os
-import fcntl
-import socket
-import struct
-from wraith.utils.bits import issetf,setf,unsetf
-from wraith.wifi.interface import iw
-from wraith.wifi.interface import iwtools as iwt
+import os                                           # filesystem
+from fcntl import ioctl                             # io control
+import socket                                       # kernel comms
+import struct                                       # c struct conversion
+from wraith.utils.bits import issetf,setf,unsetf    # flag manipulation
+from wraith.wifi.interface import iw                # iw cmdline parsing
 from wraith.wifi.interface import sockios_h as sioc # sockios constants
-from wraith.wifi.interface import if_h as ifh
+from wraith.wifi.interface import if_h as ifh       # ifreq creation
 
 # widths currently supported
 RDO_CHWS = [None,'HT20','HT40+','HT40-']
 
-# constants
-# constants error code
-RDO_PERMISSION =  1
-RDO_BUSY       = 16
-RDO_NONIC      = 19
-RDO_INVALIDARG = 22
-RDO_EXCEED     = 23
-RDO_OPERATION  = 95
-# max nic name length
-IFNAMSIZ = ifh.IFNAMSIZ - 1 # use in a range
+# Exception
+# Defined error codes
+RDO_UNDEFINED     = -1
+RDO_UNINITIALIZED =  0
+RDO_PERMISSION    =  1 # this and below are codes from IOError
+RDO_BUSY          = 16
+RDO_NONIC         = 19
+RDO_INVALIDARG    = 22
+RDO_EXCEED        = 23
+RDO_BADIOCTL      = 25
+RDO_OPERATION     = 95
+
+class RadioException(Exception): pass # tuple t = (errcode,errmessage)
 
 def interfaces():
     """ :returns: a list of names of current network interfaces cards """
@@ -65,7 +63,7 @@ def interfaces():
         ns = fin.read().split('\n')[2:-1]
         fin.close()
     except Exception as e:
-        raise RadioException('ifaces: {0}'.format(e))
+        raise RadioException((RDO_UNDEFINED,e))
 
     # the remaining lines are <nicname>: p1 p2 ... p3, split on ':' & strip whitespace
     nics = []
@@ -75,11 +73,20 @@ def interfaces():
 def winterfaces():
     """ :returns: a list of names of current wwireless network interfaces cards """
     # tried reading in devices from /proc/net/wireless but it did not always
-    # include my usb interfaces.
-    try:
-        return iwt.wifaces()
-    except Exception as e:
-        raise RadioException('wifaces: {0}'.format(e))
+    # include my usb interfaces. look at SIOCGIWNAME (what header is it found in)
+    wics = []
+    s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+    for nic in interfaces():
+        try:
+            # send SIOCGIWNAME (from wireless.h) = 0x8B01, a non-wireless card
+            # will result in an IOError 'Operation not supported' but we
+            # take any error to mean non-wireless
+            _ = ioctl(s.fileno(),sioc.SIOCGIWNAME,ifh.ifreq(nic))
+            wics.append(nic)
+        except:
+            pass
+    s.close()
+    return wics
 
 def setrd(rd):
     """
@@ -89,94 +96,30 @@ def setrd(rd):
     try:
         iw.regset(rd)
     except iw.IWException as e:
-        raise RadioException(e)
+        raise RadioException((RDO_UNDEFINED,e))
 
 def getrd():
     """ return the current regulatory domain """
     try:
         return iw.regget()
     except iw.IWException as e:
-        raise RadioException(e)
-
-def driver(nic):
-    """
-     determines driver of nic
-     :param nic: interface name
-     :returns: driver (or unknown if cannot be found)
-    """
-    try:
-        # find the driver for nic in driver's module, split on ':' and return
-        ds = os.listdir('/sys/class/net/{0}/device/driver/module/drivers'.format(nic))
-        if len(ds) > 1: return "Unknown"
-        return ds[0].split(':')[1]
-    except OSError:
-        return "Unknown"
-
-def chipset(driver):
-    """
-     returns the chipset for given driver (Thanks aircrack-ng team)
-     NOTE: does not fully implement the airmon-ng getChipset where identification
-      requires system commands
-     :param driver: driver of device
-     :returns: chipset of driver
-    """
-    if not driver: return "Unknown"
-    if driver == "Unknown": return "Unknown"
-    if driver == "Otus" or driver == "arusb_lnx": return "AR9001U"
-    if driver == "WiLink": return "TIWLAN"
-    if driver == "ath9k_htc" or driver == "usb": return "AR9001/9002/9271"
-    if driver.startswith("ath") or driver == "ar9170usb": return "Atheros"
-    if driver == "zd1211rw_mac80211": return "ZyDAS 1211"
-    if driver == "zd1211rw": return "ZyDAS"
-    if driver.startswith("acx"): return "TI ACX1xx"
-    if driver == "adm8211": return "ADMtek 8211"
-    if driver == "at76_usb": return "Atmel"
-    if driver.startswith("b43") or driver == "bcm43xx": return "Broadcom"
-    if driver.startswith("p54") or driver == "prism54": return "PrismGT"
-    if driver == "hostap": return "Prism 2/2.5/3"
-    if driver == "r8180" or driver == "rtl8180": return "RTL8180/RTL8185"
-    if driver == "rtl8187" or driver == "r8187": return "RTL8187"
-    if driver == "rt2570" or driver == "rt2500usb": return "Ralink 2570 USB"
-    if driver == "rt2400" or driver == "rt2400pci": return "Ralink 2400 PCI"
-    if driver == "rt2500" or driver == "rt2500pci": return "Ralink 2560 PCI"
-    if driver == "rt61" or driver == "rt61pci": return "Ralink 2561 PCI"
-    if driver == "rt73" or driver == "rt73usb": return "Ralink 2573 USB"
-    if driver == "rt2800" or driver == "rt2800usb" or driver == "rt3070sta": return "Ralink RT2870/3070"
-    if driver == "ipw2100": return "Intel 2100B"
-    if driver == "ipw2200": return "Intel 2200BG/2915ABG"
-    if driver == "ipw3945" or driver == "ipwraw" or driver == "iwl3945": return "Intel 3945ABG"
-    if driver == "ipw4965" or driver == "iwl4965": return "Intel 4965AGN"
-    if driver == "iwlagn" or driver == "iwlwifi": return "Intel 4965/5xxx/6xxx/1xxx"
-    if driver == "orinoco": return "Hermes/Prism"
-    if driver == "wl12xx": return "TI WL1251/WL1271"
-    if driver == "r871x_usb_drv": return "Realtek 81XX"
-    return "Unknown"
-
-# need exceptions
-class RadioException(Exception): pass            # Generic
-class RadioNotInitialized(RadioException): pass  # radio is empty
-class RadioNoPermission(RadioException): pass    # iw error -1
-class RadioBusyDevice(RadioException): pass      # iw error -16
-class RadioNicNotFound(RadioException): pass     # iw error -19
-class RadioInvalidArg(RadioException): pass      # iw error -22
-class RadioExceedOpenFiles(RadioException): pass # iw error -23
-class RadioOpNotPermitted(RadioException): pass  # iw error -95
+        raise RadioException((RDO_UNDEFINED,e))
 
 class Radio(object):
     """ define properties/methods of a wireless network interface """
-    def __init__(self,nic=None,vnic=None,spoofed=None):
+    def __init__(self,nic=None,vnic=None,spoof=None):
         """
          initializes Radio from network interface card. If vnic is present will
          create a monitor interface on this Radio. If spoofed is present, will
          set the spoofed hw address
          :param nic: name of nic to initialize
          :param vnic: name of virtual interface to create in monitor mode
-         :param spoofed: spoofed hwaddress if desired
+         :param spoof: spoofed hwaddress if desired
 
          If the Radio is not initialized i.e. nic is None, the appropiate method
          for later setup is
           1) setnic
-          2) cloak (optional)
+          2) spoof (optional)
           3) watch
         """
         # default/uninstantiated attributes
@@ -184,14 +127,14 @@ class Radio(object):
         # of a wireless nic such as phy (the physical name of the card) of driver
         # those properties that can change i.e. txpwr, current channel etc
         # will be determined by 'querying' the card
-        self._phy = None      # the <phy> of the card specified by nic
-        self._ifindex = None  # ifindex
-        self._hwaddr = None   # the real hw addr
-        self._spoofed = None  # the current/spoofed hw addr
-        self._standards = []  # list of supported standards i.e. ['b','g','n']
-        self._channels = []   # list of supported channels (by number)
-        self._driver = None   # driver if known
-        self._chipset = None  # chipset if known
+        self._phy = None       # the <phy> of the card specified by nic
+        self._ifindex = None   # ifindex
+        self._hwaddr = None    # the real hw addr
+        self._spoofed = None   # the current/spoofed hw addr
+        self._standards = None # supported standards i.e. 'b','g','n'
+        self._channels = []    # list of supported channels (by number)
+        self._driver = None    # driver if known
+        self._chipset = None   # chipset if known
 
         # these attributes are mutable but we use them to as semi-immutable
         # NOTE: the Radio will be identified by either the nic, meaning it is
@@ -200,7 +143,7 @@ class Radio(object):
         self._nic = None
         self._nicmode = None
         self._vnic = None
-        if nic: self._setup(nic,vnic,spoofed)
+        if nic: self._setup(nic,vnic,spoof)
 
     def setnic(self,nic):
         """
@@ -225,7 +168,7 @@ class Radio(object):
     def phy(self): return self._phy
 
     @property # :returns: True if Radio is up
-    def up(self): return issetf(self._getflags(),ifh.IFF_UP)
+    def isup(self): return issetf(self._ifflags(),ifh.IFF_UP)
 
     @property # :returns: interface index
     def ifindex(self):  return self._ifindex
@@ -243,20 +186,13 @@ class Radio(object):
          :returns: all (current) interfaces on this Radio
           as a list of dicts
         """
-        if not self._phy: raise RadioNotInitialized
+        if not self._phy: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
         try:
             return iw.dev()[self._phy]
         except iw.IWException as e:
-            ecode = iw.ecode(e)
-            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
-            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
-            else: raise RadioException(e)
+            raise RadioException((iw.ecode(e),e))
         except KeyError:
-            raise RadioNicNotFound("No such device (-19)")
+            raise RadioException((RDO_NONIC,"No such device (-19)"))
 
     @property
     def channel(self):
@@ -266,36 +202,36 @@ class Radio(object):
          not work if Radio is in monitor mode
         """
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
         try:
             return iw.curchget(nic)
         except iw.IWException as e:
-            raise RadioException(e)
+            raise RadioException((iw.ecode(e),e))
 
     @property
     def channels(self):
         """ :returns: list of all supported channels of this Radio """
-        if not self._channels: raise RadioNotInitialized
+        if not self._channels: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
         return self._channels
 
     @property
     def standards(self):
         """ :returns: supported standards i.e. 'a', 'b' etc """
-        if not self._standards: raise RadioNotInitialized
+        if not self._standards: raise RadioException((RDO_UNINITIALIZED,"RUninitialized"))
         return self._standards
 
     @property
     def hwaddr(self):
         """ :returns: actual hardware address """
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
         return self._hwaddr
 
     @property
     def spoofed(self):
         """:returns: spoofed hardware address """
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
         return self._spoofed
 
     @property
@@ -303,64 +239,49 @@ class Radio(object):
         """ :returns the mode of this Radio """
         # does not work
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
         try:
             _,ifaces = iw.dev(nic)
             for iface in ifaces:
                 if iface['nic'] == nic: return iface['type']
             return None
         except iw.IWException as e:
-            ecode = iw.ecode(e)
-            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
-            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
-            else: raise RadioException(e)
+            raise RadioException((iw.ecode(e),e))
 
     @property
     def txpwr(self):
         """ :returns: current transmit power (in dBm) """
-        nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
-        try:
-            return iw.txpwrget(nic)
-        except iw.IWException as e:
-            ecode = iw.ecode(e)
-            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
-            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
-            else: raise RadioException(e)
+        if not (self._nic or self._vnic):
+            raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
+        return self._iwtxpwr()
 
     @property
     def driver(self):
         """ :returns: driver for this Radio """
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
+        if nic is None: RadioException((RDO_UNINITIALIZED,"Uninitialized"))
         return self._driver
 
     @property
     def chipset(self):
         """:returns: chipset for this Radio """
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
         return self._chipset
 
 #### methods
 
-    def on(self):
+    def up(self):
         """ turns Radio on """
-        flags = self._getflags()
-        if flags & ifh.IFF_UP: return
+        flags = self._ifflags()
+        if issetf(self._ifflags(),ifh.IFF_UP): return
+        self._ifflags(setf(flags,ifh.IFF_UP))
 
-    def off(self):
+    def down(self):
         """ turns Radio off """
-        flags = self._getflags()
-        if not (flags & ifh.IFF_UP): return
+        flags = self._ifflags()
+        if not issetf(self._ifflags(),ifh.IFF_UP): return
+        self._ifflags(unsetf(flags,ifh.IFF_UP))
 
     def watch(self,vnic):
         """
@@ -373,18 +294,10 @@ class Radio(object):
         for iface in self.ifaces: iw.devdel(iface['nic'])
         try:
             iw.phyadd(self._phy,vnic,'monitor') # add monitor mode vnic
-            iwt.ifconfig(vnic,'up')             # & bring it up
             self._vnic = vnic
-        except iwt.IWToolsException as e: raise RadioException(e)
+            self.up()
         except iw.IWException as e:
-            ecode = iw.ecode(e)
-            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
-            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
-            else: raise RadioException(e)
+            raise RadioException((iw.ecode(e),e))
 
     def unwatch(self):
         """
@@ -392,48 +305,38 @@ class Radio(object):
          back to it's orginal state)
          NOTE: this does not restore all interfaces that were deleted by watch
         """
-        if not self._vnic: raise RadioException("Radio is not in monitor mode")
+        if not self._vnic:
+            raise RadioException((RDO_OPERATION,"Radio is not in monitor mode"))
         try:
             iw.devdel(self._vnic)
-            iw.phyadd(self._phy,self._nic,self._nicmode)
-            iwt.ifconfig(self._nic,'up')
             self._vnic = None
-        except iwt.IWToolsException as e: raise RadioException(e)
+            iw.phyadd(self._phy,self._nic,self._nicmode)
+            self.up()
         except iw.IWException as e:
-            ecode = iw.ecode(e)
-            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
-            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
-            else: raise RadioException(e)
+            raise RadioException((iw.ecode(e),e))
 
-    def cloak(self,hwaddr):
+    def spoof(self,hwaddr):
         """
          sets spoofed hw address
          :param hwaddr: 48 bit hex mac address of form XX:XX:XX:XX:XX:XX
         """
+        if hwaddr.lower() == 'random':
+            raise RadioException((RDO_UNDEFINED,'Random spoof not implemented'))
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
-        try:
-            iwt.ifconfig(nic,'down')
-            self._spoofed = iwt.sethwaddr(nic,hwaddr)
-            iwt.ifconfig(nic,'up')
-        except iwt.IWToolsException as e:
-            raise RadioException(e)
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
+        self.down()
+        newmac = self._ifhwaddr(hwaddr)
+        self.up()
+        if newmac == hwaddr: self._spoofed = newmac
 
-    def uncloak(self):
+    def unspoof(self):
         """ resets hw address """
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
-        try:
-            iwt.ifconfig(nic,'down')
-            iwt.resethwaddr(nic)
-            iwt.ifconfig(nic,'up')
-            self._spoofed = None
-        except iwt.IWToolsException as e:
-            raise RadioException(e)
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
+        self.down()
+        oldmac = self._ifhwaddr(self.hwaddr)
+        self.up()
+        if oldmac == self.hwaddr: self._spoofed = None
 
     def settxpwr(self,pwr,option='fixed'):
         """
@@ -441,18 +344,12 @@ class Radio(object):
         :param pwr: desired txpower in dBm
         :param option: desired option oneof {'fixed'|'limit'|'auto'}
         """
-        # this will not work for all cards
+        # NOTE: this does not work on my card(s) using either phy or nic
+        # wireless.h has a ioctl call for setting the txpwr SIOCSIWTXPOW
         try:
             iw.txpwrset(self._phy,pwr,option)
         except iw.IWException as e:
-            ecode = iw.ecode(e)
-            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
-            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
-            else: raise RadioException(e)
+            raise RadioException((iw.ecode(e),e))
 
     def setch(self,ch,chw=None):
         """
@@ -460,137 +357,251 @@ class Radio(object):
          :param ch: channel (number) to set card to
          :param chw: channel width to set to default is None
         """
-        if not self._phy: raise RadioNotInitialized
+        if not self._phy: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
         if not chw in RDO_CHWS:
-            raise RadioInvalidArg("Channel width is invalid (-19)")
+            raise RadioException((RDO_INVALIDARG,"Channel width is invalid (22)"))
 
         try:
             iw.chset(self._phy,ch,chw)
         except iw.IWException as e:
-            ecode = iw.ecode(e)
-            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
-            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
-            else: raise RadioException(e)
+            raise RadioException((iw.ecode(e),e))
 
 #### PRIVATE FUNCTIONS ####
 
-    def _setup(self,nic,vnic=None,spoofed=None):
+    def _setup(self,nic,vnic=None,spoof=None):
         """
          initialize immutable properties from network interface card
          :param nic: name of nic to initialize
          :param vnic: name of virtual interface to create in monitor mode
-         :param spoofed: spoofed hwaddress if desired (can be 'random')
+         :param spoof: spoof hwaddress if desired (can be 'random')
         """
         try:
+            # initialize Radio's attributes
             interface = None
             self._phy,ifaces = iw.dev(nic)
             for iface in ifaces:
                 if iface['nic'] == nic: interface = iface
             self._nic = nic
             self._nicmode = interface['type']
-            self._hwaddr = self._gethwaddr()
-            self._ifindex = self._getifindex() # see /sys/class/net/<nic>/ifindex
+            self._hwaddr = self._ifhwaddr()
+            self._ifindex = self._ififindex() # see also /sys/class/net/<nic>/ifindex
             self._channels = iw.chget(self._phy)
-            self._standards = iwt.iwconfig(nic,'Standards') # iw
-            self._txpwr = iwt.iwconfig(nic,'Tx-Power')
-            self._driver = driver(nic)
-            self._chipset = chipset(self._driver)
-        except TypeError: raise RadioException("Unexpected error")
-        except iwt.IWToolsException as e: raise RadioException(e)
+            self._standards = self._iwname()[1]
+            self._driver = self._ifdriver()
+            self._chipset = self._ifchipset()
+        except TypeError: raise RadioException((RDO_UNDEFINED,"Unexpected error"))
+        except RadioException: raise
         except iw.IWException as e:
-            ecode = iw.ecode(e)
-            if ecode == RDO_PERMISSION: raise RadioNoPermission(e)
-            elif ecode == RDO_BUSY: raise RadioBusyDevice(e)
-            elif ecode == RDO_NONIC: raise RadioNicNotFound(e)
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg(e)
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles(e)
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted(e)
-            else: raise RadioException(e)
+            raise RadioException((iw.ecode(e),e))
+        if spoof: self.spoof(spoof) # create a spoofed address?
+        if vnic: self.watch(vnic)   # create in montor mode?
 
-        # create a spoofed address?
-        if spoofed:
-            mac = None if spoofed.lower() == 'random' else spoofed
-            if mac: self.cloak(mac)
+#### IOCTL ifconfig/iwconfig implementation
 
-        # create in montor mode?
-        if vnic: self.watch(vnic)
+    def _ifhwaddr(self,mac=None):
+        """
+         get/sets this Radio's hwaddr. Setting and getting are the same operation,
+         the only difference is in the sockios flag sent to the kernel
+         :param mac: hwaddr to set to. If None, the current address is retrieved
+         :returns: the hw addr of this Radio
+        """
+        # are we initialized?
+        nic = self._vnic if self._vnic else self._nic
+        if nic is None: raise RadioException((RDO_UNDEFINED,"Unexpected error"))
 
-#### our iw/ifconfig/iwconfig implementation
+        # are setting or getting
+        if mac is None:
+            sflag = sioc.SIOCGIFHWADDR
+            ps = []
+        else:
+            sflag = sioc.SIOCSIFHWADDR
+            ps = [ifh.ARPHRD_ETHER,mac]
 
-    def _gethwaddr(self):
+        try:
+            s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            ret = ioctl(s.fileno(),sflag,ifh.ifreq(nic,sflag,ps))
+
+            # make sure we got an ethernet address
+            fam = struct.unpack_from(ifh.sa_addr,ret,ifh.IFNAMELEN)[0]
+            if fam == ifh.ARPHRD_ETHER:
+                # TODO: any other way then indexing the returned value
+                return ":".join(['{0:02x}'.format(ord(c)) for c in ret[18:24]])
+            raise RadioException((RDO_UNDEFINED,"invalid sa_family = {0}".format(fam)))
+        except RadioException: raise # reraise the above
+        except AttributeError as e:
+            # ifh error
+            raise RadioException((RDO_INVALIDARG,e))
+        except IOError as e:
+            raise RadioException((e.errno,e))
+        except Exception as e:
+            raise RadioException((RDO_UNDEFINED,e))
+        finally:
+            s.close()
+
+    def _ififindex(self):
         """ :returns: the hw addr of this Radio """
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
 
         try:
+            sflag = sioc.SIOCGIFINDEX
             s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-            nic = struct.pack('256s',nic[:IFNAMSIZ])
-            ret = fcntl.ioctl(s.fileno(),sioc.SIOCGIFHWADDR,nic)
-            return ":".join(['{0:02x}'.format(ord(c)) for c in ret[18:24]])
+            ifreq = ifh.ifreq(nic,sflag)
+            ret = ioctl(s.fileno(),sflag,ifreq)
+            return struct.unpack_from(ifh.ifr_ifindex,ret,ifh.IFNAMELEN)[0]
+        except AttributeError as e:
+            # ifh error
+            raise RadioException((RDO_INVALIDARG,e))
         except IOError as e:
-            ecode = e.errno
-            if ecode == RDO_PERMISSION: raise RadioNoPermission("gethwaddr")
-            elif ecode == RDO_BUSY: raise RadioBusyDevice("gethwaddr")
-            elif ecode == RDO_NONIC: raise RadioNicNotFound("gethwaddr")
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg("gethwaddr")
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles("gethwaddr")
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted("gethwaddr")
-            else: raise RadioException("gethwaddr")
+            raise RadioException((e.errno,e))
+        except struct.error as e:
+            raise RadioException((RDO_UNDEFINED,"Failed to pack/unpack {0}".format(e)))
         except Exception as e:
-            raise RadioException("gethwaddr: unknown error {0}".format(e))
+            raise RadioException((RDO_UNDEFINED,e))
         finally:
             s.close()
 
-    def _getifindex(self):
-        """ :returns: the hw addr of this Radio """
+    def _ifflags(self,flags=None):
+        """
+         get/sets this Radio's flags. Setting and getting are the same operation,
+         the only difference is in the sockios flag sent to the kernel
+         :param flags: flags to set to. If None, the current flags are retrieved
+         :returns: the current flags
+        """
+        # are we initialized?
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
+
+        # are setting or getting
+        sflag = sioc.SIOCGIFFLAGS if flags is None else sioc.SIOCSIFFLAGS
+        flags = [flags] if flags else None
 
         try:
             s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-            nic = struct.pack('256s',nic[:IFNAMSIZ])
-            ret = fcntl.ioctl(s.fileno(),sioc.SIOCGIFINDEX,nic)
-            return ord(ret[16])
+            ret = ioctl(s.fileno(),sflag,ifh.ifreq(nic,sflag,flags))
+            return struct.unpack_from(ifh.ifr_flags,ret,ifh.IFNAMELEN)[0]
+        except AttributeError as e:
+            raise RadioException((RDO_INVALIDARG,e))
         except IOError as e:
-            ecode = e.errno
-            if ecode == RDO_PERMISSION: raise RadioNoPermission("getifindex")
-            elif ecode == RDO_BUSY: raise RadioBusyDevice("getifindex")
-            elif ecode == RDO_NONIC: raise RadioNicNotFound("getifindex")
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg("getifindex")
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles("getifindex")
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted("getifindex")
-            else: raise RadioException("getifindex")
+            raise RadioException((e.errno,e))
+        except struct.error as e:
+            raise RadioException((RDO_UNDEFINED,"Failed to pack/unpack {0}".format(e)))
         except Exception as e:
-            raise RadioException("getifindex: unknown error {0}".format(e))
+            raise RadioException((RDO_UNDEFINED,e))
         finally:
             s.close()
 
-    def _getflags(self):
-        """ :returns: the ifflags this Radio """
+    def _iwname(self):
+        """
+        confirms a device by name exists and is wireless and returns the
+        standards for name if present/wireless
+        :returns: tuple t = (name,standards)
+        """
+        # are we initialized?
         nic = self._vnic if self._vnic else self._nic
-        if nic is None: raise RadioNotInitialized
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
 
         try:
+            sflag = sioc.SIOCGIWNAME
             s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-            nic = struct.pack('256s',nic[:IFNAMSIZ])
-            ret = fcntl.ioctl(s.fileno(),sioc.SIOCGIFFLAGS,nic)
-            return struct.unpack('H',ret[16:18])[0]
+            ret = ioctl(s.fileno(),sflag,ifh.ifreq(nic,sflag))
+
+            # the below is a dirty hack until we can figure another
+            # way to get standards
+            ret = ioctl(s.fileno(),sflag,ifh.ifreq(nic,sflag))
+            name = ret[:ifh.IFNAMELEN]      # get the name
+            name = name[:name.find('\x00')] # remove nulls
+            stds = ret[ifh.IFNAMELEN:]      # get the standards
+            stds = stds[:stds.find('\x00')] # remove nulls
+            stds = stds.replace('IEEE','')  # remove IEEE if present
+            return name,stds
+        except AttributeError as e:
+            raise RadioException((RDO_INVALIDARG,e))
         except IOError as e:
-            ecode = e.errno
-            if ecode == RDO_PERMISSION: raise RadioNoPermission("getflags")
-            elif ecode == RDO_BUSY: raise RadioBusyDevice("getflags")
-            elif ecode == RDO_NONIC: raise RadioNicNotFound("getflags")
-            elif ecode == RDO_INVALIDARG: raise RadioInvalidArg("getflags")
-            elif ecode == RDO_EXCEED: raise RadioExceedOpenFiles("getflags")
-            elif ecode == RDO_OPERATION: raise RadioOpNotPermitted("getflags")
-            else: raise RadioException("getflags")
-        except (struct.error,IndexError):
-            raise RadioException("getflags: error unpacking")
+            raise RadioException((e.errno,e))
+        except struct.error as e:
+            raise RadioException((RDO_UNDEFINED,"Failed to pack/unpack {0}".format(e)))
         except Exception as e:
-            raise RadioException("getflags: unknown error {0}".format(e))
+            raise RadioException((RDO_UNDEFINED,e))
         finally:
             s.close()
+
+    def _iwtxpwr(self):
+        """
+        gets current tx power of this Radio
+        :returns: the tx power
+        """
+        # are we initialized?
+        nic = self._vnic if self._vnic else self._nic
+        if nic is None: raise RadioException((RDO_UNINITIALIZED,"Uninitialized"))
+
+        try:
+            # we ignore fixed, disabled and flags (for now)
+            sflag = sioc.SIOCGIWTXPOW
+            s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            ret = ioctl(s.fileno(),sflag,ifh.ifreq(nic,sflag))
+            return struct.unpack_from(ifh.ifr_iwtxpwr,ret,ifh.IFNAMELEN)[0]
+        except AttributeError as e:
+            # ifh error
+            raise RadioException((RDO_INVALIDARG,e))
+        except IOError as e:
+            raise RadioException((e.errno,e))
+        except struct.error as e:
+            raise RadioException((RDO_UNDEFINED,"Failed to pack/unpack {0}".format(e)))
+        except Exception as e:
+            raise RadioException((RDO_UNDEFINED,e))
+        finally:
+            s.close()
+
+#### MISC
+
+    def _ifdriver(self):
+        """ :returns: driver (or unknown if cannot be found) """
+        path = '/sys/class/net/{0}/device/driver/module/drivers'.format(self._nic)
+        try:
+            # find the driver for nic in driver's module, split on ':' and return
+            ds = os.listdir(path)
+            if len(ds) > 1: return "Unknown"
+            return ds[0].split(':')[1]
+        except OSError:
+            return "Unknown"
+
+    def _ifchipset(self):
+        """
+        returns the chipset for given driver (Thanks aircrack-ng team)
+        NOTE: does not fully implement the airmon-ng getChipset where identification
+        requires system commands
+        :returns: chipset of driver
+        """
+        driver = self._driver
+        if not driver: return "Unknown"
+        if driver == "Unknown": return "Unknown"
+        if driver == "Otus" or driver == "arusb_lnx": return "AR9001U"
+        if driver == "WiLink": return "TIWLAN"
+        if driver == "ath9k_htc" or driver == "usb": return "AR9001/9002/9271"
+        if driver.startswith("ath") or driver == "ar9170usb": return "Atheros"
+        if driver == "zd1211rw_mac80211": return "ZyDAS 1211"
+        if driver == "zd1211rw": return "ZyDAS"
+        if driver.startswith("acx"): return "TI ACX1xx"
+        if driver == "adm8211": return "ADMtek 8211"
+        if driver == "at76_usb": return "Atmel"
+        if driver.startswith("b43") or driver == "bcm43xx": return "Broadcom"
+        if driver.startswith("p54") or driver == "prism54": return "PrismGT"
+        if driver == "hostap": return "Prism 2/2.5/3"
+        if driver == "r8180" or driver == "rtl8180": return "RTL8180/RTL8185"
+        if driver == "rtl8187" or driver == "r8187": return "RTL8187"
+        if driver == "rt2570" or driver == "rt2500usb": return "Ralink 2570 USB"
+        if driver == "rt2400" or driver == "rt2400pci": return "Ralink 2400 PCI"
+        if driver == "rt2500" or driver == "rt2500pci": return "Ralink 2560 PCI"
+        if driver == "rt61" or driver == "rt61pci": return "Ralink 2561 PCI"
+        if driver == "rt73" or driver == "rt73usb": return "Ralink 2573 USB"
+        if driver == "rt2800" or driver == "rt2800usb" or driver == "rt3070sta": return "Ralink RT2870/3070"
+        if driver == "ipw2100": return "Intel 2100B"
+        if driver == "ipw2200": return "Intel 2200BG/2915ABG"
+        if driver == "ipw3945" or driver == "ipwraw" or driver == "iwl3945": return "Intel 3945ABG"
+        if driver == "ipw4965" or driver == "iwl4965": return "Intel 4965AGN"
+        if driver == "iwlagn" or driver == "iwlwifi": return "Intel 4965/5xxx/6xxx/1xxx"
+        if driver == "orinoco": return "Hermes/Prism"
+        if driver == "wl12xx": return "TI WL1251/WL1271"
+        if driver == "r871x_usb_drv": return "Realtek 81XX"
+        return "Unknown"

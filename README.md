@@ -117,7 +117,6 @@ Provides the Postgresql database schema, nidus.sql.
  *  wifi                subpackage for wifi related
      - \_\_init\_\_.py  initialize radio subpackage
      - interface        initialize interface subpackage
-        + iwtools.py    iwconfig, ifconfig interface and nic utilities
         + iw.py         iw 3.17 interface
         + oui.py        oui/manuf related functions
         + radio.py      Radio consolidates iwtools.py, iw.py
