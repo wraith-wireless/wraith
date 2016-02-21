@@ -90,7 +90,7 @@ Provides the Postgresql database schema, nidus.sql.
 
 ## 4. ARCHITECTURE/HEIRARCHY: Brief Overview of the project file structure
 
-* wraith/               Top-level package
+* wraith:               Top-level package
  - \_\_init\_\_.py      initialize the top-level
  - wraith-rt.py         the main Panel gui
  - subpanels.py         child panels
@@ -99,11 +99,11 @@ Provides the Postgresql database schema, nidus.sql.
  - README.md            this file
  - CONFIGURE.txt        setup details
  - TODO                 todos for each subpackage
- * widgets              gui subpackage
-     *  icons           icons folder
+ * widgets:             gui subpackage
+     *  icons:          icons folder
      -  \_\_init\_\_.py initialize widgets subpackage
      -  panel.py        defines Panel and subclasses for gui
- * utils                utility functions
+ * utils:                utility functions
     -  \_\_init\_\_.py  initialize utils subpackage
     - bits.py           bitmask functions
     - timestamps.py     timestamp conversion functions
@@ -112,27 +112,27 @@ Provides the Postgresql database schema, nidus.sql.
     - simplepcap.py     pcap writer
     - brine.py          support for pickling connection objects
     - valrep.py         validation and reporting functionality
- *  data                data folder
+ *  data:               data folder
     - oui.txt           tab seperated oui manufacturer file
- *  wifi                subpackage for wifi related
+ *  wifi:               subpackage for wifi related
      - \_\_init\_\_.py  initialize radio subpackage
-     - interface        initialize interface subpackage
+     - interface:       initialize interface subpackage
         + iw.py         iw 3.17 interface
         + oui.py        oui/manuf related functions
         + radio.py      Radio consolidates iwtools.py, iw.py
         + sockios_h     definitions of the socket-level I/O control calls.
         + nl80211_h     nl82011 constants
         + if_h          inet definition
-     - standards        initialize standards subpackage
+     - standards:       initialize standards subpackage
         + radiotap.py   radiotap parsing
         + mpdu.py       IEEE 802.11 MAC (MPDU) parsing
         + dott1u.py     contstants for 802.11u (not currently used)
         + channels.py   802.11 channel, freq utilities
         + mcs.py        mcs index functions
- * nidus                database schema
+ * nidus:               database schema
      - \_\_init\_\_.py  initialize nidus subpackage
      - nidus.sql        database definition
- *  iyri                subpackage for wraith sensor
+ *  iyri:               subpackage for wraith sensor
      - \_\_init\_\_.py  initialize iyri package
      - iyri.conf        configuration file for iyri
      - iyri.log.conf    configuration file for iyri logging
