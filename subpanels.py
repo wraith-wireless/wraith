@@ -1375,64 +1375,36 @@ class IyriCtrlPanel(gui.SimplePanel):
             self._imgs['state'] = PhotoImage(imgopen('widgets/icons/istate.png'))
 
             # create buttons first for abad then shama
-            self._btns['ascan'] = ttk.Button(frmA,image=self._imgs['scan'],
-                                             command=lambda:self.runsingle('scan','abad'))
-            self._btns['apause'] = ttk.Button(frmA,image=self._imgs['pause'],
-                                             command=lambda:self.runsingle('pause','abad'))
-            self._btns['ahold'] = ttk.Button(frmA,image=self._imgs['hold'],
-                                             command=lambda:self.runsingle('hold','abad'))
-            self._btns['alisten'] = ttk.Button(frmA,image=self._imgs['listen'],
-                                             command=lambda:self.runsingle('listen','abad'))
-            self._btns['atxpwr'] = ttk.Button(frmA,image=self._imgs['txpwr'],
-                                             command=lambda:self.runsingle('txpwr','abad'))
-            self._btns['aspoof'] = ttk.Button(frmA,image=self._imgs['spoof'],
-                                             command=lambda:self.runsingle('spoof','abad'))
-            self._btns['astate'] = ttk.Button(frmA,image=self._imgs['state'],
-                                             command=lambda:self.runsingle('state','abad'))
-            self._btns['sscan'] = ttk.Button(frmS,image=self._imgs['scan'],
-                                             command=lambda:self.runsingle('scan','shama'))
-            self._btns['spause'] = ttk.Button(frmS,image=self._imgs['pause'],
-                                             command=lambda:self.runsingle('pause','shama'))
-            self._btns['shold'] = ttk.Button(frmS,image=self._imgs['hold'],
-                                             command=lambda:self.runsingle('hold','shama'))
-            self._btns['slisten'] = ttk.Button(frmS,image=self._imgs['listen'],
-                                             command=lambda:self.runsingle('listen','shama'))
-            self._btns['stxpwr'] = ttk.Button(frmS,image=self._imgs['txpwr'],
-                                             command=lambda:self.runsingle('txpwr','shama'))
-            self._btns['sspoof'] = ttk.Button(frmS,image=self._imgs['spoof'],
-                                             command=lambda:self.runsingle('spoof','shama'))
-            self._btns['sstate'] = ttk.Button(frmS,image=self._imgs['state'],
-                                             command=lambda:self.runsingle('state','shama'))
+            self._btns['ascan'] = ttk.Button(frmA,image=self._imgs['scan'],command=lambda:self.runsingle('scan','abad'))
+            self._btns['apause'] = ttk.Button(frmA,image=self._imgs['pause'],command=lambda:self.runsingle('pause','abad'))
+            self._btns['ahold'] = ttk.Button(frmA,image=self._imgs['hold'],command=lambda:self.runsingle('hold','abad'))
+            self._btns['alisten'] = ttk.Button(frmA,image=self._imgs['listen'],command=lambda:self.runsingle('listen','abad'))
+            self._btns['atxpwr'] = ttk.Button(frmA,image=self._imgs['txpwr'],command=lambda:self.runsingle('txpwr','abad'))
+            self._btns['aspoof'] = ttk.Button(frmA,image=self._imgs['spoof'],command=lambda:self.runsingle('spoof','abad'))
+            self._btns['astate'] = ttk.Button(frmA,image=self._imgs['state'],command=lambda:self.runsingle('state','abad'))
+            self._btns['sscan'] = ttk.Button(frmS,image=self._imgs['scan'],command=lambda:self.runsingle('scan','shama'))
+            self._btns['spause'] = ttk.Button(frmS,image=self._imgs['pause'],command=lambda:self.runsingle('pause','shama'))
+            self._btns['shold'] = ttk.Button(frmS,image=self._imgs['hold'],command=lambda:self.runsingle('hold','shama'))
+            self._btns['slisten'] = ttk.Button(frmS,image=self._imgs['listen'],command=lambda:self.runsingle('listen','shama'))
+            self._btns['stxpwr'] = ttk.Button(frmS,image=self._imgs['txpwr'],command=lambda:self.runsingle('txpwr','shama'))
+            self._btns['sspoof'] = ttk.Button(frmS,image=self._imgs['spoof'],command=lambda:self.runsingle('spoof','shama'))
+            self._btns['sstate'] = ttk.Button(frmS,image=self._imgs['state'],command=lambda:self.runsingle('state','shama'))
         except Exception as e:
             # images failed to load
-            self._btns['ascan'] = ttk.Button(frmA,text='S',
-                                             command=lambda:self.runsingle('scan','abad'))
-            self._btns['apause'] = ttk.Button(frmA,text='P',
-                                             command=lambda:self.runsingle('pause','abad'))
-            self._btns['ahold'] = ttk.Button(frmA,text='H',
-                                             command=lambda:self.runsingle('hold','abad'))
-            self._btns['alisten'] = ttk.Button(frmA,text='L',
-                                             command=lambda:self.runsingle('listenn','abad'))
-            self._btns['atxpwr'] = ttk.Button(frmA,text='T',
-                                             command=lambda:self.runsingle('txpwr','abad'))
-            self._btns['aspoof'] = ttk.Button(frmA,text='Sp',
-                                             command=lambda:self.runsingle('spoof','abad'))
-            self._btns['astate'] = ttk.Button(frmA,text='St',
-                                             command=lambda:self.runsingle('state','abad'))
-            self._btns['sscan'] = ttk.Button(frmS,text='S',
-                                             command=lambda:self.runsingle('scan','shama'))
-            self._btns['spause'] = ttk.Button(frmS,text='P',
-                                             command=lambda:self.runsingle('pause','shama'))
-            self._btns['shold'] = ttk.Button(frmS,text='H',
-                                             command=lambda:self.runsingle('hold','shama'))
-            self._btns['slisten'] = ttk.Button(frmS,text='L',
-                                             command=lambda:self.runsingle('listen','shama'))
-            self._btns['stxpwr'] = ttk.Button(frmS,text='T',
-                                             command=lambda:self.runsingle('txpwr','shama'))
-            self._btns['sspoof'] = ttk.Button(frmS,text='Sp',
-                                             command=lambda:self.runsingle('spoof','shama'))
-            self._btns['sstate'] = ttk.Button(frmS,text='St',
-                                             command=lambda:self.runsingle('state','shama'))
+            self._btns['ascan'] = ttk.Button(frmA,text='S',command=lambda:self.runsingle('scan','abad'))
+            self._btns['apause'] = ttk.Button(frmA,text='P',command=lambda:self.runsingle('pause','abad'))
+            self._btns['ahold'] = ttk.Button(frmA,text='H',command=lambda:self.runsingle('hold','abad'))
+            self._btns['alisten'] = ttk.Button(frmA,text='L',command=lambda:self.runsingle('listenn','abad'))
+            self._btns['atxpwr'] = ttk.Button(frmA,text='T',command=lambda:self.runsingle('txpwr','abad'))
+            self._btns['aspoof'] = ttk.Button(frmA,text='Sp',command=lambda:self.runsingle('spoof','abad'))
+            self._btns['astate'] = ttk.Button(frmA,text='St',command=lambda:self.runsingle('state','abad'))
+            self._btns['sscan'] = ttk.Button(frmS,text='S',command=lambda:self.runsingle('scan','shama'))
+            self._btns['spause'] = ttk.Button(frmS,text='P',command=lambda:self.runsingle('pause','shama'))
+            self._btns['shold'] = ttk.Button(frmS,text='H',command=lambda:self.runsingle('hold','shama'))
+            self._btns['slisten'] = ttk.Button(frmS,text='L',command=lambda:self.runsingle('listen','shama'))
+            self._btns['stxpwr'] = ttk.Button(frmS,text='T',command=lambda:self.runsingle('txpwr','shama'))
+            self._btns['sspoof'] = ttk.Button(frmS,text='Sp',command=lambda:self.runsingle('spoof','shama'))
+            self._btns['sstate'] = ttk.Button(frmS,text='St',command=lambda:self.runsingle('state','shama'))
         finally:
             # place the buttons and output
             self._btns['ascan'].grid(row=0,column=0)
@@ -1455,6 +1427,7 @@ class IyriCtrlPanel(gui.SimplePanel):
 
         # Multiple - can enter multiple commands to be executed in order
         frmC = ttk.Frame(nb)
+        # input text and execute button
         self._cmdline = tk.Text(frmC,width=28,height=4)
         self._cmdline.grid(row=0,column=0,sticky='nw')
         try:
@@ -1463,9 +1436,13 @@ class IyriCtrlPanel(gui.SimplePanel):
         except:
             self._btnRun = ttk.Button(frmC,width=1,text='!',command=self.runmultiple)
         finally:
-            self._btnRun.grid(row=0,column=1,sticky='n')
-        self._cmdout = tk.Text(frmC,width=33,height=4)
-        self._cmdout.grid(row=1,column=0,columnspan=2,sticky='nwse')
+            self._btnRun.grid(row=0,column=1,sticky='nw')
+        # output and scrollbar
+        self._cmdout = tk.Text(frmC,width=28,height=4)
+        self._cmdout.grid(row=1,column=0,sticky='nwse')
+        sb = ttk.Scrollbar(frmC,command=self._cmdline.yview)
+        self._cmdline['yscrollcommand'] = sb.set
+        sb.grid(row=1,column=1,sticky='nws')
         nb.add(frmC,text="Multiple")
 
     def runsingle(self,cmd,rdo,ps=None):
@@ -1483,13 +1460,23 @@ class IyriCtrlPanel(gui.SimplePanel):
             except AttributeError:
                 return
         msg = "!{0} {1} {2}{3}\n".format(self._cid,cmd,rdo,ps)
-        #print msg
         self._cmds[self._cid] = msg
         self._cid += 1
 
     def runmultiple(self):
         """ executes multiple commands (from command line widget) """
-        pass
+        cmds = self._cmdline.get('1.0','end')
+        cmds = cmds.split('\n')
+        for cmd in cmds:
+            cmd = cmd.split(' ')
+            if len(cmd) < 2: continue
+            elif len(cmd) == 2: ps = ''
+            elif len(cmd) == 3: ps = " " + cmd[2]
+            else: continue
+            msg = "!{0} {1} {2}{3}\n".format(self._cid,cmd[0],cmd[1],ps)
+            self._cmds[self._cid] = msg
+            self._cid += 1
+        self._cmdline.delete('1.0','end')
 
 # Iyri->Config
 class IyriConfigException(Exception): pass
