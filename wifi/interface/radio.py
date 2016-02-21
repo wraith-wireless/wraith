@@ -345,7 +345,8 @@ class Radio(object):
         :param option: desired option oneof {'fixed'|'limit'|'auto'}
         """
         # NOTE: this does not work on my card(s) using either phy or nic
-        # wireless.h has a ioctl call for setting the txpwr SIOCSIWTXPOW
+        # have also tried using ioctl w/ SIOCSIWTXPOW but this does not
+        # work either.
         try:
             iw.txpwrset(self._phy,pwr,option)
         except iw.IWException as e:
@@ -542,7 +543,6 @@ class Radio(object):
             ret = ioctl(s.fileno(),sflag,ifh.ifreq(nic,sflag))
             return struct.unpack_from(ifh.ifr_iwtxpwr,ret,ifh.IFNAMELEN)[0]
         except AttributeError as e:
-            # ifh error
             raise RadioException((RDO_INVALIDARG,e))
         except IOError as e:
             raise RadioException((e.errno,e))

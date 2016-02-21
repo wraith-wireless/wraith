@@ -201,12 +201,12 @@ ifr_flags = 'h'
 ifr_ifindex = 'i'
 ifr_iwname = '{0}s'.format(256-IFNAMSIZ)  # dirty hack to get an unknown string back
 ifr_iwtxpwr = 'iBBH'
-IFNAMELEN = struct.calcsize(ifr_name)       # lengths
+IFNAMELEN = struct.calcsize(ifr_name)     # lengths
 IFHWADDRLEN	= struct.calcsize(sa_addr)
 IFFLAGLEN = struct.calcsize(ifr_flags)
 IFIFINDEXLEN = struct.calcsize(ifr_ifindex)
 IWNAMELEN = struct.calcsize(ifr_iwname)
-IWPARAMLEN = struct.calcsize(ifr_iwtxpwr)
+IWTXPWRLEN = struct.calcsize(ifr_iwtxpwr)
 def ifreq(ifrn,ifru=None,param=None):
     """
      creates a 'packed' struct cooresponding loosely to the ifreq struct. Padded
@@ -244,7 +244,7 @@ def ifreq(ifrn,ifru=None,param=None):
         elif ifru == sioc.SIOCGIWNAME: # get iw name
             ifr += struct.pack('{0}x'.format(IWNAMELEN))
         elif ifru == sioc.SIOCGIWTXPOW: # get tx pwr
-            ifr += struct.pack('{0}x'.format(IWPARAMLEN))
+            ifr += struct.pack('{0}x'.format(IWTXPWRLEN))
         else:
             raise AttributeError("ifru {0} not supported".format(ifru))
     except (TypeError,IndexError):
