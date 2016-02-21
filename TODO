@@ -76,8 +76,7 @@ Iyri:
     comms from the Tuner rather than pulling off the "wire"
    o However, radio must be able to forward radio events to the collator
  83) need to revamp the c2c cmd processing
- 84) after moving away from macchanger to spoof the address, need to implement
-    setting a random address
+ 84) need to implement setting a random address in Radio class
 Wifi:
   1) Should we add support for AVS, Prism headers ?
   2) in standards.radiotap: ensure data pad is handled for atheros cards (any others?)

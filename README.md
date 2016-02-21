@@ -26,7 +26,6 @@ data to view, how to view it and 'when' to view it.
  * postgresql 9.x (tested on 9.3.5)
  * pyscopg > 2.6
  * mgrs 1.1
- * macchanger 1.7.0
 
 ## 3. MODULES: Currently consists of three main components/modules: Wifi, Iyri and
 the GUI and three secondary modules: utils, widgets, and nidus.

@@ -23,7 +23,6 @@ NOTE: It is recommended to only use the Shama radio for collection during times 
  * postgresql 9.x
  * pyscopg > 2.6
  * mgrs 1.1
- * macchanger 1.7.0
  * dateutil 2.3
 
 ### b. Setup
@@ -34,7 +33,6 @@ At present, Iyri, like Wraith, must be manually installed. See CONFIGURE.txt in 
  * Postgresql DB API: psycopg2 v2.5.4 at https://pypi.python.org/pypi/psycopg2
  * Lat/Lon conversion: mgrs v1.1 https://pypi.python.org/packages/source/m/mgrs/mgrs-1.1.0.tar.gz
    - may require python-setuptools
- * Spoofed Mac Addresses macchanger v1.7.0  http://www.gnu.org/software/macchanger
  * iw: parses the output as produced by v3.17 https://www.kernel.org/pub/software/network/iw/iw-3.17.tar.xz
 
 ### ii. Python Files
@@ -59,7 +57,7 @@ chmod 750 wraith
 cd wraith
 touch iyri.log
 ```
-It is recommended to run iyri as a service as root. However, it is possible to run iyrid as a normal user but will require some workarounds with respect to iw, iwconfig, ifconfig and macchanger and giving python temporary set raw capabilities in order to bind the raw socket(s). For more information, see CONFIGURE.txt in the wraith directory.
+It is recommended to run iyri as a service as root. However, it is possible to run iyrid as a normal user but will require some workarounds with respect to iw, iwconfig, ifconfig and giving python temporary set raw capabilities in order to bind the raw socket(s). For more information, see CONFIGURE.txt in the wraith directory.
 
 ### c. Configuration
 Using iyri.conf, there are several configurations that can be made prior to running Iyri. Any changes to iyri.conf will not be reflected until Iyri is restarted. Note that at present iyri.conf needs to be in the same directory as iyri.py
