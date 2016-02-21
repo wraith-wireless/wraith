@@ -68,6 +68,7 @@ REVISIONS:
      o deprecated dict rdos is still maintained in Thresher as is the COL_RDO
       token
    - removed oui related from conf file and functions
+   - added radio role to return messages from C2C
 """
 __name__ = 'iyri'
 __license__ = 'GPL v3.0'

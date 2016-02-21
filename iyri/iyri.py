@@ -53,8 +53,8 @@ logging.config.fileConfig(logpath)
       {fixed|auto|limit}
     o a macaddr if cmd is spoof
  Iryi will notify the client if the cmd specified by id is invalid or valid with
-  OK <id> [\001output\001]or
-  ERR <id> \001Reason for Failure\001
+  OK <id> <rdo> [\001output\001] or
+  ERR <id> <rdo> \001Reason for Failure\001
 If the command was invalid and no command id could be read it will be set to '?'
 
 Note: Iryi only allows one client connection at a time
@@ -91,7 +91,7 @@ class C2C(threading.Thread):
                 elif self._sock and not self._caddr:
                     if self._accept():
                         logging.info("Client %s connected",self.clientstr)
-                        self._send("Iyri v{0}".format(ivers))
+                        self._send("Iyri v{0}\n".format(ivers))
 
                 # prepare inputs
                 ins = [self._cI,self._csock] if self._csock else [self._cI]
@@ -278,10 +278,10 @@ class Iryi(object):
                             rmsg = '{0}:{1}:{2}'.format(cmd,cid,'-'.join(ps))
                             self._pConns[rdo].send(rmsg)
                     elif l == CMD_ERR:
-                        self._pConns['c2c'].send("ERR {0} \001{1}\001\n".format(t,m))
+                        self._pConns['c2c'].send("ERR {0} {1} \001{2}\001\n".format(t,o,m))
                         logging.info('Command %d failed: %s',t,m)
                     elif l == CMD_ACK:
-                        self._pConns['c2c'].send("OK {0} \001{1}\001\n".format(t,m))
+                        self._pConns['c2c'].send("OK {0} {1} \001{2}\001\n".format(t,o,m))
                         logging.info('Command %d succeeded',t)
                 except Exception as e: # catch everything and quit
                     logging.error("Iryi failed. %s->%s", type(e),e)
@@ -609,26 +609,14 @@ class Iryi(object):
             return None,None,None,None
 
         if len(tkns) < 3:
-            self._pConns['c2c'].send("ERR ? \001invalid command format\001\n")
+            self._pConns['c2c'].send("ERR ? ? \001invalid command format\001\n")
             return None,None,None,None
 
         # get cmdid
         try:
             cmdid = int(tkns[0].replace('!',''))
         except:
-            self._pConns['c2c'].send("ERR ? \001invalid command format\001\n")
-            return None,None,None,None
-
-        # ATT we can error/ack with associated cmd id
-        cmd = tkns[1].strip().lower()
-        if cmd not in ['state','scan','hold','listen','pause','txpwr','spoof']:
-            resp = "ERR {0} \001invalid command\001\n".format(cmdid)
-            self._pConns['c2c'].send(resp)
-            return None,None,None,None
-
-        if cmd == 'txpwr' or cmd == 'spoof':
-            resp = "ERR {0} \001{1} not implemented\001\n".format(cmdid,cmd)
-            self._pConns['c2c'].send(resp)
+            self._pConns['c2c'].send("ERR ? ? \001invalid command format\001\n")
             return None,None,None,None
 
         radio = tkns[2].strip().lower()
@@ -643,7 +631,19 @@ class Iryi(object):
         elif radio == 'both': radios = ['abad','shama']
         else: radios = [radio]
         if 'shama' in radios and self._sr is None:
-            resp = "ERR {0} \001shama radio not present\001\n".format(cmdid)
+            resp = "ERR {0} shama \001shama radio not present\001\n".format(cmdid)
+            self._pConns['c2c'].send(resp)
+            return None,None,None,None
+
+        # ATT we can error/ack with associated cmd id
+        cmd = tkns[1].strip().lower()
+        if cmd not in ['state','scan','hold','listen','pause','txpwr','spoof']:
+            resp = "ERR {0} {1} \001invalid command\001\n".format(cmdid,radio)
+            self._pConns['c2c'].send(resp)
+            return None,None,None,None
+
+        if cmd == 'txpwr' or cmd == 'spoof':
+            resp = "ERR {0} {1} \001{1} not implemented\001\n".format(cmdid,radio,cmd)
             self._pConns['c2c'].send(resp)
             return None,None,None,None
 
@@ -665,7 +665,7 @@ class Iryi(object):
                     if not valrep.validhwaddr(':'.join(ps).upper()):
                         raise RuntimeError
             except:
-                resp = "ERR {0} \001invalid params\001\n".format(cmdid)
+                resp = "ERR {0} {1} \001invalid params\001\n".format(cmdid,radio)
                 self._pConns['c2c'].send(resp)
                 return None,None,None,None
 

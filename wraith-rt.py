@@ -571,8 +571,21 @@ class WraithPanel(gui.MasterPanel):
         """ displays Iyri Control Panel """
         panel = self.getpanel('iyrictrl',False)
         if not panel:
+            # determine the address to pass to the panel
+            cp = ConfigParser.RawConfigParser()
+            if not cp.read(wraith.IYRICONF):
+                self.err("File Not Found","File iyri.conf was not found")
+                return
+            port = 2526
+            if cp.has_option('Local','C2C'):
+                try:
+                    port = int(cp.get('Local','C2C'))
+                except ValueError:
+                    self.err("Invalid Specification","C2C port {0} is invalid")
+                    return
+
             t = tk.Toplevel()
-            pnl = subgui.IyriCtrlPanel(t,self)
+            pnl = subgui.IyriCtrlPanel(t,self,port)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'iyrictrl'))
         else:
             panel[0].tk.deiconify()

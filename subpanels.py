@@ -23,6 +23,9 @@ from PIL.Image import open as imgopen      # image opening
 import psycopg2 as psql                    # postgresql api
 import psycopg2.extras as pextras          # cursors and such
 import ConfigParser                        # config file parsing
+import threading                           # Threads et al
+import socket                              # sockets (iyri control)
+import select                              # non-blocking poll
 import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
 from wraith.wifi.interface import radio    # wireless interface details
@@ -1271,6 +1274,40 @@ class SessionsPanel(gui.DBPollingTabularPanel):
             self.err("Connect Error",err)
 
 # Iyri->Control
+CMD_STATUS = 0 # status of command
+CMD_CID    = 1 # command id
+CMD_RDO    = 2 # radio
+CMD_MSG    = 3 # msg
+def tokenize(d):
+    """
+     tokenize: parses string C2C data into tokens and returns the token list
+     :param d: C2C data
+    """
+    newd = []    # list of parsed tokens
+    token = ''   # individual token
+    buff = False # buffer '\x01' has been seen
+
+    # for each char in data string d
+    d = d.strip() # remove the trailing newline
+    for i in d:
+        # if char is a buff, flip buff value
+        # if char is a space and buff is true keep it
+        # if char is a space and not buff, append the new token & make new
+        # otherwise append the char to current token
+        if i == '\x01':
+            buff = False if buff else True
+        elif i == ' ':
+            if buff: token += i
+            else:
+                newd.append(token)
+                token = ''
+        else:
+            token += i
+
+    # append any 'hanging' tokens
+    if token: newd.append(token)
+    return newd
+
 class _ParamDialog(tkSD.Dialog):
     """ _ParamDialog - (Modal) prompts user for command parameters """
     def __init__(self,parent,cmd):
@@ -1340,20 +1377,84 @@ class _ParamDialog(tkSD.Dialog):
             # noinspection PyAttributeOutsideInit
             self.params = params
 
+class C2CPoller(threading.Thread):
+    """
+     C2CPoller polls receiving end of C2C socket for messages and returns
+     to IyriCtrlPanel
+    """
+    def __init__(self,ev,rcb,ecb,sock,poll=0.25):
+        """
+        :param ev: poison event
+        :param rcb: callback to return received data
+        :param ecb: callback to return errors
+        :param sock: socket to receive from
+        :param poll: poll time
+        """
+        threading.Thread.__init__(self)
+        self._stop = ev   # poison (isset = Quit)
+        self._rcb = rcb   # message callback
+        self._ecb = ecb   # error callback
+        self._s = sock    # socket to recive from
+        self._poll = poll # poll time
+
+    def run(self):
+        """ poll socket for messages """
+        while True:
+            if self._stop.is_set(): break
+            try:
+                try:
+                    (rs,_,_) = select.select([self._s],[],[],self._poll)
+                except select.error as e: # hide (4,'Interupted system call')
+                    if e[0] == 4: continue
+                    raise
+
+                if self._s in rs:
+                    msg = self._recvmsg()
+                    if msg: self._rcb(msg)
+            except RuntimeError:
+                self._ecb("C2C server quit")
+                break
+            except Exception as e:
+                self._ecb(e)
+
+    def _recvmsg(self):
+        """ :returns: read data from C2C """
+        msg = ''
+        while len(msg) == 0 or msg[-1:] != '\n':
+            data = self._s.recv(256)
+            if not data: raise RuntimeError
+            msg += data
+        return msg
+
 class IyriCtrlPanel(gui.SimplePanel):
     """ Display Iyri Control Panel """
-    def __init__(self,tl,chief):
-        self._cid = 1   # current command id
-        self._cmds = {} # dict of commands entered keyed of cid
-        self._imgs = {} # store opened image for the buttons
-        self._btns = {} # buttons
+    def __init__(self,tl,chief,port):
+        self._cid = 1                    # current command id
+        self._cmds = {}                  # dict of commands entered keyed of cid
+        self._imgs = {}                  # store opened image for the buttons
+        self._btns = {}                  # buttons
+        self._addr = ('127.0.0.1',port)  # iyri C2C port
+        self._s = None                   # the socket to C2C
+        self._tC2C = None                # polling thread to for socket recv
+        self._poison = threading.Event() # poison pill to thread
         gui.SimplePanel.__init__(self,tl,chief,"Iyri Control","widgets/icons/radio.png")
+
+        # open socket and start thread
+        try:
+            self._s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            self._s.connect(self._addr)
+            self._tC2C = C2CPoller(self._poison,self.resultcb,self.errcb,self._s)
+            self._tC2C.start()
+            self._s.send("!1 state shama\n")
+        except socket.error as e:
+            self.logwrite("Iyri socket failed: {0}".format(e),gui.LOG_ERR)
+            self._s = None
 
     def _body(self):
         """ make the gui """
         # a simple notebook with two tabs
         nb = ttk.Notebook(self)
-        nb.grid(row=0,column=0,sticky='nwse')
+        nb.grid(row=0,column=0,columnspan=2,sticky='nwse')
 
         # Single - one command at a time button initiated
         frmV = ttk.Frame(nb)
@@ -1421,14 +1522,12 @@ class IyriCtrlPanel(gui.SimplePanel):
             self._btns['stxpwr'].grid(row=1,column=4)
             self._btns['sspoof'].grid(row=1,column=5)
             self._btns['sstate'].grid(row=1,column=6)
-            self._vout = tk.Text(frmO,width=33,height=1)
-            self._vout.grid(row=0,column=0,sticky='n')
         nb.add(frmV,text="Single")
 
         # Multiple - can enter multiple commands to be executed in order
         frmC = ttk.Frame(nb)
         # input text and execute button
-        self._cmdline = tk.Text(frmC,width=28,height=4)
+        self._cmdline = tk.Text(frmC,width=28,height=6)
         self._cmdline.grid(row=0,column=0,sticky='nw')
         try:
             self._imgs['run'] = PhotoImage(imgopen('widgets/icons/irun.png'))
@@ -1437,13 +1536,36 @@ class IyriCtrlPanel(gui.SimplePanel):
             self._btnRun = ttk.Button(frmC,width=1,text='!',command=self.runmultiple)
         finally:
             self._btnRun.grid(row=0,column=1,sticky='nw')
+        nb.add(frmC,text="Multiple")
+
         # output and scrollbar
-        self._cmdout = tk.Text(frmC,width=28,height=4)
+        self._cmdout = tk.Text(self,width=30,height=4)
         self._cmdout.grid(row=1,column=0,sticky='nwse')
-        sb = ttk.Scrollbar(frmC,command=self._cmdline.yview)
+        sb = ttk.Scrollbar(self,command=self._cmdline.yview)
         self._cmdline['yscrollcommand'] = sb.set
         sb.grid(row=1,column=1,sticky='nws')
-        nb.add(frmC,text="Multiple")
+
+    def close(self):
+        """ override close and close socket, quit thread before exiting """
+        # kill the thread & close the socket
+        self._poison.set()
+        if self._s: self._s.close()
+        if self._tC2C: self._tC2C.join()
+        gui.SimplePanel.close(self)
+
+    def resultcb(self,msg):
+        """
+         callback to notify this control panel that C2C has returned data
+         :param msg: return message from Iyri C2C
+        """
+        print tokenize(msg)
+
+    def errcb(self,err):
+        """
+         callback to notify this control panel that C2C has an error
+         :param err: return message from Iyri C2C
+        """
+        self.logwrite(err,gui.LOG_WARN)
 
     def runsingle(self,cmd,rdo,ps=None):
         """
