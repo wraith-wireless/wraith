@@ -65,7 +65,8 @@ However, there were two primary reasons for doing so:
 
 ### d. wraith-rt: GUI
 
-Currently provides limited functionality. The gui can be used to:
+At present the gui provides limited functionality and is very much in the
+developlmental stage. The gui can be used to:
  * start/stop services: Postgresql, Iyri
  * configure Wraith, Iyri
  * view current sessions, current wirless nics and Iyri's log
