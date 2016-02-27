@@ -886,6 +886,7 @@ class WraithPanel(gui.MasterPanel):
 
     def _c2cconnect(self):
         """ connect to c2c server """
+
         # stop if already connected or iyri is not running
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
         if flags['c2c'] or not flags['iyri']: return

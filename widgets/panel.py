@@ -314,6 +314,7 @@ class SlavePanel(Panel):
         self.master.title(ttl)
 
     # abstract methods must be implemented
+
     def _shutdown(self): raise NotImplementedError("SlavePanel::_shutdown")
     def pnlreset(self): raise NotImplementedError("SlavePanel::pmlreset")
     def pnlupdate(self): raise NotImplementedError("SlavePanel::pnlupdate")
