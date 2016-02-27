@@ -374,7 +374,7 @@ class Radio(object):
          initialize immutable properties from network interface card
          :param nic: name of nic to initialize
          :param vnic: name of virtual interface to create in monitor mode
-         :param spoof: spoof hwaddress if desired (can be 'random')
+         :param spoof: spoof hwaddress if desired
         """
         try:
             # initialize Radio's attributes

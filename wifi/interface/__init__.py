@@ -7,8 +7,8 @@ Objects/functions to manipulate and query wireless nics
 REVISIONS:
 interface 0.0.2
  desc: provides tools to manipulate wireless nics 
- includes: radio 0.0.3 iw 0.1.0 if_h 0.0.2, oui 0.0.3, sockios_h 0.0.2,
-  nl80211_h 0.0.1
+ includes: radio 0.0.3 iw 0.1.0 if_h 0.0.2, oui 0.0.4, sockios_h 0.0.2,
+  nl80211_h 0.0.1 hwaddr 0.0.1
  changes:
   - added Radio class to consolidate iw.py and iwtools.py
   - added sockios_h for sock ioctl constants
@@ -18,7 +18,8 @@ interface 0.0.2
   - removed iwtools and all dependence on iwtools (parsing output from
     ifconfig/iwconfig)
     o implements getting/setting hwaddr, getting ifindex, getting flags, getting
-     txpower, getting standares and listing nics & wireless nics using ioctl
+     txpower, getting standards and listing nics & wireless nics using ioctl
+  - added random hw addr generator to oui.py
 """
 __name__ = 'interface'
 __license__ = 'GPL v3.0'

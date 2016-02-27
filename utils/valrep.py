@@ -59,7 +59,7 @@ def validgpsdid(gid):
 
 def validhwaddr(addr):
     """
-     determienes validity of hw addr
+     determines validity of hw addr
      :param addr: address to check
      :returns: True if addr is valid hw address, False otherwise
     """

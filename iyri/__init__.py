@@ -69,6 +69,7 @@ REVISIONS:
       token
    - removed oui related from conf file and functions
    - added radio role to return messages from C2C
+   - random spoofed address are now supported
 """
 __name__ = 'iyri'
 __license__ = 'GPL v3.0'

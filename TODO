@@ -46,6 +46,8 @@ GUI:
 Iyri:
  26) how to identify gps device failure, removal?
  53) implement spoof, txpwr commands
+  o spoof will require a down/up of the card and a rebind on the socket
+  o setting tx power is not supported on my cards
  55) start gpsd if it does not start automatically (assuming gps device is
      plugged in)
  61) document different comm protocols used internally
@@ -75,8 +77,6 @@ Iyri:
     w/ iyri where the RadioController would be too occupied w/ fielding
     comms from the Tuner rather than pulling off the "wire"
    o However, radio must be able to forward radio events to the collator
- 83) need to revamp the c2c cmd processing
- 84) need to implement setting a random address in Radio class
 Wifi:
   1) Should we add support for AVS, Prism headers ?
   2) in standards.radiotap: ensure data pad is handled for atheros cards (any others?)

@@ -29,6 +29,7 @@ from wraith.iyri.collate import Collator          # the collator
 from wraith.iyri.rdoctl import RadioController    # Radio object etc
 from wraith.iyri.gpsctl import GPSController      # gps device
 from wraith.wifi.interface import radio           # regset/get & channels
+from wraith.wifi.interface.oui import randhw      # spoofing hwaddr
 from wraith.utils.cmdline import runningprocess   # check for psql running
 from wraith.utils import valrep                   # validation functionality
 from wraith.iyri.constants import *               # buffer dims
@@ -537,7 +538,7 @@ class Iryi(object):
                 logging.warn("Invalid spoofed MAC addr %s specified",spoof)
             else:
                 if spoof == 'RANDOM':
-                    logging.warn("Spoofing random mac is not yet supoorted")
+                    r['spoofed'] = randhw()
                 else:
                     r['spoofed'] = spoof
         if cp.has_option(rtype,'desc'): r['desc'] = cp.get(rtype,'desc')

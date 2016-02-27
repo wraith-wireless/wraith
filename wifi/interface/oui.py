@@ -5,7 +5,7 @@
 
 #__name__ = 'oui'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 __date__ = 'September 2015'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -14,7 +14,11 @@ __status__ = 'Development'
 
 import urllib2,os,sys,time
 import argparse as ap
+import random
 from wraith.utils.timestamps import ts2iso
+
+#### set oui path -> change to reflect if necessary
+OUIPATH = os.path.realpath('../../data/oui.txt')
 
 def parseoui(path=None):
     """
@@ -22,8 +26,10 @@ def parseoui(path=None):
      :param path: path of oui text file
      :returns: oui dict {oui:manuf} for each oui in path or empty dict
     """
+    if path is None: path = OUIPATH
     fin = None
     ouis = {}
+
     try:
         fin = open(path)
         for line in fin.readlines()[1:]:
@@ -35,17 +41,35 @@ def parseoui(path=None):
         if fin and not fin.closed: fin.close()
     return ouis
 
-def manufacturer(oui,mac):
+def oui(mac):
+    """
+     :param mac: 48-bit mac address
+     :returns: oui portion of mac address
+    """
+    return mac[:8]
+
+def manufacturer(ouis,mac):
     """
      returns the manufacturer of the mac address if exists, otherwise 'unknown'
-     :param oui: oui dict
+     :param ouis: oui dict
      :param mac: hw addr to search up
      :returns: manufacturer
     """
     try:
-        return oui[mac[:8]]
+        return ouis[mac[:8]]
     except KeyError:
         return "unknown"
+
+def randhw(ouis=None):
+    """
+     generate a random hw address
+     :param ouis: oui dict to use, otherwise loads from file
+     :returns: random hw address
+    """
+    if not ouis: ouis = parseoui()
+    oui = random.choice(ouis.keys())
+    ulm = ":".join(['{0:02x}'.format(random.randint(0,255)) for _ in xrange(3)])
+    return oui + ':' + ulm
 
 def fetch(path=None,verbose=False):
     """
