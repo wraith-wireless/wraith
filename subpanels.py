@@ -1445,7 +1445,10 @@ class IyriCtrlPanel(gui.SimplePanel):
             self._s.connect(self._addr)
             self._tC2C = C2CPoller(self._poison,self.resultcb,self.errcb,self._s)
             self._tC2C.start()
-            self._s.send("!1 state shama\n")
+
+            # get current states
+            self._s.send("!0 state abad\n")
+            self._s.send("!0 state shama\n")
         except socket.error as e:
             self.logwrite("Iyri socket failed: {0}".format(e),gui.LOG_ERR)
             self._s = None
@@ -1558,7 +1561,16 @@ class IyriCtrlPanel(gui.SimplePanel):
          callback to notify this control panel that C2C has returned data
          :param msg: return message from Iyri C2C
         """
-        print tokenize(msg)
+        tkns = tokenize(msg)
+        if tkns[CMD_STATUS] == 'Iyri':
+            # successful connect to C2C
+            self.logwrite("Connected to Iyri v{0} C2C".format(tkns[1]),gui.LOG_NOTE)
+            return
+        elif tkns[CMD_CID] == 0:
+            # 0 cid denotes a startup state request
+            return
+
+        # process normally
 
     def errcb(self,err):
         """

@@ -244,7 +244,8 @@ class WraithPanel(gui.MasterPanel):
         self.after(500,self._poll)
 
     def _shutdown(self):
-        """ if connected to datastorage, closes connection """
+        """ shut down cleanly """
+        self.closepanels()
         self.setbusy()               # we're busy
         self._setstate(_STATE_EXIT_) # set the state
         self._stopsensor()           # shutdown Iyri
