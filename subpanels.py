@@ -41,7 +41,6 @@ COPY = u"\N{COPYRIGHT SIGN}"
 
 #### MENU PANELS
 
-
 # Wraith->Configure
 class WraithConfigPanel(gui.ConfigPanel):
     """ Display Wraith Configuration Panel """
