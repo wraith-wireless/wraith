@@ -24,8 +24,8 @@ import psycopg2 as psql                    # postgresql api
 import psycopg2.extras as pextras          # cursors and such
 import ConfigParser                        # config file parsing
 import threading                           # Threads et al
-import socket                              # sockets (iyri control)
 import select                              # non-blocking poll
+import socket                              # socket errors from C2C
 import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
 from wraith.wifi.interface import radio    # wireless interface details
@@ -1428,21 +1428,21 @@ class C2CPoller(threading.Thread):
 
 class IyriCtrlPanel(gui.SimplePanel):
     """ Display Iyri Control Panel """
-    def __init__(self,tl,chief,port):
+    def __init__(self,tl,chief,sock):
         self._cid = 1                    # current command id
         self._cmds = {}                  # dict of commands entered keyed of cid
         self._imgs = {}                  # store opened image for the buttons
         self._btns = {}                  # buttons
-        self._addr = ('127.0.0.1',port)  # iyri C2C port
-        self._s = None                   # the socket to C2C
+        self._s = sock                   # the socket to C2C
         self._tC2C = None                # polling thread to for socket recv
         self._poison = threading.Event() # poison pill to thread
         gui.SimplePanel.__init__(self,tl,chief,"Iyri Control","widgets/icons/radio.png")
 
+        # during testing make sure we have a socket
+        assert(self._s is not None)
+
         # open socket and start thread
         try:
-            self._s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            self._s.connect(self._addr)
             self._tC2C = C2CPoller(self._poison,self.resultcb,self.errcb,self._s)
             self._tC2C.start()
 
@@ -1548,11 +1548,13 @@ class IyriCtrlPanel(gui.SimplePanel):
         self._cmdline['yscrollcommand'] = sb.set
         sb.grid(row=1,column=1,sticky='nws')
 
+        # disable the output
+        self._cmdout.configure(state=tk.DISABLED)
+
     def close(self):
         """ override close and close socket, quit thread before exiting """
         # kill the thread & close the socket
         self._poison.set()
-        if self._s: self._s.close()
         if self._tC2C: self._tC2C.join()
         gui.SimplePanel.close(self)
 
@@ -1562,12 +1564,10 @@ class IyriCtrlPanel(gui.SimplePanel):
          :param msg: return message from Iyri C2C
         """
         tkns = tokenize(msg)
-        if tkns[CMD_STATUS] == 'Iyri':
-            # successful connect to C2C
-            self.logwrite("Connected to Iyri v{0} C2C".format(tkns[1]),gui.LOG_NOTE)
+        if tkns[CMD_STATUS] == 'Iyri': # successful connect to C2C
+            self.logwrite("Connected to Iyri {0} C2C".format(tkns[1]),gui.LOG_NOTE)
             return
-        elif tkns[CMD_CID] == 0:
-            # 0 cid denotes a startup state request
+        elif tkns[CMD_CID] == 0: # 0 cid denotes a startup state request
             return
 
         # process normally

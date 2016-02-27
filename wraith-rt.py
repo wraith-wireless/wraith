@@ -21,6 +21,7 @@ from PIL import Image,ImageTk              # image input & support
 import ConfigParser                        # config file parsing
 import argparse                            # cmd line arguments
 import getpass                             # get sudo password
+import socket                              # sockets (iyri control)
 import wraith                              # version info/constants
 import wraith.widgets.panel as gui         # graphics suite
 import wraith.subpanels as subgui          # our subpanels
@@ -121,12 +122,14 @@ _STATE_INIT_   = 0
 _STATE_STORE_  = 1
 _STATE_CONN_   = 2
 _STATE_IYRI_   = 3
-_STATE_EXIT_   = 4
-_STATE_FLAGS_NAME_ = ['init','store','conn','iyri','exit']
+_STATE_C2C_    = 4
+_STATE_EXIT_   = 5
+_STATE_FLAGS_NAME_ = ['init','store','conn','iyri','c2c','exit']
 _STATE_FLAGS_ = {'init':(1 << _STATE_INIT_),   # initialized properly
                  'store':(1 << _STATE_STORE_), # storage instance is running (i.e. postgresql)
                  'conn':(1 << _STATE_CONN_),   # connected to storage instance
-                 'iyri':(1 << _STATE_IYRI_),    # at least one sensor is collecting data
+                 'iyri':(1 << _STATE_IYRI_),   # at least one sensor is collecting data
+                 'c2c':(1 << _STATE_C2C_),     # connected to iyri c2c
                  'exit':(1 << _STATE_EXIT_)}   # exiting/shutting down
 
 class WraithPanel(gui.MasterPanel):
@@ -141,6 +144,7 @@ class WraithPanel(gui.MasterPanel):
         self._conf = None   # configuration
         self._bSQL = False  # postgresql was running on startup
         self._pwd = pwd     # sudo password (should we not save it?)
+        self._c2c = None    # c2c socket
 
         # set up super
         gui.MasterPanel.__init__(self,tl,"Wraith  v{0}".format(wraith.__version__),
@@ -161,8 +165,11 @@ class WraithPanel(gui.MasterPanel):
     @property # return {True: connected to backend|False: Not connected to backend}
     def isconnected(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['conn']
 
-    @property # return {True: Iyri is running|False: Iyri is not running|
+    @property # return {True: Iyri is running|False: Iyri is not running}
     def iyriisrunning(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['iyri']
+
+    @property # return {True: Connected to Iyri C2C|False: not connected}
+    def isc2cconnected(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['c2c']
 
     @property # return {True: Wraith is exiting|False: Wraith is not exiting}
     def isexiting(self): return bits.bitmask_list(_STATE_FLAGS_,self._state)['exit']
@@ -189,8 +196,7 @@ class WraithPanel(gui.MasterPanel):
 
     def _create(self):
         # read in conf file, exit on error
-        msgs = [(time.strftime('%H:%M:%S'),
-                 "Wraith v{0}".format(wraith.__version__),gui.LOG_NOERR)]
+        msgs = [(time.strftime('%H:%M:%S'),"Wraith v{0}".format(wraith.__version__),gui.LOG_NOERR)]
         self._conf = readconf()
         if 'err' in self._conf:
             msgs.append((time.strftime('%H:%M:%S'),
@@ -227,8 +233,15 @@ class WraithPanel(gui.MasterPanel):
 
         # Iyri running?
         if cmdline.runningservice(wraith.IYRIPID):
-            msgs.append((time.strftime('%H:%M:%S'),"Iyri running",gui.LOG_NOERR))
+            # iyri is running, connect to C2C
             self._setstate(_STATE_IYRI_)
+            msgs.append((time.strftime('%H:%M:%S'),"Iyri running",gui.LOG_NOERR))
+            self._c2cconnect()
+            flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+            if not flags['c2c']:
+                msgs.append((time.strftime('%H:%M:%S'), "Iyri C2C connected failed",gui.LOG_WARN))
+            else:
+                msgs.append((time.strftime('%H:%M:%S'),"Iyri C2C connected",gui.LOG_NOERR))
         else:
             msgs.append((time.strftime('%H:%M:%S'),"Iyri not running",gui.LOG_WARN))
 
@@ -245,12 +258,13 @@ class WraithPanel(gui.MasterPanel):
 
     def _shutdown(self):
         """ shut down cleanly """
-        self.closepanels()
-        self.setbusy()               # we're busy
-        self._setstate(_STATE_EXIT_) # set the state
-        self._stopsensor()           # shutdown Iyri
-        self._stopstorage()          # shutdown storage
-        self.setbusy(False)          # we're done
+        self.closepanels()              # close out children
+        self.setbusy()                  # we're busy
+        self._setstate(_STATE_EXIT_)    # set the state
+        if self._c2c: self._c2c.close() # quit c2c
+        self._stopsensor()              # shutdown Iyri
+        self._stopstorage()             # shutdown storage
+        self.setbusy(False)             # we're done
 
     def _makemenu(self):
         """ make the menu """
@@ -559,6 +573,7 @@ class WraithPanel(gui.MasterPanel):
     def iyristart(self):
         """ starts Iyri sensor """
         self._startsensor()
+        self._c2cconnect()
         self._updatestate()
         self._menuenable()
 
@@ -572,21 +587,9 @@ class WraithPanel(gui.MasterPanel):
         """ displays Iyri Control Panel """
         panel = self.getpanel('iyrictrl',False)
         if not panel:
-            # determine the address to pass to the panel
-            cp = ConfigParser.RawConfigParser()
-            if not cp.read(wraith.IYRICONF):
-                self.err("File Not Found","File iyri.conf was not found")
-                return
-            port = 2526
-            if cp.has_option('Local','C2C'):
-                try:
-                    port = int(cp.get('Local','C2C'))
-                except ValueError:
-                    self.err("Invalid Specification","C2C port {0} is invalid")
-                    return
-
             t = tk.Toplevel()
-            pnl = subgui.IyriCtrlPanel(t,self,port)
+
+            pnl = subgui.IyriCtrlPanel(t,self,self._c2c)
             self.addpanel(pnl.name,gui.PanelRecord(t,pnl,'iyrictrl'))
         else:
             panel[0].tk.deiconify()
@@ -795,7 +798,7 @@ class WraithPanel(gui.MasterPanel):
         # disconnect from db
         if flags['conn']: self._psqldisconnect()
 
-        # before shutting downpostgresql, confirm auto shutdown is enabled
+        # before shutting down postgresql, confirm auto shutdown is enabled
         if not self._conf['policy']['shutdown']: return
 
         # shutdown postgresql (check first if polite)
@@ -824,6 +827,7 @@ class WraithPanel(gui.MasterPanel):
         self._conn.close()
         self._conn = None
         self._setstate(_STATE_CONN_,False)
+        self._menuenable()
         self.logwrite("Disconnected from Nidus datastore")
 
     def _startsensor(self):
@@ -851,6 +855,9 @@ class WraithPanel(gui.MasterPanel):
                 self.logwrite("Iyri Started")
                 self._setstate(_STATE_IYRI_)
 
+        self._updatestate()
+        self._menuenable()
+
     def _stopsensor(self):
         """ stops the Iyri sensor """
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
@@ -873,6 +880,37 @@ class WraithPanel(gui.MasterPanel):
             else:
                 self._setstate(_STATE_IYRI_,False)
                 self.logwrite("Iyri shut down")
+
+        self._updatestate()
+        self._menuenable()
+
+    def _c2cconnect(self):
+        """ connect to c2c server """
+        # stop if already connected or iyri is not running
+        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
+        if flags['c2c'] or not flags['iyri']: return
+
+        # determine the address of the C2C
+        port = 2526
+        cp = ConfigParser.RawConfigParser()
+        if not cp.read(wraith.IYRICONF):
+            self.logwrite("Iyri.conf was not found",gui.LOG_WARN)
+        else:
+            if cp.has_option('Local','C2C'):
+                try:
+                    port = int(cp.get('Local','C2C'))
+                except ValueError:
+                    self.logwrite("C2C port {0} is invalid",gui.LOG_WARN)
+
+        # connect to socket
+        try:
+            self._c2c = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            self._c2c.connect(('127.0.0.1',port))
+            self._setstate(_STATE_C2C_,True)
+            self._menuenable()
+        except socket.error as e:
+            self.logwrite("Iyri C2C connect failed: {0}".format(e),gui.LOG_ERR)
+            self._c2c = None
 
     def _getpwd(self):
         """ prompts for sudo password until correct or canceled"""

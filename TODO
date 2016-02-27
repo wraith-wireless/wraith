@@ -43,6 +43,7 @@ GUI:
  37) move wraith.log to /var/log/wraith
  38) Poll periodically to check if external process/user started/stopped postgresql
    and iyri
+ 39) need to revamp shutdown procedure
 Iyri:
  26) how to identify gps device failure, removal?
  53) implement spoof, txpwr commands
