@@ -142,7 +142,8 @@ class WraithPanel(gui.MasterPanel):
          pwd: sudo password
         """
         self._conf = None   # configuration
-        self._bSQL = False  # postgresql was running on startup
+        self._bPSQL = False  # postgresql was running on startup
+        self._biyri = False # iyri was running on startup
         self._pwd = pwd     # sudo password (should we not save it?)
         self._c2c = None    # c2c socket
 
@@ -210,7 +211,6 @@ class WraithPanel(gui.MasterPanel):
             msgs.append((time.strftime('%H:%M:%S'),
                          "PostgreSQL running",
                          gui.LOG_NOERR))
-            if not self._pwd: self._bSQL = True
             self._setstate(_STATE_STORE_)
             (self._conn,ret) = cmdline.psqlconnect(self._conf['store'])
             if not self._conn is None:
@@ -782,13 +782,9 @@ class WraithPanel(gui.MasterPanel):
         self._menuenable()
 
     def _stopstorage(self):
-        """ stop posgresql db, nidus storage manager & disconnect """
+        """ stop postgresql db, nidus storage manager & disconnect """
         # if Iyri is running, prompt for clearance
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['iyri']:
-            ans = self.ask('Iyri Running','Quit and lose queued data?')
-            self.update()
-            if ans == 'no': return
 
         # return if no storage component is running
         if not (flags['store'] or flags['conn']): return
@@ -800,21 +796,29 @@ class WraithPanel(gui.MasterPanel):
         if not self._conf['policy']['shutdown']: return
 
         # shutdown postgresql (check first if polite)
-        if self._conf['policy']['polite'] and self._bSQL: return
-        flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['store']:
-            # do we have a password
-            if not self._pwd:
-                pwd = self._getpwd()
-                if pwd is None:
-                    self.logwrite("Password entry canceled.",gui.LOG_WARN)
-                    return
-                self._pwd = pwd
+        if self._conf['policy']['polite'] and self._bPSQL:
+            print 'psql pre-started, not shutting down'
+            return
 
-            self.logwrite("Stopping PostgreSQL...",gui.LOG_NOTE)
-            if not stoppsql(self._pwd):
-                self.logwrite("Failed to stop PostgreSQL",gui.LOG_WARN)
-            else: self.logwrite("PostgreSQL stopped")
+        # get password
+        if not self._pwd:
+            pwd = self._getpwd()
+            if pwd is None:
+                self.logwrite("Password entry canceled.",gui.LOG_WARN)
+                return
+            self._pwd = pwd
+
+        # confirm mandatory iyri shutdown
+        if flags['iyri']:
+            ans = self.ask('Iyri is Running','Quit and lose queued data?')
+            self.update()
+            if ans == 'no': return
+
+        # shut her down
+        self.logwrite("Stopping PostgreSQL...",gui.LOG_NOTE)
+        if not stoppsql(self._pwd):
+            self.logwrite("Failed to stop PostgreSQL",gui.LOG_WARN)
+        else: self.logwrite("PostgreSQL stopped")
 
         self._updatestate()
         self._menuenable()
@@ -999,6 +1003,7 @@ class WraithSplash(object):
             if startpsql(pwd): self._sv.set("PostgreSQL started")
             else: self._sv.set("Failed to start PostgreSQL")
         else:
+            self._wp._bPSQL = True
             self._sv.set("PostgreSQL already running")
         self._bpsql = True
         self._pb.step(2.0)
@@ -1019,6 +1024,7 @@ class WraithSplash(object):
             if cmdline.runningservice(wraith.IYRIPID): self._sv.set("Iyri started")
             else: self._sv.set("Failed to start Iyri")
         else:
+            self._wp._biyri = True
             self._sv.set("Iyri already running")
         self._biyri = True
 
