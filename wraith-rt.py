@@ -965,6 +965,7 @@ class WraithSplash(object):
         self._bconfig = False
         self._bpsql = False
         self._bfinished = False
+
         self._tl.after(1000,self._busy)
 
     def _busy(self):
