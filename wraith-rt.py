@@ -964,8 +964,8 @@ class WraithSplash(object):
         # start 'polling'
         self._bconfig = False
         self._bpsql = False
+        self._biyri = False
         self._bfinished = False
-
         self._tl.after(1000,self._busy)
 
     def _busy(self):
@@ -977,7 +977,8 @@ class WraithSplash(object):
         else:
             if not self._bconfig: self._chkconfig()
             elif not self._bpsql: self._chkpsql()
-            else: self._chkiyri()
+            elif not self._biyri: self._chkiyri()
+            else: self._chkc2c()
             self._tl.after(1000,self._busy)
 
     def _chkconfig(self):
@@ -1004,7 +1005,7 @@ class WraithSplash(object):
 
     def _chkiyri(self):
         self._sv.set("Checking Iyri...")
-        self._pb.step(2.0)
+        self._pb.step(1.0)
         if not cmdline.runningservice(wraith.IYRIPID):
             self._sv.set("Starting Iyri")
             if not startiyri(pwd):
@@ -1019,6 +1020,31 @@ class WraithSplash(object):
             else: self._sv.set("Failed to start Iyri")
         else:
             self._sv.set("Iyri already running")
+        self._biyri = True
+
+    def _chkc2c(self):
+        self._sv.set("Checking Iyri C2C connection...")
+        self._pb.step(1.0)
+        if cmdline.runningservice(wraith.IYRIPID):
+            if not self._wp._c2c:
+                self._sv.set("Connecting to Iyri C2C...")
+                self._wp._c2cconnect()
+                time.sleep(0.5)
+                if self._wp.isc2cconnected:
+                    ivers = ''
+                    while len(ivers) == 0 or ivers[-1:] != '\n':
+                        data = self._wp._c2c.recv(256)
+                        if not data:
+                            self._sv.set("Lost connection to Iyri C2C")
+                        ivers += data
+                    if ivers:
+                        self._sv.set("Connected to {0} C2C".format(ivers))
+                else:
+                    self._sv.set("Check Iyri C2C connection")
+            else:
+                self._sv.set("Already connected to Iyri C2C")
+        else:
+            self._sv.set("Iyri stopped. Not connecting to C2C")
         self._bfinished = True
 
 if __name__ == '__main__':
