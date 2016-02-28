@@ -728,8 +728,7 @@ class WraithPanel(gui.MasterPanel):
             # cannot start/stop/control Iyri unless postgres is running
             self._mnuIyri.entryconfig(0,state=tk.DISABLED)  # start
             self._mnuIyri.entryconfig(1,state=tk.DISABLED)  # stop
-            #### TODO: uncomment below after test ctrl panel
-            #self._mnuIyri.entryconfig(3,state=tk.DISABLED)  # ctrl panel
+            self._mnuIyri.entryconfig(3,state=tk.DISABLED)  # ctrl panel
             self._mnuIyriLog.entryconfig(1,state=tk.NORMAL) # clear log
             self._mnuIyri.entryconfig(7,state=tk.NORMAL)    # configure
         else:
@@ -744,8 +743,7 @@ class WraithPanel(gui.MasterPanel):
                 # Iyri sensor is not running
                 self._mnuIyri.entryconfig(0,state=tk.NORMAL)    # start
                 self._mnuIyri.entryconfig(1,state=tk.DISABLED)  # stop
-                #### TODO: uncomment below after test ctrl panel
-                #self._mnuIyri.entryconfig(3,state=tk.DISABLED)  # ctrl panel
+                self._mnuIyri.entryconfig(3,state=tk.DISABLED)  # ctrl panel
                 self._mnuIyriLog.entryconfig(1,state=tk.NORMAL) # clear log
                 self._mnuIyri.entryconfig(7,state=tk.NORMAL)    # configure
 
