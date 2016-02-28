@@ -796,9 +796,7 @@ class WraithPanel(gui.MasterPanel):
         if not self._conf['policy']['shutdown']: return
 
         # shutdown postgresql (check first if polite)
-        if self._conf['policy']['polite'] and self._bPSQL:
-            print 'psql pre-started, not shutting down'
-            return
+        if self._conf['policy']['polite'] and self._bPSQL: return
 
         # get password
         if not self._pwd:
