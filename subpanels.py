@@ -1566,14 +1566,13 @@ class IyriCtrlPanel(gui.SimplePanel):
          callback to notify this control panel that C2C has returned data
          :param msg: return message from Iyri C2C
         """
-        msgs = msg.split('\n')
         # get tokens, attempt to make cid int
         tkns = tokenize(msg)
         print 'result = ', tkns
         try:
             cid = int(tkns[CMD_CID])
         except:
-            pass
+            cid = tkns[CMD_CID]
 
         if tkns[CMD_STATUS] == 'Iyri': # successful connect to C2C
             self.logwrite("Connected to Iyri {0} C2C".format(tkns[1]),gui.LOG_NOTE)
@@ -1581,19 +1580,29 @@ class IyriCtrlPanel(gui.SimplePanel):
         elif cid == 0: # 0 cid denotes a startup state request
             #['ERR', '0', 'shama', 'shama radio not present']
             #['OK', '0', 'abad', 'pause ch 1:None txpwr 30']
+            # TODO: use state returns to enable/disable buttons on radio(s)
+            # that are present
             print tkns
             if tkns[CMD_STATUS] == 'ERR':
-                pre = 's' if tkns[CMD_RDO] == 'shama' else 'a'
+                if tkns[CMD_RDO] == 'shama': pre = 's'
+                elif tkns[CMD_RDO] == 'abad': pre = 'a'
+                else: return # do nothing for now
                 for btn in self._btns:
                     if btn.startswith(pre):
                         self._btns[btn].configure(state=tk.DISABLED)
-            #if tkns[CMD_RDO] == 'abad':
-            #    print tkns
-            #elif tkns[CMD_RDO] == 'shama':
-            #    if tkns[CMD_STATUS] == 'ERR': pass
-
+            return
 
         # process normally
+        if cid in self._cmds:
+            cmd = self._cmds[cid]
+            del self._cmds[cid]
+
+        n = self._cmdout.index('end - 1 line').split('.')[0]
+        self._cmdout.configure(state=tk.NORMAL)
+        if n == 5: self._cmdout.delete(1.0,2.0)
+        #if self._cmdout.index('end-1c') != '1.0': self._cmdout.insert('end','\n')
+        self._cmdout.insert('end',"<{1}> {2}\n".format(tkns[CMD_STATUS],tkns[CMD_MSG]))
+        self._cmdout.configure(state=tk.DISABLED)
 
     def errcb(self,err):
         """
@@ -1616,9 +1625,10 @@ class IyriCtrlPanel(gui.SimplePanel):
                 ps = " " + dlg.params
             except AttributeError:
                 return
-        msg = "!{0} {1} {2}{3}\n".format(self._cid,cmd,rdo,ps)
+        msg = "!{0} {1} {2}{3}".format(self._cid,cmd,rdo,ps)
         self._cmds[self._cid] = msg
         self._cid += 1
+        self._s.send(msg)
 
     def runmultiple(self):
         """ executes multiple commands (from command line widget) """
