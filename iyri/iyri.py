@@ -622,7 +622,7 @@ class Iryi(object):
 
         radio = tkns[2].strip().lower()
         if radio not in ['both','all','abad','shama']:
-            resp = "ERR {0} \001invalid radio spec: {1} \001\n".format(cmdid,radio)
+            resp = "ERR {0} {1} \001invalid radio spec: {1}\001\n".format(cmdid,radio)
             self._pConns['c2c'].send(resp)
             return None,None,None,None
 

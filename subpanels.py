@@ -1304,8 +1304,9 @@ def tokenize(d):
         else:
             token += i
 
-    # append any 'hanging' tokens
+    # append any 'hanging' tokens & enforce length of 4
     if token: newd.append(token)
+    while len(newd) < 4: newd.append('')
     return newd
 
 class _ParamDialog(tkSD.Dialog):
@@ -1410,7 +1411,9 @@ class C2CPoller(threading.Thread):
 
                 if self._s in rs:
                     msg = self._recvmsg()
-                    if msg: self._rcb(msg)
+                    if msg:
+                        print 'sending msg: ', msg
+                        self._rcb(msg)
             except RuntimeError:
                 self._ecb("C2C server quit")
                 break
@@ -1563,12 +1566,32 @@ class IyriCtrlPanel(gui.SimplePanel):
          callback to notify this control panel that C2C has returned data
          :param msg: return message from Iyri C2C
         """
+        msgs = msg.split('\n')
+        # get tokens, attempt to make cid int
         tkns = tokenize(msg)
+        print 'result = ', tkns
+        try:
+            cid = int(tkns[CMD_CID])
+        except:
+            pass
+
         if tkns[CMD_STATUS] == 'Iyri': # successful connect to C2C
             self.logwrite("Connected to Iyri {0} C2C".format(tkns[1]),gui.LOG_NOTE)
             return
-        elif tkns[CMD_CID] == 0: # 0 cid denotes a startup state request
-            return
+        elif cid == 0: # 0 cid denotes a startup state request
+            #['ERR', '0', 'shama', 'shama radio not present']
+            #['OK', '0', 'abad', 'pause ch 1:None txpwr 30']
+            print tkns
+            if tkns[CMD_STATUS] == 'ERR':
+                pre = 's' if tkns[CMD_RDO] == 'shama' else 'a'
+                for btn in self._btns:
+                    if btn.startswith(pre):
+                        self._btns[btn].configure(state=tk.DISABLED)
+            #if tkns[CMD_RDO] == 'abad':
+            #    print tkns
+            #elif tkns[CMD_RDO] == 'shama':
+            #    if tkns[CMD_STATUS] == 'ERR': pass
+
 
         # process normally
 
