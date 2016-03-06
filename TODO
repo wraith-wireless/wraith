@@ -45,7 +45,6 @@ GUI:
    and iyri
  39) need to revamp shutdown procedure
  40) add a splash on shutdown to annotate procedures?
- 41) Need to fix comms betw/ control panel and iyri C2C
 Iyri:
  26) how to identify gps device failure, removal?
  53) implement spoof, txpwr commands

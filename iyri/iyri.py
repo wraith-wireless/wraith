@@ -622,7 +622,7 @@ class Iryi(object):
 
         radio = tkns[2].strip().lower()
         if radio not in ['both','all','abad','shama']:
-            resp = "ERR {0} {1} \001invalid radio spec: {1}\001\n".format(cmdid,radio)
+            resp = "ERR {0} {1} \001invalid radio spec\001\n".format(cmdid,radio)
             self._pConns['c2c'].send(resp)
             return None,None,None,None
 
@@ -644,7 +644,7 @@ class Iryi(object):
             return None,None,None,None
 
         if cmd == 'txpwr' or cmd == 'spoof':
-            resp = "ERR {0} {1} \001{1} not implemented\001\n".format(cmdid,radio,cmd)
+            resp = "ERR {0} {1} \001{2} not implemented\001\n".format(cmdid,radio,cmd)
             self._pConns['c2c'].send(resp)
             return None,None,None,None
 

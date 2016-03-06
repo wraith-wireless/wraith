@@ -1450,8 +1450,10 @@ class IyriCtrlPanel(gui.SimplePanel):
             self._tC2C.start()
 
             # get current states
-            self._s.send("!0 state abad\n")
-            self._s.send("!0 state shama\n")
+            astate = "!0 state abad\n"
+            sstate = "!0 state shama\n"
+            self._s.send(astate)
+            self._s.send(sstate)
         except socket.error as e:
             self.logwrite("Iyri socket failed: {0}".format(e),gui.LOG_ERR)
             self._s = None
@@ -1601,7 +1603,7 @@ class IyriCtrlPanel(gui.SimplePanel):
         self._cmdout.configure(state=tk.NORMAL)
         if n == 5: self._cmdout.delete(1.0,2.0)
         #if self._cmdout.index('end-1c') != '1.0': self._cmdout.insert('end','\n')
-        self._cmdout.insert('end',"<{1}> {2}\n".format(tkns[CMD_STATUS],tkns[CMD_MSG]))
+        self._cmdout.insert('end',"<{0}> {1}\n".format(tkns[CMD_STATUS],tkns[CMD_MSG]))
         self._cmdout.configure(state=tk.DISABLED)
 
     def errcb(self,err):
@@ -1625,7 +1627,7 @@ class IyriCtrlPanel(gui.SimplePanel):
                 ps = " " + dlg.params
             except AttributeError:
                 return
-        msg = "!{0} {1} {2}{3}".format(self._cid,cmd,rdo,ps)
+        msg = "!{0} {1} {2}{3}\n".format(self._cid,cmd,rdo,ps)
         self._cmds[self._cid] = msg
         self._cid += 1
         self._s.send(msg)
