@@ -1278,36 +1278,41 @@ CMD_STATUS = 0 # status of command
 CMD_CID    = 1 # command id
 CMD_RDO    = 2 # radio
 CMD_MSG    = 3 # msg
-def tokenize(d):
+def tokenize(ds):
     """
      tokenize: parses string C2C data into tokens and returns the token list
-     :param d: C2C data
+     :param ds: C2C data
+     :returns: a list of token lists
     """
-    newd = []    # list of parsed tokens
-    token = ''   # individual token
-    buff = False # buffer '\x01' has been seen
+    ts = []
+    ds = ds.split('\n')[:-1]
+    for d in ds:
+        newd = []    # list of parsed tokens
+        token = ''   # individual token
+        buff = False # buffer '\x01' has been seen
 
-    # for each char in data string d
-    d = d.strip() # remove the trailing newline
-    for i in d:
-        # if char is a buff, flip buff value
-        # if char is a space and buff is true keep it
-        # if char is a space and not buff, append the new token & make new
-        # otherwise append the char to current token
-        if i == '\x01':
-            buff = False if buff else True
-        elif i == ' ':
-            if buff: token += i
+        # for each char in data string d
+        d = d.strip() # remove the trailing newline
+        for i in d:
+            # if char is a buff, flip buff value
+            # if char is a space and buff is true keep it
+            # if char is a space and not buff, append the new token & make new
+            # otherwise append the char to current token
+            if i == '\x01':
+                buff = False if buff else True
+            elif i == ' ':
+                if buff: token += i
+                else:
+                    newd.append(token)
+                    token = ''
             else:
-                newd.append(token)
-                token = ''
-        else:
-            token += i
+                token += i
 
-    # append any 'hanging' tokens & enforce length of 4
-    if token: newd.append(token)
-    while len(newd) < 4: newd.append('')
-    return newd
+        # append any 'hanging' tokens & enforce length of 4
+        if token: newd.append(token)
+        while len(newd) < 4: newd.append('')
+        ts.append(newd)
+    return ts
 
 class _ParamDialog(tkSD.Dialog):
     """ _ParamDialog - (Modal) prompts user for command parameters """
@@ -1570,6 +1575,68 @@ class IyriCtrlPanel(gui.SimplePanel):
         """
         # get tokens, attempt to make cid int
         tkns = tokenize(msg)
+        for tkn in tkns: self._results(tkn)
+
+    def errcb(self,err):
+        """
+         callback to notify this control panel that C2C has an error
+         :param err: return message from Iyri C2C
+        """
+        self.logwrite(err,gui.LOG_WARN)
+
+    def runsingle(self,cmd,rdo,ps=None):
+        """
+         execute a single command
+         :param cmd: command to run
+         :param rdo: radio to run command on
+         :param ps: params (if any)
+        """
+        ps = ''
+        if cmd in ['listen','txpwr','spoof']:
+            dlg = _ParamDialog(self,cmd)
+            try:
+                ps = " " + dlg.params
+            except AttributeError:
+                return
+        msg = "!{0} {1} {2}{3}\n".format(self._cid,cmd,rdo,ps)
+        self._cmds[self._cid] = msg
+        self._cid += 1
+        try:
+            self._s.send(msg)
+        except socket.error as e:
+            self.logwrite("Control Panel: {0}".format(e),gui.LOG_WARN)
+
+    def runmultiple(self):
+        """ executes multiple commands (from command line widget) """
+        # pullout indiviudal cmds
+        cmds = []
+        lines = self._cmdline.get('1.0','end')
+        lines = lines.split('\n')
+        for line in lines:
+            if not line: break
+            line = line.split(' ')
+            if len(line) < 2: continue
+            elif len(line) == 2: ps = ''
+            elif len(line) == 3: ps = " " + line[2]
+            else: continue
+            msg = "!{0} {1} {2}{3}\n".format(self._cid,line[0],line[1],ps)
+            cmds.append(msg)
+            self._cmds[self._cid] = msg
+            self._cid += 1
+        self._cmdline.delete('1.0','end')
+
+        # & execute
+        for cmd in cmds:
+            try:
+                self._s.send(cmd)
+            except socket.error as e:
+                self.logwrite("Control Panel: {0}".format(e),gui.LOG_WARN)
+
+    def _results(self,tkns):
+        """
+         process results from Iyri C2C
+         :param tkns: tokenized response from C2C
+        """
         print 'result = ', tkns
         try:
             cid = int(tkns[CMD_CID])
@@ -1605,47 +1672,6 @@ class IyriCtrlPanel(gui.SimplePanel):
         #if self._cmdout.index('end-1c') != '1.0': self._cmdout.insert('end','\n')
         self._cmdout.insert('end',"<{0}> {1}\n".format(tkns[CMD_STATUS],tkns[CMD_MSG]))
         self._cmdout.configure(state=tk.DISABLED)
-
-    def errcb(self,err):
-        """
-         callback to notify this control panel that C2C has an error
-         :param err: return message from Iyri C2C
-        """
-        self.logwrite(err,gui.LOG_WARN)
-
-    def runsingle(self,cmd,rdo,ps=None):
-        """
-         execute a single command
-         :param cmd: command to run
-         :param rdo: radio to run command on
-         :param ps: params (if any)
-        """
-        ps = ''
-        if cmd in ['listen','txpwr','spoof']:
-            dlg = _ParamDialog(self,cmd)
-            try:
-                ps = " " + dlg.params
-            except AttributeError:
-                return
-        msg = "!{0} {1} {2}{3}\n".format(self._cid,cmd,rdo,ps)
-        self._cmds[self._cid] = msg
-        self._cid += 1
-        self._s.send(msg)
-
-    def runmultiple(self):
-        """ executes multiple commands (from command line widget) """
-        cmds = self._cmdline.get('1.0','end')
-        cmds = cmds.split('\n')
-        for cmd in cmds:
-            cmd = cmd.split(' ')
-            if len(cmd) < 2: continue
-            elif len(cmd) == 2: ps = ''
-            elif len(cmd) == 3: ps = " " + cmd[2]
-            else: continue
-            msg = "!{0} {1} {2}{3}\n".format(self._cid,cmd[0],cmd[1],ps)
-            self._cmds[self._cid] = msg
-            self._cid += 1
-        self._cmdline.delete('1.0','end')
 
 # Iyri->Config
 class IyriConfigException(Exception): pass
