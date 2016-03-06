@@ -1547,11 +1547,11 @@ class IyriCtrlPanel(gui.SimplePanel):
         nb.add(frmC,text="Multiple")
 
         # output and scrollbar
-        self._cmdout = tk.Text(self,width=30,height=4)
-        self._cmdout.grid(row=1,column=0,sticky='nwse')
-        sb = ttk.Scrollbar(self,command=self._cmdline.yview)
-        self._cmdline['yscrollcommand'] = sb.set
-        sb.grid(row=1,column=1,sticky='nws')
+        self._cmdout = tk.Text(self,width=30,height=5)
+        self._cmdout.grid(row=1,column=0,columnspan=2,sticky='nwse')
+        #sb = ttk.Scrollbar(self,command=self._cmdline.yview)
+        #self._cmdline['yscrollcommand'] = sb.set
+        #sb.grid(row=1,column=1,sticky='nws')
 
         # disable the output
         self._cmdout.configure(state=tk.DISABLED)
