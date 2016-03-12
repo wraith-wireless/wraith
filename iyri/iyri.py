@@ -43,7 +43,7 @@ logging.config.fileConfig(logpath)
   Messages from client must be in the following format
    !<id> <cmd> <radio> [params]\n
   where:
-   id is an integer (unique)
+   id is an integer (unique) >= 0
    cmd is oneof {state|scan|hold|listen|pause|txpwr|spoof}
    radio is oneof {both|all|abad|shama} where both enforces abad and
     shama radio and all enforces shama only if present
@@ -56,7 +56,8 @@ logging.config.fileConfig(logpath)
  Iryi will notify the client if the cmd specified by id is invalid or valid with
   OK <id> <rdo> [\001output\001] or
   ERR <id> <rdo> \001Reason for Failure\001
-If the command was invalid and no command id could be read it will be set to '?'
+ NOTE: If the command was invalid & no command id could be read it will be set to '?'
+ Iyri will also send an initial version message on connect with cid -1
 
 Note: Iryi only allows one client connection at a time
 """
@@ -92,7 +93,7 @@ class C2C(threading.Thread):
                 elif self._sock and not self._caddr:
                     if self._accept():
                         logging.info("Client %s connected",self.clientstr)
-                        self._send("Iyri v{0}\n".format(ivers))
+                        self._send("OK {0} sensor \001Iyri v{1}\001\n".format(-1,ivers))
 
                 # prepare inputs
                 ins = [self._cI,self._csock] if self._csock else [self._cI]

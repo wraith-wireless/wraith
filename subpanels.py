@@ -1416,9 +1416,7 @@ class C2CPoller(threading.Thread):
 
                 if self._s in rs:
                     msg = self._recvmsg()
-                    if msg:
-                        print 'sending msg: ', msg
-                        self._rcb(msg)
+                    if msg: self._rcb(msg)
             except RuntimeError:
                 self._ecb("C2C server quit")
                 break
@@ -1446,22 +1444,13 @@ class IyriCtrlPanel(gui.SimplePanel):
         self._poison = threading.Event() # poison pill to thread
         gui.SimplePanel.__init__(self,tl,chief,"Iyri Control","widgets/icons/radio.png")
 
-        # during testing make sure we have a socket
-        assert(self._s is not None)
+        # start the C2C listener
+        self._tC2C = C2CPoller(self._poison,self.resultcb,self.errcb,self._s)
+        self._tC2C.start()
 
-        # open socket and start thread
-        try:
-            self._tC2C = C2CPoller(self._poison,self.resultcb,self.errcb,self._s)
-            self._tC2C.start()
-
-            # get current states
-            astate = "!0 state abad\n"
-            sstate = "!0 state shama\n"
-            self._s.send(astate)
-            self._s.send(sstate)
-        except socket.error as e:
-            self.logwrite("Iyri socket failed: {0}".format(e),gui.LOG_ERR)
-            self._s = None
+        # getting occasional weird responses
+        assert(self._s is not None) # during testing make sure we have a socket
+        self.after(1,self._sensorstate)
 
     def _body(self):
         """ make the gui """
@@ -1535,6 +1524,12 @@ class IyriCtrlPanel(gui.SimplePanel):
             self._btns['stxpwr'].grid(row=1,column=4)
             self._btns['sspoof'].grid(row=1,column=5)
             self._btns['sstate'].grid(row=1,column=6)
+
+        # output
+        self._cmdout = tk.Text(frmO,width=32,height=1)
+        self._cmdout.grid(row=0,column=0,sticky='nwse')
+        self._cmdout.configure(state=tk.DISABLED)
+
         nb.add(frmV,text="Single")
 
         # Multiple - can enter multiple commands to be executed in order
@@ -1544,22 +1539,12 @@ class IyriCtrlPanel(gui.SimplePanel):
         self._cmdline.grid(row=0,column=0,sticky='nw')
         try:
             self._imgs['run'] = PhotoImage(imgopen('widgets/icons/irun.png'))
-            self._btnRun = ttk.Button(frmC,image=self._imgs['run'],command=self.runmultiple)
+            self._btnRun = ttk.Button(frmC,image=self._imgs['run'],command=self.unimplemented)
         except:
-            self._btnRun = ttk.Button(frmC,width=1,text='!',command=self.runmultiple)
+            self._btnRun = ttk.Button(frmC,width=1,text='!',command=self.unimplemented)
         finally:
             self._btnRun.grid(row=0,column=1,sticky='nw')
         nb.add(frmC,text="Multiple")
-
-        # output and scrollbar
-        self._cmdout = tk.Text(self,width=30,height=5)
-        self._cmdout.grid(row=1,column=0,columnspan=2,sticky='nwse')
-        #sb = ttk.Scrollbar(self,command=self._cmdline.yview)
-        #self._cmdline['yscrollcommand'] = sb.set
-        #sb.grid(row=1,column=1,sticky='nws')
-
-        # disable the output
-        self._cmdout.configure(state=tk.DISABLED)
 
     def close(self):
         """ override close and close socket, quit thread before exiting """
@@ -1643,8 +1628,7 @@ class IyriCtrlPanel(gui.SimplePanel):
         except:
             cid = tkns[CMD_CID]
 
-        if tkns[CMD_STATUS] == 'Iyri': # successful connect to C2C
-            self.logwrite("Connected to Iyri {0} C2C".format(tkns[1]),gui.LOG_NOTE)
+        if cid == -1: # -1 cid denotes initial connect vesion message
             return
         elif cid == 0: # 0 cid denotes a startup state request
             #['ERR', '0', 'shama', 'shama radio not present']
@@ -1666,12 +1650,21 @@ class IyriCtrlPanel(gui.SimplePanel):
             cmd = self._cmds[cid]
             del self._cmds[cid]
 
-        n = self._cmdout.index('end - 1 line').split('.')[0]
         self._cmdout.configure(state=tk.NORMAL)
-        if n == 5: self._cmdout.delete(1.0,2.0)
-        #if self._cmdout.index('end-1c') != '1.0': self._cmdout.insert('end','\n')
         self._cmdout.insert('end',"<{0}> {1}\n".format(tkns[CMD_STATUS],tkns[CMD_MSG]))
         self._cmdout.configure(state=tk.DISABLED)
+
+    def _sensorstate(self):
+        """ send state requests to C2C """
+        try:
+            # get current states
+            astate = "!0 state abad\n"
+            sstate = "!0 state shama\n"
+            self._s.send(astate)
+            self._s.send(sstate)
+        except socket.error as e:
+            self.logwrite("Iyri socket failed: {0}".format(e),gui.LOG_ERR)
+            self._s = None
 
 # Iyri->Config
 class IyriConfigException(Exception): pass

@@ -43,8 +43,14 @@ GUI:
  37) move wraith.log to /var/log/wraith
  38) Poll periodically to check if external process/user started/stopped postgresql
    and iyri
- 39) need to revamp shutdown procedure
- 40) add a splash on shutdown to annotate procedures?
+ 39) need to revamp shutdown procedure - add a splash on shutdown to annotate
+    procedures?
+ 40) Occasionally getting the following on connect to Iyri C2C
+    result =  ['OK', '-1', 'sensor', 'Iyri v0.2.1']
+    result =  ['ERR', '0', 'abad', '']
+    ['ERR', '0', 'abad', '']
+    result =  ['!0', 'invalid radio spec', '', '']
+
 Iyri:
  26) how to identify gps device failure, removal?
  53) implement spoof, txpwr commands
