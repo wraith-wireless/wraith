@@ -1424,8 +1424,6 @@ class IyriCtrlPanel(gui.SimplePanel):
         self._cmds = {}                  # dict of commands entered keyed of cid
         self._imgs = {}                  # store opened image for the buttons
         self._btns = {}                  # buttons
-        self._rdos = {'abad':None,       # radio states
-                      'shama':None}
         self._s = sock                   # the socket to C2C
         self._tC2C = None                # polling thread to for socket recv
         self._poison = threading.Event() # poison pill to thread

@@ -272,7 +272,7 @@ class Panel(ttk.Frame):
 
     # message box methods
     # below, t=title, m=message and opts = additional options
-    #def err(self,t,m): tkMB.showerror(t,m,parent=self)
+    def err(self,t,m): tkMB.showerror(t,m,parent=self)
     def warn(self,t,m): tkMB.showwarning(t,m,parent=self)
     def info(self,t,m): tkMB.showinfo(t,m,parent=self)
     def ask(self,t,m,opts=None):
