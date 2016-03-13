@@ -272,7 +272,7 @@ class Panel(ttk.Frame):
 
     # message box methods
     # below, t=title, m=message and opts = additional options
-    def err(self,t,m): tkMB.showerror(t,m,parent=self)
+    #def err(self,t,m): tkMB.showerror(t,m,parent=self)
     def warn(self,t,m): tkMB.showwarning(t,m,parent=self)
     def info(self,t,m): tkMB.showinfo(t,m,parent=self)
     def ask(self,t,m,opts=None):
@@ -1026,10 +1026,7 @@ class MasterPanel(Panel):
          :param mtype: level of message
         """
         log = self.getpanel("log",True)
-        if log:
-            log.logwrite(msg,mtype)
-        elif mtype == LOG_ERR:
-             self.err('Error',msg)
+        if log: log.logwrite(msg,mtype)
 
     # Panel accessors
 

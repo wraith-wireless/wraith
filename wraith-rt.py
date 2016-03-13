@@ -258,11 +258,14 @@ class WraithPanel(gui.MasterPanel):
 
     def _shutdown(self):
         """ shut down cleanly """
+        print 'shutting down'
         self.closepanels()              # close out children
         self.setbusy()                  # we're busy
         self._setstate(_STATE_EXIT_)    # set the state
         if self._c2c: self._c2c.close() # quit c2c
+        print 'stopping sensor'
         self._stopsensor()              # shutdown Iyri
+        print 'stopping storage'
         self._stopstorage()             # shutdown storage
         self.setbusy(False)             # we're done
 
@@ -792,10 +795,7 @@ class WraithPanel(gui.MasterPanel):
         # disconnect from db
         if flags['conn']: self._psqldisconnect()
 
-        # before shutting down postgresql, confirm auto shutdown is enabled
-        if not self._conf['policy']['shutdown']: return
-
-        # shutdown postgresql (check first if polite)
+        # check first if polite
         if self._conf['policy']['polite'] and self._bPSQL: return
 
         # get password
@@ -861,25 +861,28 @@ class WraithPanel(gui.MasterPanel):
     def _stopsensor(self):
         """ stops the Iyri sensor """
         flags = bits.bitmask_list(_STATE_FLAGS_,self._state)
-        if flags['iyri']:
-            # do we have a password
-            if not self._pwd:
-                pwd = self._getpwd()
-                if pwd is None:
-                    self.logwrite("Password entry canceled. Cannot continue",
-                                  gui.LOG_WARN)
-                    return
-                self._pwd = pwd
+        if not flags['iyri']: return
 
-            # stop the sensor
-            try:
-                self.logwrite("Shutting down Iyri...",gui.LOG_NOTE)
-                cmdline.service('iyrid',self._pwd,False)
-            except RuntimeError as e:
-                self.logwrite("Error shutting down Iyri: {0}".format(e),gui.LOG_ERR)
-            else:
-                self._setstate(_STATE_IYRI_,False)
-                self.logwrite("Iyri shut down")
+        # check first if polite
+        if self._conf['policy']['polite'] and self._biyri: return
+
+        # do we have a password
+        if not self._pwd:
+            pwd = self._getpwd()
+            if pwd is None:
+                self.logwrite("Password entry canceled. Cannot continue",gui.LOG_WARN)
+                return
+            self._pwd = pwd
+
+        # stop the sensor
+        try:
+            self.logwrite("Shutting down Iyri...",gui.LOG_NOTE)
+            cmdline.service('iyrid',self._pwd,False)
+        except RuntimeError as e:
+            self.logwrite("Error shutting down Iyri: {0}".format(e),gui.LOG_ERR)
+        else:
+            self._setstate(_STATE_IYRI_,False)
+            self.logwrite("Iyri shut down")
 
         self._updatestate()
         self._menuenable()

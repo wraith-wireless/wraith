@@ -79,15 +79,6 @@ class WraithConfigPanel(gui.ConfigPanel):
         ttk.Radiobutton(frmP,text='On',variable=self._vpolite,value=1).grid(row=0,column=1,sticky='w')
         ttk.Radiobutton(frmP,text='Off',variable=self._vpolite,value=0).grid(row=1,column=1,sticky='w')
 
-        # separator label
-        ttk.Label(frmP,text=" ").grid(row=0,column=2)
-
-        # shutdown
-        ttk.Label(frmP,text="Shutdown:").grid(row=0,column=3,sticky='w')
-        self._vstop = tk.IntVar(self)
-        ttk.Radiobutton(frmP,text='Auto',variable=self._vstop,value=1).grid(row=0,column=4,sticky='w')
-        ttk.Radiobutton(frmP,text='Manual',variable=self._vstop,value=0).grid(row=1,column=4,sticky='w')
-
     def _initialize(self):
         """ insert values from config file into entry boxes """
         conf = ConfigParser.RawConfigParser()
@@ -115,11 +106,6 @@ class WraithConfigPanel(gui.ConfigPanel):
             self._vpolite.set(0)
         else:
             self._vpolite.set(1)
-
-        if conf.has_option('Policy','shutdown') and conf.get('Policy','shutdown').lower() == 'manual':
-            self._vstop.set(0)
-        else:
-            self._vstop.set(1)
 
     def _validate(self):
         """ validate entries """
@@ -156,7 +142,6 @@ class WraithConfigPanel(gui.ConfigPanel):
             cp.set('Storage','pwd',self._entUser.get())
             cp.add_section('Policy')
             cp.set('Policy','polite','on' if self._vpolite else 'off')
-            cp.set('Policy','shutdown','auto' if self._vstop else 'manual')
             fout = open(wraith.WRAITHCONF,'w')
             cp.write(fout)
         except IOError as e:
