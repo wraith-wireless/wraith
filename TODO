@@ -6,7 +6,6 @@ Overall:
   4) add a program that will kill all iyri related processes (in the event of
    unresponsive children)
   5) manufacturer for nics
-    o remove manuf column from sta Table
     o add a manufacturer Table w/ oui, name columns
     o modify fetchoui to write to database rather than file
 GUI:
@@ -45,11 +44,6 @@ GUI:
    and iyri
  39) need to revamp shutdown procedure - add a splash on shutdown to annotate
     procedures?
- 40) Occasionally getting the following on connect to Iyri C2C
-    result =  ['OK', '-1', 'sensor', 'Iyri v0.2.1']
-    result =  ['ERR', '0', 'abad', '']
-    ['ERR', '0', 'abad', '']
-    result =  ['!0', 'invalid radio spec', '', '']
 
 Iyri:
  26) how to identify gps device failure, removal?
