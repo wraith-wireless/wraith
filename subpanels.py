@@ -1439,6 +1439,8 @@ class IyriCtrlPanel(gui.SimplePanel):
         self._cmds = {}                  # dict of commands entered keyed of cid
         self._imgs = {}                  # store opened image for the buttons
         self._btns = {}                  # buttons
+        self._rdos = {'abad':None,       # radio states
+                      'shama':None}
         self._s = sock                   # the socket to C2C
         self._tC2C = None                # polling thread to for socket recv
         self._poison = threading.Event() # poison pill to thread
@@ -1450,7 +1452,7 @@ class IyriCtrlPanel(gui.SimplePanel):
 
         # getting occasional weird responses
         assert(self._s is not None) # during testing make sure we have a socket
-        self.after(1,self._sensorstate)
+        self._sensorstate()
 
     def _body(self):
         """ make the gui """
@@ -1526,7 +1528,7 @@ class IyriCtrlPanel(gui.SimplePanel):
             self._btns['sstate'].grid(row=1,column=6)
 
         # output
-        self._cmdout = tk.Text(frmO,width=32,height=1)
+        self._cmdout = tk.Entry(frmO,width=28)
         self._cmdout.grid(row=0,column=0,sticky='nwse')
         self._cmdout.configure(state=tk.DISABLED)
 
@@ -1584,7 +1586,7 @@ class IyriCtrlPanel(gui.SimplePanel):
             except AttributeError:
                 return
         msg = "!{0} {1} {2}{3}\n".format(self._cid,cmd,rdo,ps)
-        self._cmds[self._cid] = msg
+        self._cmds[self._cid] = (cmd,rdo,ps)
         self._cid += 1
         try:
             self._s.send(msg)
@@ -1622,46 +1624,57 @@ class IyriCtrlPanel(gui.SimplePanel):
          process results from Iyri C2C
          :param tkns: tokenized response from C2C
         """
-        print 'result = ', tkns
         try:
             cid = int(tkns[CMD_CID])
         except:
-            cid = tkns[CMD_CID]
+            # this is a hack. For whatever reason, some (initial) state requests
+            # are formatted wrong on send or recieve (cannot figure out where)
+            # if we get one of those, try and resubmit the initial sensor request
+            self._sensorstate()
+            return
 
         if cid == -1: # -1 cid denotes initial connect vesion message
             return
         elif cid == 0: # 0 cid denotes a startup state request
-            #['ERR', '0', 'shama', 'shama radio not present']
+            #['ERR', '0', 'shama', 'radio not present']
             #['OK', '0', 'abad', 'pause ch 1:None txpwr 30']
             # TODO: use state returns to enable/disable buttons on radio(s)
             # that are present
-            print tkns
+            if tkns[CMD_RDO] == 'shama': pre = 's'
+            elif tkns[CMD_RDO] == 'abad': pre = 'a'
             if tkns[CMD_STATUS] == 'ERR':
-                if tkns[CMD_RDO] == 'shama': pre = 's'
-                elif tkns[CMD_RDO] == 'abad': pre = 'a'
-                else: return # do nothing for now
                 for btn in self._btns:
                     if btn.startswith(pre):
                         self._btns[btn].configure(state=tk.DISABLED)
+            else:
+                for btn in self._btns:
+                    if btn.startswith(pre):
+                        self._btns[btn].configure(state=tk.NORMAL)
             return
 
         # process normally
         if cid in self._cmds:
-            cmd = self._cmds[cid]
+            # get the originating cmd & delete from history
+            (cmd,rdo,ps) = self._cmds[cid]
             del self._cmds[cid]
 
-        self._cmdout.configure(state=tk.NORMAL)
-        self._cmdout.insert('end',"<{0}> {1}\n".format(tkns[CMD_STATUS],tkns[CMD_MSG]))
-        self._cmdout.configure(state=tk.DISABLED)
+            # write results
+            out = ""
+            if len(tkns[CMD_MSG]) > 25: out = tkns[CMD_MSG][:10] + "..."
+            else: out = tkns[CMD_MSG]
+            self._cmdout.configure(state=tk.NORMAL)
+            self._cmdout.delete(0,tk.END)
+            self._cmdout.insert(0,"{0}: {1}".format(tkns[CMD_STATUS],out))
+            self._cmdout.configure(state=tk.DISABLED)
+        else:
+            self.warn("Unknown Command","{0} {1} {2} {3}".format(tkns[0],tkns[1],tkns[2],tkns[3]))
 
     def _sensorstate(self):
         """ send state requests to C2C """
         try:
             # get current states
-            astate = "!0 state abad\n"
-            sstate = "!0 state shama\n"
-            self._s.send(astate)
-            self._s.send(sstate)
+            self._s.send("!0 state abad\n")
+            self._s.send("!0 state shama\n")
         except socket.error as e:
             self.logwrite("Iyri socket failed: {0}".format(e),gui.LOG_ERR)
             self._s = None

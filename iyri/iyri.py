@@ -633,7 +633,7 @@ class Iryi(object):
         elif radio == 'both': radios = ['abad','shama']
         else: radios = [radio]
         if 'shama' in radios and self._sr is None:
-            resp = "ERR {0} shama \001shama radio not present\001\n".format(cmdid)
+            resp = "ERR {0} shama \001radio not present\001\n".format(cmdid)
             self._pConns['c2c'].send(resp)
             return None,None,None,None
 
