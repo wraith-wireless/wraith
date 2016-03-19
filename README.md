@@ -123,6 +123,9 @@ Provides the Postgresql database schema, nidus.sql.
         + sockios_h     definitions of the socket-level I/O control calls.
         + nl80211_h     nl82011 constants
         + if_h          inet definition
+        + netlink_h     port of netlink.h
+        + nl80211_h     port nl80211.h
+        + genetlink_h   port of genetlink.h
      - standards:       initialize standards subpackage
         + radiotap.py   radiotap parsing
         + mpdu.py       IEEE 802.11 MAC (MPDU) parsing

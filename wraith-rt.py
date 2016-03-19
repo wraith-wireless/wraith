@@ -922,10 +922,11 @@ class WraithPanel(gui.MasterPanel):
 
 class WraithSplash(object):
     """ Splash Window """
-    def __init__(self,tl,wp,pwd):
+    def __init__(self,tl,wp,pwd=None):
         """
          :param tl: Toplevel
          :param wp: WraithPanel
+         :param pwd: sudo password
         """
         self._tl = tl
         self._wp = wp
@@ -1046,6 +1047,19 @@ class WraithSplash(object):
         else:
             self._sv.set("Iyri stopped. Not connecting to C2C")
         self._bfinished = True
+
+#class WraithSplashOut(object):
+#    """ Shutdown progress Window """
+#    def __init__(self,tl,wp,pwd=None):
+#        """
+#         :param tl: Toplevel
+#         :param wp: WraithPanel
+#         :param pwd: sudo password
+#        """
+#        self._tl = tl
+#        self._wp = wp
+#        self._pwd = pwd
+#        self._tl.overrideredirect(True) # hide the title bar
 
 if __name__ == '__main__':
     # create arg parser and parse arguments
