@@ -69,11 +69,12 @@ wraith 0.0.4
    o first step in moving away from parsing command line output from iw etc
   - Iyri control panel is operational
    o multiple command functionality is not implemented
+  - fixed issue with polite policy and shutdown procedures
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
 __version__ = '0.0.5'
-__date__ = 'March 2015'
+__date__ = 'March 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'

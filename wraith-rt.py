@@ -191,10 +191,6 @@ class WraithPanel(gui.MasterPanel):
         self.tk.wm_geometry("300x1+0+0") # our desired size
         self.update_idletasks()          # force update -> should put the log panel 2nd
 
-        # if a pwd was given, the wraith will be created during the splash screen
-        # if not, we have to create here
-        if self._pwd is None: self._create()
-
     def _create(self):
         # read in conf file, exit on error
         msgs = [(time.strftime('%H:%M:%S'),"Wraith v{0}".format(wraith.__version__),gui.LOG_NOERR)]

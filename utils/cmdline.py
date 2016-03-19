@@ -30,24 +30,10 @@ def runningservice(pidfile):
      determines if the service referenced by pidfile is running.
      :param pidfile: path of pid in file
      :returns: process is running
-     requires root
     """
     try:
         with open(pidfile): return True
     except:
-        return False
-
-## deprecated
-def iyrirunning(pidfile):
-    """
-     :param pidfile: pidfile of iyri process
-     :returns: True if iyri is running otherwise False
-    """
-    try:
-        # open the pid file and check running status with signal = 0
-        with open(pidfile) as fin: os.kill(int(fin.read()),0)
-        return True
-    except (TypeError,IOError,OSError):
         return False
 
 def service(process,pwd=None,start=True):
