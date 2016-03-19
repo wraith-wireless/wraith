@@ -142,7 +142,7 @@ class WraithPanel(gui.MasterPanel):
          pwd: sudo password
         """
         self._conf = None   # configuration
-        self._bPSQL = False  # postgresql was running on startup
+        self._bPSQL = False # postgresql was running on startup
         self._biyri = False # iyri was running on startup
         self._pwd = pwd     # sudo password (should we not save it?)
         self._c2c = None    # c2c socket
@@ -258,14 +258,11 @@ class WraithPanel(gui.MasterPanel):
 
     def _shutdown(self):
         """ shut down cleanly """
-        print 'shutting down'
         self.closepanels()              # close out children
         self.setbusy()                  # we're busy
         self._setstate(_STATE_EXIT_)    # set the state
         if self._c2c: self._c2c.close() # quit c2c
-        print 'stopping sensor'
         self._stopsensor()              # shutdown Iyri
-        print 'stopping storage'
         self._stopstorage()             # shutdown storage
         self.setbusy(False)             # we're done
 
@@ -1132,7 +1129,6 @@ if __name__ == '__main__':
         t = tk.Tk()     # call our main program root first or Style() will do so
         s = ttk.Style()
         if 'alt' in s.theme_names(): s.theme_use('alt')
-        # figure out how to remove the progressbar relief/border
         s.configure("splash.Horizontal.TProgressbar",foreground='green',
                     background='green',troughcolor='black',
                     troughrelief='black',borderwidth=0)
@@ -1140,13 +1136,12 @@ if __name__ == '__main__':
         s.configure("reg.Horizontal.TProgressbar",foreground='green',
                     background='green',borderwidth=0)
 
-        # WraithPanel will start everything if pwd is present otherwise just the gui
+        # start everything if pwd is present otherwise just the gui
         try:
-            wp = WraithPanel(t,pwd)                         # create main program
-            if sopts == 'all':
-                t.withdraw()                                # hide main programe
-                splash = WraithSplash(tk.Toplevel(),wp,pwd) # show the splash
-            wp.mainloop()                                   # start the main program
+            wp = WraithPanel(t,pwd)                     # create main program
+            t.withdraw()                                # hide main programe
+            splash = WraithSplash(tk.Toplevel(),wp,pwd) # show the splash
+            wp.mainloop()                               # start the main program
             sys.exit(0)
         except Exception as e:
             fout = open('wraith.log','a')

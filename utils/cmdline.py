@@ -30,6 +30,7 @@ def runningservice(pidfile):
      determines if the service referenced by pidfile is running.
      :param pidfile: path of pid in file
      :returns: process is running
+     requires root
     """
     try:
         with open(pidfile): return True
