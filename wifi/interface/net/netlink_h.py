@@ -114,13 +114,24 @@ NLM_F_APPEND  = 0x800 # Add to end of list
  */
 """
 
-#NLMSG_ALIGNTO	4U
-#NLMSG_ALIGN(len) ( ((len)+NLMSG_ALIGNTO-1) & ~(NLMSG_ALIGNTO-1) )
-#NLMSG_HDRLEN	 ((int) NLMSG_ALIGN(sizeof(struct nlmsghdr)))
-#NLMSG_LENGTH(len) ((len) + NLMSG_HDRLEN)
-#NLMSG_SPACE(len) NLMSG_ALIGN(NLMSG_LENGTH(len))
+# Most netlink protocols enforce a strict alignment policy for all boundries.
+# The alignment value is defined by NLMSG_ALIGNTO and is fixed to 4 bytes.
+# Therefore all netlink message headers, begin of payload sections, protocol
+# specific headers, and attribute sections must start at an offset which is a
+# multiple of NLMSG_ALIGNTO.
+#     <----------- nlmsg_total_size(len) ------------>
+#     <----------- nlmsg_size(len) ------------>
+#    +-------------------+- - -+- - - - - - - - +- - -+-------------------+- - -
+#    |  struct nlmsghdr  | Pad |     Payload    | Pad |  struct nlsmghdr  |
+#    +-------------------+- - -+- - - - - - - - +- - -+-------------------+- - -
+#     <---- NLMSG_HDRLEN -----> <- NLMSG_ALIGN(len) -> <---- NLMSG_HDRLEN ---
+NLMSG_ALIGNTO = 4
+def NLMSG_ALIGN(l): return (l+NLMSG_ALIGNTO-1) & ~(NLMSG_ALIGNTO-1)
+def NLMSG_LENGTH(l): return l+NLMSGHDRLEN
+def NLMSG_SPACE(l): return NLMSG_ALIGN(NLMSG_LENGTH(l))
+# still working the below out
 #NLMSG_DATA(nlh)  ((void*)(((char*)nlh) + NLMSG_LENGTH(0)))
-#NLMSG_NEXT(nlh,len)	 ((len) -= NLMSG_ALIGN((nlh)->nlmsg_len), \
+#NLMSG_NEXT(hl,len)	 ((len) -= NLMSG_ALIGN((nlh)->nlmsg_len), \
 #				  (struct nlmsghdr*)(((char*)(nlh)) + NLMSG_ALIGN((nlh)->nlmsg_len)))
 #NLMSG_OK(nlh,len) ((len) >= (int)sizeof(struct nlmsghdr) && \
 #			   (nlh)->nlmsg_len >= sizeof(struct nlmsghdr) && \
