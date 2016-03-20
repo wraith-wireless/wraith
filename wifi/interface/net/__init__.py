@@ -8,7 +8,8 @@ REVISIONS:
 net 0.0.1
  desc: a collection of ports of various linux headers providing network interface
  tools
- includes: if_h 0.0.2, sockios_h 0.0.2, netlink_h 0.0.1 genetlink_h 0.0.1nl80211_h 0.0.1
+ includes: if_h 0.0.2, sockios_h 0.0.2, netlink_h 0.0.1 genetlink_h 0.0.1
+  nl80211_h 0.0.2
  changes:
 """
 __name__ = 'net'

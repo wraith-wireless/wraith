@@ -38,54 +38,54 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Production'
 
 import struct
-from wraith.wifi.interface import sockios_h as sioc
+from wraith.wifi.interface.net import sockios_h as sioc
 
 IFNAMSIZ = 16
 IFALIASZ = 256
 
 # Standard interface flags (netdevice->flags).
-IFF_UP		    = 0x1	  # interface is up
+IFF_UP          = 0x1	  # interface is up
 IFF_BROADCAST	= 0x2	  # broadcast address valid
-IFF_DEBUG	    = 0x4	  # turn on debugging
+IFF_DEBUG       = 0x4	  # turn on debugging
 IFF_LOOPBACK	= 0x8	  # is a loopback net
 IFF_POINTOPOINT	= 0x10	  # interface is has p-p link
 IFF_NOTRAILERS	= 0x20	  # avoid use of trailers
-IFF_RUNNING	    = 0x40	  # interface RFC2863 OPER_UP
-IFF_NOARP	    = 0x80	  # no ARP protocol
-IFF_PROMISC	    = 0x100	  # receive all packets
+IFF_RUNNING     = 0x40	  # interface RFC2863 OPER_UP
+IFF_NOARP       = 0x80	  # no ARP protocol
+IFF_PROMISC     = 0x100	  # receive all packets
 IFF_ALLMULTI	= 0x200	  # receive all multicast packets
-IFF_MASTER	    = 0x400	  # master of a load balancer
-IFF_SLAVE	    = 0x800	  # slave of a load balancer
+IFF_MASTER      = 0x400	  # master of a load balancer
+IFF_SLAVE       = 0x800	  # slave of a load balancer
 IFF_MULTICAST	= 0x1000  # Supports multicast
-IFF_PORTSEL	    = 0x2000  # can set media type
+IFF_PORTSEL     = 0x2000  # can set media type
 IFF_AUTOMEDIA	= 0x4000  # auto media select active
-IFF_DYNAMIC	    = 0x8000  # dialup device with changing addresses
+IFF_DYNAMIC     = 0x8000  # dialup device with changing addresses
 IFF_LOWER_UP	= 0x10000 # driver signals L1 up
-IFF_DORMANT	    = 0x20000 # driver signals dormant
-IFF_ECHO	    = 0x40000 # echo sent packets
+IFF_DORMANT     = 0x20000 # driver signals dormant
+IFF_ECHO        = 0x40000 # echo sent packets
 
 IFF_VOLATILE = IFF_LOOPBACK | IFF_POINTOPOINT | IFF_BROADCAST | IFF_ECHO | \
                IFF_MASTER | IFF_SLAVE | IFF_RUNNING | IFF_LOWER_UP | IFF_DORMANT
 
 # Private (from user) interface flags (netdevice->priv_flags).
 IFF_802_1Q_VLAN      = 0x1   # 802.1Q VLAN device.
-IFF_EBRIDGE	         = 0x2	 # Ethernet bridging device.
-IFF_SLAVE_INACTIVE	 = 0x4	 # bonding slave not the curr. active
-IFF_MASTER_8023AD	 = 0x8	 # bonding master, 802.3ad.
-IFF_MASTER_ALB	     = 0x10	 # bonding master, balance-alb.
-IFF_BONDING	         = 0x20	 # bonding master or slave
-IFF_SLAVE_NEEDARP    = 0x40	 # need ARPs for validation
-IFF_ISATAP	         = 0x80	 # ISATAP interface (RFC4214)
+IFF_EBRIDGE          = 0x2   # Ethernet bridging device.
+IFF_SLAVE_INACTIVE   = 0x4   # bonding slave not the curr. active
+IFF_MASTER_8023AD    = 0x8   # bonding master, 802.3ad.
+IFF_MASTER_ALB	     = 0x10  # bonding master, balance-alb.
+IFF_BONDING          = 0x20  # bonding master or slave
+IFF_SLAVE_NEEDARP    = 0x40  # need ARPs for validation
+IFF_ISATAP           = 0x80  # ISATAP interface (RFC4214)
 IFF_MASTER_ARPMON    = 0x100 # bonding master, ARP mon in use
 IFF_WAN_HDLC	     = 0x200 # WAN HDLC device
 IFF_XMIT_DST_RELEASE = 0x400 # dev_hard_start_xmit() is allowed to release skb->dst
 
 IFF_DONT_BRIDGE      = 0x800	# disallow bridging this ether dev
-IFF_DISABLE_NETPOLL	 = 0x1000	# disable netpoll at run-time
-IFF_MACVLAN_PORT	 = 0x2000	# device used as macvlan port
+IFF_DISABLE_NETPOLL  = 0x1000   # disable netpoll at run-time
+IFF_MACVLAN_PORT     = 0x2000   # device used as macvlan port
 IFF_BRIDGE_PORT	     = 0x4000	# device used as bridge port
-IFF_OVS_DATAPATH	 = 0x8000	# device used as Open vSwitch datapath port
-IFF_TX_SKB_SHARING	 = 0x10000	# The interface supports sharing skbs on transmit
+IFF_OVS_DATAPATH     = 0x8000   # device used as Open vSwitch datapath port
+IFF_TX_SKB_SHARING   = 0x10000  # The interface supports sharing skbs on transmit
 IFF_UNICAST_FLT	     = 0x20000	# Supports unicast filtering
 IFF_TEAM_PORT	     = 0x40000	# device used as team port
 IFF_SUPP_NOFCS	     = 0x80000	# device supports sending custom FCS
@@ -100,8 +100,8 @@ IF_GET_PROTO = 0x0002
 IF_IFACE_V35	     = 0x1000 # V.35 serial interface
 IF_IFACE_V24	     = 0x1001 # V.24 serial interface
 IF_IFACE_X21	     = 0x1002 # X.21 serial interface
-IF_IFACE_T1	         = 0x1003 # T1 telco serial interface
-IF_IFACE_E1	         = 0x1004 # E1 telco serial interface
+IF_IFACE_T1          = 0x1003 # T1 telco serial interface
+IF_IFACE_E1          = 0x1004 # E1 telco serial interface
 IF_IFACE_SYNC_SERIAL = 0x1005 # can't be set by software
 IF_IFACE_X21D        = 0x1006 # X.21 Dual Clocking (FarSite)
 
@@ -109,7 +109,7 @@ IF_IFACE_X21D        = 0x1006 # X.21 Dual Clocking (FarSite)
 IF_PROTO_HDLC	        = 0x2000 # raw HDLC protocol
 IF_PROTO_PPP	        = 0x2001 # PPP protocol
 IF_PROTO_CISCO	        = 0x2002 # Cisco HDLC protocol
-IF_PROTO_FR	            = 0x2003 # Frame Relay protocol
+IF_PROTO_FR             = 0x2003 # Frame Relay protocol
 IF_PROTO_FR_ADD_PVC     = 0x2004 # Create FR PVC
 IF_PROTO_FR_DEL_PVC     = 0x2005 # Delete FR PVC
 IF_PROTO_X25	        = 0x2006 # X.25
@@ -169,7 +169,7 @@ IF_LINK_MODE_DORMANT = 1 # limit upward transition to dormant
 #  __u8		fixed;		/* Hardware should not use auto select */
 #  __u8		disabled;	/* Disable the feature */
 #  __u16		flags;		/* Various specifc flags (if any) */
-# to get the txpower and verify the prescense of wireless extensions
+# to get the txpower and verify the presense of wireless extensions
 #};
 
 """

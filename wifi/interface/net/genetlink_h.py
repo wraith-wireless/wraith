@@ -28,8 +28,8 @@ struct genlmsghdr {
 	__u16	reserved;
 };
 """
-nl_genlmsghdr = "BBH"
-GENLMSGHDRLEN = struct.calcsize(nl_genlmsghdr)
+genl_genlmsghdr = "BBH"
+GENLMSGHDRLEN = struct.calcsize(genl_genlmsghdr)
 def genlmsghdr(cmd,vers=1):
     """
      create a generic netlink header
@@ -37,7 +37,7 @@ def genlmsghdr(cmd,vers=1):
      :param vers: revision value for backward compatability
      :returns: packed generic netlink header
     """
-    return struct.pack(nl_genlmsghdr,cmd,vers,0)
+    return struct.pack(genl_genlmsghdr,cmd,vers,0)
 
 #GENL_HDRLEN	NLMSG_ALIGN(sizeof(struct genlmsghdr))
 
@@ -47,10 +47,10 @@ GENL_CMD_CAP_DUMP	= 0x04
 GENL_CMD_CAP_HASPOL	= 0x08
 
 # List of reserved static generic netlink identifiers:
-GENL_ID_GENERATE	= 0
-GENL_ID_CTRL		= 0x10 # hardcoded from netlink_h
-GENL_ID_VFS_DQUOT	= GENL_ID_CTRL + 1
-GENL_ID_PMCRAID		= GENL_ID_CTRL + 2
+GENL_ID_GENERATE  = 0
+GENL_ID_CTRL	  = 0x10 # hardcoded from netlink_h
+GENL_ID_VFS_DQUOT = GENL_ID_CTRL + 1
+GENL_ID_PMCRAID	  = GENL_ID_CTRL + 2
 
 
 #Controller
