@@ -28,14 +28,14 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                                           # filesystem
-from fcntl import ioctl                             # io control
-import socket                                       # kernel comms
-import struct                                       # c struct conversion
-from wraith.utils.bits import issetf,setf,unsetf    # flag manipulation
-from wraith.wifi.interface import iw                # iw cmdline parsing
-from wraith.wifi.interface import sockios_h as sioc # sockios constants
-from wraith.wifi.interface import if_h as ifh       # ifreq creation
+import os                                               # filesystem
+from fcntl import ioctl                                 # io control
+import socket                                           # kernel comms
+import struct                                           # c struct conversion
+from wraith.utils.bits import issetf,setf,unsetf        # flag manipulation
+from wraith.wifi.interface import iw                    # iw cmdline parsing
+from wraith.wifi.interface.net import sockios_h as sioc # sockios constants
+from wraith.wifi.interface.net import if_h as ifh       # ifreq creation
 
 # widths currently supported
 RDO_CHWS = [None,'HT20','HT40+','HT40-']
