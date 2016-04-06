@@ -32,7 +32,7 @@ import os                                               # filesystem
 from fcntl import ioctl                                 # io control
 import socket                                           # kernel comms
 import struct                                           # c struct conversion
-from wraith.utils.bits import issetf,setf,unsetf        # flag manipulation
+from toolbox.bits import issetf,setf,unsetf             # flag manipulation
 from wraith.wifi.interface import iw                    # iw cmdline parsing
 from wraith.wifi.interface.net import sockios_h as sioc # sockios constants
 from wraith.wifi.interface.net import if_h as ifh       # ifreq creation
@@ -71,7 +71,7 @@ def interfaces():
     return nics
 
 def winterfaces():
-    """ :returns: a list of names of current wwireless network interfaces cards """
+    """ :returns: a list of names of current wireless network interfaces cards """
     # tried reading in devices from /proc/net/wireless but it did not always
     # include my usb interfaces. look at SIOCGIWNAME (what header is it found in)
     wics = []
@@ -505,7 +505,6 @@ class Radio(object):
         try:
             sflag = sioc.SIOCGIWNAME
             s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-            ret = ioctl(s.fileno(),sflag,ifh.ifreq(nic,sflag))
 
             # the below is a dirty hack until we can figure another
             # way to get standards

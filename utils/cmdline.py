@@ -16,7 +16,7 @@ import subprocess as sp           # subprcess stuff
 
 def runningprocess(process):
     """
-     :param process: nme of process
+     :param process: name of process
      :returns: the pid(s) of process if running or the empty list
     """
     pids = []

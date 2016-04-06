@@ -16,7 +16,7 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import struct
-from wraith.utils.bits import bitmask, bitmask_list, bitmask_get
+from toolbox.bits import bitmask, bitmask_list, bitmask_get
 
 class RadiotapException(Exception): pass
 

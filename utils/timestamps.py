@@ -30,7 +30,7 @@ def validdate(s): # confirm string s is of the form YYYY-MM-DD and is a valid da
     except:
         return False
 
-def validtime(s): # confirm string s a valid time of the form HH:MM[:SS]
+def validtime(s): # confirm string s is a valid time of the form HH:MM[:SS]
     try:
         dt.datetime.strptime(s,'%H:%M:%S')
         return True

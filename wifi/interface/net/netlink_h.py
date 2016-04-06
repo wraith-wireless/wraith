@@ -63,11 +63,11 @@ struct sockaddr_nl {
 
 """
 struct nlmsghdr {
-	__u32		nlmsg_len;	/* Length of message including header */
-	__u16		nlmsg_type;	/* Message content */
-	__u16		nlmsg_flags;	/* Additional flags */
-	__u32		nlmsg_seq;	/* Sequence number */
-	__u32		nlmsg_pid;	/* Sending process port ID */
+	__u32		nlmsg_len;	 /* Length of message including header */
+	__u16		nlmsg_type;	 /* Message content */
+	__u16		nlmsg_flags; /* Additional flags */
+	__u32		nlmsg_seq;	 /* Sequence number */
+	__u32		nlmsg_pid;	 /* Sending process port ID */
 };
 """
 nl_nlmsghdr = "IHHII"
@@ -129,8 +129,9 @@ NLMSG_ALIGNTO = 4
 def NLMSG_ALIGN(l): return (l+NLMSG_ALIGNTO-1) & ~(NLMSG_ALIGNTO-1)
 def NLMSG_LENGTH(l): return l+NLMSGHDRLEN
 def NLMSG_SPACE(l): return NLMSG_ALIGN(NLMSG_LENGTH(l))
+def NLMSG_ALIGNBY(l): return NLMSG_ALIGN(l) - l
 # still working the below out
-#NLMSG_DATA(nlh)  ((void*)(((char*)nlh) + NLMSG_LENGTH(0)))
+#NLMSG_DATA(nlh)  ((void*)(((char*)nlh) + NLMSGHDRLEN))
 #NLMSG_NEXT(hl,len)	 ((len) -= NLMSG_ALIGN((nlh)->nlmsg_len), \
 #				  (struct nlmsghdr*)(((char*)(nlh)) + NLMSG_ALIGN((nlh)->nlmsg_len)))
 #NLMSG_OK(nlh,len) ((len) >= (int)sizeof(struct nlmsghdr) && \

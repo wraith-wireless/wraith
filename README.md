@@ -26,6 +26,8 @@ data to view, how to view it and 'when' to view it.
  * postgresql 9.x (tested on 9.3.5)
  * pyscopg > 2.6
  * mgrs 1.1
+ * toolbox 0.0.2 (https://github.com/wraith-wireless/toolbox)
+ * pyric 0.0.2 https://github.com/wraith-wireless/pyric)
 
 ## 3. MODULES: Currently consists of three main components/modules: Wifi, Iyri and
 the GUI and three secondary modules: utils, widgets, and nidus.
@@ -105,12 +107,10 @@ Provides the Postgresql database schema, nidus.sql.
      -  panel.py        defines Panel and subclasses for gui
  * utils:                utility functions
     -  \_\_init\_\_.py  initialize utils subpackage
-    - bits.py           bitmask functions
     - timestamps.py     timestamp conversion functions
     - landnav.py        land navigation utilities
     - cmdline.py        various cmdline utilities for testing processes
     - simplepcap.py     pcap writer
-    - brine.py          support for pickling connection objects
     - valrep.py         validation and reporting functionality
  *  data:               data folder
     - oui.txt           tab seperated oui manufacturer file
@@ -127,6 +127,7 @@ Provides the Postgresql database schema, nidus.sql.
             + if_h            inet definition
             + netlink_h       port of netlink.h
             + genetlink_h     port of genetlink.h
+            + pyw             interface to netlink related
      - standards:       initialize standards subpackage
         + radiotap.py   radiotap parsing
         + mpdu.py       IEEE 802.11 MAC (MPDU) parsing

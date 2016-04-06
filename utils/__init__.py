@@ -7,8 +7,7 @@ Module for utility functionality
 REVISIONS:
  0.0.2
   desc:
-  includes: bits 0.0.5 brine 0.0.1 cmdline 0.0.2 landnav 0.3.2 simplepcap 0.0.1
-   timestamps 0.0.2 valrep 0.0.1
+  includes: cmdline 0.0.2 landnav 0.3.2 simplepcap 0.0.1 timestamps 0.0.2 valrep 0.0.1
   changes:
 """
 __name__ = 'utils'

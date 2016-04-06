@@ -11,22 +11,22 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                                  # file info etc
-import sys                                 # for exit
-import time                                # sleeping, timestamps
-import psycopg2 as psql                    # postgresql api
-import Tkinter as tk                       # gui constructs
-import ttk                                 # ttk widgets
-from PIL import Image,ImageTk              # image input & support
-import ConfigParser                        # config file parsing
-import argparse                            # cmd line arguments
-import getpass                             # get sudo password
-import socket                              # sockets (iyri control)
-import wraith                              # version info/constants
-import wraith.widgets.panel as gui         # graphics suite
-import wraith.subpanels as subgui          # our subpanels
-from wraith.utils import bits              # bitmask functions
-from wraith.utils import cmdline           # command line stuff
+import os                          # file info etc
+import sys                         # for exit
+import time                        # sleeping, timestamps
+import psycopg2 as psql            # postgresql api
+import Tkinter as tk               # gui constructs
+import ttk                         # ttk widgets
+from PIL import Image,ImageTk      # image input & support
+import ConfigParser                # config file parsing
+import argparse                    # cmd line arguments
+import getpass                     # get sudo password
+import socket                      # sockets (iyri control)
+import wraith                      # version info/constants
+import wraith.widgets.panel as gui # graphics suite
+import wraith.subpanels as subgui  # our subpanels
+from toolbox import bits           # bitmask functions
+from wraith.utils import cmdline   # command line stuff
 
 # server/services functions shared by splash and main panel
 
