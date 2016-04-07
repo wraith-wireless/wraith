@@ -2,7 +2,6 @@ Overall:
   2) add program to extract saved frames from db and write to a pcap file
    o initially write in bulk but add filters etc to all allow user to specify
     what frames they want to write
-  3) add relevant __all__ to init files
   4) add a program that will kill all iyri related processes (in the event of
    unresponsive children)
   5) manufacturer for nics

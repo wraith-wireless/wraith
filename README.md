@@ -120,14 +120,6 @@ Provides the Postgresql database schema, nidus.sql.
         + iw.py         iw 3.17 interface
         + oui.py        oui/manuf related functions
         + radio.py      Radio consolidates iwtools.py, iw.py
-          * net:        linux header ports
-            - \_\_init\_\_.py initialize net subpackage
-            + sockios_h       definitions of the socket-level I/O control calls.
-            + nl80211_h       nl82011 constants
-            + if_h            inet definition
-            + netlink_h       port of netlink.h
-            + genetlink_h     port of genetlink.h
-            + pyw             interface to netlink related
      - standards:       initialize standards subpackage
         + radiotap.py   radiotap parsing
         + mpdu.py       IEEE 802.11 MAC (MPDU) parsing

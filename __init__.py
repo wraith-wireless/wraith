@@ -70,11 +70,18 @@ wraith 0.0.4
   - Iyri control panel is operational
    o multiple command functionality is not implemented
   - fixed issue with polite policy and shutdown procedures
+
+ wraith 0.0.6
+  desc: concentration on single-platform system. Remove nidus data management
+  portion and allow sensor to communicate directly with postgresql.
+ includes:  wraith-rt.py, subpanels.py & relevant subpackages
+ changes:
+  - moved nic functionality to seperate project (see https://github.com/wraith-wireless/pyric)
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.5'
-__date__ = 'March 2016'
+__version__ = '0.0.6'
+__date__ = 'April 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
