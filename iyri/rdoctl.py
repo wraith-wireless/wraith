@@ -21,15 +21,16 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-from time import time,sleep                 # current time, waiting
-import signal                               # handling signals
-import socket                               # reading frames
-from Queue import Empty                     # queue empty exception
-import multiprocessing as mp                # for Process
-from wraith.wifi.interface import radio     # wireless nics & details
-from wraith.utils.timestamps import isots   # converted timestamp
-from wraith.iyri.tuner import Tuner         # our tuner
-from wraith.iyri.constants import *         # tuner states & buffer dims
+from time import time,sleep               # current time, waiting
+import signal                             # handling signals
+import socket                             # reading frames
+from Queue import Empty                   # queue empty exception
+import multiprocessing as mp              # for Process
+from pyric.pyw import winterfaces         # list wireless interfaces
+from wraith.wifi.interface import radio   # wireless nics & details
+from wraith.utils.timestamps import isots # converted timestamp
+from wraith.iyri.tuner import Tuner       # our tuner
+from wraith.iyri.constants import *       # tuner states & buffer dims
 
 class RadioController(mp.Process):
     """ RadioController - handles radio initialization and collection """
@@ -194,16 +195,14 @@ class RadioController(mp.Process):
          :param conf: radio configuration
         """
         # 1) set radio properties as specified in conf
-        if conf['nic'] not in radio.winterfaces():
-            print conf['nic']
-            print radio.winterfaces()
+        if conf['nic'] not in winterfaces():
             raise RuntimeError("{0}:radio.nic:not found".format(conf['role']))
         self._role = conf['role']      # save role
         self._paused = conf['paused']  # & initial state (paused|scan)
 
         # determine virtual interface name
         ns = []
-        for wiface in radio.winterfaces():
+        for wiface in winterfaces():
             cs = wiface.split('iyri')
             try:
                 if len(cs) == 2:

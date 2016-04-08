@@ -26,9 +26,10 @@ import ConfigParser                        # config file parsing
 import threading                           # Threads et al
 import select                              # non-blocking poll
 import socket                              # socket errors from C2C
+from pyric.pyw import winterfaces          # list wireless interfaces
 import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
-from wraith.wifi.interface import radio    # wireless interface details
+from wraith.wifi.interface import radio    # Radio class
 from wraith.wifi.standards import mpdu     # for 802.11 types/subtypes
 from wraith.wifi.standards import channels # available channels
 from wraith.utils import timestamps        # valid data/time
@@ -396,7 +397,7 @@ class InterfacePanel(gui.PollingTabularPanel):
     def pnlupdate(self):
         """ lists interfaces """
         # get list of current wifaces on system & list of wifaces in tree
-        nics = radio.winterfaces()
+        nics = winterfaces()
         ls = self._tree.get_children()
 
         # remove nics that are no longer present
@@ -1996,7 +1997,7 @@ class IyriConfigPanel(gui.ConfigPanel):
         if not nic:
             self.err("Invalid Abad Input","Radio nic must be specified")
             return False
-        elif not nic in radio.winterfaces():
+        elif not nic in winterfaces():
             self.warn("Not Found","Abad radio may not be wireless")
         spoof = self._entAbadSpoof.get().upper()
         if spoof and not valrep.validhwaddr(spoof):
@@ -2070,7 +2071,7 @@ class IyriConfigPanel(gui.ConfigPanel):
         # then shama radio details
         nic = self._entShamaNic.get()
         if nic:
-            if not nic in radio.winterfaces():
+            if not nic in winterfaces():
                 self.warn("Not Found","Radio may not be wireless")
             spoof = self._entShamaSpoof.get().upper()
             if spoof and not valrep.validhwaddr(spoof):

@@ -260,7 +260,7 @@ def txpwrset(phy,pwr,option='fixed'):
     # NOTE: does not work (at least on my cards)
     # confirm option is valid
     if not option in ['fixed','auto','limit']:
-        raise IWException("option {0} must be one of {fixed|limit|auto}".format(option))
+        raise IWException("option {0} must be one of fixed|limit|auto".format(option))
 
     cmd = [IW3_17,'phy',phy,'set','txpower',option,str(pwr*100)]
     if os.getuid() != 0: cmd.insert(0,'sudo')

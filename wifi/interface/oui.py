@@ -18,7 +18,7 @@ import random
 from wraith.utils.timestamps import ts2iso
 
 #### set oui path -> change to reflect if necessary
-OUIPATH = os.path.realpath('../../data/oui.txt')
+OUIPATH = os.path.realpath('data/oui.txt')
 
 def parseoui(path=None):
     """

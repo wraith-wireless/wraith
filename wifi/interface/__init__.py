@@ -19,10 +19,19 @@ interface 0.0.2
     o implements getting/setting hwaddr, getting ifindex, getting flags, getting
      txpower, getting standards and listing nics & wireless nics using ioctl
   - added random hw addr generator to oui.py
+
+interface 0.0.3
+ desc: provides tools to manipulate wireless nics
+ includes: radio 0.0.4 iw 0.1.0 oui 0.0.4
+ changes:
+  - moved ioctl/netlink/nl80211 related to separate project
+   o Radio incorporates this
+  - Radio supports random hwaddr generation
+
 """
 __name__ = 'interface'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 __date__ = 'February 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
