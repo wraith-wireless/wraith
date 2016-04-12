@@ -22,7 +22,7 @@ interface 0.0.2
 
 interface 0.0.3
  desc: provides tools to manipulate wireless nics
- includes: radio 0.0.4 iw 0.1.0 oui 0.0.4
+ includes: radio 0.0.5 iw 0.1.0 oui 0.0.4
  changes:
   - moved ioctl/netlink/nl80211 related to separate project
    o Radio incorporates this

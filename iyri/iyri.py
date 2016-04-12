@@ -17,23 +17,23 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import os                                       # for path validations
-import signal                                   # signal processing
-import logging,logging.config,logging.handlers  # logging
-import multiprocessing as mp                    # multiprocessing process, events
-import ConfigParser                             # reading configuration files
-import socket,threading                         # for the c2c server
-import select                                   # c2c & main loop
-from pyric.pyw import winterfaces               # list wireless interfacs
-from wraith.iyri import __version__ as ivers    # for iyri version
-from wraith.iyri.collate import Collator        # the collator
-from wraith.iyri.rdoctl import RadioController  # Radio object etc
-from wraith.iyri.gpsctl import GPSController    # gps device
-from wraith.wifi.interface import radio         # regset/get & channels
-from wraith.wifi.interface.oui import randhw    # spoofing hwaddr
-from wraith.utils.cmdline import runningprocess # check for psql running
-from wraith.utils import valrep                 # validation functionality
-from wraith.iyri.constants import *             # buffer dims
+import os                                        # for path validations
+import signal                                    # signal processing
+import logging,logging.config,logging.handlers   # logging
+import multiprocessing as mp                     # multiprocessing process, events
+import ConfigParser                              # reading configuration files
+import socket,threading                          # for the c2c server
+import select                                    # c2c & main loop
+import pyric                                     # pyric errors
+from pyric import pyw                            # ifaces, get/set reg domain, ch widths
+from wraith.iyri import __version__ as ivers     # for iyri version
+from wraith.iyri.collate import Collator         # the collator
+from wraith.iyri.rdoctl import RadioController   # Radio object etc
+from wraith.iyri.gpsctl import GPSController     # gps device
+from wraith.wifi.interface.oui import randhw     # spoofing hwaddr
+from wraith.utils.cmdline import runningprocess  # check for psql running
+from wraith.utils import valrep                  # validation functionality
+from wraith.iyri.constants import *              # buffer dims
 
 #### set up log -> have to configure absolute path
 GPATH = os.path.dirname(os.path.abspath(__file__))
@@ -301,10 +301,10 @@ class Iryi(object):
         if self._rd:
             try:
                 logging.info("Resetting regulatory domain...")
-                radio.setrd(self._rd)
-                if radio.getrd != self._rd: raise RuntimeError
+                pyw.regdom(self._rd)
+                if pyw.regdom() != self._rd: raise RuntimeError
                 logging.info("Regulatory domain reset")
-            except:
+            except (pyric.error,RuntimeError):
                 logging.warning("Failed to reset regulatory domain")
 
     # noinspection PyUnusedLocal
@@ -377,8 +377,11 @@ class Iryi(object):
             rd = self._conf['local']['region']
             if rd:
                 logging.info("Setting regulatory domain to %s...",rd)
-                self._rd = radio.getrd
-                radio.setrd(rd)
+                try:
+                    self._rd = pyw.regdom()
+                    pyw.regdom(rd)
+                except pyric.error:
+                    logging.warning("Failed to set regulatory domain")
 
             # abad radio is mandatory -> as with the Collator, we cannot continue
             # w/out this one, allow the outer block to catch any failures
@@ -516,7 +519,7 @@ class Iryi(object):
          :param rtype: radio type onoeof {'Abad'|'Shama'}
         """
         nic = cp.get(rtype,'nic')
-        if not nic in winterfaces():
+        if not nic in pyw.winterfaces():
             err = "Radio {0} not present/not wireless".format(nic)
             raise RuntimeError(err)
 
@@ -589,7 +592,7 @@ class Iryi(object):
                     ch = scanspec
                     chw = None
                 ch = int(ch) if ch else r['scan'][0][0]
-                if not chw in radio.RDO_CHWS: chw = r['scan'][0][1]
+                if not chw in pyw.CHWIDTHS: chw = r['scan'][0][1]
                 r['scan_start'] = (ch,chw) if (ch,chw) in r['scan'] else r['scan'][0]
             except ValueError:
                 r['scan_start'] = r['scan'][0]

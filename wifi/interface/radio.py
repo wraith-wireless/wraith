@@ -12,7 +12,7 @@ is now implemeting all iwconfig and ifconfig functionality through ioctl
 """
 __name__ = 'radio'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 __date__ = 'February 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
@@ -29,30 +29,28 @@ import pyric.lib.libio as io                 # ioctl library
 from wraith.wifi.interface.oui import randhw # random hwaddr
 from wraith.wifi.interface import iw         # iw cmdline parsing
 
-# widths currently supported
-RDO_CHWS = [None,'HT20','HT40+','HT40-']
-
 # Exception
 # Define error code for unitialized, all others are defined in pyric
 RDO_UNINITIALIZED = -1
 class RadioException(EnvironmentError): pass # tuple t = (errcode,errmessage)
 
+#### setrd/getrd left for posterity
 def setrd(rd):
     """
      set the regulatory domain
      :param rd: desired two-character domain
     """
     try:
-        iw.regset(rd)
-    except iw.IWException as e:
-        raise RadioException(iw.ecode(e),e)
+        pyw.regdom(rd)
+    except pyric.error as e:
+        raise RadioException(e.errno,e.strerror)
 
 def getrd():
     """ return the current regulatory domain """
     try:
-        return iw.regget()
-    except iw.IWException as e:
-        raise RadioException(iw.ecode(e),e)
+        return pyw.regdom()
+    except pyric.error as e:
+        raise RadioException(e.errno, e.strerror)
 
 class Radio(object):
     """ define properties/methods of a wireless network interface """
@@ -94,15 +92,12 @@ class Radio(object):
 
         # internal attributes for kernel/device comms
         self._nlsock = None # netlink socket
-        self._fid = None    # nl80211 family id
         self._seq = None    # netlink seq number
         self._iosock = None # ioctl socket
 
         # create the netlink socket & get the family id
         try:
             self._nlsock = nl.nl_socket_alloc()
-            self._fid = pyw.familyidex(self._nlsock)
-            self._seq = 1
         except pyric.error as e:
             raise RadioException(e.errno,e.strerror)
 
@@ -175,7 +170,7 @@ class Radio(object):
         except iw.IWException as e:
             raise RadioException((iw.ecode(e),e))
         except KeyError:
-            raise RadioException(pyric.ENODEV,"No such device (-19)")
+            raise RadioException(pyric.NLE_NODEV,"No such device (-19)")
 
     @property
     def channel(self):
@@ -301,7 +296,7 @@ class Radio(object):
          NOTE: this does not restore all interfaces that were deleted by watch
         """
         if not self._vnic:
-            raise RadioException(pyric.EOPNOTSUPP,"Radio is not in monitor mode")
+            raise RadioException(pyric.NLE_OPNOTSUPP,"Radio is not in monitor mode")
         try:
             iw.devdel(self._vnic)
             self._vnic = None
@@ -359,8 +354,8 @@ class Radio(object):
          :param chw: channel width to set to default is None
         """
         if not self._phy: raise RadioException(RDO_UNINITIALIZED,"Uninitialized")
-        if not chw in RDO_CHWS:
-            raise RadioException(pyric.EINVAL,"Channel width is invalid")
+        if not chw in pyw.CHWIDTHS:
+            raise RadioException(pyric.NLE_INVAL,"Channel width is invalid")
 
         try:
             iw.chset(self._phy,ch,chw)
@@ -392,7 +387,7 @@ class Radio(object):
             self._chipset = pywutils.ifchipset(self._driver)
             if spoof: self.spoof(spoof)  # create a spoofed address?
             if vnic: self.watch(vnic)  # create in montor mode?
-        except TypeError: raise RadioException(pyric.EUNDEF,"Unexpected error")
+        except TypeError: raise RadioException(pyric.NLE_UNDEF,"Unexpected error")
         except RadioException: raise
         except pyric.error as e:
             raise RadioException(e.errno,e.strerror)

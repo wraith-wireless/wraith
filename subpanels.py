@@ -27,6 +27,7 @@ import threading                           # Threads et al
 import select                              # non-blocking poll
 import socket                              # socket errors from C2C
 from pyric.pyw import winterfaces          # list wireless interfaces
+from pyric import pyw                      # channel widths
 import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
 from wraith.wifi.interface import radio    # Radio class
@@ -1336,7 +1337,7 @@ class _ParamDialog(tkSD.Dialog):
                     ch = param
                     chw = 'None'
                 ch = int(ch)
-                if not (chw in radio.RDO_CHWS or chw == 'None'):
+                if not (chw in pyw.CHWIDTHS or chw == 'None'):
                     err = "Invalid channel width"
                 elif not ch in channels.channels(): err = "Invalid channel"
                 else: params = "{0}:{1}".format(ch,chw)
@@ -2053,7 +2054,7 @@ class IyriConfigPanel(gui.ConfigPanel):
                     ch = start
                     chw = None
                 ch = int(ch)
-                if chw and not chw in radio.RDO_CHWS:
+                if chw and not chw in pyw.CHWIDTHS:
                     raise RuntimeError("Specified channel width is not valid")
         except ValueError:
             self.err("Invalid Abad Input","Scan start must be integer")
@@ -2128,7 +2129,7 @@ class IyriConfigPanel(gui.ConfigPanel):
                         ch = start
                         chw = None
                     ch = int(ch)
-                    if chw and not chw in radio.RDO_CHWS:
+                    if chw and not chw in pyw.CHWIDTHS:
                         raise RuntimeError("Specified channel width is not valid")
             except ValueError:
                 self.err("Invalid Shama Input", "Scan start must be integer")
