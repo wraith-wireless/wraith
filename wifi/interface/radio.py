@@ -72,10 +72,9 @@ class Radio(object):
         # default/uninstantiated attributes
         # NOTE: we only set member variables for those "immutable" properties
         # of a wireless nic such as phy (the physical name of the card) of driver
-        # those properties that can change i.e. txpwr, current channel etc
-        # will be determined by 'querying' the card
+        # those properties that can change i.e. txpwr, current channel and ifindex
+        # etc will be determined by 'querying' the card
         self._phy = None       # the <phy> of the card specified by nic
-        self._ifindex = None   # ifindex
         self._hwaddr = None    # the real hw addr
         self._spoofed = None   # the current/spoofed hw addr
         self._standards = None # supported standards i.e. 'b','g','n'
@@ -120,7 +119,6 @@ class Radio(object):
          :param nic: name of interface
         """
         self._phy = None
-        self._ifindex = None
         self._hwaddr = None
         self._spoofed = None
         self._standards = []
@@ -146,10 +144,13 @@ class Radio(object):
             raise RadioException(e.errno,e.strerror)
 
     @property # :returns: interface index
-    def ifindex(self): return self._ifindex
-    # NOTE: redo this. ifindex only refers to nic, setting a monitor mode to 
-    # for example test0, test0 will have a different ifindex. only commonality
-    # is the phy
+    def ifindex(self):
+        nic = self.curnic
+        if nic is None: raise RadioException(RDO_UNINITIALIZED,"Uninitialized")
+        try:
+            return pyw.ifindexex(self._iosock,nic)
+        except pyric.error as e:
+            raise RadioException(e.errno, e.strerror)
 
     @property # :returns: the nic name (if any)
     def nic(self): return self._nic
@@ -160,20 +161,20 @@ class Radio(object):
     @property # :returns: 'current' nic
     def curnic(self): return self._vnic or self._nic
 
-    @property
-    def ifaces(self):
-        """
-         current interfaces belonging to this Radio
-         :returns: all (current) interfaces on this Radio
-          as a list of dicts
-        """
-        if not self._phy: raise RadioException(RDO_UNINITIALIZED,"Uninitialized")
-        try:
-            return iw.dev()[self._phy]
-        except iw.IWException as e:
-            raise RadioException((iw.ecode(e),e))
-        except KeyError:
-            raise RadioException(pyric.NLE_NODEV,"No such device (-19)")
+#    @property
+#    def ifaces(self):
+#        """
+#         current interfaces belonging to this Radio
+#         :returns: all (current) interfaces on this Radio
+#          as a list of dicts
+#        """
+#        if not self._phy: raise RadioException(RDO_UNINITIALIZED,"Uninitialized")
+#        try:
+#            return iw.dev()[self._phy]
+#        except iw.IWException as e:
+#            raise RadioException((iw.ecode(e),e))
+#        except KeyError:
+#            raise RadioException(pyric.NLE_NODEV,"No such device (-19)")
 
     @property
     def channel(self):
@@ -375,21 +376,18 @@ class Radio(object):
          :param spoof: spoof hwaddress if desired
         """
         try:
-            # initialize Radio's attributes
-            interface = None
-            self._phy,ifaces = iw.dev(nic)
-            for iface in ifaces:
-                if iface['nic'] == nic: interface = iface
+            # get basic info
             self._nic = nic
-            self._nicmode = interface['type']
-            self._hwaddr = pyw.ifhwaddrex(self._iosock,self._nic)
-            self._ifindex = pyw.ifindexex(self._iosock,self._nic)
+            info = pyw.infoex(self._nlsock,self._nic)
+            self._phy = "phy{0}".format(info['phy'])
+            self._nicmode = info['iftype']
+            self._hwaddr = info['mac']
             self._channels = iw.chget(self._phy)
             self._standards = pyw.standardsex(self._iosock,self._nic)
             self._driver = pywutils.ifdriver(self._nic)
             self._chipset = pywutils.ifchipset(self._driver)
             if spoof: self.spoof(spoof)  # create a spoofed address?
-            if vnic: self.watch(vnic)  # create in montor mode?
+            if vnic: self.watch(vnic)    # create in montor mode?
         except TypeError: raise RadioException(pyric.NLE_UNDEF,"Unexpected error")
         except RadioException: raise
         except pyric.error as e:
