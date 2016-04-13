@@ -32,7 +32,7 @@ __status__ = 'Development'
 
 import os,re
 import subprocess as sp
-from wraith.wifi.standards.channels import f2c
+from pyric.channels import rf2ch
 
 # constants error code
 IW_PERMISSION =  -1
@@ -224,7 +224,7 @@ def curchget(nic):
         lines = [line.strip() for line in out.split('\n') if line]
         rf = r'Current Frequency:([\d|\.]*)'
         freq = int(float(re.search(rf,lines[-1]).group(1))*1000)
-        ch = f2c(freq)
+        ch = rf2ch(freq)
         return ch
     except (AttributeError,IndexError,ValueError): return None
     except Exception as e: raise IWException(e)

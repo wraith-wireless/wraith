@@ -20,9 +20,8 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 from toolbox.bits import issetf              # flag on verification
-import pyric                                 # pyric error & error codes
-from pyric import pyw                        # pyw commands
-import pyric.utils as pywutils               # driver/chipset
+import pyric,errno                           # pyric error & error codes
+from pyric import pyw,device                 # pyw commands, driver/chipset
 import pyric.net.if_h as ifh                 # for interface flags
 import pyric.lib.libnl as nl                 # netlink library
 import pyric.lib.libio as io                 # ioctl library
@@ -300,7 +299,7 @@ class Radio(object):
          NOTE: this does not restore all interfaces that were deleted by watch
         """
         if not self._vnic:
-            raise RadioException(pyric.NLE_OPNOTSUPP,"Radio is not in monitor mode")
+            raise RadioException(errno.EOPNOTSUPP,"Radio is not in monitor mode")
         try:
             iw.devdel(self._vnic)
             self._vnic = None
@@ -359,7 +358,7 @@ class Radio(object):
         """
         if not self._phy: raise RadioException(RDO_UNINITIALIZED,"Uninitialized")
         if not chw in pyw.CHWIDTHS:
-            raise RadioException(pyric.NLE_INVAL,"Channel width is invalid")
+            raise RadioException(errno.EINVAL,"Channel width is invalid")
 
         try:
             iw.chset(self._phy,ch,chw)
@@ -378,17 +377,17 @@ class Radio(object):
         try:
             # get basic info
             self._nic = nic
-            info = pyw.infoex(self._nlsock,self._nic)
+            info = pyw.devinfoex(self._nlsock,self._nic)
             self._phy = "phy{0}".format(info['phy'])
             self._nicmode = info['iftype']
             self._hwaddr = info['mac']
             self._channels = iw.chget(self._phy)
             self._standards = pyw.standardsex(self._iosock,self._nic)
-            self._driver = pywutils.ifdriver(self._nic)
-            self._chipset = pywutils.ifchipset(self._driver)
+            self._driver = device.ifdriver(self._nic)
+            self._chipset = device.ifchipset(self._driver)
             if spoof: self.spoof(spoof)  # create a spoofed address?
             if vnic: self.watch(vnic)    # create in montor mode?
-        except TypeError: raise RadioException(pyric.NLE_UNDEF,"Unexpected error")
+        except TypeError: raise RadioException(pyric.EUNDEF,"Unexpected error")
         except RadioException: raise
         except pyric.error as e:
             raise RadioException(e.errno,e.strerror)

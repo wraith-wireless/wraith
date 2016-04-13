@@ -12,11 +12,11 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Production'
 
-import re                                  # reg exp matching
-from socket import gethostbyname           # hostname resolution
-from pyric.pyw import CHWIDTHS             # allowed channel widths
-from wraith.wifi.standards import channels # channel list specification
-import sys,traceback                       # traceback/error reporting
+import re                        # reg exp matching
+from socket import gethostbyname # hostname resolution
+from pyric import channels       # channel list specification
+from pyric.pyw import CHWIDTHS   # allowed channel widths
+import sys,traceback             # traceback/error reporting
 
 # validation expressions
 IPADDR = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") # re for ip addr

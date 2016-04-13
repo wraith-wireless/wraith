@@ -18,11 +18,11 @@ import select                                      # for select
 import multiprocessing as mp                       # multiprocessing
 import psycopg2 as psql                            # postgresql api
 from dateutil import parser as dtparser            # parse out timestamps
+from pyric import channels                         # 802.11 channels/RFs
 from wraith.utils.timestamps import isots          # converted timestamp
 import wraith.wifi.standards.radiotap as rtap      # 802.11 layer 1 parsing
 from wraith.wifi.standards import mpdu             # 802.11 layer 2 parsing
 from wraith.wifi.standards import mcs              # mcs functions
-from wraith.wifi.standards import channels         # 802.11 channels/RFs
 from wraith.utils.valrep import tb                 # for traceback
 from wraith.iyri.constants import *                # constants
 
@@ -333,7 +333,7 @@ class Thresher(mp.Process):
             index = None
             stbc = None
             hasMCS = 0
-        self._curs.execute(sql,(fid,std,rate,channels.f2c(dR['channel'][0]),
+        self._curs.execute(sql,(fid,std,rate,channels.rf2ch(dR['channel'][0]),
                                 dR['channel'][1],dR['channel'][0],hasMCS,bw,gi,
                                 ht,index,stbc))
         self._conn.commit()
