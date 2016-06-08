@@ -25,7 +25,7 @@ import socket                      # sockets (iyri control)
 import wraith                      # version info/constants
 import wraith.widgets.panel as gui # graphics suite
 import wraith.subpanels as subgui  # our subpanels
-from toolbox import bits           # bitmask functions
+from wraith.utils import bits      # bitmask functions
 from wraith.utils import cmdline   # command line stuff
 
 # server/services functions shared by splash and main panel

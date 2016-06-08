@@ -11,7 +11,7 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-from wraith.wifi.standards.mpdu import MAX_MPDU
+from wraith.standards.mpdu import MAX_MPDU
 
 # define the m x n array size for the cirular buffer
 DIM_M = 1000     # number of rows for memory view

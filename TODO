@@ -62,6 +62,8 @@ Iyri:
   o need to give newly created threshers time to reduce the capacity
   o still not sure that this will be able to handle the workload of one radio
    not to mention when used with the shama radio as well
+  o have noticed that if iyri starts paused, the threshers seem to be overwhelmed
+   immediately when the sensor starts
  70) handle IOError/EOFError in Collator better - if there is an error in the
    Pipe we need to be able to kill the correpsonding Thresher through a signal
  80) iyrid needs to handle stop better
@@ -70,11 +72,6 @@ Iyri:
   o when run as service, logging is also stopped shortly after calling 'stop'
    - artifact of calling as a service?
  81) user command state needs to return more data such as current channel, txpwr etc
- 82) have tuner interact directly with iyri?
-   o it could become an issue if a process was programmatically interacting
-    w/ iyri where the RadioController would be too occupied w/ fielding
-    comms from the Tuner rather than pulling off the "wire"
-   o However, radio must be able to forward radio events to the collator
 Wifi:
   1) Should we add support for AVS, Prism headers ?
   2) in standards.radiotap: ensure data pad is handled for atheros cards (any others?)

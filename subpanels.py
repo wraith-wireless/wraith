@@ -26,12 +26,12 @@ import ConfigParser                        # config file parsing
 import threading                           # Threads et al
 import select                              # non-blocking poll
 import socket                              # socket errors from C2C
-#from pyric.pyw import winterfaces          # list wireless interfaces
-from pyric import pyw,channels             # channels & channel widths
+from pyric import pyw                      # nic enumerations
+from pyric.utils import channels           # channel specs
+from pyric.utils import hardware           # device details
 import wraith                              # version info & constants
 import wraith.widgets.panel as gui         # graphics suite
-from wraith.wifi.interface import radio    # Radio class
-from wraith.wifi.standards import mpdu     # for 802.11 types/subtypes
+from wraith.standards import mpdu          # for 802.11 types/subtypes
 from wraith.utils import timestamps        # valid data/time
 from wraith.utils import landnav           # lang nav utilities
 from wraith.utils import cmdline           # cmdline functionality
@@ -405,20 +405,28 @@ class InterfacePanel(gui.PollingTabularPanel):
             if not l in nics: self._tree.delete(l)
 
         # add new system nics
-        r = radio.Radio()
-        for nic in nics:
-            r.setnic(nic)
+        for nic in nics():
+            info = pyw.devinfo(nic)
+            driver,chipset = hardware.ifcard(nic)
             if nic in ls:
                 # check if data has changed -
                 cur = self._tree.set(nic)
-                if cur['PHY'] != r.phy: self._tree.set(nic,'PHY',r.phy)
-                if cur['MAC'] != r.hwaddr: self._tree.set(nic,'MAC',r.hwaddr)
-                if cur['Mode'] != r.mode: self._tree.set(nic,'Mode',r.mode)
-                if cur['Driver'] != r.driver: self._tree.set(nic,'Driver',r.driver)
-                if cur['Chipset'] != r.chipset: self._tree.set(nic,'Chipset',r.chipset)
+                if cur['PHY'] != info['card'].phy:
+                    self._tree.set(nic,'PHY',info['card'].phy)
+                if cur['MAC'] != info['mac']:
+                    self._tree.set(nic,'MAC',info['mac'])
+                if cur['Mode'] != info['mode']:
+                    self._tree.set(nic,'Mode',info['mode'])
+                if cur['Driver'] != driver:
+                    self._tree.set(nic,'Driver',driver)
+                    self._tree.set(nic,'Chipset',chipset)
             else:
-                self._tree.insert('','end',iid=nic,values=(r.phy,nic,r.hwaddr,
-                                                           r.mode,r.driver,r.chipset))
+                self._tree.insert('','end',iid=nic,values=(info['card'].phy,
+                                                           nic,
+                                                           info['mac'],
+                                                           info['mode'],
+                                                           driver,
+                                                           chipset))
 # View->DataBin
 class DatabinPanel(gui.SimplePanel):
     """ DatabinPanel - displays a set of data bins for retrieved data storage """
@@ -1336,7 +1344,7 @@ class _ParamDialog(tkSD.Dialog):
                     ch = param
                     chw = 'None'
                 ch = int(ch)
-                if not (chw in pyw.CHWIDTHS or chw == 'None'):
+                if not (chw in channels.CHWIDTHS or chw == 'None'):
                     err = "Invalid channel width"
                 elif not ch in channels.channels(): err = "Invalid channel"
                 else: params = "{0}:{1}".format(ch,chw)
@@ -2053,7 +2061,7 @@ class IyriConfigPanel(gui.ConfigPanel):
                     ch = start
                     chw = None
                 ch = int(ch)
-                if chw and not chw in pyw.CHWIDTHS:
+                if chw and not chw in channels.CHWIDTHS:
                     raise RuntimeError("Specified channel width is not valid")
         except ValueError:
             self.err("Invalid Abad Input","Scan start must be integer")
@@ -2128,7 +2136,7 @@ class IyriConfigPanel(gui.ConfigPanel):
                         ch = start
                         chw = None
                     ch = int(ch)
-                    if chw and not chw in pyw.CHWIDTHS:
+                    if chw and not chw in channels.CHWIDTHS:
                         raise RuntimeError("Specified channel width is not valid")
             except ValueError:
                 self.err("Invalid Shama Input", "Scan start must be integer")

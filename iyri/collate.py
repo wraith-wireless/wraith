@@ -24,18 +24,18 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import platform,sys                            # system & interpreter details
-import signal,select                           # signal & select processing
-from time import time                          # sleep and timestamps
-import socket                                  # connection to gps device
-from Queue import Empty                        # queue empty exception
-import multiprocessing as mp                   # multiprocessing
-import psycopg2 as psql                        # postgresql api
-from wraith.utils.timestamps import isots      # converted timestamp
-from wraith.wifi.interface.iw import regget    # regulatory domain
-from wraith.utils.cmdline import ipaddr        # returns ip address
-from wraith.iyri.thresh import Thresher        # thresher process
-from wraith.iyri.constants import *            # constants
+import platform,sys                       # system & interpreter details
+import signal,select                      # signal & select processing
+from time import time                     # sleep and timestamps
+import socket                             # connection to gps device
+from Queue import Empty                   # queue empty exception
+import multiprocessing as mp              # multiprocessing
+import psycopg2 as psql                   # postgresql api
+from wraith.utils.timestamps import isots # converted timestamp
+from pyric.pyw import regget              # regulatory domain
+from wraith.utils.cmdline import ipaddr   # returns ip address
+from wraith.iyri.thresh import Thresher   # thresher process
+from wraith.iyri.constants import *       # constants
 
 class Collator(mp.Process):
     """ Collator - handles processing/storage of raw frames from the sniffer """

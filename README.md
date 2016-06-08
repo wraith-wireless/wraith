@@ -112,20 +112,15 @@ Provides the Postgresql database schema, nidus.sql.
     - cmdline.py        various cmdline utilities for testing processes
     - simplepcap.py     pcap writer
     - valrep.py         validation and reporting functionality
+    - oui.py            oui/manuf related functions
  *  data:               data folder
     - oui.txt           tab seperated oui manufacturer file
- *  wifi:               subpackage for wifi related
-     - \_\_init\_\_.py  initialize radio subpackage
-     - interface:       initialize interface subpackage
-        + iw.py         iw 3.17 interface
-        + oui.py        oui/manuf related functions
-        + radio.py      Radio consolidates iwtools.py, iw.py
-     - standards:       initialize standards subpackage
-        + radiotap.py   radiotap parsing
-        + mpdu.py       IEEE 802.11 MAC (MPDU) parsing
-        + dott1u.py     contstants for 802.11u (not currently used)
-        + channels.py   802.11 channel, freq utilities
-        + mcs.py        mcs index functions
+ * standards:           initialize standards subpackage
+    - radiotap.py       radiotap parsing
+    - mpdu.py           IEEE 802.11 MAC (MPDU) parsing
+    - dott1u.py         contstants for 802.11u (not currently used)
+    - channels.py       802.11 channel, freq utilities
+    - mcs.py            mcs index functions
  * nidus:               database schema
      - \_\_init\_\_.py  initialize nidus subpackage
      - nidus.sql        database definition

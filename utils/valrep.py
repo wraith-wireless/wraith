@@ -14,8 +14,7 @@ __status__ = 'Production'
 
 import re                        # reg exp matching
 from socket import gethostbyname # hostname resolution
-from pyric import channels       # channel list specification
-from pyric.pyw import CHWIDTHS   # allowed channel widths
+from pyric.utils import channels # channels/widths specification
 import sys,traceback             # traceback/error reporting
 
 # validation expressions
@@ -121,9 +120,9 @@ def channellist(pattern,ptype='scan'):
     # compile all possible combinations
     if (chs,ws) == ([],[]):
         if ptype == 'scan':
-            return [(ch,chw) for chw in CHWIDTHS for ch in channels.channels()]
+            return [(ch,chw) for chw in channels.CHWIDTHS for ch in channels.channels()]
     elif not chs: return [(ch,chw) for chw in ws for ch in channels.channels()]
-    elif not ws: return [(ch,chw) for chw in CHWIDTHS for ch in chs]
+    elif not ws: return [(ch,chw) for chw in channels.CHWIDTHS for ch in chs]
     else: return [(ch,chw) for chw in ws for ch in chs]
     return [],[]
 

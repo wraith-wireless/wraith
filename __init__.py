@@ -77,6 +77,8 @@ wraith 0.0.4
  includes:  wraith-rt.py, subpanels.py & relevant subpackages
  changes:
   - moved nic functionality to seperate project (see https://github.com/wraith-wireless/pyric)
+  - remove reliance on Popen and parsing commandline tools for nic related
+    o solely using PyRIC
 """
 __name__ = 'wraith'
 __license__ = 'GPL v3.0'

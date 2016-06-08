@@ -26,8 +26,8 @@ import signal                             # handling signals
 import socket                             # reading frames
 from Queue import Empty                   # queue empty exception
 import multiprocessing as mp              # for Process
-from pyric.pyw import winterfaces         # list wireless interfaces
-from wraith.wifi.interface import radio   # wireless nics & details
+import pyric                              # pyric errors
+from pyric import pyw                     # & nic functions
 from wraith.utils.timestamps import isots # converted timestamp
 from wraith.iyri.tuner import Tuner       # our tuner
 from wraith.iyri.constants import *       # tuner states & buffer dims
@@ -195,14 +195,14 @@ class RadioController(mp.Process):
          :param conf: radio configuration
         """
         # 1) set radio properties as specified in conf
-        if conf['nic'] not in winterfaces():
+        if conf['nic'] not in pyw.winterfaces():
             raise RuntimeError("{0}:radio.nic:not found".format(conf['role']))
         self._role = conf['role']      # save role
         self._paused = conf['paused']  # & initial state (paused|scan)
 
         # determine virtual interface name
         ns = []
-        for wiface in winterfaces():
+        for wiface in pyw.winterfaces():
             cs = wiface.split('iyri')
             try:
                 if len(cs) == 2:

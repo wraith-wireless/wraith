@@ -13,18 +13,18 @@ __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import signal                                      # handle signals
-import select                                      # for select
-import multiprocessing as mp                       # multiprocessing
-import psycopg2 as psql                            # postgresql api
-from dateutil import parser as dtparser            # parse out timestamps
-from pyric import channels                         # 802.11 channels/RFs
-from wraith.utils.timestamps import isots          # converted timestamp
-import wraith.wifi.standards.radiotap as rtap      # 802.11 layer 1 parsing
-from wraith.wifi.standards import mpdu             # 802.11 layer 2 parsing
-from wraith.wifi.standards import mcs              # mcs functions
-from wraith.utils.valrep import tb                 # for traceback
-from wraith.iyri.constants import *                # constants
+import signal                             # handle signals
+import select                             # for select
+import multiprocessing as mp              # multiprocessing
+import psycopg2 as psql                   # postgresql api
+from dateutil import parser as dtparser   # parse out timestamps
+from pyric.utils import channels          # 802.11 channels/RFs
+from wraith.utils.timestamps import isots # converted timestamp
+import wraith.standards.radiotap as rtap  # 802.11 layer 1 parsing
+from wraith.standards import mpdu         # 802.11 layer 2 parsing
+from wraith.standards import mcs          # mcs functions
+from wraith.utils.valrep import tb        # for traceback
+from wraith.iyri.constants import *       # constants
 
 class Thresher(mp.Process):
     """ Thresher process frames and inserts frame data in database """

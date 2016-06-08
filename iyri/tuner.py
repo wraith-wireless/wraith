@@ -17,7 +17,8 @@ __status__ = 'Development'
 from time import time                              # timestamps/timing metrics
 import signal                                      # handling signals
 import multiprocessing as mp                       # for Process
-from wraith.wifi.interface import radio           # radio
+import pyric                                       # pyric error
+from pyric import pyw                              # and nic functions
 from wraith.utils.timestamps import isots, ts2iso # time stamp conversion
 from wraith.iyri.constants import *               # tuner states & buffer dims
 

@@ -17,7 +17,7 @@ __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
 import struct
-from toolbox.bits import *
+from wraith.utils.bits import *
 
 class MPDUException(Exception): pass                    # generic mpdu exception
 class MPDUUninstantiatedException(MPDUException): pass  # class not instantiated

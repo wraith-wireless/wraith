@@ -26,11 +26,12 @@ import socket,threading                          # for the c2c server
 import select                                    # c2c & main loop
 import pyric                                     # pyric errors
 from pyric import pyw                            # ifaces, get/set reg domain, ch widths
+from pyric.utils.hardware import randhw          # spoofing hwaddr
+from pyric.utils.channels import CHWIDTHS        # chwidths
 from wraith.iyri import __version__ as ivers     # for iyri version
 from wraith.iyri.collate import Collator         # the collator
 from wraith.iyri.rdoctl import RadioController   # Radio object etc
 from wraith.iyri.gpsctl import GPSController     # gps device
-from wraith.wifi.interface.oui import randhw     # spoofing hwaddr
 from wraith.utils.cmdline import runningprocess  # check for psql running
 from wraith.utils import valrep                  # validation functionality
 from wraith.iyri.constants import *              # buffer dims
@@ -301,8 +302,8 @@ class Iryi(object):
         if self._rd:
             try:
                 logging.info("Resetting regulatory domain...")
-                pyw.regdom(self._rd)
-                if pyw.regdom() != self._rd: raise RuntimeError
+                pyw.regset(self._rd)
+                if pyw.regget() != self._rd: raise RuntimeError
                 logging.info("Regulatory domain reset")
             except (pyric.error,RuntimeError):
                 logging.warning("Failed to reset regulatory domain")
@@ -378,8 +379,8 @@ class Iryi(object):
             if rd:
                 logging.info("Setting regulatory domain to %s...",rd)
                 try:
-                    self._rd = pyw.regdom()
-                    pyw.regdom(rd)
+                    self._rd = pyw.regget()
+                    pyw.regset(rd)
                 except pyric.error:
                     logging.warning("Failed to set regulatory domain")
 
@@ -592,7 +593,7 @@ class Iryi(object):
                     ch = scanspec
                     chw = None
                 ch = int(ch) if ch else r['scan'][0][0]
-                if not chw in pyw.CHWIDTHS: chw = r['scan'][0][1]
+                if not chw in CHWIDTHS: chw = r['scan'][0][1]
                 r['scan_start'] = (ch,chw) if (ch,chw) in r['scan'] else r['scan'][0]
             except ValueError:
                 r['scan_start'] = r['scan'][0]
