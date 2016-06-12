@@ -10,8 +10,8 @@ used is similar to kismet (see below)
 
 #__name__ = 'iyri'
 __license__ = 'GPL v3.0'
-__version__ = '0.1.1'
-__date__ = 'January 2016'
+__version__ = '0.1.2'
+__date__ = 'June 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
@@ -25,7 +25,7 @@ import ConfigParser                              # reading configuration files
 import socket,threading                          # for the c2c server
 import select                                    # c2c & main loop
 import pyric                                     # pyric errors
-from pyric import pyw                            # ifaces, get/set reg domain, ch widths
+from pyric import pyw                            # wifaces, get/set reg domain
 from pyric.utils.hardware import randhw          # spoofing hwaddr
 from pyric.utils.channels import CHWIDTHS        # chwidths
 from wraith.iyri import __version__ as ivers     # for iyri version
@@ -303,8 +303,6 @@ class Iryi(object):
             try:
                 logging.info("Resetting regulatory domain...")
                 pyw.regset(self._rd)
-                if pyw.regget() != self._rd: raise RuntimeError
-                logging.info("Regulatory domain reset")
             except (pyric.error,RuntimeError):
                 logging.warning("Failed to reset regulatory domain")
 
@@ -381,8 +379,8 @@ class Iryi(object):
                 try:
                     self._rd = pyw.regget()
                     pyw.regset(rd)
-                except pyric.error:
-                    logging.warning("Failed to set regulatory domain")
+                except pyric.error as e:
+                    logging.warning("Error {0}. Failed to set regulatory domain".format(e.errno))
 
             # abad radio is mandatory -> as with the Collator, we cannot continue
             # w/out this one, allow the outer block to catch any failures
@@ -488,11 +486,9 @@ class Iryi(object):
                 raise RuntimeError("Invalid IP address for storage host")
 
             # Local section
-            # thresher related are required, c2c and region are optional
+            # thresher maxt is required, c2c and region are optional
             # get required
-            self._conf['local'] = {'thresher':{},
-                                   'region':None,
-                                   'c2c':2526}
+            self._conf['local'] = {'thresher':{},'region':None,'c2c':2526}
             self._conf['local']['thresher']['max'] = cp.getint('Local','maxt')
 
             if cp.has_option('Local','C2C'):
@@ -540,13 +536,10 @@ class Iryi(object):
         # get optional properties
         if cp.has_option(rtype,'spoof'):
             spoof = cp.get(rtype,'spoof').upper()
-            if not spoof == 'RANDOM' and not valrep.validhwaddr(spoof):
-                logging.warn("Invalid spoofed MAC addr %s specified",spoof)
+            if spoof == 'RANDOM': r['spoofed'] = randhw()
+            elif valrep.validhwaddr(spoof): r['spoofed'] = spoof
             else:
-                if spoof == 'RANDOM':
-                    r['spoofed'] = randhw()
-                else:
-                    r['spoofed'] = spoof
+                logging.warn("Invalid spoofed MAC addr %s specified",spoof)
         if cp.has_option(rtype,'desc'): r['desc'] = cp.get(rtype,'desc')
         if cp.has_option(rtype,'paused'): r['paused'] = cp.getboolean(rtype,'paused')
 

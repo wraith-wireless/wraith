@@ -6,25 +6,24 @@ Processings of frames, stores frame data/metadata to DB.
 """
 __name__ = 'thresh'
 __license__ = 'GPL v3.0'
-__version__ = '0.0.5'
-__date__ = 'January 2016'
+__version__ = '0.0.6'
+__date__ = 'June 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
 __email__ = 'wraith.wireless@yandex.com'
 __status__ = 'Development'
 
-import signal                             # handle signals
-import select                             # for select
-import multiprocessing as mp              # multiprocessing
-import psycopg2 as psql                   # postgresql api
-from dateutil import parser as dtparser   # parse out timestamps
-from pyric.utils import channels          # 802.11 channels/RFs
-from wraith.utils.timestamps import isots # converted timestamp
-import wraith.standards.radiotap as rtap  # 802.11 layer 1 parsing
-from wraith.standards import mpdu         # 802.11 layer 2 parsing
-from wraith.standards import mcs          # mcs functions
-from wraith.utils.valrep import tb        # for traceback
-from wraith.iyri.constants import *       # constants
+import signal,select                               # handle signals, select
+import multiprocessing as mp                       # multiprocessing
+import psycopg2 as psql                            # postgresql api
+from dateutil import parser as dtparser            # parse out timestamps
+from pyric.utils.channels import ISM_24_F2C, rf2ch # ISM band  & converter
+from wraith.utils.timestamps import isots          # converted timestamp
+import wraith.standards.radiotap as rtap           # 802.11 layer 1 parsing
+from wraith.standards import mpdu                  # 802.11 layer 2 parsing
+from wraith.standards import mcs                   # mcs functions
+from wraith.utils.valrep import tb                 # for traceback
+from wraith.iyri.constants import *                # constants
 
 class Thresher(mp.Process):
     """ Thresher process frames and inserts frame data in database """
@@ -322,7 +321,7 @@ class Thresher(mp.Process):
             rate = mcs.mcs_rate(index,width,gi)
             hasMCS = 1
         except:
-            if dR['channel'][0] in channels.ISM_24_F2C:
+            if dR['channel'][0] in ISM_24_F2C:
                 if rtap.chflags_get(dR['channel'][1],'cck'): std = 'b'
                 else: std = 'g'
             else: std = 'a'
@@ -333,7 +332,7 @@ class Thresher(mp.Process):
             index = None
             stbc = None
             hasMCS = 0
-        self._curs.execute(sql,(fid,std,rate,channels.rf2ch(dR['channel'][0]),
+        self._curs.execute(sql,(fid,std,rate,rf2ch(dR['channel'][0]),
                                 dR['channel'][1],dR['channel'][0],hasMCS,bw,gi,
                                 ht,index,stbc))
         self._conn.commit()

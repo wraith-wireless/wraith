@@ -36,6 +36,7 @@ REVISIONS:
    - writing raw frames
     o removed seperate 'writer' process, writes handled by thresher
     o removed writing raw frames to file, stored in db (have to use psycopg2 Binary
+
  0.2.1
   desc: Adds some "intelligence". Collator will add threshers IOT to avoid race
    condition introduced by circular buffer where frames are being overwritten
@@ -70,10 +71,20 @@ REVISIONS:
    - removed oui related from conf file and functions
    - added radio role to return messages from C2C
    - random spoofed address are now supported
+
+ 0.2.2
+  desc: utilize's PyRIC wireless library to handle wireless card manipulations,
+   moving entirely away from using command lines tools through subprocess.Popen
+  includes: iyri 0.1.2 constants 0.0.1 collate 0.1.4 gpsctl 0.0.3 rdoctl 0.1.2
+   tuner 0.0.1 thresh 0.0.6 iyrid iyri.conf iyri.log.conf iyrid
+  changes:
+   - removed all iw/iwtools functions
+   - replaced with calls through PyRIC
+
 """
 __name__ = 'iyri'
 __license__ = 'GPL v3.0'
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 __date__ = 'January 2016'
 __author__ = 'Dale Patterson'
 __maintainer__ = 'Dale Patterson'
