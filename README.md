@@ -22,12 +22,10 @@ data to view, how to view it and 'when' to view it.
    - NOTE: some cards i.e. rosewill usb nics were not fully supported through iw
      on earlier 3.13.x kernels
  * Python 2.7
- * iw 3.17
  * postgresql 9.x (tested on 9.3.5)
  * pyscopg > 2.6
  * mgrs 1.1
- * toolbox 0.0.2 (https://github.com/wraith-wireless/toolbox)
- * pyric 0.0.2 https://github.com/wraith-wireless/pyric)
+ * PyRIC 0.1.3 https://github.com/wraith-wireless/pyric)
 
 ## 3. MODULES: Currently consists of three main components/modules: Wifi, Iyri and
 the GUI and three secondary modules: utils, widgets, and nidus.

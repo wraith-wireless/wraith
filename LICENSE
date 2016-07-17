@@ -1,5 +1,7 @@
 WRAITH: Wireless Reconnaissance And Intelligent Target Harvesting.
-Copyright (C) 2015  Dale V. Patterson (wraith.wireless@yandex.com)
+
+Wireless Pentesting Toolsuite
+Copyright (C) 2016  Dale V. Patterson (wraith.wireless@yandex.com)
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -27,7 +29,7 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT
 STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Wraith is free software but use, duplication or disclosure by the United States
+PyRIC is free software but use, duplication or disclosure by the United States
 Government is subject to the restrictions set forth in DFARS 252.227-7014.
 
 Use of this software is governed by all applicable federal, state and local

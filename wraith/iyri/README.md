@@ -19,7 +19,7 @@ NOTE: It is recommended to only use the Shama radio for collection during times 
 ### a. Dependencies:
  * linux (tested on 3.13.x kernel)
  * Python 2.7
- * PyRIC 0.1.1
+ * PyRIC >= 0.1.5
  * postgresql 9.x
  * pyscopg > 2.6
  * mgrs 1.1
@@ -33,7 +33,7 @@ At present, Iyri, like Wraith, must be manually installed. See CONFIGURE.txt in 
  * Postgresql DB API: psycopg2 v2.5.4 at https://pypi.python.org/pypi/psycopg2
  * Lat/Lon conversion: mgrs v1.1 at https://pypi.python.org/packages/source/m/mgrs/mgrs-1.1.0.tar.gz
    - may require python-setuptools
- * Wireless interface: PyRIC v0.1.1 at  https://pypi.python.org/pypi/PyRIC
+ * Wireless interface: PyRIC v0.1.5 at  https://pypi.python.org/pypi/PyRIC
 
 ### ii. Python Files
 Iyri requires all files in the iyri directory as well as those in the utils and wifi directories.

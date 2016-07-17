@@ -16,9 +16,7 @@ psql -h localhost -U nidus -d nidus # at prompt, enter password, past nidus.sql
 2) Dependencies
  - dateutil 2.3 https://pypi.python.org/pypi/python-dateutil
 
- - iw 3.17 https://www.kernel.org/pub/software/network/iw/iw-3.17.tar.xz
-   o install to /usr/sbin/iw
-   o iw.py depends upon this version
+ - PyrIC: sudo pip install PyRIC
 
  - psycopg2 2.5.4 https://pypi.python.org/pypi/psycopg2
  

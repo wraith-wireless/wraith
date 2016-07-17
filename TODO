@@ -104,3 +104,4 @@ Wifi:
  15) see if ioctl can be used to set txpwr
 Nidus(.sql):
   1) create different users (w/ varying roles/authorities)
+  2) Add configuration file here
