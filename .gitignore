@@ -37,7 +37,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-# lib -> commented out as we use lib
+lib/
 lib64/
 parts/
 sdist/

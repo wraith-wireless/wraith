@@ -27,7 +27,7 @@ import select                                    # c2c & main loop
 import pyric                                     # pyric errors
 from pyric import pyw                            # wifaces, get/set reg domain
 from pyric.utils.hardware import randhw          # spoofing hwaddr
-from pyric.utils.channels import CHWIDTHS        # chwidths
+from pyric.utils.channels import CHTYPES         # channel widths
 from wraith.iyri import __version__ as ivers     # for iyri version
 from wraith.iyri.collate import Collator         # the collator
 from wraith.iyri.rdoctl import RadioController   # Radio object etc
@@ -515,13 +515,13 @@ class Iryi(object):
          :param cp: ConfigParser object
          :param rtype: radio type onoeof {'Abad'|'Shama'}
         """
-        nic = cp.get(rtype,'nic')
-        if not nic in pyw.winterfaces():
-            err = "Radio {0} not present/not wireless".format(nic)
+        dev = cp.get(rtype,'dev')
+        if not dev in pyw.winterfaces():
+            err = "Radio {0} not present/not wireless".format(dev)
             raise RuntimeError(err)
 
-        # get nic & set role, also setting defaults
-        r = {'nic':nic,
+        # get dev & set role, also setting defaults
+        r = {'dev':dev,
              'paused':False,
              'spoofed':None,
              'desc':"unknown",
@@ -586,7 +586,7 @@ class Iryi(object):
                     ch = scanspec
                     chw = None
                 ch = int(ch) if ch else r['scan'][0][0]
-                if not chw in CHWIDTHS: chw = r['scan'][0][1]
+                if not chw in CHTYPES: chw = r['scan'][0][1]
                 r['scan_start'] = (ch,chw) if (ch,chw) in r['scan'] else r['scan'][0]
             except ValueError:
                 r['scan_start'] = r['scan'][0]

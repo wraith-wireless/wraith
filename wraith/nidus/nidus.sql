@@ -131,8 +131,8 @@ CREATE TABLE flt(
 CREATE INDEX flt_ts_idx ON flt(ts);
 
 -- radio table
--- static properties of a radio i.e. a wireless nic
--- any changes to the below would imply a new wireless nic
+-- static properties of a radio i.e. a wireless intervace
+-- any changes to the below would imply a new wireless interface
 DROP TABLE IF EXISTS radio;
 CREATE TABLE radio(
    mac macaddr NOT NULL,                      -- mac address of nic
@@ -199,8 +199,8 @@ CREATE TABLE using_radio(
    sid integer NOT NULL,      -- foreign key to sensor
    mac macaddr NOT NULL,      -- foreign key to radio
    phy VARCHAR(5) NOT NULL,   -- the phy of radio
-   nic VARCHAR(5) NOT NULL,   -- actual nic of radio
-   vnic VARCHAR(6) NOT NULL,  -- virtual nic of radio
+   dev VARCHAR(5) NOT NULL,   -- device name of radio
+   vdev VARCHAR(6) NOT NULL,  -- virtual device name of radio
    hop REAL NOT NULL,         -- avg hop time
    ival REAL NOT NULL,        -- ttl time to complete a scan
    role ROLE NOT NULL,        -- what role radio is playing now
@@ -1022,7 +1022,7 @@ CREATE FUNCTION delete_all()
       DELETE FROM deauth;
       DELETE FROM beacon;
       DELETE FROM auth;
-      DELETE FROM action;
+      DELETE FROM act;
       DELETE FROM sta_activity;
       DELETE FROM sta;
       ALTER SEQUENCE sta_sta_id_seq RESTART;
@@ -1121,10 +1121,10 @@ DROP TABLE disassoc;
 DROP TABLE deauth;
 DROP TABLE beacon;
 DROP TABLE auth;
-DROP TABLE action;
+DROP TABLE act;
 DROP TABLE sta_activity;
 DROP TABLE sta;
-DROP TABLE ssids;
+DROP TABLE ssid;
 DROP TABLE malformed;
 DROP TABLE frame_raw;
 DROP TABLE frame;
