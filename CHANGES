@@ -66,3 +66,4 @@ wraith 0.0.4
    - remove reliance on Popen and parsing commandline tools for nic related
      o solely using PyRIC
    - restructured hierarchy to support pypi/pip packaging
+   - added CONFIGURE to nidus

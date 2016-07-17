@@ -1,17 +1,6 @@
 A. CONFIGURATION
 
-1) Postgresql (posgresql 9.3.X (tested on 9.3.4) with btree_gist (see http://www.postgresql.org/docs/devel/static/rangetypes.html)
-# configure postgresql with adminpack and btree_gist, then create user nidus
-# and nidus db
-sudo su - postgres psql (and from prompt)
-postgres=# CREATE EXTENSION adminpack;
-postgres=# CREATE EXTENSION btree_gist;
-postgres=# createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
-postgres=# createdb --owner=nidus nidus
-postgres=# exit
-psql -h localhost -U nidus -d nidus # at prompt, enter password, past nidus.sql
-
-# create nidus user and nidus database
+1) Create nidus user/database see wraith/nidus/CONFIGURE
 
 2) Dependencies
  - dateutil 2.3 https://pypi.python.org/pypi/python-dateutil

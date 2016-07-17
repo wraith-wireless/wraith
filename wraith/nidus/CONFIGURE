@@ -1,0 +1,26 @@
+A. CONFIGURATION (on postgresql 9.5)
+
+1) install Postgresql
+
+2) create nidus user (w/ pwd prompt, no superuser privs, cannot create roles and
+cannot create databases) then create database assigning nidus as the owner
+sudo su - postgres
+postgres~$ createuser nidus -P -S -R -D
+# enter password when prompted
+postgres~$ createdb --owner=nidus nidus
+postgres~$ exit
+
+3) Configure nidus database with btree_gist (see http://www.postgresql.org/docs/devel/static/rangetypes.html)
+and adminpack # this requires root or user with ability to modify/create etc that
+should have been setup during postgresql install
+?> psql -h localhost -U root -d nidus
+nidus=# CREATE EXTENSION btree_gist;
+CREATE EXTENSION
+nidus=# CREATE EXTENSION adminpack;
+CREATE EXTENSION
+nidus=# \q
+
+4) setup nidus database (login as nidus)
+psql -h localhost -U nidus -d nidus
+# copy and paste nidus.sql
+# NOTE: do copy past --BELOW is for admin purposes only comment

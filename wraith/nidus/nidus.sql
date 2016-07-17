@@ -1,19 +1,16 @@
 -- using postgresql 9.3.4
--- version 0.0.15
+-- __name__ = 'nidus.sql'
+-- __license__ = 'GPL v3.0'
+-- __version__ = '0.0.15'
+-- __date__ = 'July 2016'
+-- __author__ = 'Dale Patterson'
+-- __maintainer__ = 'Dale Patterson'
+-- __email__ = 'wraith.wireless@yandex.com'
+-- __status__ = 'Development'
 
--- create nidus user and nidus database
---postgres@host:/var/lib$ createuser nidus --pwprompt --no-superuser --no-createrole --no-createdb
---  Enter password for new role: **** (nidus)
---  Enter it again: **** (nidus)
---createdb --owner=nidus nidus
 
 -- to login with nidus & verify postgis
-psql -h localhost -U nidus -d nidus
-
--- use btree_gist (see http://www.postgresql.org/docs/devel/static/rangetypes.html)
--- sudo su - postgres
--- postgres=# psql -d nidus
--- postgres=# CREATE EXTENSION btree_gist;
+-- psql -h localhost -U nidus -d nidus
 
 -- force timezone to UTC
 SET TIME ZONE 'UTC';
@@ -1050,7 +1047,7 @@ CREATE FUNCTION delete_all()
     $$ LANGUAGE plpgsql;
 
 -- store procedure to fix any NULL-ended periods which can occur after
--- error or a forced kill Nidus (or a sensor)
+-- error or a forced kill of a sensor
 DROP FUNCTION IF EXISTS fix_nullperiod();
 CREATE OR REPLACE FUNCTION fix_nullperiod()
     RETURNS void as $$
