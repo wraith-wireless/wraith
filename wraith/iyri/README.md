@@ -1,18 +1,30 @@
 # ![](../widgets/icons/watcher.png?raw=true) Iyri v 0.2.1: 802.11 Sensor
 
 ## 1 DESCRIPTION:
-Iyri is a 802.11 sensor and processor. It can be configured to work with one or two wireless network interface cards (hereafter referred to as radios). It consists of a mandatory radio (Abad) which can receive or transmit and an optional radio (Shama) for receiving only. Additionally, Iyri allows for an optional GPS device. Iryi will parse data from the radio(s) (in the form of raw frames) as well as GPS data (locational and device), wireless nic information and system/platform information and store this data in a Postgresql database (nidus).
- * Iyri requires root to run although one can configure iyrid to run as local user after the raw socket has been bound
- * Iyri can be configured at startup using iyri.conf and allows for control during operation over netcat, telnet etc or programmatically over a socket.
- * Iyri can be started as service with iyrid (sudo service iyrid start) or via python (sudo python iyri.py)
+Iyri is a 802.11 sensor and processor. It can be configured to work with one or
+two wireless network interface cards (hereafter referred to as radios). It 
+consists of a mandatory radio (Abad) which can receive or transmit and an 
+optional radio (Shama) for receiving only. Additionally, Iyri allows for an 
+optional GPS device. Iryi will parse data from the radio(s) (in the form of raw
+frames) as well as GPS data (locational and device), wireless nic information 
+and system/platform information and store this data in a Postgresql database 
+(nidus).
+ * Iyri requires root to run
+ * Iyri can be configured at startup using iyri.conf and allows for control 
+ during operation over netcat, telnet etc or programmatically over a socket.
+ * Iyri can be started as service with iyrid (sudo service iyrid start) or via 
+ python (sudo python iyri.py)
  * Iyri logs informational messages and warnings/errors to /var/log/wraith/iyri.log
  * Each radio can run in scan, listen, hold, pause modes
-  - Scan: scans preconfigured channel list dwelling on each channel for a specified amount of time
+  - Scan: scans preconfigured channel list dwelling on each channel for a 
+  specified amount of time
   - Listen: stays on a specified channel
   - Hold: stays on the current channel
   - Pause: does not record any data
 
-NOTE: It is recommended to only use the Shama radio for collection during times Abad is transmitting as using both radios at the same time to scan can result in dropped packets. If traffic is spare though, both radios can be used.
+NOTE: It is recommended to only use the Shama radio for collection during times 
+Abad is transmitting as using both radios at the same time to scan can result 
+in dropped packets. If traffic is spare though, both radios can be used.
 
 ## 2. Setup, Configuration and Control
 
@@ -26,7 +38,8 @@ NOTE: It is recommended to only use the Shama radio for collection during times 
  * dateutil 2.3
 
 ### b. Setup
-At present, Iyri, like Wraith, must be manually installed. See CONFIGURE.txt in the wraith directory to setup nidus, the Postgresql database. To setup Iyri:
+At present, Iyri, like Wraith, must be manually installed. See nidus/CONFIGURE.txt 
+in setup nidus. To setup Iyri:
 
 ### i. Install the following dependencies:
  * Timestamp conversion: dateutil v2.3 at https://pypi.python.org/pypi/python-dateutil
@@ -36,18 +49,21 @@ At present, Iyri, like Wraith, must be manually installed. See CONFIGURE.txt in 
  * Wireless interface: PyRIC v0.1.5 at  https://pypi.python.org/pypi/PyRIC
 
 ### ii. Python Files
-Iyri requires all files in the iyri directory as well as those in the utils and wifi directories.
+Iyri requires all files in the iyri directory as well as those in the utils and 
+standards directories.
 
 ### iii. Configure System
 Before first use, the logging and service need to be set up.
 * Configure iyrid
 ```shell
-sudo cp ...pathtowraith.../iyri/iyrid /etc/init.d/iyri
+sudo cp ...pathtowraith.../iyri/iyrid /etc/init.d/iyrid
 cd /etc/init.d
 sudo chown root:root iyrid
 sudo chmod 755 iyrid
 ```
-You should use sys-rc-conf or chkconfig and verfiy that iyrid is not configured to run on boot. Additionally you will have modify iyrid to point to your iyri.py. Edit iyrid and change line 11.
+You should use sys-rc-conf or chkconfig and verfiy that iyrid is not configured 
+to run on boot. Additionally you will have modify iyrid to point to your iyri.py. 
+Edit iyrid and change line 11 to your path.
 * Configure Logging
 ```shell
 cd /var/logs
@@ -57,33 +73,47 @@ chmod 750 wraith
 cd wraith
 touch iyri.log
 ```
-It is recommended to run iyri as a service as root. However, it is possible to run iyrid as a normal user but will require some workarounds with respect to iw, iwconfig, ifconfig and giving python temporary set raw capabilities in order to bind the raw socket(s). For more information, see CONFIGURE.txt in the wraith directory.
 
 ### c. Configuration
-Using iyri.conf, there are several configurations that can be made prior to running Iyri. Any changes to iyri.conf will not be reflected until Iyri is restarted. Note that at present iyri.conf needs to be in the same directory as iyri.py
+Using iyri.conf, there are several configurations that can be made prior to 
+running Iyri. Any changes to iyri.conf will not be reflected until Iyri is 
+restarted. Note that at present iyri.conf needs to be in the same directory as 
+iyri.py
 
 #### i. Defining Source(s)
-Radios are definied in the Abad (required) section and Shama (optional) section. Each radio will have the following configuration options.
+Radios are definied in the Abad (required) section and Shama (optional) section. 
+Each radio will have the following configuration options.
 
  * nic: the wireless nic to use i.e. wlan0, ath0 etc
  * paused: (optional) start in paused mode or scan (default) mode
  * spoof: (optional) spoofed mac address to use
- * Antenna Definition (optional) information currently stored in the database with the hope that in future versions it can be used to aid geolocation among other things but at present is only used to highlight different radio/antenna configurations and their collection results.
+ * Antenna Definition (optional) information currently stored in the database 
+ with the hope that in future versions it can be used to aid geolocation among 
+ other things but at present is only used to highlight different radio/antenna 
+ configurations and their collection results.
    - antennas: number of antennas
    - gain: gain in dBi
    - type: examples include omni, patch, yagi
    - loss: loss in dBm from cables etc
-   - xyz: currently still in testing mode, defines the rotation of the antenna along three axis (see iyri.conf for descriptions of each axis).
+   - xyz: currently still in testing mode, defines the rotation of the antenna 
+   along three axis (see iyri.conf for descriptions of each axis).
  * desc: brief desc of the radio
  * Scan routine defines the initial scan routine to follow
-  - dwell: time to stay on each channel in seconds. At present the radio will stay on each channel for the same time but I hope to add adaptive dwells to future versions where the dwell times for each channel will change according to the amount of traffic on the channel.
+  - dwell: time to stay on each channel in seconds. At present the radio will 
+  stay on each channel for the same time but I hope to add adaptive dwells to 
+  future versions where the dwell times for each channel will change according 
+  to the amount of traffic on the channel.
   - scan: channels to scan. See below for channel list specifications
-  - pass: channels not to scan. Any channels specified in pass will override scan specifications. See below for channel list specifications
-  - scan_start (optional): the first channel. defined as 'ch:width' where channel is numeric and width is oneof {None,HT20,HT40-,HT40+}
+  - pass: channels not to scan. Any channels specified in pass will override 
+  scan specifications. See below for channel list specifications
+  - scan_start (optional): the first channel. defined as 'ch:width' where 
+  channel is numeric and width is oneof {None,HT20,HT40-,HT40+}
 
 ##### a. Channel List Definition:
-Scan and pass configurations are specified by channel lists. Channel lists are defined as channels:widths where channels can be defined:
- * A single channel or empty. Empty specifies all channels in scan and no channels in pass
+Scan and pass configurations are specified by channel lists. Channel lists are 
+defined as channels:widths where channels can be defined:
+ * A single channel or empty. Empty specifies all channels in scan and no channels
+   in pass
  * a list of ',' seperated channels i.e 1,6,11
  * a range defined lower-upper i.e. 1-14
  * a band preceded by a 'B' i.e. B.24 or B5
@@ -93,13 +123,16 @@ and widths can be HT, NOHT, ALL (or empty for all). Examples:
  * scan = B2.4:ALL --> scan ISM channels at all widths
 
 #### ii. Defining GPS
-GPS can be defined as a device with polling fixed = no or a static location fixed = yes.
+GPS can be defined as a device with polling fixed = no or a static location 
+fixed = yes.
  * fixed: use a hardcoded lat/lon or use a device and poll
  * port: port the gps device is listening to
  * devid: the device id of the gps (of the form XXXX:XXXX)
  * poll: poll time in seconds
- * epx: minimum ellipitical error to accept. inf specifies that everything is accepted
- * epy: minimum ellipitical error to accept. inf specifies that everything is accepted
+ * epx: minimum ellipitical error to accept. inf specifies that everything is 
+ accepted
+ * epy: minimum ellipitical error to accept. inf specifies that everything is 
+ accepted
  * lat: (if fixed = yes) hardcoded latitude
  * lon: (if fixed = yes) hardcoded longitude
  * alt: (if fixed = yes) hardcoded elevation
@@ -120,17 +153,23 @@ Miscellaneous parameters
  * maxt: maximum number of threshers to allow. A suggested value.
 
 ### d. Control (C2C)
-Iyri defines a simplistic command and control service where users can use a socket via netcat or telnet to send basic commands to the sensor. Iyri will only allow one connection to the C2C at a time. No authentication is present, just connect to the address and port. Messages to the sensor must be in the following format:
+Iyri defines a simplistic command and control service where users can use a 
+socket via netcat or telnet to send basic commands to the sensor. Iyri will 
+only allow one connection to the C2C at a time. No authentication is present, 
+just connect to the address and port. Messages to the sensor must be in the 
+following format:
 
 !\<id\> \<cmd\> \<radio\> [params]\\n
 
 where:
  * id is an unique (for the current session) integer
  * cmd is oneof {state|scan|hold|listen|pause|txpwr|spoof}
- * radio is oneof {both|all|abad|shama} where both enforces abad and shama radios and all only enforces shama if present
+ * radio is oneof {both|all|abad|shama} where both enforces abad and shama 
+ radios and all only enforces shama if present
  * params are:
   - of the format channel:width if cmd is listen
-  - of the format pwr:option if cmd is txpwr where pwr is dBm and option is oneof {fixed|auto|limit}
+  - of the format pwr:option if cmd is txpwr where pwr is dBm and option is 
+  oneof {fixed|auto|limit}
   - a mac address if cmd is spoof
 
 Iyri will notify the client if the cmd specified by id is valid or invalid with:
@@ -140,3 +179,4 @@ OK \<id\> [\001output\001]
 ERR \<id> \001Reason for Failure\001
 
 ## 3. Architecture
+TBD
